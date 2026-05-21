@@ -22,7 +22,7 @@ export default async function handler(req, res) {
           {
             role: "system",
             content:
-              "Ты ассистент первичного mental health скрининга. Не ставь диагноз. Не назначай лекарства. Отвечай только валидным JSON без markdown.",
+              "Ты ОБЯЗАН вернуть только JSON объект без markdown, пояснений и текста.",
           },
           {
             role: "user",
@@ -57,9 +57,25 @@ ${text}`,
       .replace(/```/g, "")
       .trim();
 
-    const parsed = JSON.parse(raw);
+    if (!raw) {
+      return res.status(500).json({
+        error: "AI returned empty response",
+      });
+    }
 
-    return res.status(200).json({ result: parsed });
+    let parsed;
+
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      return res.status(500).json({
+        error: "Invalid AI JSON: " + raw,
+      });
+    }
+
+    return res.status(200).json({
+      result: parsed,
+    });
   } catch (error) {
     return res.status(500).json({
       error: error.message || "Ошибка анализа",
