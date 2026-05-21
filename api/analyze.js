@@ -7,71 +7,62 @@ export default async function handler(req, res) {
     const { text } = req.body || {};
 
     if (!text || text.length < 20) {
-      return res.status(400).json({
-        error: "Слишком короткое описание"
-      });
+      return res.status(400).json({ error: "Слишком короткое описание" });
     }
 
-    const prompt = `
-Ты — AI-ассистент первичного психиатрического скрининга.
-
-НЕ ставь диагноз.
-НЕ назначай препараты.
-
-Нужно:
-1. Кратко суммировать состояние.
-2. Выделить возможные symptom clusters.
-3. Определить risk level.
-4. Сформулировать 3 уточняющих вопроса.
-5. Дать мягкую рекомендацию.
-
-Ответ строго JSON:
-
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4.1-mini",
+        input: [
+          {
+            role: "system",
+            content:
+              "Ты ассистент первичного mental health скрининга. Не ставь диагноз. Не назначай лекарства. Отвечай только валидным JSON без markdown.",
+          },
+          {
+            role: "user",
+            content: `Проанализируй текст пользователя и верни JSON:
 {
-  "summary": "...",
-  "clusters": ["..."],
-  "risk": "low | medium | high | crisis",
-  "questions": ["...", "...", "..."],
-  "recommendation": "..."
+  "summary": "краткое резюме",
+  "clusters": ["спектр 1", "спектр 2"],
+  "risk": "low",
+  "questions": ["вопрос 1", "вопрос 2", "вопрос 3"],
+  "recommendation": "мягкая рекомендация"
 }
 
 Текст пользователя:
-${text}
-`;
-
-    const response = await fetch(
-      "https://api.openai.com/v1/responses",
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "gpt-4.1-mini",
-          input: prompt,
-          text: {
-            format: {
-              type: "json_object"
-            }
-          }
-        })
-      }
-    );
+${text}`,
+          },
+        ],
+      }),
+    });
 
     const data = await response.json();
 
-    const parsed = JSON.parse(data.output_text);
+    if (!response.ok) {
+      return res.status(500).json({
+        error: data.error?.message || "OpenAI API error",
+      });
+    }
 
-    res.status(200).json({
-      result: parsed
-    });
+    let raw = data.output_text || "";
 
+    raw = raw
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    const parsed = JSON.parse(raw);
+
+    return res.status(200).json({ result: parsed });
   } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      error: "Ошибка анализа"
+    return res.status(500).json({
+      error: error.message || "Ошибка анализа",
     });
   }
 }
