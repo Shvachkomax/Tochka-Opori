@@ -258,26 +258,34 @@ export default function App() {
               <div style={s.result}>
                 <h2 style={{ marginTop: 0 }}>Предварительный отчет</h2>
 
-                <div style={s.label}>Краткое резюме</div>
-                <div>{result.summary}</div>
+                {typeof result === "string" ? (
+                  <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+                    {result}
+                  </div>
+                ) : (
+                  <div>
+                    <div style={s.label}>Краткое резюме</div>
+                    <div>{result.summary}</div>
 
-                <div style={s.label}>Возможные спектры</div>
-                <div>
-                  {result.clusters?.map((c) => (
-                    <span style={s.chip} key={c}>{c}</span>
-                  ))}
-                </div>
+                    <div style={s.label}>Возможные спектры</div>
+                    <div>
+                      {result.clusters?.map((c) => (
+                        <span style={s.chip} key={c}>{c}</span>
+                      ))}
+                    </div>
 
-                <div style={s.label}>Уровень риска</div>
-                <b>{result.risk}</b>
+                    <div style={s.label}>Уровень риска</div>
+                    <b>{result.risk}</b>
 
-                <div style={s.label}>Уточняющие вопросы</div>
-                <ul>
-                  {result.questions?.map((q, i) => <li key={i}>{q}</li>)}
-                </ul>
+                    <div style={s.label}>Уточняющие вопросы</div>
+                    <ul>
+                      {result.questions?.map((q, i) => <li key={i}>{q}</li>)}
+                    </ul>
 
-                <div style={s.label}>Рекомендация</div>
-                <div>{result.recommendation}</div>
+                    <div style={s.label}>Рекомендация</div>
+                    <div>{result.recommendation}</div>
+                  </div>
+                )}
               </div>
             )}
           </section>
