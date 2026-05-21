@@ -597,9 +597,6 @@ export default function App() {
 
         <main style={s.grid}>
           <section>
-            <div style={s.badge}>
-              Без имени. Без осуждения. Первый шаг — за 5–10 минут.
-            </div>
             <h1 style={s.h1}>
               Расскажите, что с вами происходит — голосом или текстом.
             </h1>
