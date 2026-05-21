@@ -29,7 +29,7 @@ export default function App() {
 
       setResult(data.result);
     } catch (e) {
-      setError("Не удалось выполнить анализ. Проверьте Vercel logs и OPENAI_API_KEY.");
+      setError(e.message || "Не удалось выполнить анализ.");
     } finally {
       setLoading(false);
     }
