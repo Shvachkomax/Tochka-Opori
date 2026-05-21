@@ -9,6 +9,7 @@ export default function App() {
   const [phase, setPhase] = useState("input");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("user");
 
   async function startScreening() {
     if (text.trim().length < 10) {
@@ -68,6 +69,7 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || "Ошибка");
 
       setResult(data.result);
+      setActiveTab("user");
       setPhase("report");
     } catch (e) {
       setError(e.message || "Не удалось получить отчёт.");
@@ -76,6 +78,16 @@ export default function App() {
     }
   }
 
+  const userPart = result
+    ? result.split("===DOCTOR_REPORT===")[0]
+        .replace("===USER_REPORT===", "")
+        .trim()
+    : "";
+
+  const doctorPart = result
+    ? result.split("===DOCTOR_REPORT===")[1]?.trim() || ""
+    : "";
+
   function handleReset() {
     setPhase("input");
     setQuestions(null);
@@ -83,6 +95,7 @@ export default function App() {
     setResult(null);
     setText("");
     setError("");
+    setActiveTab("user");
   }
 
   const s = {
@@ -230,6 +243,33 @@ export default function App() {
       marginBottom: 10,
       lineHeight: 1.5,
     },
+    tabs: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 18,
+    },
+    tab: {
+      border: "1px solid rgba(255,255,255,.12)",
+      background: "rgba(255,255,255,.04)",
+      color: "white",
+      borderRadius: 14,
+      padding: "10px 16px",
+      cursor: "pointer",
+    },
+    activeTab: {
+      border: "1px solid rgba(255,255,255,.18)",
+      background: "white",
+      color: "#020617",
+      borderRadius: 14,
+      padding: "10px 16px",
+      fontWeight: 700,
+      cursor: "pointer",
+    },
+    reportBlock: {
+      background: "rgba(255,255,255,.05)",
+      borderRadius: 20,
+      padding: 20,
+    },
     answerInput: {
       width: "100%",
       minHeight: 80,
@@ -364,9 +404,28 @@ export default function App() {
             {phase === "report" && result && (
               <div style={s.result}>
                 <h2 style={{ marginTop: 0 }}>Предварительный отчёт</h2>
-                <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
-                  {result}
+
+                <div style={s.tabs}>
+                  <button
+                    style={activeTab === "user" ? s.activeTab : s.tab}
+                    onClick={() => setActiveTab("user")}
+                  >
+                    Для вас
+                  </button>
+                  <button
+                    style={activeTab === "doctor" ? s.activeTab : s.tab}
+                    onClick={() => setActiveTab("doctor")}
+                  >
+                    Для специалиста
+                  </button>
                 </div>
+
+                <div style={s.reportBlock}>
+                  <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+                    {activeTab === "user" ? userPart : doctorPart}
+                  </div>
+                </div>
+
                 <button
                   style={{ ...s.wide, marginTop: 20 }}
                   onClick={handleReset}
