@@ -585,7 +585,7 @@ export default function App() {
         <header style={s.header}>
           <div>
             <div style={s.logo}>🧠 Точка опоры</div>
-            <div style={s.sub}>анонимный скрининг состояния</div>
+            <div style={s.sub}>Анонимно. Безопасно. Можно просто начать говорить.</div>
           </div>
           <button
             style={s.crisis}
