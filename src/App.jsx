@@ -17,10 +17,12 @@ export default function App() {
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const timerRef = useRef(null);
 
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [recordingTime, setRecordingTime] = useState(0);
 
   function handleCrisisSubmit() {
     setCrisisSubmitted(true);
@@ -95,12 +97,31 @@ export default function App() {
 
       recorder.start();
       setRecording(true);
+      setRecordingTime(0);
+
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => {
+          const next = prev + 1;
+
+          if (next >= 60) {
+            stopRecording();
+            setVoiceError("Запись автоматически остановлена через 60 секунд.");
+            return 60;
+          }
+
+          return next;
+        });
+      }, 1000);
     } catch (error) {
       setVoiceError("Не удалось получить доступ к микрофону");
     }
   }
 
   function stopRecording() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
     if (mediaRecorderRef.current && recording) {
       mediaRecorderRef.current.stop();
       setRecording(false);
@@ -195,6 +216,10 @@ export default function App() {
     setRecording(false);
     setTranscribing(false);
     setVoiceError("");
+    setRecordingTime(0);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
     setCrisisOpen(false);
     setCrisisSubmitted(false);
     setCrisisText("");
@@ -528,6 +553,16 @@ export default function App() {
                       {voiceError}
                     </div>
                   )}
+
+                  <div style={{
+                    marginTop: 12,
+                    color: recordingTime > 45 ? "#fca5a5" : "#94a3b8",
+                    fontSize: 14
+                  }}>
+                    {recording
+                      ? `Запись: ${recordingTime} сек / 60 сек`
+                      : "Максимальная длительность записи — 1 минута"}
+                  </div>
                 </div>
               ) : phase === "input" ? (
                 <>
