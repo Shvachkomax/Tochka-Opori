@@ -24,6 +24,14 @@ export default function App() {
   const [voiceError, setVoiceError] = useState("");
   const [recordingTime, setRecordingTime] = useState(0);
 
+  const [recordingQuestionIndex, setRecordingQuestionIndex] = useState(null);
+  const [questionRecordingTime, setQuestionRecordingTime] = useState(0);
+  const [questionTranscribingIndex, setQuestionTranscribingIndex] = useState(null);
+
+  const questionMediaRecorderRef = useRef(null);
+  const questionAudioChunksRef = useRef([]);
+  const questionTimerRef = useRef(null);
+
   function handleCrisisSubmit() {
     setCrisisSubmitted(true);
   }
@@ -128,6 +136,94 @@ export default function App() {
     }
   }
 
+  async function startQuestionRecording(index) {
+    setVoiceError("");
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const recorder = new MediaRecorder(stream);
+      questionMediaRecorderRef.current = recorder;
+      questionAudioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          questionAudioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+
+        if (questionTimerRef.current) {
+          clearInterval(questionTimerRef.current);
+        }
+
+        const audioBlob = new Blob(questionAudioChunksRef.current, {
+          type: "audio/webm",
+        });
+
+        setQuestionTranscribingIndex(index);
+
+        try {
+          const response = await fetch("/api/transcribe", {
+            method: "POST",
+            headers: {
+              "Content-Type": "audio/webm",
+            },
+            body: audioBlob,
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Не удалось расшифровать голос");
+          }
+
+          setAnswers((prev) => ({
+            ...prev,
+            [index]: data.text || "",
+          }));
+        } catch (error) {
+          setVoiceError(error.message || "Ошибка расшифровки");
+        } finally {
+          setQuestionTranscribingIndex(null);
+          setRecordingQuestionIndex(null);
+          setQuestionRecordingTime(0);
+        }
+      };
+
+      recorder.start();
+      setRecordingQuestionIndex(index);
+      setQuestionRecordingTime(0);
+
+      questionTimerRef.current = setInterval(() => {
+        setQuestionRecordingTime((prev) => {
+          const next = prev + 1;
+
+          if (next >= 60) {
+            stopQuestionRecording();
+            return 60;
+          }
+
+          return next;
+        });
+      }, 1000);
+    } catch (error) {
+      setVoiceError("Не удалось получить доступ к микрофону");
+    }
+  }
+
+  function stopQuestionRecording() {
+    if (questionTimerRef.current) {
+      clearInterval(questionTimerRef.current);
+    }
+
+    if (questionMediaRecorderRef.current && recordingQuestionIndex !== null) {
+      questionMediaRecorderRef.current.stop();
+    }
+  }
+
   async function startScreening() {
     if (text.trim().length < 10) {
       setError("Напишите хотя бы 2–3 предложения.");
@@ -219,6 +315,12 @@ export default function App() {
     setRecordingTime(0);
     if (timerRef.current) {
       clearInterval(timerRef.current);
+    }
+    setRecordingQuestionIndex(null);
+    setQuestionRecordingTime(0);
+    setQuestionTranscribingIndex(null);
+    if (questionTimerRef.current) {
+      clearInterval(questionTimerRef.current);
     }
     setCrisisOpen(false);
     setCrisisSubmitted(false);
@@ -592,6 +694,7 @@ export default function App() {
                       <div style={s.questionText}>
                         {index + 1}. {q}
                       </div>
+
                       <textarea
                         style={s.answerInput}
                         value={answers[index] || ""}
@@ -603,6 +706,44 @@ export default function App() {
                         }
                         placeholder="Ваш ответ..."
                       />
+
+                      <button
+                        style={{
+                          ...s.secondary,
+                          marginTop: 10,
+                          width: "100%",
+                        }}
+                        onClick={() =>
+                          recordingQuestionIndex === index
+                            ? stopQuestionRecording()
+                            : startQuestionRecording(index)
+                        }
+                        disabled={
+                          questionTranscribingIndex !== null &&
+                          questionTranscribingIndex !== index
+                        }
+                      >
+                        {questionTranscribingIndex === index
+                          ? "Расшифровываем..."
+                          : recordingQuestionIndex === index
+                            ? "Остановить и расшифровать"
+                            : "Ответить голосом"}
+                      </button>
+
+                      {recordingQuestionIndex === index && (
+                        <div
+                          style={{
+                            marginTop: 8,
+                            color:
+                              questionRecordingTime > 45
+                                ? "#fca5a5"
+                                : "#94a3b8",
+                            fontSize: 14,
+                          }}
+                        >
+                          Запись: {questionRecordingTime} сек / 60 сек
+                        </div>
+                      )}
                     </div>
                   ))}
                   <button
