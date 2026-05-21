@@ -10,6 +10,32 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("user");
+  const [crisisOpen, setCrisisOpen] = useState(false);
+  const [crisisText, setCrisisText] = useState("");
+  const [crisisContact, setCrisisContact] = useState("");
+  const [crisisSubmitted, setCrisisSubmitted] = useState(false);
+
+  function handleCrisisSubmit() {
+    setCrisisSubmitted(true);
+  }
+
+  function handleCrisisContinue() {
+    if (crisisText.trim()) {
+      setText(crisisText);
+      setMode("text");
+    }
+    setCrisisOpen(false);
+    setCrisisSubmitted(false);
+    setCrisisText("");
+    setCrisisContact("");
+  }
+
+  function handleCrisisClose() {
+    setCrisisOpen(false);
+    setCrisisSubmitted(false);
+    setCrisisText("");
+    setCrisisContact("");
+  }
 
   async function startScreening() {
     if (text.trim().length < 10) {
@@ -96,6 +122,10 @@ export default function App() {
     setText("");
     setError("");
     setActiveTab("user");
+    setCrisisOpen(false);
+    setCrisisSubmitted(false);
+    setCrisisText("");
+    setCrisisContact("");
   }
 
   const s = {
@@ -270,6 +300,70 @@ export default function App() {
       borderRadius: 20,
       padding: 20,
     },
+    overlay: {
+      position: "fixed",
+      top: 0, left: 0, right: 0, bottom: 0,
+      background: "rgba(0,0,0,.65)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+      padding: 20,
+    },
+    modal: {
+      background: "#0f172a",
+      borderRadius: 28,
+      padding: 28,
+      maxWidth: 560,
+      width: "100%",
+      border: "1px solid rgba(255,255,255,.1)",
+      boxShadow: "0 30px 80px rgba(0,0,0,.5)",
+    },
+    modalTitle: {
+      fontSize: 26,
+      fontWeight: 900,
+      marginBottom: 12,
+    },
+    modalWarning: {
+      background: "rgba(220,38,38,.15)",
+      color: "#fecaca",
+      padding: 14,
+      borderRadius: 16,
+      fontSize: 15,
+      lineHeight: 1.5,
+      marginBottom: 20,
+    },
+    crisisTextarea: {
+      width: "100%",
+      minHeight: 100,
+      resize: "vertical",
+      border: "1px solid rgba(255,255,255,.12)",
+      borderRadius: 16,
+      background: "rgba(2,6,23,.55)",
+      color: "white",
+      padding: 14,
+      fontSize: 15,
+      outline: "none",
+      boxSizing: "border-box",
+      marginBottom: 14,
+    },
+    crisisInput: {
+      width: "100%",
+      border: "1px solid rgba(255,255,255,.12)",
+      borderRadius: 16,
+      background: "rgba(2,6,23,.55)",
+      color: "white",
+      padding: "14px 14px",
+      fontSize: 15,
+      outline: "none",
+      boxSizing: "border-box",
+      marginBottom: 20,
+    },
+    crisisActions: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    },
     answerInput: {
       width: "100%",
       minHeight: 80,
@@ -295,7 +389,7 @@ export default function App() {
           </div>
           <button
             style={s.crisis}
-            onClick={() => document.getElementById("crisis")?.scrollIntoView()}
+            onClick={() => setCrisisOpen(true)}
           >
             ⚠ Мне срочно нужна помощь
           </button>
@@ -436,6 +530,56 @@ export default function App() {
             )}
           </section>
         </main>
+
+        {crisisOpen && (
+          <div style={s.overlay} onClick={handleCrisisClose}>
+            <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+              {crisisSubmitted ? (
+                <>
+                  <div style={s.modalTitle}>Заявка принята</div>
+                  <p style={{ ...s.p, marginTop: 12, marginBottom: 20 }}>
+                    Если ситуация опасна прямо сейчас — не ждите ответа сервиса,
+                    звоните <b>112</b> или <b>103</b>.
+                  </p>
+                  <button style={s.wide} onClick={handleCrisisClose}>
+                    Закрыть
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div style={s.modalTitle}>Срочная помощь</div>
+                  <div style={s.modalWarning}>
+                    Если есть непосредственная угроза жизни или безопасности —
+                    звоните <b>112</b> или <b>103</b>.
+                  </div>
+                  <textarea
+                    style={s.crisisTextarea}
+                    value={crisisText}
+                    onChange={(e) => setCrisisText(e.target.value)}
+                    placeholder="Что именно случилось?"
+                  />
+                  <input
+                    style={s.crisisInput}
+                    value={crisisContact}
+                    onChange={(e) => setCrisisContact(e.target.value)}
+                    placeholder="Телефон или Telegram для связи"
+                  />
+                  <div style={s.crisisActions}>
+                    <button style={s.wide} onClick={handleCrisisSubmit}>
+                      Жду звонка специалиста
+                    </button>
+                    <button
+                      style={s.wide}
+                      onClick={handleCrisisContinue}
+                    >
+                      Продолжить анонимный разбор
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
         <section
           id="crisis"
