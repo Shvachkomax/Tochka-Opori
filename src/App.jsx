@@ -1,14 +1,13 @@
 import React, { useState } from "react";
-import { Mic, Keyboard, AlertTriangle, Brain } from "lucide-react";
 
 export default function App() {
   const [mode, setMode] = useState("text");
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
-  const [aiResult, setAiResult] = useState(null);
+  const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
-  const analyze = async () => {
+  async function analyze() {
     if (text.trim().length < 20) {
       setError("Напишите чуть подробнее — хотя бы 2–3 предложения.");
       return;
@@ -16,7 +15,7 @@ export default function App() {
 
     setLoading(true);
     setError("");
-    setAiResult(null);
+    setResult(null);
 
     try {
       const res = await fetch("/api/analyze", {
@@ -26,188 +25,275 @@ export default function App() {
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Ошибка анализа");
-      }
+      if (!res.ok) throw new Error(data.error || "Ошибка анализа");
 
       const parsed =
         typeof data.result === "string" ? JSON.parse(data.result) : data.result;
 
-      setAiResult(parsed);
+      setResult(parsed);
     } catch (e) {
       setError("Не удалось выполнить анализ. Проверьте Vercel logs и OPENAI_API_KEY.");
     } finally {
       setLoading(false);
     }
+  }
+
+  const s = {
+    page: {
+      minHeight: "100vh",
+      background: "#050817",
+      color: "white",
+      fontFamily: "Inter, system-ui, Arial",
+      padding: "32px",
+    },
+    wrap: {
+      maxWidth: 1200,
+      margin: "0 auto",
+    },
+    header: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 80,
+    },
+    logo: {
+      fontSize: 28,
+      fontWeight: 800,
+    },
+    sub: {
+      color: "#94a3b8",
+      marginTop: 4,
+    },
+    crisis: {
+      background: "#dc2626",
+      color: "white",
+      border: 0,
+      borderRadius: 22,
+      padding: "16px 24px",
+      fontWeight: 800,
+      fontSize: 16,
+      cursor: "pointer",
+    },
+    grid: {
+      display: "grid",
+      gridTemplateColumns: "1.1fr 0.9fr",
+      gap: 56,
+      alignItems: "start",
+    },
+    badge: {
+      display: "inline-block",
+      border: "1px solid rgba(255,255,255,.14)",
+      background: "rgba(255,255,255,.06)",
+      borderRadius: 999,
+      padding: "12px 18px",
+      color: "#cbd5e1",
+      marginBottom: 28,
+    },
+    h1: {
+      fontSize: 68,
+      lineHeight: 1.03,
+      fontWeight: 900,
+      margin: 0,
+      letterSpacing: "-0.05em",
+    },
+    p: {
+      color: "#cbd5e1",
+      fontSize: 20,
+      lineHeight: 1.7,
+      maxWidth: 680,
+    },
+    row: {
+      display: "flex",
+      gap: 14,
+      marginTop: 28,
+      flexWrap: "wrap",
+    },
+    primary: {
+      border: 0,
+      borderRadius: 22,
+      background: "white",
+      color: "#020617",
+      padding: "16px 24px",
+      fontWeight: 800,
+      fontSize: 16,
+      cursor: "pointer",
+    },
+    secondary: {
+      border: "1px solid rgba(255,255,255,.18)",
+      borderRadius: 22,
+      background: "rgba(255,255,255,.06)",
+      color: "white",
+      padding: "16px 24px",
+      fontWeight: 800,
+      fontSize: 16,
+      cursor: "pointer",
+    },
+    card: {
+      border: "1px solid rgba(255,255,255,.12)",
+      background: "rgba(255,255,255,.08)",
+      borderRadius: 36,
+      padding: 28,
+      boxShadow: "0 30px 80px rgba(0,0,0,.35)",
+    },
+    inner: {
+      background: "rgba(2,6,23,.75)",
+      borderRadius: 30,
+      padding: 26,
+      marginTop: 22,
+    },
+    textarea: {
+      width: "100%",
+      minHeight: 250,
+      resize: "vertical",
+      border: "1px solid rgba(255,255,255,.12)",
+      borderRadius: 24,
+      background: "transparent",
+      color: "white",
+      padding: 20,
+      fontSize: 16,
+      outline: "none",
+      boxSizing: "border-box",
+    },
+    wide: {
+      width: "100%",
+      marginTop: 18,
+      border: 0,
+      borderRadius: 24,
+      background: "white",
+      color: "#020617",
+      padding: "18px 22px",
+      fontWeight: 900,
+      fontSize: 16,
+      cursor: "pointer",
+    },
+    error: {
+      marginTop: 16,
+      background: "rgba(220,38,38,.18)",
+      color: "#fecaca",
+      padding: 16,
+      borderRadius: 18,
+    },
+    result: {
+      marginTop: 24,
+      border: "1px solid rgba(255,255,255,.12)",
+      background: "rgba(255,255,255,.06)",
+      borderRadius: 28,
+      padding: 24,
+    },
+    label: {
+      color: "#94a3b8",
+      fontSize: 14,
+      marginTop: 18,
+      marginBottom: 6,
+    },
+    chip: {
+      display: "inline-block",
+      margin: "6px 6px 0 0",
+      padding: "8px 12px",
+      borderRadius: 999,
+      background: "rgba(255,255,255,.10)",
+      color: "#e2e8f0",
+    },
   };
 
   return (
-    <div className="min-h-screen bg-[#050817] text-white">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-8">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-3xl bg-white/10">
-            <Brain className="h-6 w-6" />
-          </div>
+    <div style={s.page}>
+      <div style={s.wrap}>
+        <header style={s.header}>
           <div>
-            <div className="text-2xl font-bold">Точка опоры</div>
-            <div className="text-sm text-slate-400">
-              анонимный скрининг состояния
+            <div style={s.logo}>🧠 Точка опоры</div>
+            <div style={s.sub}>анонимный скрининг состояния</div>
+          </div>
+          <button style={s.crisis} onClick={() => document.getElementById("crisis")?.scrollIntoView()}>
+            ⚠ Мне срочно нужна помощь
+          </button>
+        </header>
+
+        <main style={s.grid}>
+          <section>
+            <div style={s.badge}>Без имени. Без осуждения. Первый шаг — за 5–10 минут.</div>
+            <h1 style={s.h1}>Расскажите, что с вами происходит — голосом или текстом.</h1>
+            <p style={s.p}>
+              Сервис поможет мягко разобрать состояние, определить возможный спектр проблемы
+              и предложить понятный план действий.
+            </p>
+
+            <div style={s.row}>
+              <button style={s.primary} onClick={() => setMode("voice")}>🎙 Рассказать голосом</button>
+              <button style={s.secondary} onClick={() => setMode("text")}>⌨ Написать текстом</button>
             </div>
-          </div>
-        </div>
 
-        <a
-          href="#crisis"
-          className="rounded-3xl bg-red-600 px-6 py-4 font-semibold hover:bg-red-500"
-        >
-          <AlertTriangle className="mr-2 inline h-5 w-5" />
-          Мне срочно нужна помощь
-        </a>
-      </header>
+            <p style={{ ...s.sub, marginTop: 24 }}>
+              Сервис не ставит диагноз. Решение о диагнозе и лечении принимает врач.
+            </p>
+          </section>
 
-      <main className="mx-auto grid max-w-6xl gap-12 px-6 pb-20 pt-14 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
-        <section>
-          <div className="mb-8 inline-flex rounded-full border border-white/10 bg-white/5 px-5 py-3 text-base text-slate-300">
-            Без имени. Без осуждения. Первый шаг — за 5–10 минут.
-          </div>
+          <section style={s.card}>
+            <div style={s.sub}>Первичный вход</div>
+            <div style={{ fontSize: 28, fontWeight: 900 }}>Анонимный разговор</div>
 
-          <h1 className="max-w-3xl text-5xl font-black leading-tight tracking-tight md:text-7xl">
-            Расскажите, что с вами происходит — голосом или текстом.
-          </h1>
-
-          <p className="mt-7 max-w-2xl text-xl leading-9 text-slate-300">
-            Сервис поможет мягко разобрать состояние, определить возможный
-            спектр проблемы и предложить понятный план действий.
-          </p>
-
-          <div className="mt-9 flex flex-col gap-4 sm:flex-row">
-            <button
-              onClick={() => setMode("voice")}
-              className="rounded-3xl bg-white px-7 py-4 font-bold text-slate-950 hover:bg-slate-200"
-            >
-              <Mic className="mr-2 inline h-5 w-5" />
-              Рассказать голосом
-            </button>
-
-            <button
-              onClick={() => setMode("text")}
-              className="rounded-3xl border border-white/20 bg-white/5 px-7 py-4 font-bold text-white hover:bg-white/10"
-            >
-              <Keyboard className="mr-2 inline h-5 w-5" />
-              Написать текстом
-            </button>
-          </div>
-
-          <p className="mt-6 max-w-xl text-sm text-slate-500">
-            Сервис не ставит диагноз. Это первичный скрининг и маршрутизация.
-            Решение о диагнозе и лечении принимает врач.
-          </p>
-        </section>
-
-        <section className="rounded-[2rem] border border-white/10 bg-white/10 p-6 shadow-2xl">
-          <div className="mb-5">
-            <div className="text-sm text-slate-400">Первичный вход</div>
-            <div className="text-2xl font-bold">Анонимный разговор</div>
-          </div>
-
-          <div className="rounded-[2rem] bg-slate-950/70 p-6">
-            {mode === "voice" ? (
-              <div className="flex min-h-72 flex-col items-center justify-center text-center">
-                <div className="mb-6 flex h-28 w-28 items-center justify-center rounded-full bg-red-500/20">
-                  <Mic className="h-12 w-12 text-red-200" />
+            <div style={s.inner}>
+              {mode === "voice" ? (
+                <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                  <div style={{ fontSize: 58 }}>🎙</div>
+                  <h2>Голосовой режим</h2>
+                  <p style={{ color: "#94a3b8" }}>
+                    Запись голоса подключим следующим этапом. Сейчас работает текстовый AI-скрининг.
+                  </p>
                 </div>
-                <div className="text-2xl font-bold">Голосовой режим</div>
-                <p className="mt-4 max-w-sm text-slate-400">
-                  Запись голоса подключим следующим этапом. Сейчас работает
-                  текстовый AI-скрининг.
-                </p>
-              </div>
-            ) : (
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                className="h-72 w-full resize-none rounded-3xl border border-white/10 bg-transparent p-5 text-base outline-none placeholder:text-slate-500"
-                placeholder="Например: последние месяцы я плохо сплю, тревожусь, не могу собраться, часто думаю о потере..."
-              />
-            )}
+              ) : (
+                <textarea
+                  style={s.textarea}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Например: последние месяцы я плохо сплю, тревожусь, не могу собраться, часто думаю о потере..."
+                />
+              )}
 
-            <button
-              onClick={analyze}
-              disabled={loading}
-              className="mt-5 w-full rounded-3xl bg-white px-5 py-4 font-bold text-slate-950 hover:bg-slate-200 disabled:opacity-60"
-            >
-              {loading ? "Анализируем..." : "Начать анонимный разбор состояния"}
-            </button>
+              <button style={s.wide} onClick={analyze} disabled={loading}>
+                {loading ? "Анализируем..." : "Начать анонимный разбор состояния"}
+              </button>
 
-            {error && (
-              <div className="mt-4 rounded-2xl bg-red-500/15 p-4 text-sm text-red-100">
-                {error}
+              {error && <div style={s.error}>{error}</div>}
+            </div>
+
+            {result && (
+              <div style={s.result}>
+                <h2 style={{ marginTop: 0 }}>Предварительный отчет</h2>
+
+                <div style={s.label}>Краткое резюме</div>
+                <div>{result.summary}</div>
+
+                <div style={s.label}>Возможные спектры</div>
+                <div>
+                  {result.clusters?.map((c) => (
+                    <span style={s.chip} key={c}>{c}</span>
+                  ))}
+                </div>
+
+                <div style={s.label}>Уровень риска</div>
+                <b>{result.risk}</b>
+
+                <div style={s.label}>Уточняющие вопросы</div>
+                <ul>
+                  {result.questions?.map((q, i) => <li key={i}>{q}</li>)}
+                </ul>
+
+                <div style={s.label}>Рекомендация</div>
+                <div>{result.recommendation}</div>
               </div>
             )}
-          </div>
+          </section>
+        </main>
 
-          {aiResult && (
-            <div className="mt-6 rounded-[2rem] border border-white/10 bg-white/5 p-6">
-              <div className="mb-4 text-xl font-bold">Предварительный отчет</div>
-
-              <div className="space-y-5 text-slate-200">
-                <div>
-                  <div className="text-sm text-slate-400">Краткое резюме</div>
-                  <div className="mt-1">{aiResult.summary}</div>
-                </div>
-
-                <div>
-                  <div className="text-sm text-slate-400">Возможные спектры</div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {aiResult.clusters?.map((c) => (
-                      <span
-                        className="rounded-full bg-white/10 px-3 py-1 text-sm"
-                        key={c}
-                      >
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-sm text-slate-400">Уровень риска</div>
-                  <div className="mt-1 font-bold">{aiResult.risk}</div>
-                </div>
-
-                <div>
-                  <div className="text-sm text-slate-400">
-                    Уточняющие вопросы
-                  </div>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {aiResult.questions?.map((q, i) => (
-                      <li key={i}>{q}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <div className="text-sm text-slate-400">Рекомендация</div>
-                  <div className="mt-1">{aiResult.recommendation}</div>
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
-      </main>
-
-      <section id="crisis" className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-[2rem] border border-red-500/20 bg-red-500/10 p-8">
-          <h2 className="text-3xl font-bold">
-            Если вам очень плохо — не проходите опросник.
-          </h2>
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-200">
-            При угрозе жизни или безопасности нужно обращаться в экстренные
-            службы: <b>112</b> или <b>103</b>.
+        <section id="crisis" style={{ ...s.result, marginTop: 70, borderColor: "rgba(220,38,38,.35)" }}>
+          <h2>Если вам очень плохо — не проходите опросник.</h2>
+          <p style={s.p}>
+            При угрозе жизни или безопасности нужно обращаться в экстренные службы:
+            <b> 112</b> или <b>103</b>.
           </p>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
