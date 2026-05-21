@@ -27,10 +27,7 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ошибка анализа");
 
-      const parsed =
-        typeof data.result === "string" ? JSON.parse(data.result) : data.result;
-
-      setResult(parsed);
+      setResult(data.result);
     } catch (e) {
       setError("Не удалось выполнить анализ. Проверьте Vercel logs и OPENAI_API_KEY.");
     } finally {

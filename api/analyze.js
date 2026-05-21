@@ -49,15 +49,22 @@ ${text}
         },
         body: JSON.stringify({
           model: "gpt-4.1-mini",
-          input: prompt
+          input: prompt,
+          text: {
+            format: {
+              type: "json_object"
+            }
+          }
         })
       }
     );
 
     const data = await response.json();
 
+    const parsed = JSON.parse(data.output_text);
+
     res.status(200).json({
-      result: data.output_text
+      result: parsed
     });
 
   } catch (error) {
