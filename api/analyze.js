@@ -48,7 +48,7 @@ ${text}
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "gpt-5.2-mini",
+          model: "gpt-4.1-mini",
           input: prompt
         })
       }
