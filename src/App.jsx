@@ -30,9 +30,11 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ошибка");
 
-      const qs = data.result
-        .split("\n")
-        .filter((l) => l.trim() && /\d/.test(l));
+      const qs = Array.isArray(data.result)
+        ? data.result.filter(Boolean)
+        : data.result
+            .split("\n")
+            .filter((l) => l.trim() && /\d/.test(l));
 
       setQuestions(qs.length > 0 ? qs : [data.result]);
       setPhase("questions");
