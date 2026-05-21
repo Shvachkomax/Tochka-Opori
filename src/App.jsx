@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 
 export default function App() {
   const [mode, setMode] = useState("text");
@@ -14,6 +14,13 @@ export default function App() {
   const [crisisText, setCrisisText] = useState("");
   const [crisisContact, setCrisisContact] = useState("");
   const [crisisSubmitted, setCrisisSubmitted] = useState(false);
+
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
 
   function handleCrisisSubmit() {
     setCrisisSubmitted(true);
@@ -35,6 +42,69 @@ export default function App() {
     setCrisisSubmitted(false);
     setCrisisText("");
     setCrisisContact("");
+  }
+
+  async function startRecording() {
+    setVoiceError("");
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+
+        setTranscribing(true);
+
+        try {
+          const response = await fetch("/api/transcribe", {
+            method: "POST",
+            headers: {
+              "Content-Type": "audio/webm",
+            },
+            body: audioBlob,
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Не удалось расшифровать голос");
+          }
+
+          setText(data.text || "");
+          setMode("text");
+        } catch (error) {
+          setVoiceError(error.message || "Ошибка расшифровки");
+        } finally {
+          setTranscribing(false);
+        }
+      };
+
+      recorder.start();
+      setRecording(true);
+    } catch (error) {
+      setVoiceError("Не удалось получить доступ к микрофону");
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+    }
   }
 
   async function startScreening() {
@@ -122,6 +192,9 @@ export default function App() {
     setText("");
     setError("");
     setActiveTab("user");
+    setRecording(false);
+    setTranscribing(false);
+    setVoiceError("");
     setCrisisOpen(false);
     setCrisisSubmitted(false);
     setCrisisText("");
@@ -431,13 +504,30 @@ export default function App() {
 
             <div style={s.inner}>
               {mode === "voice" ? (
-                <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                <div style={{ textAlign: "center", padding: "40px 20px" }}>
                   <div style={{ fontSize: 58 }}>🎙</div>
                   <h2>Голосовой режим</h2>
-                  <p style={{ color: "#94a3b8" }}>
-                    Запись голоса подключим следующим этапом. Сейчас работает
-                    текстовый AI-скрининг.
+
+                  <p style={{ color: "#94a3b8", lineHeight: 1.6 }}>
+                    Нажмите "Начать запись", расскажите о своем состоянии, затем остановите запись.
+                    Мы расшифруем голос и перенесем текст в обычное поле.
                   </p>
+
+                  {!recording ? (
+                    <button style={s.wide} onClick={startRecording} disabled={transcribing}>
+                      {transcribing ? "Расшифровываем..." : "Начать запись"}
+                    </button>
+                  ) : (
+                    <button style={{ ...s.wide, background: "#dc2626", color: "white" }} onClick={stopRecording}>
+                      Остановить и расшифровать
+                    </button>
+                  )}
+
+                  {voiceError && (
+                    <div style={s.error}>
+                      {voiceError}
+                    </div>
+                  )}
                 </div>
               ) : phase === "input" ? (
                 <>
