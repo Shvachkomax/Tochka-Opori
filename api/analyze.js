@@ -6,11 +6,11 @@ export default async function handler(req, res) {
   try {
     const { text } = req.body || {};
 
-    if (!text || text.length < 20) {
+    if (!text || text.trim().length < 20) {
       return res.status(400).json({ error: "Слишком короткое описание" });
     }
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -18,24 +18,25 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
-        input: [
+        response_format: { type: "json_object" },
+        messages: [
           {
             role: "system",
             content:
-              "Ты ОБЯЗАН вернуть только JSON объект без markdown, пояснений и текста.",
+              "Ты ассистент первичного mental health скрининга. Не ставь диагноз. Не назначай лекарства. Верни только JSON.",
           },
           {
             role: "user",
-            content: `Проанализируй текст пользователя и верни JSON:
+            content: `Проанализируй текст и верни JSON:
 {
   "summary": "краткое резюме",
   "clusters": ["спектр 1", "спектр 2"],
-  "risk": "low",
+  "risk": "low | medium | high | crisis",
   "questions": ["вопрос 1", "вопрос 2", "вопрос 3"],
-  "recommendation": "мягкая рекомендация"
+  "recommendation": "рекомендация"
 }
 
-Текст пользователя:
+Текст:
 ${text}`,
           },
         ],
@@ -50,32 +51,15 @@ ${text}`,
       });
     }
 
-    let raw = data.output_text || "";
+    const content = data.choices?.[0]?.message?.content;
 
-    raw = raw
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
-
-    if (!raw) {
-      return res.status(500).json({
-        error: "AI returned empty response",
-      });
+    if (!content) {
+      return res.status(500).json({ error: "Empty AI response" });
     }
 
-    let parsed;
+    const parsed = JSON.parse(content);
 
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
-      return res.status(500).json({
-        error: "Invalid AI JSON: " + raw,
-      });
-    }
-
-    return res.status(200).json({
-      result: parsed,
-    });
+    return res.status(200).json({ result: parsed });
   } catch (error) {
     return res.status(500).json({
       error: error.message || "Ошибка анализа",
