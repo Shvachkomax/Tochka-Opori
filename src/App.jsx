@@ -847,20 +847,6 @@ export default function App() {
           </div>
         )}
 
-        <section
-          id="crisis"
-          style={{
-            ...s.result,
-            marginTop: 70,
-            borderColor: "rgba(220,38,38,.35)",
-          }}
-        >
-          <h2>Если вам очень плохо — не проходите опросник.</h2>
-          <p style={s.p}>
-            При угрозе жизни или безопасности нужно обращаться в экстренные
-            службы: <b> 112</b> или <b>103</b>.
-          </p>
-        </section>
       </div>
     </div>
   );
