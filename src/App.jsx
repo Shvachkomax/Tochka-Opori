@@ -4,7 +4,7 @@ export default function App() {
   const [mode, setMode] = useState("text");
   const [text, setText] = useState("");
   const [questions, setQuestions] = useState(null);
-  const [answers, setAnswers] = useState("");
+  const [answers, setAnswers] = useState({});
   const [result, setResult] = useState(null);
   const [phase, setPhase] = useState("input");
   const [loading, setLoading] = useState(false);
@@ -52,7 +52,14 @@ export default function App() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, answers, mode: "final" }),
+        body: JSON.stringify({
+          text,
+          answers: questions.map((q, index) => ({
+            question: q,
+            answer: answers[index] || "",
+          })),
+          mode: "final",
+        }),
       });
 
       const data = await res.json();
@@ -70,7 +77,7 @@ export default function App() {
   function handleReset() {
     setPhase("input");
     setQuestions(null);
-    setAnswers("");
+    setAnswers({});
     setResult(null);
     setText("");
     setError("");
@@ -210,12 +217,29 @@ export default function App() {
       padding: 24,
     },
     label: { color: "#94a3b8", fontSize: 14, marginTop: 18, marginBottom: 6 },
-    qItem: {
-      padding: "12px 16px",
-      marginBottom: 8,
-      borderRadius: 16,
+    questionCard: {
       background: "rgba(255,255,255,.06)",
+      borderRadius: 18,
+      padding: 16,
+      marginBottom: 14,
+    },
+    questionText: {
+      fontWeight: 700,
+      marginBottom: 10,
       lineHeight: 1.5,
+    },
+    answerInput: {
+      width: "100%",
+      minHeight: 80,
+      resize: "vertical",
+      border: "1px solid rgba(255,255,255,.12)",
+      borderRadius: 16,
+      background: "rgba(2,6,23,.55)",
+      color: "white",
+      padding: 14,
+      fontSize: 15,
+      outline: "none",
+      boxSizing: "border-box",
     },
   };
 
@@ -302,17 +326,24 @@ export default function App() {
                   <div style={{ marginBottom: 16, color: "#94a3b8" }}>
                     Ответьте на уточняющие вопросы:
                   </div>
-                  {questions?.map((q, i) => (
-                    <div style={s.qItem} key={i}>
-                      {q}
+                  {questions?.map((q, index) => (
+                    <div key={index} style={s.questionCard}>
+                      <div style={s.questionText}>
+                        {index + 1}. {q}
+                      </div>
+                      <textarea
+                        style={s.answerInput}
+                        value={answers[index] || ""}
+                        onChange={(e) =>
+                          setAnswers({
+                            ...answers,
+                            [index]: e.target.value,
+                          })
+                        }
+                        placeholder="Ваш ответ..."
+                      />
                     </div>
                   ))}
-                  <textarea
-                    style={{ ...s.textarea, minHeight: 200 }}
-                    value={answers}
-                    onChange={(e) => setAnswers(e.target.value)}
-                    placeholder="Напишите ваши ответы на вопросы выше..."
-                  />
                   <button
                     style={s.wide}
                     onClick={getFinalReport}
