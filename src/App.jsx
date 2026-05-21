@@ -3,16 +3,47 @@ import React, { useState } from "react";
 export default function App() {
   const [mode, setMode] = useState("text");
   const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [questions, setQuestions] = useState(null);
+  const [answers, setAnswers] = useState("");
   const [result, setResult] = useState(null);
+  const [phase, setPhase] = useState("input");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function analyze() {
-    if (text.trim().length < 20) {
-      setError("Напишите чуть подробнее — хотя бы 2–3 предложения.");
+  async function startScreening() {
+    if (text.trim().length < 10) {
+      setError("Напишите хотя бы 2–3 предложения.");
       return;
     }
 
+    setLoading(true);
+    setError("");
+    setQuestions(null);
+
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, mode: "questions" }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+
+      const qs = data.result
+        .split("\n")
+        .filter((l) => l.trim() && /\d/.test(l));
+
+      setQuestions(qs.length > 0 ? qs : [data.result]);
+      setPhase("questions");
+    } catch (e) {
+      setError(e.message || "Не удалось загрузить вопросы.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function getFinalReport() {
     setLoading(true);
     setError("");
     setResult(null);
@@ -21,18 +52,28 @@ export default function App() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, answers, mode: "final" }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка анализа");
+      if (!res.ok) throw new Error(data.error || "Ошибка");
 
       setResult(data.result);
+      setPhase("report");
     } catch (e) {
-      setError(e.message || "Не удалось выполнить анализ.");
+      setError(e.message || "Не удалось получить отчёт.");
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleReset() {
+    setPhase("input");
+    setQuestions(null);
+    setAnswers("");
+    setResult(null);
+    setText("");
+    setError("");
   }
 
   const s = {
@@ -43,24 +84,15 @@ export default function App() {
       fontFamily: "Inter, system-ui, Arial",
       padding: "32px",
     },
-    wrap: {
-      maxWidth: 1200,
-      margin: "0 auto",
-    },
+    wrap: { maxWidth: 1200, margin: "0 auto" },
     header: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
       marginBottom: 80,
     },
-    logo: {
-      fontSize: 28,
-      fontWeight: 800,
-    },
-    sub: {
-      color: "#94a3b8",
-      marginTop: 4,
-    },
+    logo: { fontSize: 28, fontWeight: 800 },
+    sub: { color: "#94a3b8", marginTop: 4 },
     crisis: {
       background: "#dc2626",
       color: "white",
@@ -140,7 +172,7 @@ export default function App() {
     },
     textarea: {
       width: "100%",
-      minHeight: 250,
+      minHeight: 180,
       resize: "vertical",
       border: "1px solid rgba(255,255,255,.12)",
       borderRadius: 24,
@@ -177,19 +209,13 @@ export default function App() {
       borderRadius: 28,
       padding: 24,
     },
-    label: {
-      color: "#94a3b8",
-      fontSize: 14,
-      marginTop: 18,
-      marginBottom: 6,
-    },
-    chip: {
-      display: "inline-block",
-      margin: "6px 6px 0 0",
-      padding: "8px 12px",
-      borderRadius: 999,
-      background: "rgba(255,255,255,.10)",
-      color: "#e2e8f0",
+    label: { color: "#94a3b8", fontSize: 14, marginTop: 18, marginBottom: 6 },
+    qItem: {
+      padding: "12px 16px",
+      marginBottom: 8,
+      borderRadius: 16,
+      background: "rgba(255,255,255,.06)",
+      lineHeight: 1.5,
     },
   };
 
@@ -201,33 +227,47 @@ export default function App() {
             <div style={s.logo}>🧠 Точка опоры</div>
             <div style={s.sub}>анонимный скрининг состояния</div>
           </div>
-          <button style={s.crisis} onClick={() => document.getElementById("crisis")?.scrollIntoView()}>
+          <button
+            style={s.crisis}
+            onClick={() => document.getElementById("crisis")?.scrollIntoView()}
+          >
             ⚠ Мне срочно нужна помощь
           </button>
         </header>
 
         <main style={s.grid}>
           <section>
-            <div style={s.badge}>Без имени. Без осуждения. Первый шаг — за 5–10 минут.</div>
-            <h1 style={s.h1}>Расскажите, что с вами происходит — голосом или текстом.</h1>
+            <div style={s.badge}>
+              Без имени. Без осуждения. Первый шаг — за 5–10 минут.
+            </div>
+            <h1 style={s.h1}>
+              Расскажите, что с вами происходит — голосом или текстом.
+            </h1>
             <p style={s.p}>
-              Сервис поможет мягко разобрать состояние, определить возможный спектр проблемы
-              и предложить понятный план действий.
+              Сервис поможет мягко разобрать состояние, определить возможный
+              спектр проблемы и предложить понятный план действий.
             </p>
 
             <div style={s.row}>
-              <button style={s.primary} onClick={() => setMode("voice")}>🎙 Рассказать голосом</button>
-              <button style={s.secondary} onClick={() => setMode("text")}>⌨ Написать текстом</button>
+              <button style={s.primary} onClick={() => setMode("voice")}>
+                🎙 Рассказать голосом
+              </button>
+              <button style={s.secondary} onClick={() => setMode("text")}>
+                ⌨ Написать текстом
+              </button>
             </div>
 
             <p style={{ ...s.sub, marginTop: 24 }}>
-              Сервис не ставит диагноз. Решение о диагнозе и лечении принимает врач.
+              Сервис не ставит диагноз. Решение о диагнозе и лечении принимает
+              врач.
             </p>
           </section>
 
           <section style={s.card}>
             <div style={s.sub}>Первичный вход</div>
-            <div style={{ fontSize: 28, fontWeight: 900 }}>Анонимный разговор</div>
+            <div style={{ fontSize: 28, fontWeight: 900 }}>
+              Анонимный разговор
+            </div>
 
             <div style={s.inner}>
               {mode === "voice" ? (
@@ -235,67 +275,88 @@ export default function App() {
                   <div style={{ fontSize: 58 }}>🎙</div>
                   <h2>Голосовой режим</h2>
                   <p style={{ color: "#94a3b8" }}>
-                    Запись голоса подключим следующим этапом. Сейчас работает текстовый AI-скрининг.
+                    Запись голоса подключим следующим этапом. Сейчас работает
+                    текстовый AI-скрининг.
                   </p>
                 </div>
-              ) : (
-                <textarea
-                  style={s.textarea}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Например: последние месяцы я плохо сплю, тревожусь, не могу собраться, часто думаю о потере..."
-                />
-              )}
-
-              <button style={s.wide} onClick={analyze} disabled={loading}>
-                {loading ? "Анализируем..." : "Начать анонимный разбор состояния"}
-              </button>
+              ) : phase === "input" ? (
+                <>
+                  <textarea
+                    style={s.textarea}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder="Например: последние месяцы я плохо сплю, тревожусь, не могу собраться, часто думаю о потере..."
+                  />
+                  <button
+                    style={s.wide}
+                    onClick={startScreening}
+                    disabled={loading}
+                  >
+                    {loading
+                      ? "Формируем вопросы..."
+                      : "Начать анонимный разбор состояния"}
+                  </button>
+                </>
+              ) : phase === "questions" ? (
+                <>
+                  <div style={{ marginBottom: 16, color: "#94a3b8" }}>
+                    Ответьте на уточняющие вопросы:
+                  </div>
+                  {questions?.map((q, i) => (
+                    <div style={s.qItem} key={i}>
+                      {q}
+                    </div>
+                  ))}
+                  <textarea
+                    style={{ ...s.textarea, minHeight: 200 }}
+                    value={answers}
+                    onChange={(e) => setAnswers(e.target.value)}
+                    placeholder="Напишите ваши ответы на вопросы выше..."
+                  />
+                  <button
+                    style={s.wide}
+                    onClick={getFinalReport}
+                    disabled={loading}
+                  >
+                    {loading
+                      ? "Анализируем..."
+                      : "Получить предварительный отчёт"}
+                  </button>
+                </>
+              ) : null}
 
               {error && <div style={s.error}>{error}</div>}
             </div>
 
-            {result && (
+            {phase === "report" && result && (
               <div style={s.result}>
-                <h2 style={{ marginTop: 0 }}>Предварительный отчет</h2>
-
-                {typeof result === "string" ? (
-                  <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
-                    {result}
-                  </div>
-                ) : (
-                  <div>
-                    <div style={s.label}>Краткое резюме</div>
-                    <div>{result.summary}</div>
-
-                    <div style={s.label}>Возможные спектры</div>
-                    <div>
-                      {result.clusters?.map((c) => (
-                        <span style={s.chip} key={c}>{c}</span>
-                      ))}
-                    </div>
-
-                    <div style={s.label}>Уровень риска</div>
-                    <b>{result.risk}</b>
-
-                    <div style={s.label}>Уточняющие вопросы</div>
-                    <ul>
-                      {result.questions?.map((q, i) => <li key={i}>{q}</li>)}
-                    </ul>
-
-                    <div style={s.label}>Рекомендация</div>
-                    <div>{result.recommendation}</div>
-                  </div>
-                )}
+                <h2 style={{ marginTop: 0 }}>Предварительный отчёт</h2>
+                <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+                  {result}
+                </div>
+                <button
+                  style={{ ...s.wide, marginTop: 20 }}
+                  onClick={handleReset}
+                >
+                  Начать заново
+                </button>
               </div>
             )}
           </section>
         </main>
 
-        <section id="crisis" style={{ ...s.result, marginTop: 70, borderColor: "rgba(220,38,38,.35)" }}>
+        <section
+          id="crisis"
+          style={{
+            ...s.result,
+            marginTop: 70,
+            borderColor: "rgba(220,38,38,.35)",
+          }}
+        >
           <h2>Если вам очень плохо — не проходите опросник.</h2>
           <p style={s.p}>
-            При угрозе жизни или безопасности нужно обращаться в экстренные службы:
-            <b> 112</b> или <b>103</b>.
+            При угрозе жизни или безопасности нужно обращаться в экстренные
+            службы: <b> 112</b> или <b>103</b>.
           </p>
         </section>
       </div>
