@@ -41,11 +41,26 @@ export default function App() {
   const questionAudioChunksRef = useRef([]);
   const questionTimerRef = useRef(null);
 
+  const crisisMediaRecorderRef = useRef(null);
+  const crisisAudioChunksRef = useRef([]);
+  const crisisTimerRef = useRef(null);
+
+  const [crisisRecording, setCrisisRecording] = useState(false);
+  const [crisisRecordingTime, setCrisisRecordingTime] = useState(0);
+  const [crisisTranscribing, setCrisisTranscribing] = useState(false);
+  const [crisisVoiceError, setCrisisVoiceError] = useState("");
+
   function handleCrisisSubmit() {
     setCrisisSubmitted(true);
   }
 
   function handleCrisisContinue() {
+    if (crisisTimerRef.current) {
+      clearInterval(crisisTimerRef.current);
+    }
+    if (crisisMediaRecorderRef.current && crisisRecording) {
+      crisisMediaRecorderRef.current.stop();
+    }
     if (crisisText.trim()) {
       setText(crisisText);
       setMode("text");
@@ -54,13 +69,27 @@ export default function App() {
     setCrisisSubmitted(false);
     setCrisisText("");
     setCrisisContact("");
+    setCrisisRecording(false);
+    setCrisisRecordingTime(0);
+    setCrisisTranscribing(false);
+    setCrisisVoiceError("");
   }
 
   function handleCrisisClose() {
+    if (crisisTimerRef.current) {
+      clearInterval(crisisTimerRef.current);
+    }
+    if (crisisMediaRecorderRef.current && crisisRecording) {
+      crisisMediaRecorderRef.current.stop();
+    }
     setCrisisOpen(false);
     setCrisisSubmitted(false);
     setCrisisText("");
     setCrisisContact("");
+    setCrisisRecording(false);
+    setCrisisRecordingTime(0);
+    setCrisisTranscribing(false);
+    setCrisisVoiceError("");
   }
 
   async function startRecording() {
@@ -233,6 +262,91 @@ export default function App() {
     }
   }
 
+  async function startCrisisRecording() {
+    setCrisisVoiceError("");
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const recorder = new MediaRecorder(stream);
+      crisisMediaRecorderRef.current = recorder;
+      crisisAudioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          crisisAudioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+
+        if (crisisTimerRef.current) {
+          clearInterval(crisisTimerRef.current);
+        }
+
+        const audioBlob = new Blob(crisisAudioChunksRef.current, {
+          type: "audio/webm",
+        });
+
+        setCrisisTranscribing(true);
+
+        try {
+          const response = await fetch("/api/transcribe", {
+            method: "POST",
+            headers: {
+              "Content-Type": "audio/webm",
+            },
+            body: audioBlob,
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Не удалось расшифровать голос");
+          }
+
+          setCrisisText(data.text || "");
+        } catch (error) {
+          setCrisisVoiceError(error.message || "Ошибка расшифровки");
+        } finally {
+          setCrisisTranscribing(false);
+          setCrisisRecording(false);
+          setCrisisRecordingTime(0);
+        }
+      };
+
+      recorder.start();
+      setCrisisRecording(true);
+      setCrisisRecordingTime(0);
+
+      crisisTimerRef.current = setInterval(() => {
+        setCrisisRecordingTime((prev) => {
+          const next = prev + 1;
+
+          if (next >= 60) {
+            stopCrisisRecording();
+            return 60;
+          }
+
+          return next;
+        });
+      }, 1000);
+    } catch (error) {
+      setCrisisVoiceError("Не удалось получить доступ к микрофону");
+    }
+  }
+
+  function stopCrisisRecording() {
+    if (crisisTimerRef.current) {
+      clearInterval(crisisTimerRef.current);
+    }
+
+    if (crisisMediaRecorderRef.current && crisisRecording) {
+      crisisMediaRecorderRef.current.stop();
+    }
+  }
+
   async function startScreening() {
     if (text.trim().length < 10) {
       setError("Напишите хотя бы 2–3 предложения.");
@@ -343,6 +457,13 @@ export default function App() {
     setCrisisSubmitted(false);
     setCrisisText("");
     setCrisisContact("");
+    setCrisisRecording(false);
+    setCrisisRecordingTime(0);
+    setCrisisTranscribing(false);
+    setCrisisVoiceError("");
+    if (crisisTimerRef.current) {
+      clearInterval(crisisTimerRef.current);
+    }
   }
 
   const s = {
@@ -929,6 +1050,40 @@ export default function App() {
                     onChange={(e) => setCrisisText(e.target.value)}
                     placeholder="Что именно случилось?"
                   />
+
+                  <button
+                    style={{
+                      ...s.secondary,
+                      marginTop: 10,
+                      width: "100%",
+                    }}
+                    onClick={() =>
+                      crisisRecording ? stopCrisisRecording() : startCrisisRecording()
+                    }
+                    disabled={crisisTranscribing}
+                  >
+                    {crisisTranscribing
+                      ? "Расшифровываем..."
+                      : crisisRecording
+                        ? "Остановить и расшифровать"
+                        : "🎙 Рассказать голосом"}
+                  </button>
+
+                  <div
+                    style={{
+                      marginTop: 8,
+                      color: crisisRecordingTime > 45 ? "#fca5a5" : "#94a3b8",
+                      fontSize: 14,
+                    }}
+                  >
+                    {crisisRecording
+                      ? `Запись: ${crisisRecordingTime} сек / 60 сек`
+                      : "Можно описать ситуацию голосом до 1 минуты"}
+                  </div>
+
+                  {crisisVoiceError && (
+                    <div style={s.error}>{crisisVoiceError}</div>
+                  )}
                   <input
                     style={s.crisisInput}
                     value={crisisContact}
