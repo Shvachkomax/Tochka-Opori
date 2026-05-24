@@ -33,6 +33,17 @@ export default function App() {
     protocolUpdate: "",
   });
 
+  const [doctorFeedbackOpen, setDoctorFeedbackOpen] = useState(false);
+  const [doctorFeedback, setDoctorFeedback] = useState({
+    wrongQuestions: "",
+    missingQuestions: "",
+    badQuestionWording: "",
+    correctedUserReport: "",
+    correctedDoctorReport: "",
+    protocolUpdate: "",
+    generalComment: "",
+  });
+
   const [recordingQuestionIndex, setRecordingQuestionIndex] = useState(null);
   const [questionRecordingTime, setQuestionRecordingTime] = useState(0);
   const [questionTranscribingIndex, setQuestionTranscribingIndex] = useState(null);
@@ -479,6 +490,16 @@ export default function App() {
       wrongQuestions: "",
       correctedLogic: "",
       protocolUpdate: "",
+    });
+    setDoctorFeedbackOpen(false);
+    setDoctorFeedback({
+      wrongQuestions: "",
+      missingQuestions: "",
+      badQuestionWording: "",
+      correctedUserReport: "",
+      correctedDoctorReport: "",
+      protocolUpdate: "",
+      generalComment: "",
     });
     setRecording(false);
     setTranscribing(false);
@@ -1068,6 +1089,141 @@ export default function App() {
                       }}
                     >
                       Скачать экспертную правку JSON
+                    </button>
+                  </div>
+                )}
+
+                <button
+                  style={{
+                    ...s.secondary,
+                    marginTop: 18,
+                    width: "100%",
+                  }}
+                  onClick={() => setDoctorFeedbackOpen(!doctorFeedbackOpen)}
+                >
+                  🩺 Врачебная правка
+                </button>
+
+                {doctorFeedbackOpen && (
+                  <div style={s.expertBox}>
+                    <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>Врачебная правка диалога</h3>
+
+                    <label style={s.label}>Какие вопросы были лишними?</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={doctorFeedback.wrongQuestions}
+                      onChange={(e) =>
+                        setDoctorFeedback({
+                          ...doctorFeedback,
+                          wrongQuestions: e.target.value,
+                        })
+                      }
+                      placeholder="Например: вопрос был не связан с жалобой, усиливал тревогу, дублировал другой вопрос..."
+                    />
+
+                    <label style={s.label}>Каких вопросов не хватило?</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={doctorFeedback.missingQuestions}
+                      onChange={(e) =>
+                        setDoctorFeedback({
+                          ...doctorFeedback,
+                          missingQuestions: e.target.value,
+                        })
+                      }
+                      placeholder="Например: не спросил про утрату, вещества, соматические причины, суицидальные мысли..."
+                    />
+
+                    <label style={s.label}>Какие вопросы были сформулированы неверно?</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={doctorFeedback.badQuestionWording}
+                      onChange={(e) =>
+                        setDoctorFeedback({
+                          ...doctorFeedback,
+                          badQuestionWording: e.target.value,
+                        })
+                      }
+                      placeholder="Например: вопрос звучал пугающе, содержал несколько смыслов, подсказывал диагноз..."
+                    />
+
+                    <label style={s.label}>Исправленная версия заключения для пациента</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={doctorFeedback.correctedUserReport}
+                      onChange={(e) =>
+                        setDoctorFeedback({
+                          ...doctorFeedback,
+                          correctedUserReport: e.target.value,
+                        })
+                      }
+                      placeholder="Вставьте или напишите правильную версию мягкого отчета для пациента..."
+                    />
+
+                    <label style={s.label}>Исправленная версия карты для специалиста</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={doctorFeedback.correctedDoctorReport}
+                      onChange={(e) =>
+                        setDoctorFeedback({
+                          ...doctorFeedback,
+                          correctedDoctorReport: e.target.value,
+                        })
+                      }
+                      placeholder="Вставьте или напишите правильную врачебную версию..."
+                    />
+
+                    <label style={s.label}>Какое правило добавить в clinical protocol?</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={doctorFeedback.protocolUpdate}
+                      onChange={(e) =>
+                        setDoctorFeedback({
+                          ...doctorFeedback,
+                          protocolUpdate: e.target.value,
+                        })
+                      }
+                      placeholder="Например: если есть бессонница + тревога, всегда уточнять вещества, препараты, утрату и соматику..."
+                    />
+
+                    <label style={s.label}>Общий комментарий врача</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={doctorFeedback.generalComment}
+                      onChange={(e) =>
+                        setDoctorFeedback({
+                          ...doctorFeedback,
+                          generalComment: e.target.value,
+                        })
+                      }
+                      placeholder="Любые дополнительные замечания..."
+                    />
+
+                    <button
+                      style={s.wide}
+                      onClick={() => {
+                        const review = {
+                          date: new Date().toISOString(),
+                          patient_input: text,
+                          questions,
+                          answers,
+                          ai_result: result,
+                          doctor_feedback: doctorFeedback,
+                        };
+
+                        const blob = new Blob([JSON.stringify(review, null, 2)], {
+                          type: "application/json",
+                        });
+
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `doctor-feedback-${Date.now()}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                    >
+                      Скачать врачебную правку JSON
                     </button>
                   </div>
                 )}
