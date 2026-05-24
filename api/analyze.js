@@ -3,13 +3,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { text, answers, mode } = req.body || {};
+  const { text, answers, mode, conversationHistory: rawHistory, depth = 0 } = req.body || {};
 
   if (!text || text.trim().length < 10) {
-    return res.status(400).json({
-      error: "Опишите состояние подробнее"
-    });
+    return res.status(400).json({ error: "Опишите состояние подробнее" });
   }
+
+  const MIN_DEPTH = 3;
+  const MAX_DEPTH = 8;
 
   const fallbackQuestions = [
     "Было ли в последние месяцы важное событие, потеря, конфликт, болезнь, переезд, военные события, исчезновение или смерть близкого человека, которое могло повлиять на ваше состояние?",
@@ -19,7 +20,7 @@ export default async function handler(req, res) {
     "Насколько это влияет на сон, работу, учебу или отношения?",
     "Бывали ли мысли, что жить не хочется или причинить себе вред?",
     "Бывали ли ощущения, что вы слышите или замечаете то, чего не замечают другие?",
-    "Бывали ли периоды, когда вы почти не спали, но чувствовали необычный прилив энергии?"
+    "Бывали ли периоды, когда вы почти не спали, но чувствовали необычный прилив энергии?",
   ];
 
   const fallbackFinal = `===USER_REPORT===
@@ -30,202 +31,232 @@ export default async function handler(req, res) {
 По описанию заметны признаки эмоционального напряжения, усталости, нарушения сна и трудностей с концентрацией. Это не диагноз, а первичный скрининг.
 
 2. Что могло запустить или усиливать состояние
-Важно оценить возможные триггеры: стрессовые события, утрата, конфликты, болезни, перегрузка, вещества или соматические факторы. Точная причина уточняется на очной консультации.
+Важно оценить возможные триггеры: стрессовые события, утрата, конфликты, болезни, перегрузка, вещества или соматические факторы.
 
 3. Что важно уточнить
-Важно понять длительность состояния, влияние на обычную жизнь, наличие мыслей о самоповреждении, эпизодов потери контроля, необычных переживаний или резких перепадов энергии.
+Важно понять длительность состояния, влияние на обычную жизнь, наличие мыслей о самоповреждении, эпизодов потери контроля.
 
 4. Возможные направления помощи
-Может быть полезна консультация психолога, психотерапевта или врача-психиатра — в зависимости от выраженности симптомов и рисков.
+Может быть полезна консультация психолога, психотерапевта или врача-психиатра.
 
 5. Что можно сделать сегодня
-Снизить нагрузку, не употреблять алкоголь и стимуляторы, попробовать стабилизировать сон, записать основные жалобы и обратиться за консультацией.
+Снизить нагрузку, стабилизировать сон, записать основные жалобы и обратиться за консультацией.
 
 6. Когда нужна срочная помощь
-Если появляются мысли о причинении вреда себе или другим, ощущение потери контроля, выраженная спутанность, голоса, сильный страх или угроза безопасности — нужно обращаться за срочной помощью: 112 или 103.
+Если появляются мысли о причинении вреда себе или другим — звоните 112 или 103.
 
 ===DOCTOR_REPORT===
 
-- Жалобы: тревога/истощение/сон/концентрация — требует уточнения.
+- Жалобы: требуют уточнения.
 - Timeline: уточнить.
 - Сон: уточнить.
 - Функциональное снижение: уточнить.
-- Possible etiology / triggers: требуется оценка триггеров — стресс, утрата, перегрузка, вещества, соматика.
-- Risk level: предварительно unknown / требует уточнения.
-- Red flags: проверить самоповреждение, психотические переживания, манию, зависимости, угрозу безопасности.
+- Possible etiology / triggers: требуется оценка.
+- Risk level: требует уточнения.
+- Red flags: проверить.
 - Reality testing: уточнить.
-- Differential directions: тревожный спектр, депрессивный спектр, стресс/выгорание, нарушения сна, ADHD-like симптомы, grief/trauma.
-- Что врачу важно уточнить: анамнез, динамика, сон, вещества, суицидальные мысли, эпизоды повышенной энергии, reality testing.
-- Рекомендуемая срочность: консультация специалиста в плановом порядке, срочно при наличии red flags.
-`;
+- Differential directions: тревожный спектр, депрессивный спектр, стресс/выгорание.
+- Что врачу важно уточнить: анамнез, сон, вещества, суицидальные мысли.
+- Рекомендуемая срочность: консультация специалиста в плановом порядке.`;
 
   if (!process.env.OPENAI_API_KEY) {
-    if (mode === "questions") {
-      return res.status(200).json({ result: fallbackQuestions });
-    }
-    return res.status(200).json({ result: fallbackFinal });
+    return res.status(200).json({
+      type: "questions",
+      questions: fallbackQuestions,
+    });
   }
 
-  const answersText = Array.isArray(answers)
-    ? answers.map((a, i) => `${i + 1}. Вопрос: ${a.question}\nОтвет: ${a.answer || "нет ответа"}`).join("\n\n")
-    : "";
+  const convHistory = Array.isArray(rawHistory) ? rawHistory : [];
 
-  const systemPrompt = `
-Ты — AI-ассистент первичного mental health triage.
+  let historyText = "";
+  if (convHistory.length > 0) {
+    historyText = convHistory
+      .map((entry) => {
+        if (entry.role === "user") {
+          return `Пользователь: ${entry.content || JSON.stringify(entry.answers)}`;
+        }
+        if (entry.role === "assistant") {
+          return `AI: заданы вопросы — ${(entry.questions || []).join("; ")}`;
+        }
+        return "";
+      })
+      .join("\n\n");
+  }
+
+  const currentAnswersText =
+    answers && typeof answers === "object"
+      ? Object.entries(answers)
+          .map(([key, val]) => `Вопрос ${parseInt(key) + 1}: ${val || "нет ответа"}`)
+          .join("\n")
+      : "";
+
+  const systemPrompt = `Ты — AI-ассистент первичного mental health triage. Ты ведешь адаптивный клинический диалог.
 
 Твоя задача:
-- помочь человеку сориентироваться
-- выявить красные флаги
-- подготовить структурированную информацию для специалиста
+- строить гипотезы о возможных направлениях проблемы
+- проверять их через уточняющие вопросы
+- углублять диалог по мере необходимости
+- не завершать слишком рано
 
-Строгие правила:
+Всегда оценивай:
+- что осталось неясным
+- какие гипотезы конкурируют
+- какие риски не проверены
+- какой информации не хватает
+
+Отслеживай возможные направления (internal, не показывать пользователю):
+- reactive/grief/trauma
+- endogenous depressive
+- anxiety spectrum
+- ADHD-like
+- bipolar-spectrum
+- psychosis/reality-testing
+- substance-related
+- somatic contributor
+- sleep/circadian
+
+Правила:
 - не ставь диагноз
 - не назначай лекарства
-- не используй формулировки "у вас психоз", "у вас шизофрения", "у вас БАР"
-- используй формулировки "возможные признаки", "может требовать оценки специалиста"
-- если есть риск самоповреждения, потери контроля, угрозы безопасности, голосов, выраженной спутанности — рекомендовать срочную помощь 112/103 и консультацию врача
-- не усиливай тревогу пользователя
+- не используй "у вас психоз/шизофрения/БАР"
+- используй "возможные признаки", "важно обсудить со специалистом"
+- если риск самоповреждения — срочная помощь 112/103
+- не усиливай тревогу
 - отвечай на русском языке
-`;
+
+MIN_DEPTH = ${MIN_DEPTH}. Не завершай диалог до MIN_DEPTH, если нет low complexity, low risk и clear explanation.
+MAX_DEPTH = ${MAX_DEPTH}. После MAX_DEPTH заверши, указав limitations.`;
 
   let userPrompt = "";
 
-  if (mode === "questions") {
-    userPrompt = `
+  if (!convHistory.length && depth === 0) {
+    userPrompt = `Это первый раунд диалога.
+
 Исходное описание пользователя:
 ${text}
 
-Сначала оцени возможные red flags:
-- самоповреждение / суицидальные мысли
-- потеря связи с реальностью / голоса / идеи преследования
-- мания: почти не спит + избыток энергии + рискованные поступки
-- насилие / угроза безопасности
-- тяжелая зависимость / интоксикация
-
-Обязательное правило:
-Первые 2–3 вопроса должны выяснять контекст и возможный триггер состояния:
-- утрата / травма / военные события / пропажа или смерть близкого
-- конфликт / развод / болезнь
-- начало без понятной причины
-- алкоголь / вещества / лекарства / отмена препаратов
-- соматические факторы
-
-Только после этого задавай вопросы о симптомах и рисках.
+Оцени red flags и задай 4-6 уточняющих вопросов.
+Первые 2-3 вопроса про возможную причину/триггер состояния.
 Вопросы должны быть адаптивными к тексту пользователя.
-Не давай финальный отчет.
-Верни только список вопросов, каждый с новой строки.
-`;
+
+Верни JSON:
+{ "type": "questions", "questions": ["вопрос 1", "вопрос 2", "вопрос 3", "вопрос 4"] }`;
   } else {
-    userPrompt = `
-Исходное описание пользователя:
-${text}
+    const enough = depth >= MIN_DEPTH;
+    const maxed = depth >= MAX_DEPTH;
 
-Ответы на уточняющие вопросы:
-${answersText}
+    let decisionRule = "";
+    if (maxed) {
+      decisionRule = "Ты достиг MAX_DEPTH. ОБЯЗАН завершить диалог и вернуть финальный отчет, указав limitations.";
+    } else if (enough) {
+      decisionRule = `Ты достиг MIN_DEPTH. Оцени, достаточно ли данных для предварительного заключения.
+Если есть competing hypotheses или missing critical info — продолжи questioning.
+Если данных достаточно — заверши и верни отчет.`;
+    } else {
+      decisionRule = `Ты еще не достиг MIN_DEPTH. Продолжай questioning. Верни только вопросы.`;
+    }
 
-Сформируй финальный отчет в ДВУХ частях, разделенных маркерами.
+    userPrompt = `Текущий раунд: ${depth + 1}.
+${decisionRule}
 
-Различай возможные причинные направления:
-- reactive / adjustment / grief / trauma
-- endogenous depressive/anxiety spectrum
-- toxic/substance/medication-related
-- somatic/medical contributor
-- sleep/circadian exhaustion
+История диалога:
+${historyText}
 
-Не делай вывод "это точно из-за…". Пиши "возможный вклад", "важно уточнить".
-Если событие связано с утратой/войной/пропажей близкого — аккуратно учитывай grief/trauma pathway.
-Если есть вещества/алкоголь/препараты — учитывай toxic/substance-related pathway.
-Если нет явного триггера — учитывай endogenous depressive/anxiety spectrum.
+${
+  currentAnswersText
+    ? `Ответы на предыдущие вопросы:\n${currentAnswersText}\n`
+    : ""
+}Исходное описание пользователя: ${text}
 
-Структура строго такая:
+Оцени:
+- что уже ясно
+- что осталось неясным
+- какие гипотезы конкурируют
+- какие риски не проверены
 
-===USER_REPORT===
+Если нужно больше информации — верни JSON:
+{ "type": "questions", "questions": ["вопрос 1", "вопрос 2", ...] }
 
-мягкий понятный отчет для пользователя
+Если данных достаточно для предварительного заключения — верни JSON:
+{ "type": "final", "user_report": "отчет для пользователя\n\n1. Что сейчас видно\n2. Что могло запустить или усиливать состояние\n3. Что важно уточнить\n4. Возможные направления помощи\n5. Что можно сделать сегодня\n6. Когда нужна срочная помощь", "doctor_report": "структурированная карта для специалиста\n- Жалобы\n- Timeline\n- Сон\n- Функциональное снижение\n- Possible etiology / triggers\n- Risk level\n- Red flags\n- Reality testing\n- Differential directions\n- Что важно уточнить\n- Рекомендуемая срочность" }
 
-1. Что сейчас видно
-2. Что могло запустить или усиливать состояние
-3. Что важно уточнить
-4. Возможные направления помощи
-5. Что можно сделать сегодня
-6. Когда нужна срочная помощь
-
-===DOCTOR_REPORT===
-
-структурированный отчет для специалиста с полями:
-- Жалобы
-- Timeline
-- Сон
-- Функциональное снижение
-- Possible etiology / triggers
-- Risk level
-- Red flags
-- Reality testing
-- Differential directions
-- Что важно уточнить
-- Рекомендуемая срочность
-`;
+ВАЖНО: Не завершай слишком рано. Если есть competing hypotheses или missing information — продолжай questioning.`;
   }
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: "gpt-4.1-mini",
+        response_format: { type: "json_object" },
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
+          { role: "user", content: userPrompt },
         ],
-        temperature: 0.25,
-        max_tokens: mode === "questions" ? 500 : 1200
-      })
+        temperature: 0.3,
+        max_tokens: depth <= 2 ? 600 : 1500,
+      }),
     });
 
     const data = await response.json();
 
     if (!response.ok || data.error) {
-      if (mode === "questions") {
-        return res.status(200).json({ result: fallbackQuestions });
+      if (depth === 0) {
+        return res.status(200).json({ type: "questions", questions: fallbackQuestions });
       }
-      return res.status(200).json({ result: fallbackFinal });
+      return res.status(200).json({ type: "final", user_report: fallbackFinal, doctor_report: "" });
     }
 
-    const content = data.choices?.[0]?.message?.content?.trim();
+    const raw = data.choices?.[0]?.message?.content?.trim();
 
-    if (!content) {
-      if (mode === "questions") {
-        return res.status(200).json({ result: fallbackQuestions });
+    if (!raw) {
+      if (depth === 0) {
+        return res.status(200).json({ type: "questions", questions: fallbackQuestions });
       }
-      return res.status(200).json({ result: fallbackFinal });
+      return res.status(200).json({ type: "final", user_report: fallbackFinal, doctor_report: "" });
     }
 
-    if (mode === "questions") {
-      const questions = content
-        .split("\n")
-        .map((q) => q.replace(/^[-•\d.)\s]+/, "").trim())
-        .filter(Boolean)
-        .slice(0, 7);
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      if (depth === 0) {
+        return res.status(200).json({ type: "questions", questions: fallbackQuestions });
+      }
+      const cleaned = raw
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch (e2) {
+        return res.status(200).json({ type: "final", user_report: raw, doctor_report: "" });
+      }
+    }
 
+    if (parsed.type === "questions" && Array.isArray(parsed.questions)) {
       return res.status(200).json({
-        result: questions.length ? questions : fallbackQuestions
+        type: "questions",
+        questions: parsed.questions.filter(Boolean).slice(0, 7),
       });
     }
 
-    return res.status(200).json({
-      result: content
-    });
+    const userPart = parsed.user_report || "";
+    const doctorPart = parsed.doctor_report || "";
 
+    const report = userPart.includes("===USER_REPORT===")
+      ? userPart
+      : `===USER_REPORT===\n\n${userPart}\n\n===DOCTOR_REPORT===\n\n${doctorPart}`;
+
+    return res.status(200).json({ type: "final", report });
   } catch (error) {
-    if (mode === "questions") {
-      return res.status(200).json({ result: fallbackQuestions });
+    if (depth === 0) {
+      return res.status(200).json({ type: "questions", questions: fallbackQuestions });
     }
-
-    return res.status(200).json({
-      result: fallbackFinal
-    });
+    return res.status(200).json({ type: "final", report: fallbackFinal });
   }
 }

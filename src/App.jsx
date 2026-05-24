@@ -44,6 +44,9 @@ export default function App() {
     generalComment: "",
   });
 
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [dialogDepth, setDialogDepth] = useState(0);
+
   const [recordingQuestionIndex, setRecordingQuestionIndex] = useState(null);
   const [questionRecordingTime, setQuestionRecordingTime] = useState(0);
   const [questionTranscribingIndex, setQuestionTranscribingIndex] = useState(null);
@@ -398,8 +401,8 @@ export default function App() {
     }
   }
 
-  async function startScreening() {
-    if (text.trim().length < 10) {
+  async function submitRound() {
+    if (dialogDepth === 0 && text.trim().length < 10) {
       setError("Напишите хотя бы 2–3 предложения.");
       return;
     }
@@ -412,57 +415,57 @@ export default function App() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, mode: "questions" }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка");
-
-      const qs = Array.isArray(data.result)
-        ? data.result.filter(Boolean)
-        : data.result
-            .split("\n")
-            .filter((l) => l.trim() && /\d/.test(l));
-
-      setQuestions(qs.length > 0 ? qs : [data.result]);
-      setPhase("questions");
-    } catch (e) {
-      setError(e.message || "Не удалось загрузить вопросы.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function getFinalReport() {
-    setLoading(true);
-    setError("");
-    setResult(null);
-
-    try {
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text,
-          answers: questions.map((q, index) => ({
-            question: q,
-            answer: answers[index] || "",
-          })),
-          mode: "final",
+          answers: dialogDepth === 0 ? {} : answers,
+          conversationHistory,
+          depth: dialogDepth,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Ошибка");
 
-      setResult(data.result);
-      setActiveTab("user");
-      setPhase("report");
+      if (data.type === "questions") {
+        const qs = Array.isArray(data.questions)
+          ? data.questions.filter(Boolean)
+          : [];
+
+        const newHistory = [
+          ...conversationHistory,
+          ...(dialogDepth > 0
+            ? [{ role: "user", answers }]
+            : []),
+          { role: "assistant", questions: qs },
+        ];
+
+        setConversationHistory(newHistory);
+        setQuestions(qs.length > 0 ? qs : fallbackQ());
+        setAnswers({});
+        setDialogDepth((d) => d + 1);
+        setPhase("questions");
+      } else if (data.type === "final") {
+        setResult(data.report || "");
+        setActiveTab("user");
+        setPhase("report");
+      } else {
+        throw new Error("Неизвестный тип ответа");
+      }
     } catch (e) {
-      setError(e.message || "Не удалось получить отчёт.");
+      setError(e.message || "Ошибка");
     } finally {
       setLoading(false);
     }
+  }
+
+  function fallbackQ() {
+    return [
+      "Было ли в последние месяцы важное событие, которое могло повлиять на ваше состояние?",
+      "Началось ли состояние после конкретного события или постепенно?",
+      "Как давно вы замечаете это состояние?",
+      "Насколько это влияет на сон, работу или отношения?",
+      "Бывали ли мысли, что жить не хочется или причинить себе вред?",
+    ];
   }
 
   const userPart = result
@@ -501,6 +504,8 @@ export default function App() {
       protocolUpdate: "",
       generalComment: "",
     });
+    setConversationHistory([]);
+    setDialogDepth(0);
     setRecording(false);
     setTranscribing(false);
     setVoiceError("");
@@ -899,7 +904,7 @@ export default function App() {
                   />
                   <button
                     style={s.wide}
-                    onClick={startScreening}
+                    onClick={submitRound}
                     disabled={loading}
                   >
                     {loading
@@ -910,7 +915,7 @@ export default function App() {
               ) : phase === "questions" ? (
                 <>
                   <div style={{ marginBottom: 16, color: "#94a3b8" }}>
-                    Ответьте на уточняющие вопросы:
+                    Раунд уточнения {dialogDepth}
                   </div>
                   {questions?.map((q, index) => (
                     <div key={index} style={s.questionCard}>
@@ -971,12 +976,14 @@ export default function App() {
                   ))}
                   <button
                     style={s.wide}
-                    onClick={getFinalReport}
+                    onClick={submitRound}
                     disabled={loading}
                   >
                     {loading
                       ? "Анализируем..."
-                      : "Получить предварительный отчёт"}
+                      : dialogDepth < 3
+                        ? "Продолжить уточнение"
+                        : "Получить предварительный отчёт"}
                   </button>
                 </>
               ) : null}
