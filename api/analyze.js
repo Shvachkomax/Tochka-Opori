@@ -27,17 +27,19 @@ export default async function handler(req, res) {
 
 Предварительный разбор для вас
 
+В вашем описании заметны некоторые признаки эмоционального напряжения, усталости, нарушения сна и трудностей с концентрацией. Это не диагноз, а первичное выявление сигналов.
+
 1. Что сейчас видно
-По описанию заметны признаки эмоционального напряжения, усталости, нарушения сна и трудностей с концентрацией. Это не диагноз, а первичный скрининг.
+Обнаружены сигналы в affective/emotional domain, neurocognitive domain. Требуется уточнение по trauma domain и contextual modifiers.
 
 2. Что могло запустить или усиливать состояние
 Важно оценить возможные триггеры: стрессовые события, утрата, конфликты, болезни, перегрузка, вещества или соматические факторы.
 
 3. Что важно уточнить
-Важно понять длительность состояния, влияние на обычную жизнь, наличие мыслей о самоповреждении, эпизодов потери контроля.
+Длительность состояния, влияние на обычную жизнь, наличие мыслей о самоповреждении.
 
-4. Возможные направления помощи
-Может быть полезна консультация психолога, психотерапевта или врача-психиатра.
+4. Рекомендуется
+Обсудить это со специалистом — психологом, психотерапевтом или врачом-психиатром.
 
 5. Что можно сделать сегодня
 Снизить нагрузку, стабилизировать сон, записать основные жалобы и обратиться за консультацией.
@@ -47,17 +49,14 @@ export default async function handler(req, res) {
 
 ===DOCTOR_REPORT===
 
-- Жалобы: требуют уточнения.
-- Timeline: уточнить.
-- Сон: уточнить.
-- Функциональное снижение: уточнить.
-- Possible etiology / triggers: требуется оценка.
-- Risk level: требует уточнения.
-- Red flags: проверить.
-- Reality testing: уточнить.
-- Differential directions: тревожный спектр, депрессивный спектр, стресс/выгорание.
-- Что врачу важно уточнить: анамнез, сон, вещества, суицидальные мысли.
-- Рекомендуемая срочность: консультация специалиста в плановом порядке.`;
+Signal detection: affective/emotional domain, neurocognitive domain — signals present. Trauma domain, risk domain — require clarification.
+Risk markers: не оценены.
+Contextual modifiers: не оценены.
+Temporal pattern: требует уточнения.
+Functional impairment: требует уточнения.
+Confidence: low — недостаточно данных.
+Urgency: requires assessment.
+Recommended escalation: консультация специалиста в плановом порядке.`;
 
   if (!process.env.OPENAI_API_KEY) {
     return res.status(200).json({
@@ -90,42 +89,58 @@ export default async function handler(req, res) {
           .join("\n")
       : "";
 
-  const systemPrompt = `Ты — AI-ассистент первичного mental health triage. Ты ведешь адаптивный клинический диалог.
+  const systemPrompt = `Stage 1 = SIGNAL DETECTION, not psychiatric diagnosis.
 
-Твоя задача:
-- строить гипотезы о возможных направлениях проблемы
-- проверять их через уточняющие вопросы
-- углублять диалог по мере необходимости
-- не завершать слишком рано
+Ты НЕ ставишь диагноз.
+Ты определяешь:
+- signals
+- risk markers
+- emotional and cognitive patterns
+- urgency level
+- need for escalation
 
-Всегда оценивай:
-- что осталось неясным
-- какие гипотезы конкурируют
-- какие риски не проверены
-- какой информации не хватает
+Используй формулировки:
+- anxiety indicators
+- trauma-related indicators
+- ADHD-like markers
+- mania red flags
+- psychosis red flags
+- executive dysfunction markers
+- risk markers
 
-Отслеживай возможные направления (internal, не показывать пользователю):
-- reactive/grief/trauma
-- endogenous depressive
-- anxiety spectrum
-- ADHD-like
-- bipolar-spectrum
-- psychosis/reality-testing
-- substance-related
-- somatic contributor
-- sleep/circadian
+Запрещено:
+- "у вас PTSD"
+- "у вас bipolar disorder"
+- "у вас шизофрения"
+- "это подтверждает ADHD"
+
+Detection domains (internal tracking):
+- Affective / emotional domain
+- Trauma domain
+- Neurocognitive domain
+- Thought / perception domain
+- Mood instability domain
+- Risk domain
+- Contextual modifiers
+- Temporal analysis layer
+- Functional impairment layer
 
 Правила:
 - не ставь диагноз
 - не назначай лекарства
 - не используй "у вас психоз/шизофрения/БАР"
-- используй "возможные признаки", "важно обсудить со специалистом"
+- используй "обнаружены сигналы", "важно уточнить", "рекомендуется обсудить со специалистом"
 - если риск самоповреждения — срочная помощь 112/103
 - не усиливай тревогу
 - отвечай на русском языке
 
 MIN_DEPTH = ${MIN_DEPTH}. Не завершай диалог до MIN_DEPTH, если нет low complexity, low risk и clear explanation.
-MAX_DEPTH = ${MAX_DEPTH}. После MAX_DEPTH заверши, указав limitations.`;
+MAX_DEPTH = ${MAX_DEPTH}. После MAX_DEPTH заверши, указав limitations.
+
+Confidence model:
+- High: multiple signals within a domain, consistent across rounds
+- Moderate: some signals present, partial data
+- Low: few signals, inconsistent data — recommend further evaluation`;
 
   let userPrompt = "";
 
@@ -135,9 +150,10 @@ MAX_DEPTH = ${MAX_DEPTH}. После MAX_DEPTH заверши, указав limi
 Исходное описание пользователя:
 ${text}
 
-Оцени red flags и задай 4-6 уточняющих вопросов.
-Первые 2-3 вопроса про возможную причину/триггер состояния.
-Вопросы должны быть адаптивными к тексту пользователя.
+Определи, какие detection domains активны.
+Задай 4-6 уточняющих вопросов для signal clarification.
+Первые 2-3 вопроса — про контекст и возможный триггер (trauma domain, contextual modifiers).
+Вопросы должны быть адаптивными к тексту пользователя, а не шаблонными.
 
 Верни JSON:
 { "type": "questions", "questions": ["вопрос 1", "вопрос 2", "вопрос 3", "вопрос 4"] }`;
@@ -168,17 +184,17 @@ ${
     : ""
 }Исходное описание пользователя: ${text}
 
-Оцени:
-- что уже ясно
-- что осталось неясным
-- какие гипотезы конкурируют
-- какие риски не проверены
+Оцени по detection domains:
+- какие домены активны
+- какие сигналы подтверждены
+- какие домены требуют clarification
+- какой уровень confidence по каждому домену
 
 Если нужно больше информации — верни JSON:
 { "type": "questions", "questions": ["вопрос 1", "вопрос 2", ...] }
 
 Если данных достаточно для предварительного заключения — верни JSON:
-{ "type": "final", "user_report": "отчет для пользователя\n\n1. Что сейчас видно\n2. Что могло запустить или усиливать состояние\n3. Что важно уточнить\n4. Возможные направления помощи\n5. Что можно сделать сегодня\n6. Когда нужна срочная помощь", "doctor_report": "структурированная карта для специалиста\n- Жалобы\n- Timeline\n- Сон\n- Функциональное снижение\n- Possible etiology / triggers\n- Risk level\n- Red flags\n- Reality testing\n- Differential directions\n- Что важно уточнить\n- Рекомендуемая срочность" }
+{ "type": "final", "user_report": "текст для пользователя в мягкой форме\n\nВ вашем описании заметны некоторые признаки...\nЭто не диагноз.\nВажно уточнить...\n\n1. Что сейчас видно\n2. Что могло запустить или усиливать состояние\n3. Что важно уточнить\n4. Возможные направления помощи\n5. Что можно сделать сегодня\n6. Когда нужна срочная помощь", "doctor_report": "Signal detection: [домены]\nRisk markers: [риски]\nContextual modifiers: [контекст]\nTemporal pattern: [динамика]\nFunctional impairment: [нарушения]\nConfidence: [уровень]\nUrgency: [срочность]\nRecommended escalation: [рекомендация]" }
 
 ВАЖНО: Не завершай слишком рано. Если есть competing hypotheses или missing information — продолжай questioning.`;
   }
