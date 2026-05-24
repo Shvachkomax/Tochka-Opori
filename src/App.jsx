@@ -24,6 +24,15 @@ export default function App() {
   const [voiceError, setVoiceError] = useState("");
   const [recordingTime, setRecordingTime] = useState(0);
 
+  const [expertMode, setExpertMode] = useState(false);
+  const [expertNotes, setExpertNotes] = useState({
+    aiIssue: "",
+    missingQuestions: "",
+    wrongQuestions: "",
+    correctedLogic: "",
+    protocolUpdate: "",
+  });
+
   const [recordingQuestionIndex, setRecordingQuestionIndex] = useState(null);
   const [questionRecordingTime, setQuestionRecordingTime] = useState(0);
   const [questionTranscribingIndex, setQuestionTranscribingIndex] = useState(null);
@@ -309,6 +318,14 @@ export default function App() {
     setText("");
     setError("");
     setActiveTab("user");
+    setExpertMode(false);
+    setExpertNotes({
+      aiIssue: "",
+      missingQuestions: "",
+      wrongQuestions: "",
+      correctedLogic: "",
+      protocolUpdate: "",
+    });
     setRecording(false);
     setTranscribing(false);
     setVoiceError("");
@@ -498,6 +515,13 @@ export default function App() {
     reportBlock: {
       background: "rgba(255,255,255,.05)",
       borderRadius: 20,
+      padding: 20,
+    },
+    expertBox: {
+      marginTop: 24,
+      border: "1px solid rgba(255,255,255,.12)",
+      background: "rgba(255,255,255,.05)",
+      borderRadius: 24,
       padding: 20,
     },
     overlay: {
@@ -782,6 +806,90 @@ export default function App() {
                     {activeTab === "user" ? userPart : doctorPart}
                   </div>
                 </div>
+
+                <button
+                  style={{ ...s.secondary, marginTop: 16 }}
+                  onClick={() => setExpertMode(!expertMode)}
+                >
+                  Экспертная правка врача
+                </button>
+
+                {expertMode && (
+                  <div style={s.expertBox}>
+                    <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>Экспертная правка врача</h3>
+
+                    <label style={s.label}>Что AI сделал неправильно?</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={expertNotes.aiIssue}
+                      onChange={(e) => setExpertNotes({ ...expertNotes, aiIssue: e.target.value })}
+                      placeholder="Например: задал лишний вопрос, не уточнил триггер, неверно оценил риск..."
+                    />
+
+                    <label style={s.label}>Каких вопросов не хватило?</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={expertNotes.missingQuestions}
+                      onChange={(e) => setExpertNotes({ ...expertNotes, missingQuestions: e.target.value })}
+                      placeholder="Список недостающих вопросов..."
+                    />
+
+                    <label style={s.label}>Какие вопросы были лишними или неверными?</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={expertNotes.wrongQuestions}
+                      onChange={(e) => setExpertNotes({ ...expertNotes, wrongQuestions: e.target.value })}
+                      placeholder="Список лишних/неудачных вопросов..."
+                    />
+
+                    <label style={s.label}>Как должна выглядеть правильная логика?</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={expertNotes.correctedLogic}
+                      onChange={(e) => setExpertNotes({ ...expertNotes, correctedLogic: e.target.value })}
+                      placeholder="Опишите правильный clinical reasoning..."
+                    />
+
+                    <label style={s.label}>Что нужно добавить в протокол?</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={expertNotes.protocolUpdate}
+                      onChange={(e) => setExpertNotes({ ...expertNotes, protocolUpdate: e.target.value })}
+                      placeholder="Правило, которое нужно сохранить в clinical protocol..."
+                    />
+
+                    <button
+                      style={s.wide}
+                      onClick={() => {
+                        const review = {
+                          date: new Date().toISOString(),
+                          patient_input: text,
+                          questions,
+                          answers,
+                          ai_result: result,
+                          ai_issue: expertNotes.aiIssue,
+                          missing_questions: expertNotes.missingQuestions,
+                          wrong_questions: expertNotes.wrongQuestions,
+                          corrected_logic: expertNotes.correctedLogic,
+                          protocol_update: expertNotes.protocolUpdate,
+                        };
+
+                        const blob = new Blob([JSON.stringify(review, null, 2)], {
+                          type: "application/json",
+                        });
+
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `case-review-${Date.now()}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                    >
+                      Скачать экспертную правку JSON
+                    </button>
+                  </div>
+                )}
 
                 <button
                   style={{ ...s.wide, marginTop: 20 }}
