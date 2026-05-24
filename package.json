@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "node --env-file=.env.local local-api-server.js",
+    "dev:all": "concurrently \"npm run dev:api\" \"npm run dev\"",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -16,5 +18,7 @@
     "lucide-react": "latest",
     "framer-motion": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
 }
