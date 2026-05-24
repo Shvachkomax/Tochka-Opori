@@ -49,12 +49,52 @@ export default function App() {
   const [crisisRecordingTime, setCrisisRecordingTime] = useState(0);
   const [crisisTranscribing, setCrisisTranscribing] = useState(false);
   const [crisisVoiceError, setCrisisVoiceError] = useState("");
+  const [crisisWarning, setCrisisWarning] = useState("");
+  const [crisisConfirmation, setCrisisConfirmation] = useState("");
 
-  function handleCrisisSubmit() {
-    setCrisisSubmitted(true);
+  const crisisKeywords = [
+    "хочу умереть",
+    "покончить с собой",
+    "самоубий",
+    "суицид",
+    "убить себя",
+    "не хочу жить",
+    "причинить себе вред",
+    "порезать",
+    "таблетки",
+    "повеситься",
+    "прыгнуть",
+    "навредить кому-то",
+    "убить кого-то",
+    "угрожают",
+    "меня убьют",
+    "голоса приказывают",
+  ];
+
+  function hasCrisisRisk(value) {
+    const lower = (value || "").toLowerCase();
+    return crisisKeywords.some((keyword) => lower.includes(keyword));
   }
 
-  function handleCrisisContinue() {
+  function submitCrisisRequest() {
+    setCrisisWarning("");
+
+    if (!crisisContact.trim()) {
+      setCrisisWarning("Укажите телефон или Telegram для связи. Если есть непосредственная опасность — звоните 112 или 103.");
+      return;
+    }
+
+    setCrisisConfirmation("Заявка принята. Ожидайте связи. Если ситуация опасна прямо сейчас — не ждите ответа сервиса, звоните 112 или 103.");
+  }
+
+  function continueFromCrisis() {
+    setCrisisConfirmation("");
+
+    if (hasCrisisRisk(crisisText)) {
+      setCrisisWarning("Похоже, ситуация может быть срочной. Пожалуйста, не оставайтесь один. Позвоните 112 или 103 прямо сейчас. Если рядом есть близкий человек — попросите его быть рядом с вами.");
+      return;
+    }
+
     if (crisisTimerRef.current) {
       clearInterval(crisisTimerRef.current);
     }
@@ -66,13 +106,13 @@ export default function App() {
       setMode("text");
     }
     setCrisisOpen(false);
-    setCrisisSubmitted(false);
     setCrisisText("");
     setCrisisContact("");
     setCrisisRecording(false);
     setCrisisRecordingTime(0);
     setCrisisTranscribing(false);
     setCrisisVoiceError("");
+    setCrisisWarning("");
   }
 
   function handleCrisisClose() {
@@ -461,6 +501,8 @@ export default function App() {
     setCrisisRecordingTime(0);
     setCrisisTranscribing(false);
     setCrisisVoiceError("");
+    setCrisisWarning("");
+    setCrisisConfirmation("");
     if (crisisTimerRef.current) {
       clearInterval(crisisTimerRef.current);
     }
@@ -708,6 +750,24 @@ export default function App() {
       display: "flex",
       flexDirection: "column",
       gap: 10,
+    },
+    crisisWarning: {
+      marginTop: 14,
+      background: "rgba(220,38,38,.22)",
+      border: "1px solid rgba(248,113,113,.35)",
+      color: "#fecaca",
+      padding: 16,
+      borderRadius: 18,
+      lineHeight: 1.5,
+    },
+    crisisConfirmation: {
+      marginTop: 14,
+      background: "rgba(34,197,94,.16)",
+      border: "1px solid rgba(74,222,128,.35)",
+      color: "#bbf7d0",
+      padding: 16,
+      borderRadius: 18,
+      lineHeight: 1.5,
     },
     answerInput: {
       width: "100%",
@@ -1026,24 +1086,21 @@ export default function App() {
         {crisisOpen && (
           <div style={s.overlay} onClick={handleCrisisClose}>
             <div style={s.modal} onClick={(e) => e.stopPropagation()}>
-              {crisisSubmitted ? (
-                <>
-                  <div style={s.modalTitle}>Заявка принята</div>
-                  <p style={{ ...s.p, marginTop: 12, marginBottom: 20 }}>
-                    Если ситуация опасна прямо сейчас — не ждите ответа сервиса,
-                    звоните <b>112</b> или <b>103</b>.
-                  </p>
-                  <button style={s.wide} onClick={handleCrisisClose}>
-                    Закрыть
-                  </button>
-                </>
-              ) : (
                 <>
                   <div style={s.modalTitle}>Срочная помощь</div>
                   <div style={s.modalWarning}>
                     Если есть непосредственная угроза жизни или безопасности —
                     звоните <b>112</b> или <b>103</b>.
                   </div>
+
+                  {crisisConfirmation && (
+                    <div style={s.crisisConfirmation}>{crisisConfirmation}</div>
+                  )}
+
+                  {crisisWarning && (
+                    <div style={s.crisisWarning}>{crisisWarning}</div>
+                  )}
+
                   <textarea
                     style={s.crisisTextarea}
                     value={crisisText}
@@ -1084,6 +1141,7 @@ export default function App() {
                   {crisisVoiceError && (
                     <div style={s.error}>{crisisVoiceError}</div>
                   )}
+
                   <input
                     style={s.crisisInput}
                     value={crisisContact}
@@ -1091,18 +1149,14 @@ export default function App() {
                     placeholder="Телефон или Telegram для связи"
                   />
                   <div style={s.crisisActions}>
-                    <button style={s.wide} onClick={handleCrisisSubmit}>
+                    <button style={s.wide} onClick={submitCrisisRequest}>
                       Жду звонка специалиста
                     </button>
-                    <button
-                      style={s.wide}
-                      onClick={handleCrisisContinue}
-                    >
+                    <button style={s.wide} onClick={continueFromCrisis}>
                       Продолжить анонимный разбор
                     </button>
                   </div>
                 </>
-              )}
             </div>
           </div>
         )}
