@@ -41,6 +41,18 @@ export default function App() {
   const [conversationHistory, setConversationHistory] = useState([]);
   const [dialogDepth, setDialogDepth] = useState(0);
 
+  const [sessionModalOpen, setSessionModalOpen] = useState(false);
+  const [sessionCodeInput, setSessionCodeInput] = useState("");
+  const [loadingSession, setLoadingSession] = useState(false);
+  const [sessionData, setSessionData] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
+  const [publicCode, setPublicCode] = useState(null);
+  const [isContinuation, setIsContinuation] = useState(false);
+  const [previousPatientReport, setPreviousPatientReport] = useState("");
+  const [previousDoctorReport, setPreviousDoctorReport] = useState("");
+  const [homeTasks, setHomeTasks] = useState("");
+  const [resourceFactors, setResourceFactors] = useState("");
+
   const [recordingQuestionIndex, setRecordingQuestionIndex] = useState(null);
   const [questionRecordingTime, setQuestionRecordingTime] = useState(0);
   const [questionTranscribingIndex, setQuestionTranscribingIndex] = useState(null);
@@ -414,6 +426,11 @@ export default function App() {
           answers: dialogDepth === 0 ? {} : answers,
           conversationHistory,
           depth: dialogDepth,
+          isContinuation,
+          previousPatientReport,
+          previousDoctorReport,
+          homeTasks,
+          resourceFactors,
         }),
       });
 
@@ -462,15 +479,38 @@ export default function App() {
     ];
   }
 
+  function generatePublicCode() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const part1 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    const part2 = Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    return `ТОЧКА-${part1}-${part2}`;
+  }
+
   function buildCaseReview() {
+    const now = new Date().toISOString();
+    const sid = sessionId || `session-${Date.now()}`;
+    const code = publicCode || generatePublicCode();
+
+    if (!sessionId) setSessionId(sid);
+    if (!publicCode) setPublicCode(code);
+
     return {
-      case_id: `case-${Date.now()}`,
-      created_at: new Date().toISOString(),
+      case_id: sid,
+      sessionId: sid,
+      publicCode: code,
+      createdAt: now,
+      updatedAt: now,
       environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
       patient_input: text,
       questions,
       answers,
       ai_result: result,
+      conversationHistory,
+      dialogDepth,
+      previousPatientReport: previousPatientReport || "",
+      previousDoctorReport: previousDoctorReport || "",
+      homeTasks: homeTasks || "",
+      resourceFactors: resourceFactors || "",
       patient_feedback: {
         rating: patientRating,
         useful: patientUseful,
@@ -510,6 +550,67 @@ export default function App() {
     ? result.split("===DOCTOR_REPORT===")[1]?.trim() || ""
     : "";
 
+  function renderUserReport(text) {
+    if (!text) return null;
+    const highlightTitles = [
+      "Что может помочь сегодня",
+      "План до следующего разговора",
+      "До следующего разговора",
+    ];
+    const lines = text.split("\n");
+    const sections = [];
+    let current = null;
+    for (const line of lines) {
+      const m = line.match(/^(\d+)\.\s+(.+)/);
+      if (m) {
+        if (current) sections.push(current);
+        current = { num: m[1], title: m[2], lines: [] };
+      } else if (current) {
+        current.lines.push(line);
+      }
+    }
+    if (current) sections.push(current);
+
+    if (!sections.length) {
+      return <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{text}</div>;
+    }
+
+    const isHighlighted = (title) =>
+      highlightTitles.some((h) => title.toLowerCase().includes(h.toLowerCase()) || h.toLowerCase().includes(title.toLowerCase()));
+
+    return sections.map((s, i) => {
+      const hl = isHighlighted(s.title);
+      return (
+        <div
+          key={i}
+          style={{
+            marginBottom: 12,
+            padding: hl ? "14px 18px" : 0,
+            borderRadius: hl ? 14 : 0,
+            background: hl ? "rgba(99,102,241,.12)" : "transparent",
+            border: hl ? "1px solid rgba(99,102,241,.3)" : "none",
+          }}
+        >
+          <div
+            style={{
+              fontWeight: hl ? 700 : 600,
+              fontSize: hl ? 16 : 15,
+              color: hl ? "#c7d2fe" : "#e2e8f0",
+              marginBottom: s.lines.some((l) => l.trim()) ? 6 : 0,
+            }}
+          >
+            {s.num}. {s.title}
+          </div>
+          {s.lines.some((l) => l.trim()) && (
+            <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7, color: "#94a3b8" }}>
+              {s.lines.join("\n").trim()}
+            </div>
+          )}
+        </div>
+      );
+    });
+  }
+
   function handleReset() {
     setPhase("input");
     setQuestions(null);
@@ -533,6 +634,14 @@ export default function App() {
     });
     setConversationHistory([]);
     setDialogDepth(0);
+    setSessionData(null);
+    setSessionId(null);
+    setPublicCode(null);
+    setIsContinuation(false);
+    setPreviousPatientReport("");
+    setPreviousDoctorReport("");
+    setHomeTasks("");
+    setResourceFactors("");
     setRecording(false);
     setTranscribing(false);
     setVoiceError("");
@@ -871,6 +980,12 @@ export default function App() {
               <button style={s.secondary} onClick={() => setMode("text")}>
                 ⌨ Написать текстом
               </button>
+              <button
+                style={{ ...s.secondary, border: "1px solid rgba(99,102,241,.4)", background: "rgba(99,102,241,.12)" }}
+                onClick={() => setSessionModalOpen(true)}
+              >
+                🔄 Продолжить разговор
+              </button>
             </div>
 
             <p style={{ ...s.sub, marginTop: 24 }}>
@@ -1023,6 +1138,21 @@ export default function App() {
               <div style={s.result}>
                 <h2 style={{ marginTop: 0 }}>Предварительный отчёт</h2>
 
+                {publicCode && (
+                  <div style={{
+                    background: "rgba(99,102,241,.12)", border: "1px solid rgba(99,102,241,.3)",
+                    borderRadius: 16, padding: "12px 16px", marginBottom: 16,
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                  }}>
+                    <span style={{ color: "#a5b4fc", fontSize: 13 }}>
+                      Код диалога для продолжения:
+                    </span>
+                    <span style={{ fontWeight: 900, fontSize: 18, color: "#c7d2fe", letterSpacing: 1 }}>
+                      {publicCode}
+                    </span>
+                  </div>
+                )}
+
                 <div style={s.tabs}>
                   <button
                     style={activeTab === "user" ? s.activeTab : s.tab}
@@ -1039,9 +1169,13 @@ export default function App() {
                 </div>
 
                 <div style={s.reportBlock}>
-                  <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
-                    {activeTab === "user" ? userPart : doctorPart}
-                  </div>
+                  {activeTab === "user" ? (
+                    renderUserReport(userPart)
+                  ) : (
+                    <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+                      {doctorPart}
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -1164,6 +1298,22 @@ export default function App() {
                       placeholder="Любые дополнительные замечания..."
                     />
 
+                    <label style={s.label2}>Рекомендации до следующей встречи</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={homeTasks}
+                      onChange={(e) => setHomeTasks(e.target.value)}
+                      placeholder="Например: вести дневник настроения, попробовать техники релаксации, обратиться к конкретному специалисту..."
+                    />
+
+                    <label style={s.label2}>Ресурсные факторы (что помогает / поддерживает)</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={resourceFactors}
+                      onChange={(e) => setResourceFactors(e.target.value)}
+                      placeholder="Например: поддержка близких, хобби, спорт, стабильный режим..."
+                    />
+
                     <button
                       style={s.wide}
                       onClick={async () => {
@@ -1274,6 +1424,77 @@ export default function App() {
                     </button>
                   </div>
                 </>
+            </div>
+          </div>
+        )}
+
+        {sessionModalOpen && (
+          <div style={s.overlay} onClick={() => setSessionModalOpen(false)}>
+            <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+              <div style={s.modalTitle}>Продолжить разговор</div>
+
+              <p style={{ color: "#94a3b8", lineHeight: 1.6, marginBottom: 20 }}>
+                Введите код диалога, который был показан после завершения предыдущей сессии.
+              </p>
+
+              <input
+                style={s.crisisInput}
+                value={sessionCodeInput}
+                onChange={(e) => setSessionCodeInput(e.target.value.toUpperCase())}
+                placeholder="ТОЧКА-XXXX-XXXX"
+              />
+
+              <div style={s.crisisActions}>
+                <button
+                  style={s.wide}
+                  disabled={loadingSession || sessionCodeInput.trim().length < 5}
+                  onClick={async () => {
+                    setLoadingSession(true);
+                    try {
+                      const res = await fetch("/api/get-session", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ code: sessionCodeInput.trim() }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error || "Сессия не найдена");
+
+                      const s = data.session;
+                      setSessionData(s);
+                      setSessionId(s.sessionId);
+                      setPublicCode(s.publicCode);
+                      setText(s.patient_input || "");
+                      setQuestions(s.questions || null);
+                      setAnswers(s.answers || {});
+                      setResult(s.ai_result || null);
+                      setConversationHistory(s.conversationHistory || []);
+                      setDialogDepth(s.dialogDepth || 0);
+                      setPreviousPatientReport(s.previousPatientReport || "");
+                      setPreviousDoctorReport(s.previousDoctorReport || "");
+                      setHomeTasks(s.homeTasks || "");
+                      setResourceFactors(s.resourceFactors || "");
+                      setIsContinuation(true);
+
+                      setSessionModalOpen(false);
+                      setSessionCodeInput("");
+
+                      if (s.ai_result) {
+                        setPhase("report");
+                      } else if (s.questions) {
+                        setPhase("questions");
+                      } else {
+                        setPhase("input");
+                      }
+                    } catch (e) {
+                      alert(e.message || "Сессия не найдена");
+                    } finally {
+                      setLoadingSession(false);
+                    }
+                  }}
+                >
+                  {loadingSession ? "Поиск..." : "Продолжить"}
+                </button>
+              </div>
             </div>
           </div>
         )}
