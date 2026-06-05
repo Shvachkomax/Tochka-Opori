@@ -24,16 +24,10 @@ export default function App() {
   const [voiceError, setVoiceError] = useState("");
   const [recordingTime, setRecordingTime] = useState(0);
 
-  const [expertMode, setExpertMode] = useState(false);
-  const [expertNotes, setExpertNotes] = useState({
-    aiIssue: "",
-    missingQuestions: "",
-    wrongQuestions: "",
-    correctedLogic: "",
-    protocolUpdate: "",
-  });
-
-  const [doctorFeedbackOpen, setDoctorFeedbackOpen] = useState(false);
+  const [sessionReviewOpen, setSessionReviewOpen] = useState(false);
+  const [patientRating, setPatientRating] = useState(0);
+  const [patientUseful, setPatientUseful] = useState("");
+  const [patientUnclear, setPatientUnclear] = useState("");
   const [doctorFeedback, setDoctorFeedback] = useState({
     wrongQuestions: "",
     missingQuestions: "",
@@ -468,6 +462,44 @@ export default function App() {
     ];
   }
 
+  function buildCaseReview() {
+    return {
+      case_id: `case-${Date.now()}`,
+      created_at: new Date().toISOString(),
+      environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
+      patient_input: text,
+      questions,
+      answers,
+      ai_result: result,
+      patient_feedback: {
+        rating: patientRating,
+        useful: patientUseful,
+        unclear_or_useless: patientUnclear,
+      },
+      doctor_feedback: {
+        wrong_questions: doctorFeedback.wrongQuestions,
+        missing_questions: doctorFeedback.missingQuestions,
+        bad_question_wording: doctorFeedback.badQuestionWording,
+        corrected_user_report: doctorFeedback.correctedUserReport,
+        corrected_doctor_report: doctorFeedback.correctedDoctorReport,
+        protocol_update: doctorFeedback.protocolUpdate,
+        general_comment: doctorFeedback.generalComment,
+      },
+    };
+  }
+
+  function downloadCaseReview(caseReview) {
+    const blob = new Blob([JSON.stringify(caseReview, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${caseReview.case_id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const userPart = result
     ? result.split("===DOCTOR_REPORT===")[0]
         .replace("===USER_REPORT===", "")
@@ -486,15 +518,10 @@ export default function App() {
     setText("");
     setError("");
     setActiveTab("user");
-    setExpertMode(false);
-    setExpertNotes({
-      aiIssue: "",
-      missingQuestions: "",
-      wrongQuestions: "",
-      correctedLogic: "",
-      protocolUpdate: "",
-    });
-    setDoctorFeedbackOpen(false);
+    setSessionReviewOpen(false);
+    setPatientRating(0);
+    setPatientUseful("");
+    setPatientUnclear("");
     setDoctorFeedback({
       wrongQuestions: "",
       missingQuestions: "",
@@ -668,6 +695,7 @@ export default function App() {
       padding: 24,
     },
     label: { color: "#94a3b8", fontSize: 14, marginTop: 18, marginBottom: 6 },
+    label2: { color: "#94a3b8", fontSize: 14, marginTop: 22, marginBottom: 6 },
     questionCard: {
       background: "rgba(255,255,255,.06)",
       borderRadius: 18,
@@ -1018,219 +1046,145 @@ export default function App() {
 
                 <button
                   style={{ ...s.secondary, marginTop: 16 }}
-                  onClick={() => setExpertMode(!expertMode)}
+                  onClick={() => setSessionReviewOpen(!sessionReviewOpen)}
                 >
-                  Экспертная правка врача
+                  Оценка сессии
                 </button>
 
-                {expertMode && (
+                {sessionReviewOpen && (
                   <div style={s.expertBox}>
-                    <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>Экспертная правка врача</h3>
+                    <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>Оценка сессии</h3>
 
-                    <label style={s.label}>Что AI сделал неправильно?</label>
+                    <label style={s.label}>Оценка пациентом</label>
+                    <div style={{ marginBottom: 6, color: "#94a3b8", fontSize: 13 }}>Насколько полезным был разбор? 1–5</div>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button
+                          key={n}
+                          style={{
+                            width: 44, height: 44, borderRadius: 12, border: "1px solid rgba(255,255,255,.12)",
+                            background: patientRating === n ? "white" : "rgba(255,255,255,.06)",
+                            color: patientRating === n ? "#020617" : "white",
+                            fontWeight: 800, fontSize: 18, cursor: "pointer",
+                          }}
+                          onClick={() => setPatientRating(n)}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+
+                    <label style={s.label}>Что было полезно?</label>
                     <textarea
                       style={s.answerInput}
-                      value={expertNotes.aiIssue}
-                      onChange={(e) => setExpertNotes({ ...expertNotes, aiIssue: e.target.value })}
-                      placeholder="Например: задал лишний вопрос, не уточнил триггер, неверно оценил риск..."
+                      value={patientUseful}
+                      onChange={(e) => setPatientUseful(e.target.value)}
+                      placeholder="Например: помогло структурировать мысли, стало понятно, к кому обратиться..."
                     />
 
-                    <label style={s.label}>Каких вопросов не хватило?</label>
+                    <label style={s.label}>Что было непонятно или бесполезно?</label>
                     <textarea
                       style={s.answerInput}
-                      value={expertNotes.missingQuestions}
-                      onChange={(e) => setExpertNotes({ ...expertNotes, missingQuestions: e.target.value })}
-                      placeholder="Список недостающих вопросов..."
+                      value={patientUnclear}
+                      onChange={(e) => setPatientUnclear(e.target.value)}
+                      placeholder="Например: вопросы были слишком общими, заключение непонятно..."
                     />
 
-                    <label style={s.label}>Какие вопросы были лишними или неверными?</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={expertNotes.wrongQuestions}
-                      onChange={(e) => setExpertNotes({ ...expertNotes, wrongQuestions: e.target.value })}
-                      placeholder="Список лишних/неудачных вопросов..."
-                    />
+                    <div style={{ borderTop: "1px solid rgba(255,255,255,.08)", margin: "20px 0" }} />
 
-                    <label style={s.label}>Как должна выглядеть правильная логика?</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={expertNotes.correctedLogic}
-                      onChange={(e) => setExpertNotes({ ...expertNotes, correctedLogic: e.target.value })}
-                      placeholder="Опишите правильный clinical reasoning..."
-                    />
+                    <label style={s.label}>Оценка специалистом</label>
 
-                    <label style={s.label}>Что нужно добавить в протокол?</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={expertNotes.protocolUpdate}
-                      onChange={(e) => setExpertNotes({ ...expertNotes, protocolUpdate: e.target.value })}
-                      placeholder="Правило, которое нужно сохранить в clinical protocol..."
-                    />
-
-                    <button
-                      style={s.wide}
-                      onClick={() => {
-                        const review = {
-                          date: new Date().toISOString(),
-                          patient_input: text,
-                          questions,
-                          answers,
-                          ai_result: result,
-                          ai_issue: expertNotes.aiIssue,
-                          missing_questions: expertNotes.missingQuestions,
-                          wrong_questions: expertNotes.wrongQuestions,
-                          corrected_logic: expertNotes.correctedLogic,
-                          protocol_update: expertNotes.protocolUpdate,
-                        };
-
-                        const blob = new Blob([JSON.stringify(review, null, 2)], {
-                          type: "application/json",
-                        });
-
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `case-review-${Date.now()}.json`;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                      }}
-                    >
-                      Скачать экспертную правку JSON
-                    </button>
-                  </div>
-                )}
-
-                <button
-                  style={{
-                    ...s.secondary,
-                    marginTop: 18,
-                    width: "100%",
-                  }}
-                  onClick={() => setDoctorFeedbackOpen(!doctorFeedbackOpen)}
-                >
-                  🩺 Врачебная правка
-                </button>
-
-                {doctorFeedbackOpen && (
-                  <div style={s.expertBox}>
-                    <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>Врачебная правка диалога</h3>
-
-                    <label style={s.label}>Какие вопросы были лишними?</label>
+                    <label style={s.label2}>Какие вопросы были лишними?</label>
                     <textarea
                       style={s.answerInput}
                       value={doctorFeedback.wrongQuestions}
                       onChange={(e) =>
-                        setDoctorFeedback({
-                          ...doctorFeedback,
-                          wrongQuestions: e.target.value,
-                        })
+                        setDoctorFeedback({ ...doctorFeedback, wrongQuestions: e.target.value })
                       }
-                      placeholder="Например: вопрос был не связан с жалобой, усиливал тревогу, дублировал другой вопрос..."
+                      placeholder="Например: вопрос был не связан с жалобой, усиливал тревогу..."
                     />
 
-                    <label style={s.label}>Каких вопросов не хватило?</label>
+                    <label style={s.label2}>Каких вопросов не хватило?</label>
                     <textarea
                       style={s.answerInput}
                       value={doctorFeedback.missingQuestions}
                       onChange={(e) =>
-                        setDoctorFeedback({
-                          ...doctorFeedback,
-                          missingQuestions: e.target.value,
-                        })
+                        setDoctorFeedback({ ...doctorFeedback, missingQuestions: e.target.value })
                       }
-                      placeholder="Например: не спросил про утрату, вещества, соматические причины, суицидальные мысли..."
+                      placeholder="Например: не спросил про утрату, вещества, соматические причины..."
                     />
 
-                    <label style={s.label}>Какие вопросы были сформулированы неверно?</label>
+                    <label style={s.label2}>Какие вопросы были сформулированы неверно?</label>
                     <textarea
                       style={s.answerInput}
                       value={doctorFeedback.badQuestionWording}
                       onChange={(e) =>
-                        setDoctorFeedback({
-                          ...doctorFeedback,
-                          badQuestionWording: e.target.value,
-                        })
+                        setDoctorFeedback({ ...doctorFeedback, badQuestionWording: e.target.value })
                       }
-                      placeholder="Например: вопрос звучал пугающе, содержал несколько смыслов, подсказывал диагноз..."
+                      placeholder="Например: вопрос содержал несколько смыслов, подсказывал диагноз..."
                     />
 
-                    <label style={s.label}>Исправленная версия заключения для пациента</label>
+                    <label style={s.label2}>Исправленная версия заключения для пациента</label>
                     <textarea
                       style={s.answerInput}
                       value={doctorFeedback.correctedUserReport}
                       onChange={(e) =>
-                        setDoctorFeedback({
-                          ...doctorFeedback,
-                          correctedUserReport: e.target.value,
-                        })
+                        setDoctorFeedback({ ...doctorFeedback, correctedUserReport: e.target.value })
                       }
-                      placeholder="Вставьте или напишите правильную версию мягкого отчета для пациента..."
+                      placeholder="Вставьте правильную версию мягкого отчета для пациента..."
                     />
 
-                    <label style={s.label}>Исправленная версия карты для специалиста</label>
+                    <label style={s.label2}>Исправленная карта для специалиста</label>
                     <textarea
                       style={s.answerInput}
                       value={doctorFeedback.correctedDoctorReport}
                       onChange={(e) =>
-                        setDoctorFeedback({
-                          ...doctorFeedback,
-                          correctedDoctorReport: e.target.value,
-                        })
+                        setDoctorFeedback({ ...doctorFeedback, correctedDoctorReport: e.target.value })
                       }
-                      placeholder="Вставьте или напишите правильную врачебную версию..."
+                      placeholder="Вставьте правильную врачебную версию..."
                     />
 
-                    <label style={s.label}>Какое правило добавить в clinical protocol?</label>
+                    <label style={s.label2}>Какое правило добавить в clinical protocol?</label>
                     <textarea
                       style={s.answerInput}
                       value={doctorFeedback.protocolUpdate}
                       onChange={(e) =>
-                        setDoctorFeedback({
-                          ...doctorFeedback,
-                          protocolUpdate: e.target.value,
-                        })
+                        setDoctorFeedback({ ...doctorFeedback, protocolUpdate: e.target.value })
                       }
-                      placeholder="Например: если есть бессонница + тревога, всегда уточнять вещества, препараты, утрату и соматику..."
+                      placeholder="Например: если бессонница + тревога, всегда уточнять вещества, утрату и соматику..."
                     />
 
-                    <label style={s.label}>Общий комментарий врача</label>
+                    <label style={s.label2}>Общий комментарий специалиста</label>
                     <textarea
                       style={s.answerInput}
                       value={doctorFeedback.generalComment}
                       onChange={(e) =>
-                        setDoctorFeedback({
-                          ...doctorFeedback,
-                          generalComment: e.target.value,
-                        })
+                        setDoctorFeedback({ ...doctorFeedback, generalComment: e.target.value })
                       }
                       placeholder="Любые дополнительные замечания..."
                     />
 
                     <button
                       style={s.wide}
-                      onClick={() => {
-                        const review = {
-                          date: new Date().toISOString(),
-                          patient_input: text,
-                          questions,
-                          answers,
-                          ai_result: result,
-                          doctor_feedback: doctorFeedback,
-                        };
+                      onClick={async () => {
+                        const caseReview = buildCaseReview();
+                        downloadCaseReview(caseReview);
 
-                        const blob = new Blob([JSON.stringify(review, null, 2)], {
-                          type: "application/json",
-                        });
-
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `doctor-feedback-${Date.now()}.json`;
-                        a.click();
-                        URL.revokeObjectURL(url);
+                        if (window.location.hostname.includes("localhost")) {
+                          try {
+                            await fetch("/api/save-review", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify(caseReview),
+                            });
+                            alert("Case review сохранён в data/case-reviews.jsonl");
+                          } catch {
+                            alert("JSON скачан, но локально не сохранён");
+                          }
+                        }
                       }}
                     >
-                      Скачать врачебную правку JSON
+                      Скачать JSON / сохранить локально
                     </button>
                   </div>
                 )}
