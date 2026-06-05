@@ -1,8 +1,13 @@
+import "dotenv/config";
 import http from "node:http";
 import { Readable } from "node:stream";
 
 import analyzeHandler from "./api/analyze.js";
 import transcribeHandler from "./api/transcribe.js";
+import saveSessionHandler from "./api/save-session.js";
+import loadSessionHandler from "./api/load-session.js";
+import saveReviewHandler from "./api/save-review.js";
+import getSessionHandler from "./api/get-session.js";
 
 const PORT = 3001;
 
@@ -51,6 +56,18 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     }
     if (nodeReq.url.startsWith("/api/transcribe")) {
       return transcribeHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/save-session")) {
+      return saveSessionHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/load-session")) {
+      return loadSessionHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/save-review")) {
+      return saveReviewHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/get-session")) {
+      return getSessionHandler(req, res);
     }
 
     nodeRes.writeHead(404, { "Content-Type": "application/json" });

@@ -461,28 +461,52 @@ export default function App() {
         setPhase("report");
 
         const sid = sessionId || `session-${Date.now()}`;
-        const code = publicCode || generatePublicCode();
         if (!sessionId) setSessionId(sid);
-        if (!publicCode) setPublicCode(code);
 
-        if (window.location.hostname.includes("localhost")) {
-          const review = {
-            case_id: sid, sessionId: sid, publicCode: code,
-            createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-            environment: "local", patient_input: text, questions, answers,
-            ai_result: data.report || "", conversationHistory, dialogDepth,
-            previousPatientReport: previousPatientReport || "",
-            previousDoctorReport: previousDoctorReport || "",
-            homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
-            patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
-            doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
-          };
-          fetch("/api/save-review", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(review),
-          }).catch(() => {});
-        }
+        // Save session to Supabase (works on localhost and Vercel)
+        fetch("/api/save-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: sid,
+            patient_text: text,
+            conversationHistory: [
+              ...conversationHistory,
+              ...(dialogDepth > 0 ? [{ role: "user", answers }] : []),
+            ],
+            user_report: data.report?.split("===DOCTOR_REPORT===")[0]?.replace("===USER_REPORT===", "").trim() || "",
+            doctor_report: data.report?.split("===DOCTOR_REPORT===")[1]?.trim() || "",
+            riskLevel: null,
+            supportPlan: null,
+          }),
+        })
+          .then((r) => r.json())
+          .then((result) => {
+            const code = result.publicCode || publicCode || "";
+            if (result.publicCode && !publicCode) {
+              setPublicCode(result.publicCode);
+            }
+            // Local filesystem fallback
+            if (window.location.hostname.includes("localhost") && code) {
+              const review = {
+                case_id: sid, sessionId: sid, publicCode: code,
+                createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+                environment: "local", patient_input: text, questions, answers,
+                ai_result: data.report || "", conversationHistory, dialogDepth,
+                previousPatientReport: previousPatientReport || "",
+                previousDoctorReport: previousDoctorReport || "",
+                homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
+                patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
+                doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
+              };
+              fetch("/api/save-review", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(review),
+              }).catch(() => {});
+            }
+          })
+          .catch(() => {});
       } else {
         throw new Error("Неизвестный тип ответа");
       }
@@ -505,9 +529,8 @@ export default function App() {
 
   function generatePublicCode() {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    const part1 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-    const part2 = Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-    return `ТОЧКА-${part1}-${part2}`;
+    const part = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    return `ТОЧКА-${part()}-${part()}`;
   }
 
   function buildCaseReview() {
@@ -1482,40 +1505,55 @@ export default function App() {
                   onClick={async () => {
                     setLoadingSession(true);
                     try {
-                      const res = await fetch("/api/get-session", {
+                      const code = sessionCodeInput.trim();
+
+                      // Try Supabase first
+                      let res = await fetch("/api/load-session", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ code: sessionCodeInput.trim() }),
+                        body: JSON.stringify({ publicCode: code }),
                       });
-                      const data = await res.json();
-                      if (!res.ok) throw new Error(data.error || "Сессия не найдена");
+                      let data = await res.json();
+
+                      // Fallback to local fs
+                      if (!res.ok || !data.ok) {
+                        res = await fetch("/api/get-session", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ code }),
+                        });
+                        data = await res.json();
+                        if (!res.ok) throw new Error(data.error || "Сессия не найдена");
+                      }
 
                       const s = data.session;
-                      setSessionData(s);
-                      setSessionId(s.sessionId);
-                      setPublicCode(s.publicCode);
-                      setText(s.patient_input || "");
-                      setQuestions(s.questions || null);
-                      setAnswers(s.answers || {});
-                      setResult(s.ai_result || null);
-                      setConversationHistory(s.conversationHistory || []);
+                      setSessionId(s.sessionId || s.session_id);
+                      setPublicCode(s.publicCode || s.public_code);
+                      setText(s.patient_input || s.patient_text || "");
+                      setConversationHistory(s.conversationHistory || s.conversation_history || []);
                       setDialogDepth(s.dialogDepth || 0);
-                      setPreviousPatientReport(s.previousPatientReport || "");
-                      setPreviousDoctorReport(s.previousDoctorReport || "");
+                      setPreviousPatientReport(s.user_report || s.previousPatientReport || "");
+                      setPreviousDoctorReport(s.doctor_report || s.previousDoctorReport || "");
                       setHomeTasks(s.homeTasks || "");
                       setResourceFactors(s.resourceFactors || "");
-                      setIsContinuation(true);
 
+                      // Restore questions/answers if present
+                      const savedAnswers = s.answers || {};
+                      const savedResult = s.ai_result || s.result || null;
+                      const hasResult = !!savedResult || !!s.user_report || !!s.doctor_report;
+
+                      if (hasResult) {
+                        setResult(savedResult || `${s.user_report || ""}\n\n===DOCTOR_REPORT===\n\n${s.doctor_report || ""}`);
+                        setPhase("report");
+                      } else {
+                        setResult(null);
+                        setAnswers(savedAnswers);
+                        setPhase(Object.keys(savedAnswers).length > 0 ? "questions" : "input");
+                      }
+
+                      setIsContinuation(true);
                       setSessionModalOpen(false);
                       setSessionCodeInput("");
-
-                      if (s.ai_result) {
-                        setPhase("report");
-                      } else if (s.questions) {
-                        setPhase("questions");
-                      } else {
-                        setPhase("input");
-                      }
                     } catch (e) {
                       alert(e.message || "Сессия не найдена");
                     } finally {
