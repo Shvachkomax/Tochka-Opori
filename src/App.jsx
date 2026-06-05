@@ -459,6 +459,30 @@ export default function App() {
         setResult(data.report || "");
         setActiveTab("user");
         setPhase("report");
+
+        const sid = sessionId || `session-${Date.now()}`;
+        const code = publicCode || generatePublicCode();
+        if (!sessionId) setSessionId(sid);
+        if (!publicCode) setPublicCode(code);
+
+        if (window.location.hostname.includes("localhost")) {
+          const review = {
+            case_id: sid, sessionId: sid, publicCode: code,
+            createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+            environment: "local", patient_input: text, questions, answers,
+            ai_result: data.report || "", conversationHistory, dialogDepth,
+            previousPatientReport: previousPatientReport || "",
+            previousDoctorReport: previousDoctorReport || "",
+            homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
+            patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
+            doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
+          };
+          fetch("/api/save-review", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(review),
+          }).catch(() => {});
+        }
       } else {
         throw new Error("Неизвестный тип ответа");
       }
