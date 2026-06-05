@@ -1338,28 +1338,35 @@ export default function App() {
                       placeholder="Например: поддержка близких, хобби, спорт, стабильный режим..."
                     />
 
-                    <button
-                      style={s.wide}
-                      onClick={async () => {
-                        const caseReview = buildCaseReview();
-                        downloadCaseReview(caseReview);
-
-                        if (window.location.hostname.includes("localhost")) {
-                          try {
-                            await fetch("/api/save-review", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify(caseReview),
-                            });
-                            alert("Case review сохранён в data/case-reviews.jsonl");
-                          } catch {
-                            alert("JSON скачан, но локально не сохранён");
-                          }
-                        }
-                      }}
-                    >
-                      Скачать JSON / сохранить локально
-                    </button>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button
+                        style={s.wide}
+                        onClick={() => {
+                          downloadCaseReview(buildCaseReview());
+                        }}
+                      >
+                        Скачать JSON
+                      </button>
+                      {window.location.hostname.includes("localhost") && (
+                        <button
+                          style={s.wide}
+                          onClick={async () => {
+                            try {
+                              await fetch("/api/save-review", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(buildCaseReview()),
+                              });
+                              alert("Сохранено локально");
+                            } catch {
+                              alert("Ошибка локального сохранения");
+                            }
+                          }}
+                        >
+                          Сохранить локально
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
