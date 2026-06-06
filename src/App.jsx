@@ -60,8 +60,9 @@ export default function App() {
   const [adminAuthed, setAdminAuthed] = useState(false);
   const [adminReviews, setAdminReviews] = useState([]);
   const [adminTotal, setAdminTotal] = useState(0);
-  const [adminFilter, setAdminFilter] = useState("pending");
+  const [adminFilter, setAdminFilter] = useState("all");
   const [adminEnv, setAdminEnv] = useState("production");
+  const [adminExpertFilter, setAdminExpertFilter] = useState("all");
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminActionLoading, setAdminActionLoading] = useState(null);
 
@@ -75,6 +76,17 @@ export default function App() {
   const [expertModalOpen, setExpertModalOpen] = useState(false);
   const [expertCodeInput, setExpertCodeInput] = useState("");
   const [expertLoggingIn, setExpertLoggingIn] = useState(false);
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [registerForm, setRegisterForm] = useState({
+    name: "", email: "", telegram: "", role: "psychologist", specialty: "", city: "", organization: "",
+  });
+  const [registerSending, setRegisterSending] = useState(false);
+  const [registrationResult, setRegistrationResult] = useState(null); // { access_code, expert }
+
+  // Admin expert requests state
+  const [adminReqTab, setAdminReqTab] = useState("reviews");
+  const [adminRequests, setAdminRequests] = useState([]);
+  const [adminReqFilter, setAdminReqFilter] = useState("pending");
 
   function showToast(message, type = "success") {
     setToast({ message, type, key: Date.now() });
@@ -111,6 +123,66 @@ export default function App() {
     setExpertData(null);
     localStorage.removeItem("tochka_expert");
     showToast("Режим специалиста выключен");
+  }
+
+  function resetRegisterForm() {
+    setRegisterForm({ name: "", email: "", telegram: "", role: "psychologist", specialty: "", city: "", organization: "" });
+  }
+
+  async function handleExpertRegister() {
+    const f = registerForm;
+    if (f.name.trim().length < 2) { showToast("Укажите имя (минимум 2 символа)", "error"); return; }
+
+    setRegisterSending(true);
+    try {
+      const res = await fetch("/api/register-expert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(f),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setRegistrationResult(data);
+        setExpertData(data.expert);
+        localStorage.setItem("tochka_expert", JSON.stringify(data.expert));
+        showToast(`Режим специалиста активирован: ${data.expert.name}`);
+      } else {
+        showToast(data.error || "Ошибка регистрации", "error");
+      }
+    } catch {
+      showToast("Ошибка подключения", "error");
+    } finally {
+      setRegisterSending(false);
+    }
+  }
+
+  async function adminLoadRequests(filterStatus) {
+    const st = filterStatus || adminReqFilter;
+    try {
+      const res = await fetch("/api/list-expert-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: st, limit: 100 }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAdminRequests(data.requests || []);
+      }
+    } catch {}
+  }
+
+  async function adminUpdateRequestStatus(requestId, status) {
+    try {
+      await fetch("/api/update-expert-request-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ request_id: requestId, status, admin_secret: adminPassword }),
+      });
+      showToast("Статус заявки обновлён");
+      adminLoadRequests(adminReqFilter);
+    } catch {
+      showToast("Ошибка обновления", "error");
+    }
   }
 
   const [recordingQuestionIndex, setRecordingQuestionIndex] = useState(null);
@@ -819,15 +891,16 @@ export default function App() {
     }
   }
 
-  async function adminLoadReviews(filterStatus, filterEnv) {
+  async function adminLoadReviews(filterStatus, filterEnv, expertFilter) {
     const st = filterStatus || adminFilter;
     const env = filterEnv !== undefined ? filterEnv : adminEnv;
+    const exp = expertFilter !== undefined ? expertFilter : adminExpertFilter;
     setAdminLoading(true);
     try {
       const res = await fetch("/api/list-reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: st, environment: env, limit: 100 }),
+        body: JSON.stringify({ status: st, environment: env, expert_filter: exp, limit: 100 }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -926,7 +999,125 @@ export default function App() {
             </div>
           ) : (
             <>
-              {/* Filters */}
+              {/* Tabs */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "reviews" ? "white" : "rgba(255,255,255,.06)",
+                    color: adminReqTab === "reviews" ? "#020617" : "white",
+                  }}
+                  onClick={() => setAdminReqTab("reviews")}
+                >
+                  Отзывы о сессиях
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "requests" ? "white" : "rgba(255,255,255,.06)",
+                    color: adminReqTab === "requests" ? "#020617" : "white",
+                  }}
+                  onClick={() => { setAdminReqTab("requests"); adminLoadRequests(adminReqFilter); }}
+                >
+                  Заявки специалистов
+                </button>
+              </div>
+
+              {adminReqTab === "requests" ? (
+                <>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
+                    <select
+                      value={adminReqFilter}
+                      onChange={(e) => { const v = e.target.value; setAdminReqFilter(v); adminLoadRequests(v); }}
+                      style={{
+                        border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
+                        color: "white", padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                      }}
+                    >
+                      <option value="pending">Ожидают</option>
+                      <option value="approved">Одобренные</option>
+                      <option value="rejected">Отклонённые</option>
+                      <option value="all">Все</option>
+                    </select>
+                    <button
+                      style={{
+                        border: "1px solid rgba(255,255,255,.18)", borderRadius: 12, background: "rgba(255,255,255,.06)",
+                        color: "white", padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                      }}
+                      onClick={() => adminLoadRequests(adminReqFilter)}
+                    >
+                      Обновить ({adminRequests.length})
+                    </button>
+                  </div>
+
+                  {adminRequests.length === 0 ? (
+                    <div style={{ color: "#94a3b8", textAlign: "center", padding: 60 }}>Нет заявок</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      {adminRequests.map((req) => (
+                        <div key={req.id} style={{
+                          border: "1px solid rgba(255,255,255,.1)", borderRadius: 20,
+                          background: "rgba(255,255,255,.04)", padding: 20,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                              <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                                {new Date(req.created_at).toLocaleString("ru-RU")}
+                              </span>
+                              <span style={{
+                                fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                                background: req.status === "approved" ? "rgba(34,197,94,.2)" : req.status === "rejected" ? "rgba(220,38,38,.2)" : "rgba(234,179,8,.2)",
+                                color: req.status === "approved" ? "#bbf7d0" : req.status === "rejected" ? "#fecaca" : "#fde68a",
+                              }}>
+                                {req.status}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ marginBottom: 8 }}>
+                            <span style={{ fontWeight: 700, color: "#e2e8f0" }}>{req.name}</span>
+                            <span style={{ color: "#94a3b8", marginLeft: 8 }}>{req.role}</span>
+                          </div>
+                          <div style={{ color: "#64748b", fontSize: 13, marginBottom: 8 }}>
+                            {req.email && <span>Email: {req.email}  </span>}
+                            {req.telegram && <span>Telegram: {req.telegram}  </span>}
+                            {req.specialty && <span>Специализация: {req.specialty}  </span>}
+                            {req.city && <span>Город: {req.city}  </span>}
+                            {req.organization && <span>Организация: {req.organization}</span>}
+                          </div>
+                          {req.comment && (
+                            <div style={{ color: "#94a3b8", fontSize: 13, fontStyle: "italic", marginBottom: 8 }}>
+                              "{req.comment}"
+                            </div>
+                          )}
+
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            {req.status !== "approved" && (
+                              <button style={{ border: 0, borderRadius: 12, background: "rgba(34,197,94,.2)", color: "#bbf7d0", padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                                onClick={() => adminUpdateRequestStatus(req.id, "approved")}>
+                                Одобрить
+                              </button>
+                            )}
+                            {req.status !== "rejected" && (
+                              <button style={{ border: 0, borderRadius: 12, background: "rgba(220,38,38,.2)", color: "#fecaca", padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                                onClick={() => adminUpdateRequestStatus(req.id, "rejected")}>
+                                Отклонить
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/*
+                    TODO: "Создать специалиста и сгенерировать код"
+                    Добавить кнопку рядом с одобренными заявками для создания записи в experts
+                    и генерации access_code. Заполнять вручную.
+                  */}
+                </>
+              ) : (
+              <>
+              {/* Reviews filters */}
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
                 <select
                   value={adminFilter}
@@ -936,6 +1127,7 @@ export default function App() {
                     color: "white", padding: "10px 16px", fontSize: 14, cursor: "pointer",
                   }}
                 >
+                  <option value="all">Все</option>
                   <option value="pending">Ожидают</option>
                   <option value="approved">Одобренные</option>
                   <option value="rejected">Отклонённые</option>
@@ -953,6 +1145,18 @@ export default function App() {
                   <option value="production">Production</option>
                   <option value="local">Local</option>
                   <option value="">Все окружения</option>
+                </select>
+                <select
+                  value={adminExpertFilter}
+                  onChange={(e) => { const v = e.target.value; setAdminExpertFilter(v); adminLoadReviews(adminFilter, adminEnv, v); }}
+                  style={{
+                    border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
+                    color: "white", padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                  }}
+                >
+                  <option value="all">Все отзывы</option>
+                  <option value="with_expert">С экспертом</option>
+                  <option value="without_expert">Без эксперта</option>
                 </select>
                 <button
                   style={{
@@ -1087,7 +1291,14 @@ export default function App() {
                 TODO: "Экспортировать approved reviews в JSONL"
                 <button>Экспортировать одобренные в JSONL</button>
               */}
-            </>
+
+              {/* Future /admin/experts page placeholder */}
+              {/*
+                TODO: "Позже добавить список зарегистрированных специалистов, отключение is_active и просмотр их reviews."
+              */}
+              </>
+            )}
+          </>
           )}
         </div>
 
@@ -2112,36 +2323,116 @@ export default function App() {
         )}
 
         {expertModalOpen && (
-          <div style={s.overlay} onClick={() => setExpertModalOpen(false)}>
+          <div style={s.overlay} onClick={() => { setExpertModalOpen(false); setShowRegisterForm(false); resetRegisterForm(); setRegistrationResult(null); }}>
             <div style={s.modal} className="modal" onClick={(e) => e.stopPropagation()}>
-              <div style={s.modalTitle}>Режим специалиста</div>
-              <p style={{ color: "#94a3b8", lineHeight: 1.6, marginBottom: 20 }}>
-                Введите код, полученный от администратора, чтобы привязать экспертную оценку к вашему профилю.
-              </p>
+              {registrationResult ? (
+                <>
+                  <div style={s.modalTitle}>Режим специалиста активирован</div>
+                  <p style={{ color: "#bbf7d0", lineHeight: 1.6, marginBottom: 16, background: "rgba(34,197,94,.12)", padding: "14px 18px", borderRadius: 14, fontSize: 14 }}>
+                    Вы зарегистрированы как специалист. Ваш профиль привязан к этому устройству.
+                  </p>
+                  <div style={{ background: "rgba(99,102,241,.12)", border: "1px solid rgba(99,102,241,.25)", borderRadius: 14, padding: "16px 18px", marginBottom: 16 }}>
+                    <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 6 }}>Ваш код специалиста</div>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: "#a5b4fc", letterSpacing: 1, fontFamily: "monospace" }}>
+                      {registrationResult.access_code}
+                    </div>
+                    <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
+                      Сохраните этот код. С ним вы сможете войти как специалист с другого устройства.
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button style={s.wide} onClick={() => { navigator.clipboard.writeText(registrationResult.access_code); showToast("Код скопирован"); }}>
+                      Скопировать код
+                    </button>
+                    <button style={{ ...s.secondary, width: "100%" }} onClick={() => { setExpertModalOpen(false); setShowRegisterForm(false); resetRegisterForm(); setRegistrationResult(null); }}>
+                      Готово
+                    </button>
+                  </div>
+                </>
+              ) : !showRegisterForm ? (
+                <>
+                  <div style={s.modalTitle}>Режим специалиста</div>
 
-              <input
-                style={s.crisisInput}
-                value={expertCodeInput}
-                onChange={(e) => setExpertCodeInput(e.target.value.toUpperCase())}
-                onKeyDown={(e) => e.key === "Enter" && handleExpertLogin()}
-                placeholder="XXXX-XXXX-XX"
-              />
+                  {/* Block A: existing code */}
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ color: "#e2e8f0", fontWeight: 600, fontSize: 14, marginBottom: 10 }}>У меня уже есть код</div>
+                    <input
+                      style={s.crisisInput}
+                      value={expertCodeInput}
+                      onChange={(e) => setExpertCodeInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === "Enter" && handleExpertLogin()}
+                      placeholder="EXPERT-XXXX-XXXX"
+                    />
+                    <div style={s.crisisActions}>
+                      <button
+                        style={s.wide}
+                        disabled={expertLoggingIn || expertCodeInput.trim().length < 3}
+                        onClick={handleExpertLogin}
+                      >
+                        {expertLoggingIn ? "Поиск..." : "Войти"}
+                      </button>
+                    </div>
+                  </div>
 
-              <div style={s.crisisActions}>
-                <button
-                  style={s.wide}
-                  disabled={expertLoggingIn || expertCodeInput.trim().length < 3}
-                  onClick={handleExpertLogin}
-                >
-                  {expertLoggingIn ? "Поиск..." : "Войти"}
-                </button>
-                <button
-                  style={{ ...s.secondary, width: "100%" }}
-                  onClick={() => setExpertModalOpen(false)}
-                >
-                  Отмена
-                </button>
-              </div>
+                  {/* Divider */}
+                  <div style={{ borderTop: "1px solid rgba(255,255,255,.08)", margin: "16px 0" }} />
+
+                  {/* Block B: first time registration */}
+                  <div>
+                    <div style={{ color: "#e2e8f0", fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Я впервые здесь</div>
+                    <p style={{ color: "#94a3b8", lineHeight: 1.6, marginBottom: 14, fontSize: 13 }}>
+                      Если вы врач, психолог или другой специалист и участвуете в тестировании, заполните короткую форму. Доступ включится сразу.
+                    </p>
+                    <button
+                      style={{ ...s.wide, background: "rgba(99,102,241,.15)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,.3)" }}
+                      onClick={() => { setShowRegisterForm(true); resetRegisterForm(); }}
+                    >
+                      Зарегистрироваться как специалист
+                    </button>
+                  </div>
+
+                  <button
+                    style={{ ...s.secondary, width: "100%" }}
+                    onClick={() => setExpertModalOpen(false)}
+                  >
+                    Отмена
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div style={s.modalTitle}>Регистрация специалиста</div>
+                  <p style={{ color: "#94a3b8", lineHeight: 1.6, marginBottom: 16, fontSize: 13 }}>
+                    Заполните форму. После регистрации вы получите код специалиста и доступ включится сразу.
+                  </p>
+
+                  <input style={s.crisisInput} placeholder="ФИО *" value={registerForm.name} onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })} />
+                  <input style={s.crisisInput} placeholder="Email" type="email" value={registerForm.email} onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} />
+                  <input style={s.crisisInput} placeholder="Telegram" value={registerForm.telegram} onChange={(e) => setRegisterForm({ ...registerForm, telegram: e.target.value })} />
+                  <select style={{ ...s.crisisInput, cursor: "pointer" }} value={registerForm.role} onChange={(e) => setRegisterForm({ ...registerForm, role: e.target.value })}>
+                    <option value="psychiatrist">Психиатр</option>
+                    <option value="psychologist">Психолог</option>
+                    <option value="psychotherapist">Психотерапевт</option>
+                    <option value="clinical_psychologist">Клинический психолог</option>
+                    <option value="neurologist">Невролог</option>
+                    <option value="other">Другое</option>
+                  </select>
+                  <input style={s.crisisInput} placeholder="Специализация" value={registerForm.specialty} onChange={(e) => setRegisterForm({ ...registerForm, specialty: e.target.value })} />
+                  <input style={s.crisisInput} placeholder="Город" value={registerForm.city} onChange={(e) => setRegisterForm({ ...registerForm, city: e.target.value })} />
+                  <input style={s.crisisInput} placeholder="Организация" value={registerForm.organization} onChange={(e) => setRegisterForm({ ...registerForm, organization: e.target.value })} />
+
+                  <div style={s.crisisActions}>
+                    <button style={s.wide} disabled={registerSending} onClick={handleExpertRegister}>
+                      {registerSending ? "Регистрация..." : "Зарегистрироваться"}
+                    </button>
+                    <button
+                      style={{ ...s.secondary, width: "100%" }}
+                      onClick={() => { setShowRegisterForm(false); resetRegisterForm(); }}
+                    >
+                      Назад
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

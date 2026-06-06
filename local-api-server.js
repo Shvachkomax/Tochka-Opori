@@ -15,6 +15,10 @@ import listReviewsHandler from "./api/list-reviews.js";
 import updateReviewStatusHandler from "./api/update-review-status.js";
 import adminVerifyHandler from "./api/admin-verify.js";
 import expertLoginHandler from "./api/expert-login.js";
+import requestExpertAccessHandler from "./api/request-expert-access.js";
+import listExpertRequestsHandler from "./api/list-expert-requests.js";
+import updateExpertRequestStatusHandler from "./api/update-expert-request-status.js";
+import registerExpertHandler from "./api/register-expert.js";
 
 const PORT = 3001;
 
@@ -90,6 +94,18 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     }
     if (nodeReq.url.startsWith("/api/expert-login")) {
       return expertLoginHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/request-expert-access")) {
+      return requestExpertAccessHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/list-expert-requests")) {
+      return listExpertRequestsHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/update-expert-request-status")) {
+      return updateExpertRequestStatusHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/register-expert")) {
+      return registerExpertHandler(req, res);
     }
 
     nodeRes.writeHead(404, { "Content-Type": "application/json" });

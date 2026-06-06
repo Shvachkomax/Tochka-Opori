@@ -8,20 +8,30 @@ export default async function handler(req, res) {
   try {
     const params = req.method === "POST" ? (req.body || {}) : (req.query || {});
 
-    const status = params.status || "pending";
+    const status = params.status || "all";
     const environment = params.environment || null;
+    const expertFilter = params.expert_filter || "all";
     const limit = Math.min(parseInt(params.limit) || 50, 200);
     const offset = parseInt(params.offset) || 0;
 
     let query = getSupabase()
       .from("case_reviews")
       .select("*")
-      .filter("json_data->>status", "eq", status)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
+    if (status !== "all") {
+      query = query.filter("json_data->>status", "eq", status);
+    }
+
     if (environment) {
       query = query.filter("json_data->>environment", "eq", environment);
+    }
+
+    if (expertFilter === "with_expert") {
+      query = query.not("expert_id", "is", null);
+    } else if (expertFilter === "without_expert") {
+      query = query.filter("expert_id", "is", null);
     }
 
     const { data, error } = await query;
@@ -33,11 +43,20 @@ export default async function handler(req, res) {
     // Get total count
     let countQuery = getSupabase()
       .from("case_reviews")
-      .select("id", { count: "exact", head: true })
-      .filter("json_data->>status", "eq", status);
+      .select("id", { count: "exact", head: true });
+
+    if (status !== "all") {
+      countQuery = countQuery.filter("json_data->>status", "eq", status);
+    }
 
     if (environment) {
       countQuery = countQuery.filter("json_data->>environment", "eq", environment);
+    }
+
+    if (expertFilter === "with_expert") {
+      countQuery = countQuery.not("expert_id", "is", null);
+    } else if (expertFilter === "without_expert") {
+      countQuery = countQuery.filter("expert_id", "is", null);
     }
 
     const { count } = await countQuery;
@@ -57,6 +76,7 @@ export default async function handler(req, res) {
       total: count || reviews.length,
       status,
       environment: environment || "all",
+      expert_filter: expertFilter,
     });
   } catch (error) {
     return res.status(500).json({
