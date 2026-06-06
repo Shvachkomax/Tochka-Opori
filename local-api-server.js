@@ -8,6 +8,7 @@ import saveSessionHandler from "./api/save-session.js";
 import loadSessionHandler from "./api/load-session.js";
 import saveReviewHandler from "./api/save-review.js";
 import getSessionHandler from "./api/get-session.js";
+import checkEnvHandler from "./api/check-env.js";
 
 const PORT = 3001;
 
@@ -68,6 +69,9 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     }
     if (nodeReq.url.startsWith("/api/get-session")) {
       return getSessionHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/check-env")) {
+      return checkEnvHandler(req, res);
     }
 
     nodeRes.writeHead(404, { "Content-Type": "application/json" });
