@@ -1,6 +1,8 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import http from "node:http";
 import { Readable } from "node:stream";
+
+dotenv.config({ path: ".env.local" });
 
 import analyzeHandler from "./api/analyze.js";
 import transcribeHandler from "./api/transcribe.js";
@@ -9,6 +11,9 @@ import loadSessionHandler from "./api/load-session.js";
 import saveReviewHandler from "./api/save-review.js";
 import getSessionHandler from "./api/get-session.js";
 import checkEnvHandler from "./api/check-env.js";
+import listReviewsHandler from "./api/list-reviews.js";
+import updateReviewStatusHandler from "./api/update-review-status.js";
+import adminVerifyHandler from "./api/admin-verify.js";
 
 const PORT = 3001;
 
@@ -72,6 +77,15 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     }
     if (nodeReq.url.startsWith("/api/check-env")) {
       return checkEnvHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/list-reviews")) {
+      return listReviewsHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/update-review-status")) {
+      return updateReviewStatusHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/admin-verify")) {
+      return adminVerifyHandler(req, res);
     }
 
     nodeRes.writeHead(404, { "Content-Type": "application/json" });

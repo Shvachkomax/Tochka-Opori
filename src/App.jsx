@@ -55,6 +55,16 @@ export default function App() {
 
   const [toast, setToast] = useState({ message: "", type: "", key: 0 });
 
+  // Admin panel state
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminAuthed, setAdminAuthed] = useState(false);
+  const [adminReviews, setAdminReviews] = useState([]);
+  const [adminTotal, setAdminTotal] = useState(0);
+  const [adminFilter, setAdminFilter] = useState("pending");
+  const [adminEnv, setAdminEnv] = useState("production");
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminActionLoading, setAdminActionLoading] = useState(null);
+
   function showToast(message, type = "success") {
     setToast({ message, type, key: Date.now() });
   }
@@ -735,6 +745,312 @@ export default function App() {
     if (crisisTimerRef.current) {
       clearInterval(crisisTimerRef.current);
     }
+  }
+
+  async function adminLogin() {
+    if (!adminPassword) return;
+    try {
+      const res = await fetch("/api/admin-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAdminAuthed(true);
+        adminLoadReviews(adminFilter, adminEnv);
+      } else {
+        showToast("Неверный пароль", "error");
+      }
+    } catch {
+      showToast("Ошибка подключения", "error");
+    }
+  }
+
+  async function adminLoadReviews(filterStatus, filterEnv) {
+    const st = filterStatus || adminFilter;
+    const env = filterEnv !== undefined ? filterEnv : adminEnv;
+    setAdminLoading(true);
+    try {
+      const res = await fetch("/api/list-reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: st, environment: env, limit: 100 }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAdminReviews(data.reviews || []);
+        setAdminTotal(data.total || 0);
+      } else {
+        showToast(data.error || "Ошибка загрузки", "error");
+      }
+    } catch {
+      showToast("Ошибка загрузки списка", "error");
+    } finally {
+      setAdminLoading(false);
+    }
+  }
+
+  async function adminUpdateStatus(reviewId, status) {
+    setAdminActionLoading(reviewId);
+    try {
+      const res = await fetch("/api/update-review-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ review_id: reviewId, status, admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Статус обновлён");
+        adminLoadReviews();
+      } else {
+        showToast(data.error || "Ошибка обновления", "error");
+      }
+    } catch {
+      showToast("Ошибка обновления статуса", "error");
+    } finally {
+      setAdminActionLoading(null);
+    }
+  }
+
+  function adminDownloadJson(review) {
+    const blob = new Blob([JSON.stringify(review.json_data || review, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${review.case_id || review.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function shorten(text, max = 100) {
+    if (!text) return "—";
+    return text.length > max ? text.slice(0, max) + "…" : text;
+  }
+
+  const isAdminPage = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+
+  if (isAdminPage) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#050817", color: "white", fontFamily: "Inter, system-ui, Arial", padding: 32 }}>
+        <style>{`
+  * { box-sizing: border-box; }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+`}</style>
+
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 40 }}>
+            <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>🧠 Админ-панель / Отзывы о сессиях</h1>
+            <a href="/" style={{ color: "#94a3b8", fontSize: 14 }}>← На главную</a>
+          </div>
+
+          {!adminAuthed ? (
+            <div style={{ maxWidth: 400, margin: "60px auto" }}>
+              <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20 }}>Вход в админ-панель</h2>
+              <input
+                type="password"
+                style={{
+                  width: "100%", border: "1px solid rgba(255,255,255,.12)", borderRadius: 16,
+                  background: "rgba(2,6,23,.55)", color: "white", padding: "14px", fontSize: 15,
+                  outline: "none", boxSizing: "border-box", marginBottom: 16,
+                }}
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && adminLogin()}
+                placeholder="Пароль администратора"
+              />
+              <button
+                style={{
+                  width: "100%", border: 0, borderRadius: 24, background: "white", color: "#020617",
+                  padding: "18px 22px", fontWeight: 900, fontSize: 16, cursor: "pointer",
+                }}
+                onClick={adminLogin}
+              >
+                Войти
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Filters */}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
+                <select
+                  value={adminFilter}
+                  onChange={(e) => { const v = e.target.value; setAdminFilter(v); adminLoadReviews(v, adminEnv); }}
+                  style={{
+                    border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
+                    color: "white", padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                  }}
+                >
+                  <option value="pending">Ожидают</option>
+                  <option value="approved">Одобренные</option>
+                  <option value="rejected">Отклонённые</option>
+                  <option value="needs_review">На доработку</option>
+                  <option value="local_auto_saved">Локальные</option>
+                </select>
+                <select
+                  value={adminEnv}
+                  onChange={(e) => { const v = e.target.value; setAdminEnv(v); adminLoadReviews(adminFilter, v); }}
+                  style={{
+                    border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
+                    color: "white", padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                  }}
+                >
+                  <option value="production">Production</option>
+                  <option value="local">Local</option>
+                  <option value="">Все окружения</option>
+                </select>
+                <button
+                  style={{
+                    border: "1px solid rgba(255,255,255,.18)", borderRadius: 12, background: "rgba(255,255,255,.06)",
+                    color: "white", padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                  }}
+                  onClick={adminLoadReviews}
+                >
+                  {adminLoading ? "Загрузка..." : `Обновить (${adminTotal})`}
+                </button>
+              </div>
+
+              {/* Reviews list */}
+              {adminLoading ? (
+                <div style={{ color: "#94a3b8", textAlign: "center", padding: 60 }}>Загрузка...</div>
+              ) : adminReviews.length === 0 ? (
+                <div style={{ color: "#94a3b8", textAlign: "center", padding: 60 }}>Нет записей</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {adminReviews.map((review) => {
+                    const j = review.json_data || {};
+                    return (
+                      <div
+                        key={review.id}
+                        style={{
+                          border: "1px solid rgba(255,255,255,.1)", borderRadius: 20,
+                          background: "rgba(255,255,255,.04)", padding: 20,
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                            <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                              {review.created_at ? new Date(review.created_at).toLocaleString("ru-RU") : "—"}
+                            </span>
+                            <span style={{
+                              fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                              background: j.status === "approved" ? "rgba(34,197,94,.2)" : j.status === "rejected" ? "rgba(220,38,38,.2)" : j.status === "needs_review" ? "rgba(234,179,8,.2)" : j.status === "local_auto_saved" ? "rgba(99,102,241,.2)" : "rgba(255,255,255,.1)",
+                              color: j.status === "approved" ? "#bbf7d0" : j.status === "rejected" ? "#fecaca" : j.status === "needs_review" ? "#fde68a" : j.status === "local_auto_saved" ? "#c7d2fe" : "#94a3b8",
+                            }}>
+                              {j.status || "unknown"}
+                            </span>
+                            <span style={{ color: "#64748b", fontSize: 12 }}>
+                              {j.environment || "—"} / {j.source || "—"}
+                            </span>
+                          </div>
+                          {review.public_code && (
+                            <span style={{ fontWeight: 700, fontSize: 13, color: "#a5b4fc", letterSpacing: 0.5 }}>
+                              {review.public_code}
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                          <div>
+                            <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>PATIENT TEXT</div>
+                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shorten(j.patient_input || j.patient_text || "", 200)}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>USER REPORT</div>
+                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shorten(j.user_report || "", 200)}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>DOCTOR REPORT</div>
+                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shorten(j.doctor_report || "", 200)}</div>
+                          </div>
+                          <div>
+                            <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>DOCTOR FEEDBACK</div>
+                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>
+                              {j.doctor_feedback?.generalComment ? shorten(j.doctor_feedback.generalComment, 200) : "—"}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button
+                            disabled={adminActionLoading === review.id}
+                            style={{
+                              border: 0, borderRadius: 12, background: "rgba(34,197,94,.2)", color: "#bbf7d0",
+                              padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                              opacity: adminActionLoading === review.id ? 0.5 : 1,
+                            }}
+                            onClick={() => adminUpdateStatus(review.id, "approved")}
+                          >
+                            Одобрить
+                          </button>
+                          <button
+                            disabled={adminActionLoading === review.id}
+                            style={{
+                              border: 0, borderRadius: 12, background: "rgba(220,38,38,.2)", color: "#fecaca",
+                              padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                              opacity: adminActionLoading === review.id ? 0.5 : 1,
+                            }}
+                            onClick={() => adminUpdateStatus(review.id, "rejected")}
+                          >
+                            Отклонить
+                          </button>
+                          <button
+                            disabled={adminActionLoading === review.id}
+                            style={{
+                              border: 0, borderRadius: 12, background: "rgba(234,179,8,.2)", color: "#fde68a",
+                              padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                              opacity: adminActionLoading === review.id ? 0.5 : 1,
+                            }}
+                            onClick={() => adminUpdateStatus(review.id, "needs_review")}
+                          >
+                            Требует доработки
+                          </button>
+                          <button
+                            style={{
+                              border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
+                              color: "#94a3b8", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                            }}
+                            onClick={() => adminDownloadJson(review)}
+                          >
+                            Скачать JSON
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Future export button placeholder */}
+              {/*
+                TODO: "Экспортировать approved reviews в JSONL"
+                <button>Экспортировать одобренные в JSONL</button>
+              */}
+            </>
+          )}
+        </div>
+
+        {toast.message && (
+          <div
+            key={toast.key}
+            style={{
+              position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+              zIndex: 2000, padding: "14px 24px", borderRadius: 16, fontWeight: 600, fontSize: 15,
+              boxShadow: "0 8px 30px rgba(0,0,0,.5)", animation: "toastIn 0.3s ease",
+              textAlign: "center", maxWidth: "calc(100vw - 40px)",
+              ...(toast.type === "error"
+                ? { background: "rgba(220,38,38,.2)", border: "1px solid rgba(248,113,113,.4)", color: "#fecaca" }
+                : { background: "rgba(34,197,94,.2)", border: "1px solid rgba(74,222,128,.4)", color: "#bbf7d0" }),
+            }}
+          >
+            {toast.message}
+          </div>
+        )}
+      </div>
+    );
   }
 
   const s = {
