@@ -1,9 +1,38 @@
+import { supabase } from "../lib/supabase.js";
+
 export default async function handler(req, res) {
-  return res.status(200).json({
+  const info = {
     has_url: !!process.env.SUPABASE_URL,
     has_key: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    url_prefix: process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 20) + "..." : null,
+    url_prefix: process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 25) + "..." : null,
+    key_prefix: process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 10) + "..." : null,
     node_version: process.version,
     vercel: process.env.VERCEL || "not set",
-  });
+  };
+
+  // Test Supabase connectivity
+  try {
+    const { data, error } = await supabase
+      .from("sessions")
+      .select("id")
+      .limit(1);
+    info.supabase_query = error ? `Error: ${error.message}` : "OK";
+    if (data) info.row_count = data.length;
+  } catch (e) {
+    info.supabase_query = `Exception: ${e.message}`;
+  }
+
+  // Test raw fetch to Supabase REST API
+  try {
+    const url = `${process.env.SUPABASE_URL}/rest/v1/`;
+    const resp = await fetch(url, {
+      headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY },
+    });
+    info.rest_status = resp.status;
+    info.rest_body = (await resp.text()).substring(0, 100);
+  } catch (e) {
+    info.rest_fetch = `Exception: ${e.message}`;
+  }
+
+  return res.status(200).json(info);
 }
