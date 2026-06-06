@@ -7,6 +7,10 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({ ok: false, error: "Supabase not configured: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" });
+    }
+
     const body = req.body || {};
     let publicCode = body.publicCode;
 
@@ -39,19 +43,29 @@ export default async function handler(req, res) {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: existing } = await supabase
+    let response;
+
+    const { data: existing, error: selectError } = await supabase
       .from("sessions")
       .select("id")
       .eq("public_code", publicCode)
       .maybeSingle();
 
+    if (selectError) {
+      return res.status(500).json({ ok: false, error: `Select error: ${selectError.message}` });
+    }
+
     if (existing) {
-      await supabase
+      response = await supabase
         .from("sessions")
         .update(payload)
         .eq("public_code", publicCode);
     } else {
-      await supabase.from("sessions").insert({ ...payload, created_at: new Date().toISOString() });
+      response = await supabase.from("sessions").insert({ ...payload, created_at: new Date().toISOString() });
+    }
+
+    if (response.error) {
+      return res.status(500).json({ ok: false, error: `Save error: ${response.error.message}` });
     }
 
     return res.status(200).json({ ok: true, publicCode });
