@@ -1,4 +1,4 @@
-import { supabase } from "../lib/supabase.js";
+import { getSupabase } from "../lib/supabase.js";
 import { generatePublicCode } from "../lib/publicCode.js";
 
 export default async function handler(req, res) {
@@ -19,12 +19,12 @@ export default async function handler(req, res) {
 
       let attempts = 0;
       while (attempts < 5) {
-        const { data: existing } = await supabase
+        const { data: dup } = await getSupabase()
           .from("sessions")
           .select("id")
           .eq("public_code", publicCode)
           .maybeSingle();
-        if (!existing) break;
+        if (!dup) break;
         publicCode = generatePublicCode();
         attempts++;
       }
@@ -39,13 +39,22 @@ export default async function handler(req, res) {
       doctor_report: body.doctor_report || "",
       support_plan: body.supportPlan || null,
       risk_level: body.riskLevel || null,
-      json_data: body,
+      json_data: {
+        ...body,
+        dialogDepth: body.dialogDepth ?? 0,
+        previousPatientReport: body.previousPatientReport || "",
+        previousDoctorReport: body.previousDoctorReport || "",
+        homeTasks: body.homeTasks || "",
+        resourceFactors: body.resourceFactors || "",
+        questions: body.questions || null,
+        answers: body.answers || {},
+      },
       updated_at: new Date().toISOString(),
     };
 
     let response;
 
-    const { data: existing, error: selectError } = await supabase
+    const { data: existing, error: selectError } = await getSupabase()
       .from("sessions")
       .select("id")
       .eq("public_code", publicCode)
@@ -56,19 +65,25 @@ export default async function handler(req, res) {
     }
 
     if (existing) {
-      response = await supabase
+      response = await getSupabase()
         .from("sessions")
         .update(payload)
         .eq("public_code", publicCode);
     } else {
-      response = await supabase.from("sessions").insert({ ...payload, created_at: new Date().toISOString() });
+      response = await getSupabase().from("sessions").insert({ ...payload, created_at: new Date().toISOString() });
     }
 
     if (response.error) {
-      return res.status(500).json({ ok: false, error: `Save error: ${response.error.message}` });
+      return res.status(500).json({ ok: false, error: `Ошибка сохранения сессии: ${response.error.message}` });
     }
 
-    return res.status(200).json({ ok: true, publicCode });
+    return res.status(200).json({
+      ok: true,
+      publicCode,
+      message: existing
+        ? "Сессия обновлена. Код продолжения сохранён."
+        : "Сессия сохранена. Сохраните код для продолжения.",
+    });
   } catch (error) {
     return res.status(500).json({ error: error.message || "Failed to save session" });
   }

@@ -53,6 +53,12 @@ export default function App() {
   const [homeTasks, setHomeTasks] = useState("");
   const [resourceFactors, setResourceFactors] = useState("");
 
+  const [toast, setToast] = useState({ message: "", type: "", key: 0 });
+
+  function showToast(message, type = "success") {
+    setToast({ message, type, key: Date.now() });
+  }
+
   const [recordingQuestionIndex, setRecordingQuestionIndex] = useState(null);
   const [questionRecordingTime, setQuestionRecordingTime] = useState(0);
   const [questionTranscribingIndex, setQuestionTranscribingIndex] = useState(null);
@@ -478,20 +484,29 @@ export default function App() {
             doctor_report: data.report?.split("===DOCTOR_REPORT===")[1]?.trim() || "",
             riskLevel: null,
             supportPlan: null,
+            dialogDepth,
+            previousPatientReport: previousPatientReport || "",
+            previousDoctorReport: previousDoctorReport || "",
+            homeTasks: homeTasks || "",
+            resourceFactors: resourceFactors || "",
+            questions,
+            answers,
           }),
         })
           .then((r) => r.json())
           .then((result) => {
-            const code = result.publicCode || publicCode || "";
-            if (result.publicCode && !publicCode) {
-              setPublicCode(result.publicCode);
-            }
-            // Local filesystem fallback
-            if (window.location.hostname.includes("localhost") && code) {
+            if (result.ok) {
+              const code = result.publicCode || publicCode || "";
+              if (result.publicCode && !publicCode) {
+                setPublicCode(result.publicCode);
+              }
+              if (result.message) showToast(result.message);
+              // Save case review (local + Supabase)
               const review = {
                 case_id: sid, sessionId: sid, publicCode: code,
                 createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-                environment: "local", patient_input: text, questions, answers,
+                environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
+                patient_input: text, questions, answers,
                 ai_result: data.report || "", conversationHistory, dialogDepth,
                 previousPatientReport: previousPatientReport || "",
                 previousDoctorReport: previousDoctorReport || "",
@@ -504,9 +519,13 @@ export default function App() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(review),
               }).catch(() => {});
+            } else {
+              showToast(result.error || "Ошибка сохранения сессии", "error");
             }
           })
-          .catch(() => {});
+          .catch(() => {
+            showToast("Не удалось сохранить сессию. Код продолжения может не сохраниться.", "error");
+          });
       } else {
         throw new Error("Неизвестный тип ответа");
       }
@@ -712,6 +731,7 @@ export default function App() {
     setCrisisVoiceError("");
     setCrisisWarning("");
     setCrisisConfirmation("");
+    setToast({ message: "", type: "", key: 0 });
     if (crisisTimerRef.current) {
       clearInterval(crisisTimerRef.current);
     }
@@ -979,6 +999,31 @@ export default function App() {
       borderRadius: 18,
       lineHeight: 1.5,
     },
+    toast: {
+      position: "fixed",
+      bottom: 24,
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 2000,
+      padding: "14px 24px",
+      borderRadius: 16,
+      fontWeight: 600,
+      fontSize: 15,
+      boxShadow: "0 8px 30px rgba(0,0,0,.5)",
+      animation: "toastIn 0.3s ease",
+      textAlign: "center",
+      maxWidth: "calc(100vw - 40px)",
+    },
+    toastSuccess: {
+      background: "rgba(34,197,94,.2)",
+      border: "1px solid rgba(74,222,128,.4)",
+      color: "#bbf7d0",
+    },
+    toastError: {
+      background: "rgba(220,38,38,.2)",
+      border: "1px solid rgba(248,113,113,.4)",
+      color: "#fecaca",
+    },
     answerInput: {
       width: "100%",
       minHeight: 80,
@@ -999,6 +1044,11 @@ export default function App() {
       <style>{`
   * {
     box-sizing: border-box;
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
 
   html, body, #root {
@@ -1643,8 +1693,9 @@ export default function App() {
                       setIsContinuation(true);
                       setSessionModalOpen(false);
                       setSessionCodeInput("");
+                      if (data.message) showToast(data.message);
                     } catch (e) {
-                      alert(e.message || "Сессия не найдена");
+                      showToast(e.message || "Сессия не найдена. Проверьте код.", "error");
                     } finally {
                       setLoadingSession(false);
                     }
@@ -1654,6 +1705,18 @@ export default function App() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {toast.message && (
+          <div
+            key={toast.key}
+            style={{
+              ...s.toast,
+              ...(toast.type === "error" ? s.toastError : s.toastSuccess),
+            }}
+          >
+            {toast.message}
           </div>
         )}
 
