@@ -995,9 +995,98 @@ export default function App() {
   };
 
   return (
-    <div style={s.page}>
+    <div style={s.page} className="app-page">
+      <style>{`
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  @media (max-width: 768px) {
+    .app-page {
+      padding: 18px !important;
+    }
+
+    .app-header {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 16px !important;
+      margin-bottom: 36px !important;
+    }
+
+    .app-grid {
+      display: block !important;
+    }
+
+    .app-hero-title {
+      font-size: 38px !important;
+      line-height: 1.08 !important;
+      letter-spacing: -0.03em !important;
+    }
+
+    .app-hero-text {
+      font-size: 17px !important;
+      line-height: 1.55 !important;
+    }
+
+    .app-actions {
+      flex-direction: column !important;
+      width: 100% !important;
+    }
+
+    .app-actions button {
+      width: 100% !important;
+    }
+
+    .app-card {
+      margin-top: 32px !important;
+      padding: 18px !important;
+      border-radius: 24px !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    textarea,
+    input {
+      width: 100% !important;
+      max-width: 100% !important;
+      font-size: 16px !important;
+    }
+
+    button {
+      max-width: 100% !important;
+      white-space: normal !important;
+    }
+
+    .modal {
+      width: calc(100vw - 28px) !important;
+      max-width: calc(100vw - 28px) !important;
+      max-height: calc(100vh - 28px) !important;
+      overflow-y: auto !important;
+      padding: 18px !important;
+    }
+
+    .tabs {
+      flex-direction: column !important;
+    }
+
+    .tabs button {
+      width: 100% !important;
+    }
+
+    .report-block {
+      overflow-wrap: anywhere !important;
+      word-break: break-word !important;
+    }
+  }
+`}</style>
       <div style={s.wrap}>
-        <header style={s.header}>
+        <header style={s.header} className="app-header">
           <div>
             <div style={s.logo}>🧠 Точка опоры</div>
             <div style={s.sub}>Анонимно. Безопасно. Можно просто начать говорить.</div>
@@ -1010,17 +1099,17 @@ export default function App() {
           </button>
         </header>
 
-        <main style={s.grid}>
+        <main style={s.grid} className="app-grid">
           <section>
-            <h1 style={s.h1}>
+            <h1 style={s.h1} className="app-hero-title">
               Расскажите, что с вами происходит — голосом или текстом.
             </h1>
-            <p style={s.p}>
+            <p style={s.p} className="app-hero-text">
               Сервис поможет мягко разобрать состояние, определить возможный
               спектр проблемы и предложить понятный план действий.
             </p>
 
-            <div style={s.row}>
+            <div style={s.row} className="app-actions">
               <button style={s.primary} onClick={() => setMode("voice")}>
                 🎙 Рассказать голосом
               </button>
@@ -1041,7 +1130,7 @@ export default function App() {
             </p>
           </section>
 
-          <section style={s.card}>
+          <section style={s.card} className="app-card">
             <div style={s.sub}>Первичный вход</div>
             <div style={{ fontSize: 28, fontWeight: 900 }}>
               Анонимный разговор
@@ -1200,7 +1289,7 @@ export default function App() {
                   </div>
                 )}
 
-                <div style={s.tabs}>
+                <div style={s.tabs} className="tabs">
                   <button
                     style={activeTab === "user" ? s.activeTab : s.tab}
                     onClick={() => setActiveTab("user")}
@@ -1215,7 +1304,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <div style={s.reportBlock}>
+                <div style={s.reportBlock} className="report-block">
                   {activeTab === "user" ? (
                     renderUserReport(userPart)
                   ) : (
@@ -1406,7 +1495,7 @@ export default function App() {
 
         {crisisOpen && (
           <div style={s.overlay} onClick={handleCrisisClose}>
-            <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={s.modal} className="modal" onClick={(e) => e.stopPropagation()}>
                 <>
                   <div style={s.modalTitle}>Срочная помощь</div>
                   <div style={s.modalWarning}>
@@ -1484,7 +1573,7 @@ export default function App() {
 
         {sessionModalOpen && (
           <div style={s.overlay} onClick={() => setSessionModalOpen(false)}>
-            <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+            <div style={s.modal} className="modal" onClick={(e) => e.stopPropagation()}>
               <div style={s.modalTitle}>Продолжить разговор</div>
 
               <p style={{ color: "#94a3b8", lineHeight: 1.6, marginBottom: 20 }}>
