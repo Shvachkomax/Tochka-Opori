@@ -14,6 +14,7 @@ import checkEnvHandler from "./api/check-env.js";
 import listReviewsHandler from "./api/list-reviews.js";
 import updateReviewStatusHandler from "./api/update-review-status.js";
 import adminVerifyHandler from "./api/admin-verify.js";
+import expertLoginHandler from "./api/expert-login.js";
 
 const PORT = 3001;
 
@@ -86,6 +87,9 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     }
     if (nodeReq.url.startsWith("/api/admin-verify")) {
       return adminVerifyHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/expert-login")) {
+      return expertLoginHandler(req, res);
     }
 
     nodeRes.writeHead(404, { "Content-Type": "application/json" });

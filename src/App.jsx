@@ -65,8 +65,52 @@ export default function App() {
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminActionLoading, setAdminActionLoading] = useState(null);
 
+  // Expert state
+  const [expertData, setExpertData] = useState(() => {
+    try {
+      const saved = localStorage.getItem("tochka_expert");
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+  const [expertModalOpen, setExpertModalOpen] = useState(false);
+  const [expertCodeInput, setExpertCodeInput] = useState("");
+  const [expertLoggingIn, setExpertLoggingIn] = useState(false);
+
   function showToast(message, type = "success") {
     setToast({ message, type, key: Date.now() });
+  }
+
+  async function handleExpertLogin() {
+    const code = expertCodeInput.trim();
+    if (!code) return;
+    setExpertLoggingIn(true);
+    try {
+      const res = await fetch("/api/expert-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_code: code }),
+      });
+      const data = await res.json();
+      if (data.ok && data.expert) {
+        setExpertData(data.expert);
+        localStorage.setItem("tochka_expert", JSON.stringify(data.expert));
+        setExpertModalOpen(false);
+        setExpertCodeInput("");
+        showToast(`Режим специалиста: ${data.expert.name}`);
+      } else {
+        showToast(data.error || "Код специалиста не найден", "error");
+      }
+    } catch {
+      showToast("Ошибка подключения", "error");
+    } finally {
+      setExpertLoggingIn(false);
+    }
+  }
+
+  function handleExpertLogout() {
+    setExpertData(null);
+    localStorage.removeItem("tochka_expert");
+    showToast("Режим специалиста выключен");
   }
 
   const [recordingQuestionIndex, setRecordingQuestionIndex] = useState(null);
@@ -523,6 +567,10 @@ export default function App() {
                 homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
                 patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
                 doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
+                expert_id: expertData?.id || null,
+                expert_name: expertData?.name || null,
+                expert_role: expertData?.role || null,
+                expert_specialty: expertData?.specialty || null,
               };
               fetch("/api/save-review", {
                 method: "POST",
@@ -587,6 +635,10 @@ export default function App() {
       previousDoctorReport: previousDoctorReport || "",
       homeTasks: homeTasks || "",
       resourceFactors: resourceFactors || "",
+      expert_id: expertData?.id || null,
+      expert_name: expertData?.name || null,
+      expert_role: expertData?.role || null,
+      expert_specialty: expertData?.specialty || null,
       patient_feedback: {
         rating: patientRating,
         useful: patientUseful,
@@ -952,6 +1004,12 @@ export default function App() {
                             </span>
                           )}
                         </div>
+
+                        {j.expert_name && (
+                          <div style={{ marginBottom: 10, fontSize: 12, color: "#a5b4fc" }}>
+                            🔬 {j.expert_name}{j.expert_role ? `, ${j.expert_role}` : ""}{j.expert_specialty ? ` (${j.expert_specialty})` : ""}{j.city ? ` · ${j.city}` : ""}{j.organization ? ` · ${j.organization}` : ""}
+                          </div>
+                        )}
 
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                           <div>
@@ -1457,12 +1515,41 @@ export default function App() {
             <div style={s.logo}>🧠 Точка опоры</div>
             <div style={s.sub}>Анонимно. Безопасно. Можно просто начать говорить.</div>
           </div>
-          <button
-            style={s.crisis}
-            onClick={() => setCrisisOpen(true)}
-          >
-            ⚠ Мне срочно нужна помощь
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {expertData && (
+              <div style={{
+                background: "rgba(99,102,241,.15)", border: "1px solid rgba(99,102,241,.3)",
+                borderRadius: 22, padding: "8px 16px", fontSize: 13, color: "#c7d2fe",
+                display: "flex", alignItems: "center", gap: 8,
+              }}>
+                <span>🔬 {expertData.name}, {expertData.role}</span>
+                <button
+                  onClick={handleExpertLogout}
+                  style={{
+                    background: "none", border: "1px solid rgba(255,255,255,.2)", borderRadius: 10,
+                    color: "#94a3b8", padding: "4px 10px", fontSize: 11, cursor: "pointer",
+                  }}
+                >
+                  Выйти
+                </button>
+              </div>
+            )}
+            <button
+              style={{
+                ...s.secondary, fontSize: 13, padding: "10px 16px",
+                border: "1px solid rgba(99,102,241,.3)", background: "rgba(99,102,241,.08)",
+              }}
+              onClick={() => setExpertModalOpen(true)}
+            >
+              🔬 Для специалистов
+            </button>
+            <button
+              style={s.crisis}
+              onClick={() => setCrisisOpen(true)}
+            >
+              ⚠ Мне срочно нужна помощь
+            </button>
+          </div>
         </header>
 
         <main style={s.grid} className="app-grid">
@@ -2018,6 +2105,41 @@ export default function App() {
                   }}
                 >
                   {loadingSession ? "Поиск..." : "Продолжить"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {expertModalOpen && (
+          <div style={s.overlay} onClick={() => setExpertModalOpen(false)}>
+            <div style={s.modal} className="modal" onClick={(e) => e.stopPropagation()}>
+              <div style={s.modalTitle}>Режим специалиста</div>
+              <p style={{ color: "#94a3b8", lineHeight: 1.6, marginBottom: 20 }}>
+                Введите код, полученный от администратора, чтобы привязать экспертную оценку к вашему профилю.
+              </p>
+
+              <input
+                style={s.crisisInput}
+                value={expertCodeInput}
+                onChange={(e) => setExpertCodeInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === "Enter" && handleExpertLogin()}
+                placeholder="XXXX-XXXX-XX"
+              />
+
+              <div style={s.crisisActions}>
+                <button
+                  style={s.wide}
+                  disabled={expertLoggingIn || expertCodeInput.trim().length < 3}
+                  onClick={handleExpertLogin}
+                >
+                  {expertLoggingIn ? "Поиск..." : "Войти"}
+                </button>
+                <button
+                  style={{ ...s.secondary, width: "100%" }}
+                  onClick={() => setExpertModalOpen(false)}
+                >
+                  Отмена
                 </button>
               </div>
             </div>

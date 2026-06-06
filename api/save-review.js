@@ -20,16 +20,13 @@ export default async function handler(req, res) {
       host.includes("127.0.0.1") ||
       process.env.VERCEL !== "1";
 
-    const environment = isLocal ? "local" : "production";
-
     if (isLocal) {
       review.status = "local_auto_saved";
       review.environment = "local";
-      review.source = "developer_local";
+      review.source = review.expert_id ? "developer_expert_review" : "developer_local";
       review.local_only = true;
       review.approved_for_training = false;
 
-      // Local filesystem save (dev only)
       const dataDir = path.join(process.cwd(), "data");
       const jsonlPath = path.join(dataDir, "case-reviews.jsonl");
       const sessionsDir = path.join(dataDir, "sessions");
@@ -44,18 +41,50 @@ export default async function handler(req, res) {
     } else {
       review.status = "pending";
       review.environment = "production";
-      review.source = "external_test";
+      review.source = review.expert_id ? "external_expert_review" : "external_anonymous_review";
       review.local_only = false;
       review.approved_for_training = false;
     }
 
-    // Save to Supabase case_reviews (both local and Vercel)
-    const { error: insertError } = await getSupabase().from("case_reviews").insert({
+    // Validate expert_id if provided
+    if (review.expert_id) {
+      const { data: expert, error: expertError } = await getSupabase()
+        .from("experts")
+        .select("id, name, role, specialty")
+        .eq("id", review.expert_id)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (expertError) {
+        console.error("Expert validation error:", expertError);
+      } else if (!expert) {
+        return res.status(400).json({
+          ok: false,
+          error: "Указанный специалист не найден или не активен",
+        });
+      } else {
+        // Ensure expert_name matches the DB record
+        review.expert_name = expert.name;
+        review.expert_role = expert.role;
+        review.expert_specialty = expert.specialty;
+      }
+    }
+
+    // Save to Supabase case_reviews
+    const insertPayload = {
       case_id: review.case_id,
       session_id: review.sessionId,
       public_code: review.publicCode,
+      expert_id: review.expert_id || null,
+      expert_name: review.expert_name || null,
+      expert_role: review.expert_role || null,
+      expert_specialty: review.expert_specialty || null,
       json_data: review,
-    });
+    };
+
+    const { error: insertError } = await getSupabase()
+      .from("case_reviews")
+      .insert(insertPayload);
 
     if (insertError) {
       console.error("Supabase insert error:", insertError);
@@ -66,8 +95,11 @@ export default async function handler(req, res) {
       ok: true,
       sessionId: review.sessionId,
       publicCode: review.publicCode,
-      environment,
+      environment: review.environment,
       status: review.status,
+      source: review.source,
+      expert_id: review.expert_id || null,
+      expert_name: review.expert_name || null,
       saved_to: isLocal ? "local+supabase" : "supabase",
     });
   } catch (error) {
