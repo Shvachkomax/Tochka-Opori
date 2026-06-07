@@ -944,18 +944,51 @@ export default function App() {
     }
   }
 
+  function safeObject(value) {
+    if (!value) return {};
+    if (typeof value === "object" && !Array.isArray(value)) return value;
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  }
+
+  function getReviewJson(review) {
+    return safeObject(review?.json_data);
+  }
+
+  function getDoctorCorrection(review) {
+    return safeObject(review?.doctor_correction);
+  }
+
+  function getCorrectedJson(review) {
+    return safeObject(review?.corrected_json);
+  }
+
   function openCorrectionForm(review) {
-    const j = review.json_data || {};
-    setCorrectionForm({
-      wrong_questions: j.doctor_feedback?.wrong_questions || "",
-      missing_questions: j.doctor_feedback?.missing_questions || "",
-      bad_question_wording: j.doctor_feedback?.bad_question_wording || "",
-      corrected_user_report: j.doctor_feedback?.corrected_user_report || "",
-      corrected_doctor_report: j.doctor_feedback?.corrected_doctor_report || "",
-      protocol_update: j.doctor_feedback?.protocol_update || "",
-      correction_comment: "",
-    });
-    setEditingReview(review.id);
+    try {
+      const json = getReviewJson(review);
+      const correction = getDoctorCorrection(review);
+      const corrected = getCorrectedJson(review);
+
+      setCorrectionForm({
+        wrong_questions: correction.wrong_questions || json?.doctor_feedback?.wrong_questions || "",
+        missing_questions: correction.missing_questions || json?.doctor_feedback?.missing_questions || "",
+        bad_question_wording: correction.bad_question_wording || json?.doctor_feedback?.bad_question_wording || "",
+        corrected_user_report: corrected.corrected_user_report || correction.corrected_user_report || json?.corrected_user_report || "",
+        corrected_doctor_report: corrected.corrected_doctor_report || correction.corrected_doctor_report || json?.corrected_doctor_report || "",
+        protocol_update: review?.protocol_update || correction.protocol_update || "",
+        correction_comment: review?.correction_comment || correction.correction_comment || "",
+      });
+      setEditingReview(review?.id);
+    } catch (error) {
+      console.error("open correction editor failed", error, review);
+    }
   }
 
   function closeCorrectionForm() {
@@ -1241,7 +1274,8 @@ export default function App() {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   {adminReviews.map((review) => {
-                    const j = review.json_data || {};
+                    try {
+                    const j = getReviewJson(review);
                     return (
                       <div
                         key={review.id}
@@ -1392,6 +1426,14 @@ export default function App() {
                         )}
                       </div>
                     );
+                    } catch (error) {
+                      console.error("review card render error", error, review);
+                      return (
+                        <div key={review?.id} style={{ border: "1px solid rgba(220,38,38,.2)", borderRadius: 20, background: "rgba(220,38,38,.05)", padding: 20, color: "#fecaca", fontSize: 13 }}>
+                          Ошибка отображения review {review?.id || "unknown"}
+                        </div>
+                      );
+                    }
                   })}
                 </div>
               )}
