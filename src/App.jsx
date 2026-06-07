@@ -1952,7 +1952,7 @@ export default function App() {
             <LogoMark size={40} />
             <div>
               <div style={s.logo}>Точка опоры</div>
-              <div style={s.sub}>Анонимно. Спокойно. Без диагноза на скорую руку.</div>
+              <div style={s.sub}>Анонимно. Безопасно. Можно просто поговорить.</div>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -1991,8 +1991,6 @@ export default function App() {
 
         <main style={s.grid} className="app-grid">
           <section>
-            <div style={s.badge}>Анонимно. Спокойно. Без диагноза на скорую руку.</div>
-
             <h1 style={s.h1} className="app-hero-title">
               Найдём точку опоры
             </h1>
