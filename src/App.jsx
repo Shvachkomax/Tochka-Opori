@@ -2015,7 +2015,7 @@ export default function App() {
                 style={{ ...s.secondary, marginTop: 8 }}
                 onClick={() => setSessionModalOpen(true)}
               >
-                Продолжить разговор
+                Вернуться к разговору
               </button>
             </div>
 
@@ -2470,17 +2470,17 @@ export default function App() {
         {sessionModalOpen && (
           <div style={s.overlay} onClick={() => setSessionModalOpen(false)}>
             <div style={s.modal} className="modal" onClick={(e) => e.stopPropagation()}>
-              <div style={s.modalTitle}>Продолжить разговор</div>
+              <div style={s.modalTitle}>Вернуться к разговору</div>
 
               <p style={{ color: "#7A7268", lineHeight: 1.6, marginBottom: 20 }}>
-                Введите код диалога, который был показан после завершения предыдущей сессии.
+                Если вы уже начинали разговор, введите код вида ТОЧКА-XXXX-XXXX. Мы восстановим прошлую сессию и продолжим с того места, где вы остановились.
               </p>
 
               <input
                 style={s.crisisInput}
                 value={sessionCodeInput}
                 onChange={(e) => setSessionCodeInput(e.target.value.toUpperCase())}
-                placeholder="ТОЧКА-XXXX-XXXX"
+                placeholder="Код продолжения"
               />
 
               <div style={s.crisisActions}>
@@ -2547,7 +2547,7 @@ export default function App() {
                     }
                   }}
                 >
-                  {loadingSession ? "Поиск..." : "Продолжить"}
+                  {loadingSession ? "Поиск..." : "Продолжить по коду"}
                 </button>
               </div>
             </div>
