@@ -40,8 +40,12 @@ export default async function handler(req, res) {
       type: req.headers["content-type"] || "audio/webm"
     });
 
+    const MODEL_TRANSCRIBE = process.env.AI_MODEL_TRANSCRIBE || "gpt-4o-mini-transcribe";
+
+    console.log("Using AI model for transcribe:", MODEL_TRANSCRIBE);
+
     formData.append("file", audioBlob, "voice.webm");
-    formData.append("model", "gpt-4o-mini-transcribe");
+    formData.append("model", MODEL_TRANSCRIBE);
     formData.append("language", "ru");
 
     const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {

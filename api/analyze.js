@@ -411,23 +411,34 @@ ${
     }
   }
 
+  const MODEL_TRIAGE = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
+  const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
+
+  console.log("Using AI model for triage:", MODEL_TRIAGE);
+
   try {
+    const body = {
+      model: MODEL_TRIAGE,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.3,
+      max_tokens: depth <= 2 ? 600 : 1500,
+    };
+
+    if (REASONING_EFFORT) {
+      body.reasoning_effort = REASONING_EFFORT;
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.3,
-        max_tokens: depth <= 2 ? 600 : 1500,
-      }),
+      body: JSON.stringify(body),
     });
 
     const data = await response.json();
