@@ -3,7 +3,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "" } = req.body || {};
+  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan } = req.body || {};
 
   if (!text || text.trim().length < 10) {
     return res.status(400).json({ error: "Опишите состояние подробнее" });
@@ -238,7 +238,19 @@ AI кратко напоминает прошлый разговор и зада
 - какие появились новые жалобы или сигналы?
 Не повторяй вопросы, которые уже были заданы в предыдущей сессии.
 Не запрашивай заново то, что уже выяснено.
-Фокус — на changes, progress, new signals.`;
+Фокус — на changes, progress, new signals.
+
+Если в support_plan есть selected_practices, спросить:
+- Удалось ли попробовать выбранную практику?
+- Что изменилось после неё?
+- Стало легче, тяжелее или без изменений?
+- Что оказалось неудобным или не подошло?
+- Заполняли ли дневник состояния?
+
+Если выбран дневник:
+- спросить, удалось ли вести дневник 1–3 дня;
+- какие симптомы усиливались;
+- что немного помогало.`;
 
   let userPrompt = "";
 
@@ -267,14 +279,22 @@ ${homeTasks}
 Ресурсные факторы:
 ${resourceFactors}
 
-Твоя задача: это follow-up сессия.
+${
+  supportPlan?.selected_practices?.length
+    ? `Выбранные практики из прошлой сессии:\n${supportPlan.selected_practices.map((p) => `- ${p.title}`).join("\n")}\n\n`
+    : ""
+}${supportPlan?.diary_requested ? "Был предложен дневник состояния на 3 дня.\n\n" : ""}Твоя задача: это follow-up сессия.
 НЕ начинай новый опрос с нуля.
 Кратко напомни прошлый разговор и спроси о динамике:
 - что изменилось?
 - что помогло?
 - что ухудшилось?
 - удалось ли выполнить рекомендации?
-- есть ли новые жалобы или сигналы?
+- есть ли новые жалобы или сигналы?${
+  supportPlan?.selected_practices?.length
+    ? "\n- удалось ли попробовать выбранные практики?\n- что изменилось после практик?"
+    : ""
+}${supportPlan?.diary_requested ? "\n- удалось ли вести дневник?\n- какие симптомы усилились?\n- что немного помогало?" : ""}
 
 Задай 3-5 вопросов про динамику.
 

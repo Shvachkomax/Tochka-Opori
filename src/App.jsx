@@ -86,6 +86,56 @@ export default function App() {
   const [homeTasks, setHomeTasks] = useState("");
   const [resourceFactors, setResourceFactors] = useState("");
 
+  // Support Toolkit state
+  const [supportPlan, setSupportPlan] = useState(null);
+  const [showSelfAssessment, setShowSelfAssessment] = useState(false);
+  const [canManageWithoutSpecialist, setCanManageWithoutSpecialist] = useState(null);
+  const [showSupportToolkit, setShowSupportToolkit] = useState(false);
+  const [showSpecialistIntent, setShowSpecialistIntent] = useState(false);
+  const [specialistIntentDone, setSpecialistIntentDone] = useState(false);
+
+  const PRACTICES = [
+    { id: "breathing", title: "Дыхание 4–6 минут при тревоге", file: "01-breathing.md" },
+    { id: "grounding", title: "Заземление 5–4–3–2–1", file: "02-grounding.md" },
+    { id: "jaw_relaxation", title: "Мягкое расслабление лица и челюсти", file: "03-jaw-relaxation.md" },
+    { id: "sleep_prep", title: "Практика перед сном", file: "04-sleep-prep.md" },
+    { id: "neck_shoulders_stretch", title: "Мягкая растяжка шеи и плеч", file: "05-neck-shoulders-stretch.md" },
+    { id: "diary", title: "Дневник состояния на 3 дня", file: "06-diary.md" },
+    { id: "24h_plan", title: "План 24 часа без ухудшения", file: "07-24h-plan.md" },
+  ];
+
+  function downloadPracticeFile(file) {
+    const anchor = document.createElement("a");
+    anchor.href = `/support-practices/${file}`;
+    anchor.download = file;
+    anchor.click();
+  }
+
+  function addPracticeToPlan(practiceId) {
+    const practice = PRACTICES.find(p => p.id === practiceId);
+    if (!practice) return;
+    const current = supportPlan?.selected_practices || [];
+    if (current.some(p => p.id === practiceId)) return;
+    const updated = [...current, { id: practice.id, title: practice.title, selected_at: new Date().toISOString(), downloaded: false }];
+    const newPlan = { ...(supportPlan || {}), selected_practices: updated };
+    setSupportPlan(newPlan);
+    saveSupportPlan(newPlan);
+    showToast("Добавлено в план. При следующем разговоре мы спросим, удалось ли попробовать.");
+  }
+
+  function saveSupportPlan(plan) {
+    const sp = plan || supportPlan;
+    if (!sp) return;
+    if (publicCode) {
+      fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateSupportPlan", public_code: publicCode, session_id: sessionId, support_plan: sp }),
+      }).catch(() => {});
+    }
+    localStorage.setItem("tochka_support_plan", JSON.stringify(sp));
+  }
+
   const [toast, setToast] = useState({ message: "", type: "", key: 0 });
 
   // Admin panel state
@@ -666,6 +716,7 @@ export default function App() {
           previousDoctorReport,
           homeTasks,
           resourceFactors,
+          supportPlan,
         }),
       });
 
@@ -712,7 +763,7 @@ export default function App() {
             user_report: data.report?.split("===DOCTOR_REPORT===")[0]?.replace("===USER_REPORT===", "").trim() || "",
             doctor_report: data.report?.split("===DOCTOR_REPORT===")[1]?.trim() || "",
             riskLevel: null,
-            supportPlan: null,
+            supportPlan: supportPlan,
             dialogDepth,
             previousPatientReport: previousPatientReport || "",
             previousDoctorReport: previousDoctorReport || "",
@@ -943,6 +994,12 @@ export default function App() {
     setIsContinuation(false);
     setPreviousPatientReport("");
     setPreviousDoctorReport("");
+    setSupportPlan(null);
+    setShowSelfAssessment(false);
+    setCanManageWithoutSpecialist(null);
+    setShowSupportToolkit(false);
+    setShowSpecialistIntent(false);
+    setSpecialistIntentDone(false);
     setHomeTasks("");
     setResourceFactors("");
     setRecording(false);
@@ -2508,6 +2565,89 @@ export default function App() {
                   )}
                 </div>
 
+                {!showSelfAssessment && !showSupportToolkit && !showSpecialistIntent && (
+                  <div style={{ marginTop: 24, borderTop: "1px solid rgba(46,42,37,.1)", paddingTop: 20 }}>
+                    <div style={{ fontSize: 14, color: "#2E2A25", lineHeight: 1.6, marginBottom: 16, fontFamily: "Georgia, \"PT Serif\", serif" }}>
+                      Как вам кажется, на этом этапе вы сможете справляться с состоянием без подключения специалиста?
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button style={{ ...s.wide, flex: "1 1 auto", minWidth: 140 }} onClick={() => { setCanManageWithoutSpecialist("yes"); setShowSelfAssessment(true); setShowSupportToolkit(true); }}>
+                        Да, пока попробую сам(а)
+                      </button>
+                      <button style={{ ...s.secondary, flex: "1 1 auto", minWidth: 140 }} onClick={() => { setCanManageWithoutSpecialist("not_sure"); setShowSelfAssessment(true); setShowSupportToolkit(true); }}>
+                        Не уверен(а)
+                      </button>
+                      <button style={{ ...s.secondary, flex: "1 1 auto", minWidth: 140, borderColor: "#B85C4A", color: "#B85C4A" }} onClick={() => { setCanManageWithoutSpecialist("no"); setShowSelfAssessment(true); setShowSpecialistIntent(true); }}>
+                        Нет, хочу подключить специалиста
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {showSpecialistIntent && !specialistIntentDone && (
+                  <div style={{ marginTop: 24, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", borderRadius: 14, padding: 20 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "#2E2A25", marginBottom: 12 }}>Запрос на подключение специалиста</div>
+                    <p style={{ color: "#7A7268", lineHeight: 1.7, fontSize: 14, margin: "0 0 16px" }}>
+                      Эта возможность готовится. Сейчас сервис работает в закрытом тестовом режиме и не является телемедицинской платформой. Мы сохраним отметку в вашей анонимной сессии, чтобы в будущем можно было вернуться к этому шагу.
+                    </p>
+                    <button
+                      style={{ ...s.wide, background: "#7D9A89", color: "white" }}
+                      onClick={() => {
+                        setSpecialistIntentDone(true);
+                        const newPlan = { ...(supportPlan || {}), specialist_request_intent: true, patient_self_assessment: { ...((supportPlan?.patient_self_assessment) || {}), can_manage_without_specialist: canManageWithoutSpecialist } };
+                        setSupportPlan(newPlan);
+                        saveSupportPlan(newPlan);
+                      }}
+                    >
+                      Отметить, что хочу подключить специалиста
+                    </button>
+                    {specialistIntentDone && (
+                      <div style={{ color: "#5F7D6C", fontSize: 13, marginTop: 12, lineHeight: 1.5, background: "#E2EBE4", borderRadius: 10, padding: 12 }}>
+                        Отметка сохранена в вашей анонимной сессии. Если состояние ухудшается или есть риск причинить вред себе или другому человеку — звоните 112 или 103.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {showSupportToolkit && (
+                  <div style={{ marginTop: 24 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "#2E2A25", marginBottom: 12, fontFamily: "Georgia, \"PT Serif\", serif" }}>
+                      Что можно попробовать до следующего разговора
+                    </div>
+                    <p style={{ color: "#7A7268", lineHeight: 1.6, fontSize: 13, margin: "0 0 16px" }}>
+                      Это не лечение, не терапия и не замена специалисту. Немедикаментозные поддерживающие практики на 24–72 часа.
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {PRACTICES.map((p) => {
+                        const alreadyAdded = supportPlan?.selected_practices?.some(sp => sp.id === p.id);
+                        return (
+                          <div key={p.id} style={{ border: "1px solid rgba(46,42,37,.1)", borderRadius: 12, padding: "12px 16px", background: "#FAF6EF" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 14, fontWeight: 600, color: "#2E2A25", flex: 1 }}>{p.title}</span>
+                              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                                <button style={{ fontSize: 12, padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(46,42,37,.15)", background: "white", color: "#5F7D6C", cursor: "pointer" }} onClick={() => downloadPracticeFile(p.file)}>
+                                  Скачать текст
+                                </button>
+                                <button
+                                  style={{
+                                    fontSize: 12, padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(46,42,37,.15)",
+                                    background: alreadyAdded ? "#E2EBE4" : "white", color: alreadyAdded ? "#5F7D6C" : "#7D9A89",
+                                    cursor: alreadyAdded ? "default" : "pointer", fontWeight: alreadyAdded ? 400 : 600,
+                                  }}
+                                  disabled={alreadyAdded}
+                                  onClick={() => addPracticeToPlan(p.id)}
+                                >
+                                  {alreadyAdded ? "✓ Добавлено" : "Добавить в мой план"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <button
                   style={{ ...s.secondary, marginTop: 16 }}
                   onClick={() => setSessionReviewOpen(!sessionReviewOpen)}
@@ -2803,6 +2943,19 @@ export default function App() {
                       setPreviousDoctorReport(s.doctor_report || s.previousDoctorReport || "");
                       setHomeTasks(s.homeTasks || "");
                       setResourceFactors(s.resourceFactors || "");
+                      if (s.supportPlan) {
+                        setSupportPlan(s.supportPlan);
+                        const sa = s.supportPlan.patient_self_assessment;
+                        if (sa?.can_manage_without_specialist) {
+                          setCanManageWithoutSpecialist(sa.can_manage_without_specialist);
+                          setShowSelfAssessment(true);
+                          setShowSupportToolkit(true);
+                          if (s.supportPlan.specialist_request_intent) {
+                            setShowSpecialistIntent(true);
+                            setSpecialistIntentDone(true);
+                          }
+                        }
+                      }
 
                       // Restore questions/answers if present
                       const savedAnswers = s.answers || {};

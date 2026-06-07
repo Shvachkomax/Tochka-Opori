@@ -14,6 +14,8 @@ export default async function handler(req, res) {
         return await handleSave(req, res);
       case "load":
         return await handleLoad(req, res);
+      case "updateSupportPlan":
+        return await handleUpdateSupportPlan(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -172,5 +174,34 @@ async function handleLoad(req, res) {
       ok: false,
       error: error.message || "Ошибка при поиске сессии",
     });
+  }
+}
+
+async function handleUpdateSupportPlan(req, res) {
+  try {
+    const { public_code, session_id, support_plan } = req.body || {};
+
+    if (!public_code && !session_id) {
+      return res.status(400).json({ ok: false, error: "Missing public_code or session_id" });
+    }
+
+    let query = getSupabase().from("sessions").update({ support_plan, updated_at: new Date().toISOString() });
+
+    if (public_code) {
+      query = query.eq("public_code", public_code);
+    } else {
+      query = query.eq("session_id", session_id);
+    }
+
+    const { error } = await query;
+
+    if (error) {
+      console.error("updateSupportPlan error:", error);
+      return res.status(500).json({ ok: false, error: "Failed to update support plan" });
+    }
+
+    return res.status(200).json({ ok: true, message: "План поддержки обновлён" });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message || "Error updating support plan" });
   }
 }
