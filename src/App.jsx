@@ -176,7 +176,10 @@ export default function App() {
 
   async function handleExpertRegister() {
     const f = registerForm;
-    if (f.name.trim().length < 2) { showToast("Укажите имя (минимум 2 символа)", "error"); return; }
+    if (!f.name || f.name.trim().length < 2) {
+      showToast("Укажите имя (минимум 2 символа)", "error");
+      return;
+    }
 
     setRegisterSending(true);
     try {
@@ -184,22 +187,29 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: f.name,
+          name: f.name.trim(),
           role: f.role,
-          specialty: f.specialty,
+          specialty: f.specialty ? f.specialty.trim() : "",
         }),
       });
-      const data = await res.json();
-      if (data.ok) {
-        setRegistrationResult(data);
-        setExpertData(data.expert);
-        localStorage.setItem("tochka_expert", JSON.stringify(data.expert));
-        showToast(`Режим специалиста активирован: ${data.expert.name}`);
-      } else {
-        showToast(data.error || "Ошибка регистрации", "error");
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        showToast(`Ошибка сервера: ${res.status} ${res.statusText}`, "error");
+        return;
       }
-    } catch {
-      showToast("Ошибка подключения", "error");
+      if (!res.ok || !data?.ok) {
+        showToast(`Ошибка регистрации: ${data?.error || data?.details || res.statusText}`, "error");
+        return;
+      }
+      setRegistrationResult(data);
+      setExpertData(data.expert);
+      localStorage.setItem("tochka_expert", JSON.stringify(data.expert));
+      showToast(`Режим специалиста активирован: ${data.expert.name}`);
+    } catch (e) {
+      showToast(`Ошибка подключения: ${e?.message || "проверьте, запущен ли сервер"}`, "error");
     } finally {
       setRegisterSending(false);
     }
@@ -272,6 +282,15 @@ export default function App() {
     "меня убьют",
     "голоса приказывают",
   ];
+
+  const roleMap = {
+    psychiatrist: "Психиатр",
+    psychologist: "Психолог",
+    psychotherapist: "Психотерапевт",
+    clinical_psychologist: "Клинический психолог",
+    neurologist: "Невролог",
+    other: "Другое",
+  };
 
   function hasCrisisRisk(value) {
     const lower = (value || "").toLowerCase();
@@ -2241,7 +2260,7 @@ export default function App() {
                 borderRadius: 22, padding: "8px 16px", fontSize: 13, color: "#5F7D6C",
                 display: "flex", alignItems: "center", gap: 8,
               }}>
-                <span>{expertData.name}, {expertData.role}</span>
+                <span>{expertData.name}, {roleMap[expertData.role] || expertData.role}</span>
                 <button
                   onClick={handleExpertLogout}
                   style={{
