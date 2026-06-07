@@ -4,25 +4,26 @@ function LogoMark({ size = 44 }) {
   return (
     <svg
       width={size}
-      height={size * (44 / 48)}
-      viewBox="0 0 48 44"
+      height={size}
+      viewBox="0 0 48 48"
       fill="none"
       aria-label="Точка опоры"
       style={{ display: "block", flexShrink: 0 }}
     >
-      {/* Bowl / support — стабильная опора */}
-      <path d="M8 30 C8 44, 40 44, 40 30" stroke="#5F7D6C" strokeWidth="3" strokeLinecap="round" />
-      {/* Amorphous state — мягкое, нестабильное состояние */}
-      <path d="M24 6 C14 6, 8 12, 9 20 C9 26, 15 28, 23 27 C29 28, 37 25, 38 18 C39 11, 33 6, 24 6 Z" fill="#7D9A89" fillOpacity="0.25" />
+      {/* Bowl / support — надёжная твёрдая чаша */}
+      <path d="M6 28 C6 46 42 46 42 28 C42 30 6 30 6 28 Z" fill="#5F7D6C" />
+      {/* Bowl inner highlight */}
+      <path d="M9 30 C9 43 39 43 39 30" fill="none" stroke="#7D9A89" strokeWidth="1.5" strokeOpacity="0.35" />
+      {/* Amorphous state — мягкое нестабильное состояние, опирающееся на чашу */}
+      <path d="M24 6 C12 6 6 14 7 22 C8 28 14 31 24 30 C34 31 40 28 41 22 C42 14 36 6 24 6 Z" fill="#7D9A89" fillOpacity="0.2" />
       {/* Denser core */}
-      <path d="M24 12 C18 12, 14 16, 14 20 C14 24, 18 25, 24 25 C30 25, 34 22, 34 18 C34 14, 30 12, 24 12 Z" fill="#7D9A89" fillOpacity="0.45" />
-      {/* Scatter dots — фрагменты / мысли */}
-      <circle cx="14" cy="8" r="1.5" fill="#7D9A89" fillOpacity="0.5" />
-      <circle cx="35" cy="10" r="1.2" fill="#7D9A89" fillOpacity="0.4" />
-      <circle cx="28" cy="3" r="1" fill="#7D9A89" fillOpacity="0.35" />
-      <circle cx="21" cy="4" r="0.9" fill="#7D9A89" fillOpacity="0.45" />
-      <circle cx="38" cy="16" r="0.8" fill="#7D9A89" fillOpacity="0.3" />
-      <circle cx="10" cy="16" r="0.8" fill="#7D9A89" fillOpacity="0.3" />
+      <path d="M24 14 C17 14 13 18 13 23 C13 27 17 29 24 29 C31 29 35 27 35 23 C35 18 31 14 24 14 Z" fill="#7D9A89" fillOpacity="0.45" />
+      {/* Scatter dots — фрагменты / рассеянные мысли */}
+      <circle cx="13" cy="10" r="1.5" fill="#7D9A89" fillOpacity="0.5" />
+      <circle cx="36" cy="11" r="1.3" fill="#7D9A89" fillOpacity="0.4" />
+      <circle cx="28" cy="3" r="1.1" fill="#7D9A89" fillOpacity="0.35" />
+      <circle cx="20" cy="4" r="1" fill="#7D9A89" fillOpacity="0.45" />
+      <circle cx="39" cy="18" r="0.9" fill="#7D9A89" fillOpacity="0.3" />
     </svg>
   );
 }
