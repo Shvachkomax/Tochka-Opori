@@ -46,7 +46,7 @@ export default function App() {
   const [crisisOpen, setCrisisOpen] = useState(false);
   const [crisisText, setCrisisText] = useState("");
   const [crisisContact, setCrisisContact] = useState("");
-  const [crisisSubmitted, setCrisisSubmitted] = useState(false);
+  const [crisisSubmitting, setCrisisSubmitting] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -126,6 +126,12 @@ export default function App() {
   const [adminReqTab, setAdminReqTab] = useState("reviews");
   const [adminRequests, setAdminRequests] = useState([]);
   const [adminReqFilter, setAdminReqFilter] = useState("pending");
+
+  // Admin crisis requests state
+  const [adminCrisisRequests, setAdminCrisisRequests] = useState([]);
+  const [adminCrisisFilter, setAdminCrisisFilter] = useState("new");
+  const [adminCrisisLoading, setAdminCrisisLoading] = useState(false);
+  const [adminCrisisActionLoading, setAdminCrisisActionLoading] = useState(null);
 
   function showToast(message, type = "success") {
     setToast({ message, type, key: Date.now() });
@@ -242,6 +248,7 @@ export default function App() {
   const [crisisVoiceError, setCrisisVoiceError] = useState("");
   const [crisisWarning, setCrisisWarning] = useState("");
   const [crisisConfirmation, setCrisisConfirmation] = useState("");
+  const [crisisShowHighRiskWarning, setCrisisShowHighRiskWarning] = useState(false);
 
   const crisisKeywords = [
     "хочу умереть",
@@ -267,24 +274,52 @@ export default function App() {
     return crisisKeywords.some((keyword) => lower.includes(keyword));
   }
 
-  function submitCrisisRequest() {
+  async function submitCrisisRequest() {
     setCrisisWarning("");
+    setCrisisConfirmation("");
 
-    if (!crisisContact.trim()) {
-      setCrisisWarning("Укажите телефон или Telegram для связи. Если есть непосредственная опасность — звоните 112 или 103.");
+    if (hasCrisisRisk(crisisText) && !crisisShowHighRiskWarning) {
+      setCrisisShowHighRiskWarning(true);
+      setCrisisWarning("Если есть риск причинить вред себе или другому человеку — звоните 112 или 103 и не оставайтесь одни.");
       return;
     }
 
-    setCrisisConfirmation("Заявка принята. Ожидайте связи. Если ситуация опасна прямо сейчас — не ждите ответа сервиса, звоните 112 или 103.");
+    if (!crisisContact.trim() && !crisisText.trim()) {
+      setCrisisWarning("Опишите ситуацию или укажите контакт для связи. Если опасно прямо сейчас — звоните 112 или 103.");
+      return;
+    }
+
+    setCrisisSubmitting(true);
+    try {
+      const res = await fetch("/api/save-crisis-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          crisis_text: crisisText,
+          contact: crisisContact,
+          public_code: publicCode || null,
+          session_id: sessionId || null,
+          high_risk_detected: hasCrisisRisk(crisisText),
+          risk_markers: hasCrisisRisk(crisisText) ? crisisKeywords.filter(k => (crisisText || "").toLowerCase().includes(k)) : null,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setCrisisConfirmation("Обращение сохранено. Если есть непосредственная угроза жизни или безопасности — не ждите ответа сервиса, звоните 112 или 103.");
+      } else {
+        setCrisisWarning(data.error || "Не удалось сохранить обращение. Если опасно прямо сейчас — звоните 112 или 103.");
+      }
+    } catch (e) {
+      console.error("submit crisis error", e);
+      setCrisisWarning("Не удалось сохранить обращение. Если опасно прямо сейчас — звоните 112 или 103.");
+    } finally {
+      setCrisisSubmitting(false);
+    }
   }
 
   function continueFromCrisis() {
     setCrisisConfirmation("");
-
-    if (hasCrisisRisk(crisisText)) {
-      setCrisisWarning("Похоже, ситуация может быть срочной. Пожалуйста, не оставайтесь один. Позвоните 112 или 103 прямо сейчас. Если рядом есть близкий человек — попросите его быть рядом с вами.");
-      return;
-    }
+    setCrisisWarning("");
 
     if (crisisTimerRef.current) {
       clearInterval(crisisTimerRef.current);
@@ -304,6 +339,7 @@ export default function App() {
     setCrisisTranscribing(false);
     setCrisisVoiceError("");
     setCrisisWarning("");
+    setCrisisShowHighRiskWarning(false);
   }
 
   function handleCrisisClose() {
@@ -314,13 +350,16 @@ export default function App() {
       crisisMediaRecorderRef.current.stop();
     }
     setCrisisOpen(false);
-    setCrisisSubmitted(false);
+    setCrisisSubmitting(false);
     setCrisisText("");
     setCrisisContact("");
     setCrisisRecording(false);
     setCrisisRecordingTime(0);
     setCrisisTranscribing(false);
     setCrisisVoiceError("");
+    setCrisisWarning("");
+    setCrisisConfirmation("");
+    setCrisisShowHighRiskWarning(false);
   }
 
   async function startRecording() {
@@ -1080,6 +1119,56 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  async function adminLoadCrisisRequests(filterStatus) {
+    const st = filterStatus !== undefined ? filterStatus : adminCrisisFilter;
+    setAdminCrisisLoading(true);
+    try {
+      const res = await fetch(`/api/list-crisis-requests?status=${encodeURIComponent(st)}&limit=100&admin_secret=${encodeURIComponent(adminPassword)}`);
+      const data = await res.json();
+      if (data.ok) {
+        setAdminCrisisRequests(data.requests || []);
+      } else {
+        console.error("load crisis requests error", data);
+      }
+    } catch (err) {
+      console.error("adminLoadCrisisRequests error", err);
+    } finally {
+      setAdminCrisisLoading(false);
+    }
+  }
+
+  async function adminUpdateCrisisStatus(requestId, status) {
+    setAdminCrisisActionLoading(requestId);
+    try {
+      const res = await fetch("/api/update-crisis-request-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ request_id: requestId, status, admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Статус обновлён");
+        adminLoadCrisisRequests(adminCrisisFilter);
+      } else {
+        showToast(data.error || "Ошибка обновления", "error");
+      }
+    } catch {
+      showToast("Ошибка обновления статуса", "error");
+    } finally {
+      setAdminCrisisActionLoading(null);
+    }
+  }
+
+  function adminDownloadCrisisJson(req) {
+    const blob = new Blob([JSON.stringify(req, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `crisis-${req.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function safeText(value, fallback = "—") {
     if (value === null || value === undefined) return fallback;
     if (typeof value === "string") return value || fallback;
@@ -1473,6 +1562,16 @@ export default function App() {
                 <button
                   style={{
                     border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "crisis" ? "white" : "rgba(255,255,255,.06)",
+                    color: adminReqTab === "crisis" ? "#020617" : "white",
+                  }}
+                  onClick={() => { setAdminReqTab("crisis"); adminLoadCrisisRequests(adminCrisisFilter); }}
+                >
+                  Срочные обращения
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
                     background: adminReqTab === "requests" ? "white" : "rgba(255,255,255,.06)",
                     color: adminReqTab === "requests" ? "#020617" : "white",
                   }}
@@ -1482,7 +1581,164 @@ export default function App() {
                 </button>
               </div>
 
-              {adminReqTab === "requests" ? (
+              {adminReqTab === "crisis" ? (
+                <>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
+                    <select
+                      value={adminCrisisFilter}
+                      onChange={(e) => { const v = e.target.value; setAdminCrisisFilter(v); adminLoadCrisisRequests(v); }}
+                      style={{
+                        border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
+                        color: "white", padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                      }}
+                    >
+                      <option value="new">Новые</option>
+                      <option value="in_progress">В работе</option>
+                      <option value="closed">Закрытые</option>
+                      <option value="false_alarm">Тестовые</option>
+                      <option value="all">Все</option>
+                    </select>
+                    <button
+                      style={{
+                        border: "1px solid rgba(255,255,255,.18)", borderRadius: 12, background: "rgba(255,255,255,.06)",
+                        color: "white", padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                      }}
+                      onClick={() => adminLoadCrisisRequests(adminCrisisFilter)}
+                    >
+                      {adminCrisisLoading ? "Загрузка..." : `Обновить (${adminCrisisRequests.length})`}
+                    </button>
+                  </div>
+
+                  {adminCrisisLoading ? (
+                    <div style={{ color: "#94a3b8", textAlign: "center", padding: 60 }}>Загрузка...</div>
+                  ) : adminCrisisRequests.length === 0 ? (
+                    <div style={{ color: "#94a3b8", textAlign: "center", padding: 60 }}>Нет обращений</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      {adminCrisisRequests.map((req) => (
+                        <div key={req.id} style={{
+                          border: "1px solid rgba(255,255,255,.1)", borderRadius: 20,
+                          background: "rgba(255,255,255,.04)", padding: 20,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                              <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                                {new Date(req.created_at).toLocaleString("ru-RU")}
+                              </span>
+                              <span style={{
+                                fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                                background: req.status === "in_progress" ? "rgba(59,130,246,.2)" : req.status === "closed" ? "rgba(34,197,94,.2)" : req.status === "false_alarm" ? "rgba(100,116,139,.2)" : "rgba(220,38,38,.2)",
+                                color: req.status === "in_progress" ? "#93c5fd" : req.status === "closed" ? "#bbf7d0" : req.status === "false_alarm" ? "#cbd5e1" : "#fecaca",
+                              }}>
+                                {req.status === "new" ? "Новое" : req.status === "in_progress" ? "В работе" : req.status === "closed" ? "Закрыто" : req.status === "false_alarm" ? "Тестовое" : req.status}
+                              </span>
+                              <span style={{ color: "#64748b", fontSize: 12 }}>
+                                {req.environment} / {req.source}
+                              </span>
+                              {req.high_risk_detected && (
+                                <span style={{
+                                  fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                                  background: "rgba(220,38,38,.2)", color: "#fecaca",
+                                }}>
+                                  Высокий риск
+                                </span>
+                              )}
+                            </div>
+                            {req.public_code && (
+                              <span style={{ fontWeight: 700, fontSize: 13, color: "#a5b4fc", letterSpacing: 0.5 }}>
+                                {req.public_code}
+                              </span>
+                            )}
+                          </div>
+
+                          {req.crisis_text && (
+                            <div style={{ marginBottom: 8 }}>
+                              <div style={{ color: "#64748b", fontSize: 11, marginBottom: 2 }}>Ситуация</div>
+                              <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{req.crisis_text}</div>
+                            </div>
+                          )}
+
+                          {req.contact && (
+                            <div style={{ marginBottom: 8 }}>
+                              <div style={{ color: "#64748b", fontSize: 11, marginBottom: 2 }}>Контакт</div>
+                              <div style={{ color: "#e2e8f0", fontSize: 13 }}>{req.contact}</div>
+                            </div>
+                          )}
+
+                          {req.risk_markers && Array.isArray(req.risk_markers) && req.risk_markers.length > 0 && (
+                            <div style={{ marginBottom: 8 }}>
+                              <div style={{ color: "#64748b", fontSize: 11, marginBottom: 2 }}>Маркеры риска</div>
+                              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                {req.risk_markers.map((m, i) => (
+                                  <span key={i} style={{
+                                    fontSize: 11, padding: "2px 6px", borderRadius: 4,
+                                    background: "rgba(220,38,38,.15)", color: "#fca5a5",
+                                  }}>{m}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {req.admin_comment && (
+                            <div style={{ marginBottom: 8, color: "#94a3b8", fontSize: 13, fontStyle: "italic" }}>
+                              Комментарий: {req.admin_comment}
+                            </div>
+                          )}
+
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                            {req.status === "new" && (
+                              <button
+                                disabled={adminCrisisActionLoading === req.id}
+                                style={{
+                                  border: 0, borderRadius: 12, background: "rgba(59,130,246,.2)", color: "#93c5fd",
+                                  padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                                  opacity: adminCrisisActionLoading === req.id ? 0.5 : 1,
+                                }}
+                                onClick={() => adminUpdateCrisisStatus(req.id, "in_progress")}
+                              >
+                                Взять в работу
+                              </button>
+                            )}
+                            {req.status === "in_progress" && (
+                              <button
+                                disabled={adminCrisisActionLoading === req.id}
+                                style={{
+                                  border: 0, borderRadius: 12, background: "rgba(34,197,94,.2)", color: "#bbf7d0",
+                                  padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                                  opacity: adminCrisisActionLoading === req.id ? 0.5 : 1,
+                                }}
+                                onClick={() => adminUpdateCrisisStatus(req.id, "closed")}
+                              >
+                                Закрыть
+                              </button>
+                            )}
+                            <button
+                              disabled={adminCrisisActionLoading === req.id}
+                              style={{
+                                border: 0, borderRadius: 12, background: "rgba(100,116,139,.2)", color: "#cbd5e1",
+                                padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                                opacity: adminCrisisActionLoading === req.id ? 0.5 : 1,
+                              }}
+                              onClick={() => adminUpdateCrisisStatus(req.id, "false_alarm")}
+                            >
+                              Ложная/тестовая
+                            </button>
+                            <button
+                              style={{
+                                border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
+                                color: "#94a3b8", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                              onClick={() => adminDownloadCrisisJson(req)}
+                            >
+                              Скачать JSON
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : adminReqTab === "requests" ? (
                 <>
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
                     <select
@@ -2403,14 +2659,14 @@ export default function App() {
                     <div style={s.crisisConfirmation}>{crisisConfirmation}</div>
                   )}
 
-                  {crisisWarning && (
+                  {crisisWarning && !crisisConfirmation && (
                     <div style={s.crisisWarning}>{crisisWarning}</div>
                   )}
 
                   <textarea
                     style={s.crisisTextarea}
                     value={crisisText}
-                    onChange={(e) => setCrisisText(e.target.value)}
+                    onChange={(e) => { setCrisisText(e.target.value); setCrisisShowHighRiskWarning(false); }}
                     placeholder="Что именно случилось?"
                   />
 
@@ -2455,12 +2711,19 @@ export default function App() {
                     placeholder="Телефон или Telegram для связи"
                   />
                   <div style={s.crisisActions}>
-                    <button style={s.wide} onClick={submitCrisisRequest}>
-                      Жду звонка специалиста
+                    <button
+                      style={s.wide}
+                      onClick={submitCrisisRequest}
+                      disabled={crisisSubmitting}
+                    >
+                      {crisisSubmitting ? "Сохранение..." : "Отправить обращение"}
                     </button>
                     <button style={{ ...s.secondary, width: "100%", marginTop: 0 }} onClick={continueFromCrisis}>
                       Продолжить анонимный разбор
                     </button>
+                  </div>
+                  <div style={{ color: "#7A7268", fontSize: 12, marginTop: 12, textAlign: "center", lineHeight: 1.5 }}>
+                    Сервис не является экстренной службой. Если опасно прямо сейчас — звоните 112 или 103.
                   </div>
                 </>
             </div>

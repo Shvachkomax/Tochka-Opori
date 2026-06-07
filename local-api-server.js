@@ -19,6 +19,9 @@ import requestExpertAccessHandler from "./api/request-expert-access.js";
 import listExpertRequestsHandler from "./api/list-expert-requests.js";
 import updateExpertRequestStatusHandler from "./api/update-expert-request-status.js";
 import registerExpertHandler from "./api/register-expert.js";
+import saveCrisisRequestHandler from "./api/save-crisis-request.js";
+import listCrisisRequestsHandler from "./api/list-crisis-requests.js";
+import updateCrisisRequestStatusHandler from "./api/update-crisis-request-status.js";
 
 const PORT = 3001;
 
@@ -106,6 +109,15 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     }
     if (nodeReq.url.startsWith("/api/register-expert")) {
       return registerExpertHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/save-crisis-request")) {
+      return saveCrisisRequestHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/list-crisis-requests")) {
+      return listCrisisRequestsHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/update-crisis-request-status")) {
+      return updateCrisisRequestStatusHandler(req, res);
     }
 
     nodeRes.writeHead(404, { "Content-Type": "application/json" });
