@@ -1,9 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
+import { getPrivacySafeMode } from "../lib/sanitize.js";
 
 export default async function handler(req, res) {
   try {
     if (req.method !== "POST") {
       return res.status(405).json({ ok: false, error: "Method not allowed" });
+    }
+
+    if (getPrivacySafeMode()) {
+      return res.status(200).json({
+        ok: true,
+        privacy_safe_mode: true,
+        message: "Privacy-safe mode active. Crisis request not persisted.",
+      });
     }
 
     const {
@@ -59,7 +68,6 @@ export default async function handler(req, res) {
       status: "new",
       priority: "urgent",
       crisis_text: text || null,
-      contact: contactStr || null,
       source: "crisis_button",
       environment,
       public_code: public_code || null,

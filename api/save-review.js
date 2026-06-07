@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getSupabase } from "../lib/supabase.js";
+import { maskSensitiveData, getPrivacySafeMode } from "../lib/sanitize.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -26,18 +27,6 @@ export default async function handler(req, res) {
       review.source = review.expert_id ? "developer_expert_review" : "developer_local";
       review.local_only = true;
       review.approved_for_training = false;
-
-      const dataDir = path.join(process.cwd(), "data");
-      const jsonlPath = path.join(dataDir, "case-reviews.jsonl");
-      const sessionsDir = path.join(dataDir, "sessions");
-
-      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-      if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
-
-      fs.appendFileSync(jsonlPath, JSON.stringify(review) + "\n", "utf8");
-
-      const sessionPath = path.join(sessionsDir, `${review.sessionId}.json`);
-      fs.writeFileSync(sessionPath, JSON.stringify(review, null, 2), "utf8");
     } else {
       review.status = "pending";
       review.environment = "production";
@@ -46,12 +35,18 @@ export default async function handler(req, res) {
       review.approved_for_training = false;
     }
 
+    // Sanitize review data in privacy-safe mode
+    let sanitizedReview = review;
+    if (getPrivacySafeMode()) {
+      sanitizedReview = maskSensitiveData(review);
+    }
+
     // Validate expert_id if provided
-    if (review.expert_id) {
+    if (sanitizedReview.expert_id) {
       const { data: expert, error: expertError } = await getSupabase()
         .from("experts")
         .select("id, name, role, specialty")
-        .eq("id", review.expert_id)
+        .eq("id", sanitizedReview.expert_id)
         .eq("is_active", true)
         .maybeSingle();
 
@@ -63,23 +58,37 @@ export default async function handler(req, res) {
           error: "Указанный специалист не найден или не активен",
         });
       } else {
-        // Ensure expert_name matches the DB record
-        review.expert_name = expert.name;
-        review.expert_role = expert.role;
-        review.expert_specialty = expert.specialty;
+        sanitizedReview.expert_name = expert.name;
+        sanitizedReview.expert_role = expert.role;
+        sanitizedReview.expert_specialty = expert.specialty;
       }
     }
 
-    // Save to Supabase case_reviews
+    // Save to local filesystem (always original data for debugging)
+    if (isLocal) {
+      const dataDir = path.join(process.cwd(), "data");
+      const jsonlPath = path.join(dataDir, "case-reviews.jsonl");
+      const sessionsDir = path.join(dataDir, "sessions");
+
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
+
+      fs.appendFileSync(jsonlPath, JSON.stringify(review) + "\n", "utf8");
+
+      const sessionPath = path.join(sessionsDir, `${review.sessionId}.json`);
+      fs.writeFileSync(sessionPath, JSON.stringify(review, null, 2), "utf8");
+    }
+
+    // Save to Supabase case_reviews (with sanitized data if privacy mode)
     const insertPayload = {
-      case_id: review.case_id,
-      session_id: review.sessionId,
-      public_code: review.publicCode,
-      expert_id: review.expert_id || null,
-      expert_name: review.expert_name || null,
-      expert_role: review.expert_role || null,
-      expert_specialty: review.expert_specialty || null,
-      json_data: review,
+      case_id: sanitizedReview.case_id,
+      session_id: sanitizedReview.sessionId,
+      public_code: sanitizedReview.publicCode,
+      expert_id: sanitizedReview.expert_id || null,
+      expert_name: sanitizedReview.expert_name || null,
+      expert_role: sanitizedReview.expert_role || null,
+      expert_specialty: sanitizedReview.expert_specialty || null,
+      json_data: sanitizedReview,
     };
 
     const { error: insertError } = await getSupabase()
@@ -93,13 +102,13 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
-      sessionId: review.sessionId,
-      publicCode: review.publicCode,
-      environment: review.environment,
-      status: review.status,
-      source: review.source,
-      expert_id: review.expert_id || null,
-      expert_name: review.expert_name || null,
+      sessionId: sanitizedReview.sessionId,
+      publicCode: sanitizedReview.publicCode,
+      environment: sanitizedReview.environment,
+      status: sanitizedReview.status,
+      source: sanitizedReview.source,
+      expert_id: sanitizedReview.expert_id || null,
+      expert_name: sanitizedReview.expert_name || null,
       saved_to: isLocal ? "local+supabase" : "supabase",
     });
   } catch (error) {

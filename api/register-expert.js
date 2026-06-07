@@ -1,5 +1,6 @@
 import { getSupabase } from "../lib/supabase.js";
 import { generateExpertCode } from "../lib/expertCode.js";
+import { getPrivacySafeMode } from "../lib/sanitize.js";
 
 const VALID_ROLES = ["psychiatrist", "psychologist", "psychotherapist", "clinical_psychologist", "neurologist", "other"];
 
@@ -22,21 +23,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "Укажите корректную роль" });
     }
 
-    if (email && email.length > 200) {
-      return res.status(400).json({ ok: false, error: "Email не должен превышать 200 символов" });
-    }
-    if (telegram && telegram.length > 200) {
-      return res.status(400).json({ ok: false, error: "Telegram не должен превышать 200 символов" });
-    }
     if (specialty && specialty.length > 300) {
       return res.status(400).json({ ok: false, error: "Специализация не должна превышать 300 символов" });
     }
-    if (city && city.length > 200) {
-      return res.status(400).json({ ok: false, error: "Город не должен превышать 200 символов" });
-    }
-    if (organization && organization.length > 300) {
-      return res.status(400).json({ ok: false, error: "Организация не должна превышать 300 символов" });
-    }
+
+    // In privacy-safe mode, never store personal contact fields
+    const privacySafe = getPrivacySafeMode();
+    const safeEmail = privacySafe ? null : (email?.trim() || null);
+    const safeTelegram = privacySafe ? null : (telegram?.trim() || null);
+    const safeCity = privacySafe ? null : (city?.trim() || null);
+    const safeOrg = privacySafe ? null : (organization?.trim() || null);
 
     // Generate unique access_code
     let access_code;
@@ -63,16 +59,16 @@ export default async function handler(req, res) {
       .from("experts")
       .insert({
         name: name.trim(),
-        email: email?.trim() || null,
-        telegram: telegram?.trim() || null,
+        email: safeEmail,
+        telegram: safeTelegram,
         role,
         specialty: specialty?.trim() || null,
-        city: city?.trim() || null,
-        organization: organization?.trim() || null,
+        city: safeCity,
+        organization: safeOrg,
         access_code,
         is_active: true,
       })
-      .select("id, name, role, specialty, city, organization")
+      .select("id, name, role, specialty")
       .single();
 
     if (insertError) {
@@ -87,8 +83,6 @@ export default async function handler(req, res) {
         name: newExpert.name,
         role: newExpert.role,
         specialty: newExpert.specialty,
-        city: newExpert.city,
-        organization: newExpert.organization,
       },
       access_code,
     });

@@ -183,7 +183,11 @@ export default function App() {
       const res = await fetch("/api/register-expert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(f),
+        body: JSON.stringify({
+          name: f.name,
+          role: f.role,
+          specialty: f.specialty,
+        }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -1463,6 +1467,16 @@ export default function App() {
       borderRadius: 18,
       lineHeight: 1.5,
     },
+    privacyNote: {
+      marginBottom: 20,
+      background: "rgba(125,154,137,.08)",
+      border: "1px solid rgba(125,154,137,.2)",
+      color: "#5F7D6C",
+      padding: 14,
+      borderRadius: 16,
+      fontSize: 14,
+      lineHeight: 1.5,
+    },
     toast: {
       position: "fixed",
       bottom: 24,
@@ -1583,6 +1597,9 @@ export default function App() {
 
               {adminReqTab === "crisis" ? (
                 <>
+                  <div style={{ color: "#94a3b8", fontSize: 13, lineHeight: 1.5, marginBottom: 16, padding: 16, border: "1px solid rgba(255,255,255,.08)", borderRadius: 16, background: "rgba(255,255,255,.03)" }}>
+                    Сохранение срочных обращений временно отключено в privacy-safe режиме. Обращения не сохраняются в базу данных.
+                  </div>
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
                     <select
                       value={adminCrisisFilter}
@@ -2276,7 +2293,7 @@ export default function App() {
             </div>
 
             <p style={{ color: "#7A7268", fontSize: 13, marginTop: 24, lineHeight: 1.5 }}>
-              Сервис не ставит диагноз. Решение о диагнозе и лечении принимает специалист.
+              Сервис работает в тестовом режиме, не ставит диагноз и не является экстренной службой. Не указывайте персональные данные в тексте обращения.
             </p>
           </section>
 
@@ -2655,18 +2672,14 @@ export default function App() {
                     звоните <b>112</b> или <b>103</b>.
                   </div>
 
-                  {crisisConfirmation && (
-                    <div style={s.crisisConfirmation}>{crisisConfirmation}</div>
-                  )}
-
-                  {crisisWarning && !crisisConfirmation && (
-                    <div style={s.crisisWarning}>{crisisWarning}</div>
-                  )}
+                  <div style={s.privacyNote}>
+                    Пока сервис работает в тестовом режиме и не является экстренной службой. Мы не сохраняем ваш телефон или Telegram и не обещаем обратный звонок.
+                  </div>
 
                   <textarea
                     style={s.crisisTextarea}
                     value={crisisText}
-                    onChange={(e) => { setCrisisText(e.target.value); setCrisisShowHighRiskWarning(false); }}
+                    onChange={(e) => setCrisisText(e.target.value)}
                     placeholder="Что именно случилось?"
                   />
 
@@ -2704,22 +2717,12 @@ export default function App() {
                     <div style={s.error}>{crisisVoiceError}</div>
                   )}
 
-                  <input
-                    style={s.crisisInput}
-                    value={crisisContact}
-                    onChange={(e) => setCrisisContact(e.target.value)}
-                    placeholder="Телефон или Telegram для связи"
-                  />
                   <div style={s.crisisActions}>
-                    <button
-                      style={s.wide}
-                      onClick={submitCrisisRequest}
-                      disabled={crisisSubmitting}
-                    >
-                      {crisisSubmitting ? "Сохранение..." : "Отправить обращение"}
+                    <button style={s.wide} onClick={continueFromCrisis}>
+                      Понял, перейти к анонимному разбору
                     </button>
-                    <button style={{ ...s.secondary, width: "100%", marginTop: 0 }} onClick={continueFromCrisis}>
-                      Продолжить анонимный разбор
+                    <button style={{ ...s.secondary, width: "100%", marginTop: 0 }} onClick={handleCrisisClose}>
+                      Закрыть
                     </button>
                   </div>
                   <div style={{ color: "#7A7268", fontSize: 12, marginTop: 12, textAlign: "center", lineHeight: 1.5 }}>
@@ -2897,12 +2900,10 @@ export default function App() {
                 <>
                   <div style={s.modalTitle}>Регистрация специалиста</div>
                   <p style={{ color: "#7A7268", lineHeight: 1.6, marginBottom: 16, fontSize: 13 }}>
-                    Заполните форму. После регистрации вы получите код специалиста и доступ включится сразу.
+                    В тестовом режиме используйте имя или псевдоним. Не указывайте данные, которые не хотите сохранять.
                   </p>
 
-                  <input style={s.crisisInput} placeholder="ФИО *" value={registerForm.name} onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })} />
-                  <input style={s.crisisInput} placeholder="Email" type="email" value={registerForm.email} onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} />
-                  <input style={s.crisisInput} placeholder="Telegram" value={registerForm.telegram} onChange={(e) => setRegisterForm({ ...registerForm, telegram: e.target.value })} />
+                  <input style={s.crisisInput} placeholder="Имя или псевдоним специалиста *" value={registerForm.name} onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })} />
                   <select style={{ ...s.crisisInput, cursor: "pointer" }} value={registerForm.role} onChange={(e) => setRegisterForm({ ...registerForm, role: e.target.value })}>
                     <option value="psychiatrist">Психиатр</option>
                     <option value="psychologist">Психолог</option>
@@ -2912,8 +2913,6 @@ export default function App() {
                     <option value="other">Другое</option>
                   </select>
                   <input style={s.crisisInput} placeholder="Специализация" value={registerForm.specialty} onChange={(e) => setRegisterForm({ ...registerForm, specialty: e.target.value })} />
-                  <input style={s.crisisInput} placeholder="Город" value={registerForm.city} onChange={(e) => setRegisterForm({ ...registerForm, city: e.target.value })} />
-                  <input style={s.crisisInput} placeholder="Организация" value={registerForm.organization} onChange={(e) => setRegisterForm({ ...registerForm, organization: e.target.value })} />
 
                   <div style={s.crisisActions}>
                     <button style={s.wide} disabled={registerSending} onClick={handleExpertRegister}>

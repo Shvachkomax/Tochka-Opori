@@ -1,5 +1,6 @@
 import { getSupabase } from "../lib/supabase.js";
 import { generatePublicCode } from "../lib/publicCode.js";
+import { maskText, maskSensitiveData, getPrivacySafeMode } from "../lib/sanitize.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -30,25 +31,54 @@ export default async function handler(req, res) {
       }
     }
 
+    // Mask sensitive data before persisting
+    const patientText = getPrivacySafeMode() ? maskText(body.patient_text || "") : (body.patient_text || "");
+    const userReport = getPrivacySafeMode() ? maskText(body.user_report || "") : (body.user_report || "");
+    const doctorReport = getPrivacySafeMode() ? maskText(body.doctor_report || "") : (body.doctor_report || "");
+
+    let maskedConversationHistory = body.conversationHistory;
+    if (getPrivacySafeMode() && Array.isArray(maskedConversationHistory)) {
+      maskedConversationHistory = maskedConversationHistory.map(entry => {
+        if (typeof entry === "object" && entry !== null) {
+          const masked = { ...entry };
+          if (masked.content) masked.content = maskText(masked.content);
+          if (masked.text) masked.text = maskText(masked.text);
+          return masked;
+        }
+        return maskText(String(entry));
+      });
+    }
+
     const payload = {
       public_code: publicCode,
       session_id: body.sessionId || `session-${Date.now()}`,
-      patient_text: body.patient_text || "",
-      conversation_history: body.conversationHistory || null,
-      user_report: body.user_report || "",
-      doctor_report: body.doctor_report || "",
+      patient_text: patientText,
+      conversation_history: maskedConversationHistory || null,
+      user_report: userReport,
+      doctor_report: doctorReport,
       support_plan: body.supportPlan || null,
       risk_level: body.riskLevel || null,
-      json_data: {
-        ...body,
-        dialogDepth: body.dialogDepth ?? 0,
-        previousPatientReport: body.previousPatientReport || "",
-        previousDoctorReport: body.previousDoctorReport || "",
-        homeTasks: body.homeTasks || "",
-        resourceFactors: body.resourceFactors || "",
-        questions: body.questions || null,
-        answers: body.answers || {},
-      },
+      json_data: getPrivacySafeMode()
+        ? maskSensitiveData({
+            ...body,
+            dialogDepth: body.dialogDepth ?? 0,
+            previousPatientReport: body.previousPatientReport || "",
+            previousDoctorReport: body.previousDoctorReport || "",
+            homeTasks: body.homeTasks || "",
+            resourceFactors: body.resourceFactors || "",
+            questions: body.questions || null,
+            answers: body.answers || {},
+          })
+        : {
+            ...body,
+            dialogDepth: body.dialogDepth ?? 0,
+            previousPatientReport: body.previousPatientReport || "",
+            previousDoctorReport: body.previousDoctorReport || "",
+            homeTasks: body.homeTasks || "",
+            resourceFactors: body.resourceFactors || "",
+            questions: body.questions || null,
+            answers: body.answers || {},
+          },
       updated_at: new Date().toISOString(),
     };
 
