@@ -1,18 +1,55 @@
 import { getSupabase } from "../lib/supabase.js";
 
 export default async function handler(req, res) {
-  if (req.method !== "GET" && req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
   try {
+    if (req.method !== "GET" && req.method !== "POST") {
+      return res.status(405).json({ ok: false, error: "Method not allowed" });
+    }
+
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({
+        ok: false,
+        error: "Missing Supabase env vars",
+        hasUrl: Boolean(process.env.SUPABASE_URL),
+        hasServiceKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      });
+    }
+
+    const isDebug = req.method === "GET" && req.query && req.query.debug === "1";
+
+    if (isDebug) {
+      const { data, error } = await getSupabase()
+        .from("case_reviews")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (error) {
+        return res.status(200).json({
+          ok: false,
+          mode: "debug",
+          error: error.message,
+          details: error.details || null,
+          hint: error.hint || null,
+          code: error.code || null,
+        });
+      }
+
+      return res.status(200).json({
+        ok: true,
+        mode: "debug",
+        reviews: data || [],
+        count: (data || []).length,
+      });
+    }
+
     const params = req.method === "POST" ? (req.body || {}) : (req.query || {});
 
     const status = params.status || "all";
     const environment = params.environment || null;
     const expertFilter = params.expert_filter || "all";
-    const limit = Math.min(parseInt(params.limit) || 50, 200);
-    const offset = parseInt(params.offset) || 0;
+    const limit = Math.min(parseInt(String(params.limit), 10) || 50, 200);
+    const offset = parseInt(String(params.offset), 10) || 0;
 
     let query = getSupabase()
       .from("case_reviews")
@@ -37,10 +74,15 @@ export default async function handler(req, res) {
     const { data, error } = await query;
 
     if (error) {
-      return res.status(500).json({ ok: false, error: "Ошибка загрузки списка" });
+      return res.status(500).json({
+        ok: false,
+        error: "Database query failed",
+        details: error.message,
+        code: error.code,
+        hint: error.hint,
+      });
     }
 
-    // Get total count
     let countQuery = getSupabase()
       .from("case_reviews")
       .select("id", { count: "exact", head: true });
@@ -79,9 +121,20 @@ export default async function handler(req, res) {
       expert_filter: expertFilter,
     });
   } catch (error) {
+    console.error("list-reviews error", {
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+      code: error?.code,
+      stack: error?.stack,
+    });
+
     return res.status(500).json({
       ok: false,
-      error: error.message || "Ошибка загрузки списка",
+      error: "Failed to load reviews",
+      details: error?.message || String(error),
+      code: error?.code || null,
+      hint: error?.hint || null,
     });
   }
 }
