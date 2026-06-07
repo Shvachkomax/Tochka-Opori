@@ -65,6 +65,12 @@ export default function App() {
   const [adminExpertFilter, setAdminExpertFilter] = useState("all");
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminActionLoading, setAdminActionLoading] = useState(null);
+  const [editingReview, setEditingReview] = useState(null);
+  const [correctionForm, setCorrectionForm] = useState({
+    wrong_questions: "", missing_questions: "", bad_question_wording: "",
+    corrected_user_report: "", corrected_doctor_report: "",
+    protocol_update: "", correction_comment: "",
+  });
 
   // Expert state
   const [expertData, setExpertData] = useState(() => {
@@ -938,6 +944,64 @@ export default function App() {
     }
   }
 
+  function openCorrectionForm(review) {
+    const j = review.json_data || {};
+    setCorrectionForm({
+      wrong_questions: j.doctor_feedback?.wrong_questions || "",
+      missing_questions: j.doctor_feedback?.missing_questions || "",
+      bad_question_wording: j.doctor_feedback?.bad_question_wording || "",
+      corrected_user_report: j.doctor_feedback?.corrected_user_report || "",
+      corrected_doctor_report: j.doctor_feedback?.corrected_doctor_report || "",
+      protocol_update: j.doctor_feedback?.protocol_update || "",
+      correction_comment: "",
+    });
+    setEditingReview(review.id);
+  }
+
+  function closeCorrectionForm() {
+    setEditingReview(null);
+  }
+
+  async function adminSaveCorrection(reviewId, newStatus) {
+    setAdminActionLoading(reviewId);
+    try {
+      const body = {
+        review_id: reviewId,
+        admin_secret: adminPassword,
+        action: "save_correction",
+        doctor_correction: {
+          wrong_questions: correctionForm.wrong_questions,
+          missing_questions: correctionForm.missing_questions,
+          bad_question_wording: correctionForm.bad_question_wording,
+          corrected_user_report: correctionForm.corrected_user_report,
+          corrected_doctor_report: correctionForm.corrected_doctor_report,
+        },
+        protocol_update: correctionForm.protocol_update,
+        correction_comment: correctionForm.correction_comment,
+      };
+      if (newStatus) {
+        body.status = newStatus;
+      }
+      const res = await fetch("/api/update-review-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Сохранено");
+        setEditingReview(null);
+        adminLoadReviews();
+      } else {
+        showToast(data.error || "Ошибка сохранения", "error");
+      }
+    } catch {
+      showToast("Ошибка сохранения правок", "error");
+    } finally {
+      setAdminActionLoading(null);
+    }
+  }
+
   function adminDownloadJson(review) {
     const blob = new Blob([JSON.stringify(review.json_data || review, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -1279,7 +1343,53 @@ export default function App() {
                           >
                             Скачать JSON
                           </button>
+                          <button
+                            style={{
+                              border: "1px solid rgba(99,102,241,.3)", borderRadius: 12, background: "rgba(99,102,241,.08)",
+                              color: "#a5b4fc", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                            }}
+                            onClick={() => openCorrectionForm(review)}
+                          >
+                            Редактировать
+                          </button>
                         </div>
+
+                        {editingReview === review.id && (
+                          <div style={{ marginTop: 16, borderTop: "1px solid rgba(255,255,255,.08)", paddingTop: 16 }}>
+                            <div style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Редакция отзыва</div>
+
+                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="Что было неверно в вопросах?" value={correctionForm.wrong_questions} onChange={(e) => setCorrectionForm({ ...correctionForm, wrong_questions: e.target.value })} />
+                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="Какие вопросы нужно было добавить?" value={correctionForm.missing_questions} onChange={(e) => setCorrectionForm({ ...correctionForm, missing_questions: e.target.value })} />
+                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="Какие вопросы были лишними?" value={correctionForm.bad_question_wording} onChange={(e) => setCorrectionForm({ ...correctionForm, bad_question_wording: e.target.value })} />
+                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Исправленная версия отчета для пациента" value={correctionForm.corrected_user_report} onChange={(e) => setCorrectionForm({ ...correctionForm, corrected_user_report: e.target.value })} />
+                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Исправленная версия отчета для специалиста" value={correctionForm.corrected_doctor_report} onChange={(e) => setCorrectionForm({ ...correctionForm, corrected_doctor_report: e.target.value })} />
+                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Предложение для изменения протокола / prompts" value={correctionForm.protocol_update} onChange={(e) => setCorrectionForm({ ...correctionForm, protocol_update: e.target.value })} />
+                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 12 }} placeholder="Комментарий редактора" value={correctionForm.correction_comment} onChange={(e) => setCorrectionForm({ ...correctionForm, correction_comment: e.target.value })} />
+
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              <button
+                                disabled={adminActionLoading === review.id}
+                                style={{ border: 0, borderRadius: 12, background: "rgba(99,102,241,.2)", color: "#c7d2fe", padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: adminActionLoading === review.id ? 0.5 : 1 }}
+                                onClick={() => adminSaveCorrection(review.id, null)}
+                              >
+                                Сохранить правки
+                              </button>
+                              <button
+                                disabled={adminActionLoading === review.id}
+                                style={{ border: 0, borderRadius: 12, background: "rgba(34,197,94,.2)", color: "#bbf7d0", padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: adminActionLoading === review.id ? 0.5 : 1 }}
+                                onClick={() => adminSaveCorrection(review.id, "approved")}
+                              >
+                                Одобрить после правки
+                              </button>
+                              <button
+                                style={{ border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)", color: "#94a3b8", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
+                                onClick={closeCorrectionForm}
+                              >
+                                Отмена
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
