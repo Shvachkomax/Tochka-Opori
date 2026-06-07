@@ -78,10 +78,6 @@ export default async function handler(req, res) {
       query = query.filter("json_data->>environment", "eq", environment);
     }
 
-    if (environment && environment !== "all") {
-      query = query.filter("json_data->>environment", "eq", environment);
-    }
-
     if (expertFilter === "with_expert") {
       query = query.not("expert_id", "is", null);
     }

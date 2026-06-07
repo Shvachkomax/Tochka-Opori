@@ -888,7 +888,7 @@ export default function App() {
       const data = await res.json();
       if (data.ok) {
         setAdminAuthed(true);
-        adminLoadReviews(adminFilter, adminEnv);
+        adminLoadReviews(adminFilter, adminEnv, adminExpertFilter);
       } else {
         showToast("Неверный пароль", "error");
       }
@@ -898,7 +898,7 @@ export default function App() {
   }
 
   async function adminLoadReviews(filterStatus, filterEnv, expertFilter) {
-    const st = filterStatus || adminFilter;
+    const st = filterStatus !== undefined ? filterStatus : adminFilter;
     const env = filterEnv !== undefined ? filterEnv : adminEnv;
     const exp = expertFilter !== undefined ? expertFilter : adminExpertFilter;
     setAdminLoading(true);
@@ -911,11 +911,13 @@ export default function App() {
       const data = await res.json();
       if (data.ok) {
         setAdminReviews(data.reviews || []);
-        setAdminTotal(data.total || 0);
+        setAdminTotal(data.count || data.reviews?.length || 0);
       } else {
-        showToast(data.error || "Ошибка загрузки", "error");
+        const details = data.details || data.error || null;
+        showToast(details ? `Ошибка загрузки: ${details}` : "Ошибка загрузки", "error");
       }
-    } catch {
+    } catch (err) {
+      console.error("adminLoadReviews error", err);
       showToast("Ошибка загрузки списка", "error");
     } finally {
       setAdminLoading(false);
@@ -1566,7 +1568,7 @@ export default function App() {
                 >
                   <option value="production">Production</option>
                   <option value="local">Local</option>
-                  <option value="">Все окружения</option>
+                  <option value="all">Все окружения</option>
                 </select>
                 <select
                   value={adminExpertFilter}
@@ -1585,7 +1587,7 @@ export default function App() {
                     border: "1px solid rgba(255,255,255,.18)", borderRadius: 12, background: "rgba(255,255,255,.06)",
                     color: "white", padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
                   }}
-                  onClick={adminLoadReviews}
+                  onClick={() => adminLoadReviews()}
                 >
                   {adminLoading ? "Загрузка..." : `Обновить (${adminTotal})`}
                 </button>
