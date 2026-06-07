@@ -1045,9 +1045,32 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
-  function shorten(text, max = 100) {
+  function safeText(value, fallback = "—") {
+    if (value === null || value === undefined) return fallback;
+    if (typeof value === "string") return value || fallback;
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return fallback;
+    }
+  }
+
+  function shortText(value, max = 240) {
+    const text = safeText(value, "");
     if (!text) return "—";
     return text.length > max ? text.slice(0, max) + "…" : text;
+  }
+
+  function safeDate(value) {
+    if (!value) return "—";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleString("ru-RU");
+  }
+
+  function shorten(text, max = 100) {
+    return shortText(text, max);
   }
 
   const isAdminPage = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
@@ -1275,7 +1298,24 @@ export default function App() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   {adminReviews.map((review) => {
                     try {
-                    const j = getReviewJson(review);
+                    const json = getReviewJson(review);
+                    const correction = getDoctorCorrection(review);
+                    const corrected = getCorrectedJson(review);
+
+                    const patientText = safeText(json.patient_input || json.patient_text || json.input || "");
+                    const userReport = safeText(json.user_report || "");
+                    const doctorReport = safeText(json.doctor_report || "");
+                    const doctorFeedbackComment = safeText(json.doctor_feedback?.generalComment || "");
+                    const status = safeText(json.status, "legacy");
+                    const source = safeText(json.source, "—");
+                    const environment = safeText(json.environment, "—");
+                    const publicCode = safeText(json.public_code || json.publicCode, "—");
+                    const expertName = safeText(json.expert_name || "");
+                    const expertRole = safeText(json.expert_role || "");
+                    const expertSpecialty = safeText(json.expert_specialty || "");
+                    const city = safeText(json.city || "");
+                    const organization = safeText(json.organization || "");
+
                     return (
                       <div
                         key={review.id}
@@ -1287,56 +1327,54 @@ export default function App() {
                         <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                             <span style={{ color: "#94a3b8", fontSize: 12 }}>
-                              {review.created_at ? new Date(review.created_at).toLocaleString("ru-RU") : "—"}
+                              {safeDate(review.created_at)}
                             </span>
                             <span style={{
                               fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
-                              background: j.status === "approved" ? "rgba(34,197,94,.2)" : j.status === "rejected" ? "rgba(220,38,38,.2)" : j.status === "needs_review" ? "rgba(234,179,8,.2)" : j.status === "local_auto_saved" ? "rgba(99,102,241,.2)" : "rgba(255,255,255,.1)",
-                              color: j.status === "approved" ? "#bbf7d0" : j.status === "rejected" ? "#fecaca" : j.status === "needs_review" ? "#fde68a" : j.status === "local_auto_saved" ? "#c7d2fe" : "#94a3b8",
+                              background: status === "approved" ? "rgba(34,197,94,.2)" : status === "rejected" ? "rgba(220,38,38,.2)" : status === "needs_review" ? "rgba(234,179,8,.2)" : status === "local_auto_saved" ? "rgba(99,102,241,.2)" : "rgba(255,255,255,.1)",
+                              color: status === "approved" ? "#bbf7d0" : status === "rejected" ? "#fecaca" : status === "needs_review" ? "#fde68a" : status === "local_auto_saved" ? "#c7d2fe" : "#94a3b8",
                             }}>
-                              {j.status || "unknown"}
+                              {status}
                             </span>
                             <span style={{ color: "#64748b", fontSize: 12 }}>
-                              {j.environment || "—"} / {j.source || "—"}
+                              {environment} / {source}
                             </span>
                           </div>
-                          {review.public_code && (
+                          {publicCode !== "—" && (
                             <span style={{ fontWeight: 700, fontSize: 13, color: "#a5b4fc", letterSpacing: 0.5 }}>
-                              {review.public_code}
+                              {publicCode}
                             </span>
                           )}
                         </div>
 
-                        {j.expert_name && (
+                        {expertName && (
                           <div style={{ marginBottom: 10, fontSize: 12, color: "#a5b4fc" }}>
-                            🔬 {j.expert_name}{j.expert_role ? `, ${j.expert_role}` : ""}{j.expert_specialty ? ` (${j.expert_specialty})` : ""}{j.city ? ` · ${j.city}` : ""}{j.organization ? ` · ${j.organization}` : ""}
+                            🔬 {expertName}{expertRole ? `, ${expertRole}` : ""}{expertSpecialty ? ` (${expertSpecialty})` : ""}{city ? ` · ${city}` : ""}{organization ? ` · ${organization}` : ""}
                           </div>
                         )}
 
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                           <div>
                             <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>PATIENT TEXT</div>
-                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shorten(j.patient_input || j.patient_text || "", 200)}</div>
+                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shortText(patientText, 200)}</div>
                           </div>
                           <div>
                             <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>USER REPORT</div>
-                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shorten(j.user_report || "", 200)}</div>
+                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shortText(userReport, 200)}</div>
                           </div>
                           <div>
                             <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>DOCTOR REPORT</div>
-                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shorten(j.doctor_report || "", 200)}</div>
+                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shortText(doctorReport, 200)}</div>
                           </div>
                           <div>
                             <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>DOCTOR FEEDBACK</div>
-                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>
-                              {j.doctor_feedback?.generalComment ? shorten(j.doctor_feedback.generalComment, 200) : "—"}
-                            </div>
+                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shortText(doctorFeedbackComment, 200)}</div>
                           </div>
                         </div>
 
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           <button
-                            disabled={adminActionLoading === review.id}
+                            disabled={!review?.id || adminActionLoading === review.id}
                             style={{
                               border: 0, borderRadius: 12, background: "rgba(34,197,94,.2)", color: "#bbf7d0",
                               padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
@@ -1347,7 +1385,7 @@ export default function App() {
                             Одобрить
                           </button>
                           <button
-                            disabled={adminActionLoading === review.id}
+                            disabled={!review?.id || adminActionLoading === review.id}
                             style={{
                               border: 0, borderRadius: 12, background: "rgba(220,38,38,.2)", color: "#fecaca",
                               padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
@@ -1358,7 +1396,7 @@ export default function App() {
                             Отклонить
                           </button>
                           <button
-                            disabled={adminActionLoading === review.id}
+                            disabled={!review?.id || adminActionLoading === review.id}
                             style={{
                               border: 0, borderRadius: 12, background: "rgba(234,179,8,.2)", color: "#fde68a",
                               padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
@@ -1369,6 +1407,7 @@ export default function App() {
                             Требует доработки
                           </button>
                           <button
+                            disabled={!review?.id}
                             style={{
                               border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
                               color: "#94a3b8", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
@@ -1378,6 +1417,7 @@ export default function App() {
                             Скачать JSON
                           </button>
                           <button
+                            disabled={!review?.id}
                             style={{
                               border: "1px solid rgba(99,102,241,.3)", borderRadius: 12, background: "rgba(99,102,241,.08)",
                               color: "#a5b4fc", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
@@ -1392,24 +1432,24 @@ export default function App() {
                           <div style={{ marginTop: 16, borderTop: "1px solid rgba(255,255,255,.08)", paddingTop: 16 }}>
                             <div style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Редакция отзыва</div>
 
-                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="Что было неверно в вопросах?" value={correctionForm.wrong_questions} onChange={(e) => setCorrectionForm({ ...correctionForm, wrong_questions: e.target.value })} />
-                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="Какие вопросы нужно было добавить?" value={correctionForm.missing_questions} onChange={(e) => setCorrectionForm({ ...correctionForm, missing_questions: e.target.value })} />
-                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="Какие вопросы были лишними?" value={correctionForm.bad_question_wording} onChange={(e) => setCorrectionForm({ ...correctionForm, bad_question_wording: e.target.value })} />
-                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Исправленная версия отчета для пациента" value={correctionForm.corrected_user_report} onChange={(e) => setCorrectionForm({ ...correctionForm, corrected_user_report: e.target.value })} />
-                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Исправленная версия отчета для специалиста" value={correctionForm.corrected_doctor_report} onChange={(e) => setCorrectionForm({ ...correctionForm, corrected_doctor_report: e.target.value })} />
-                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Предложение для изменения протокола / prompts" value={correctionForm.protocol_update} onChange={(e) => setCorrectionForm({ ...correctionForm, protocol_update: e.target.value })} />
-                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 12 }} placeholder="Комментарий редактора" value={correctionForm.correction_comment} onChange={(e) => setCorrectionForm({ ...correctionForm, correction_comment: e.target.value })} />
+                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="Что было неверно в вопросах?" value={correctionForm?.wrong_questions || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, wrong_questions: e.target.value })} />
+                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="Какие вопросы нужно было добавить?" value={correctionForm?.missing_questions || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, missing_questions: e.target.value })} />
+                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="Какие вопросы были лишними?" value={correctionForm?.bad_question_wording || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, bad_question_wording: e.target.value })} />
+                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Исправленная версия отчета для пациента" value={correctionForm?.corrected_user_report || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, corrected_user_report: e.target.value })} />
+                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Исправленная версия отчета для специалиста" value={correctionForm?.corrected_doctor_report || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, corrected_doctor_report: e.target.value })} />
+                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Предложение для изменения протокола / prompts" value={correctionForm?.protocol_update || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, protocol_update: e.target.value })} />
+                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 12 }} placeholder="Комментарий редактора" value={correctionForm?.correction_comment || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, correction_comment: e.target.value })} />
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                               <button
-                                disabled={adminActionLoading === review.id}
+                                disabled={!review?.id || adminActionLoading === review.id}
                                 style={{ border: 0, borderRadius: 12, background: "rgba(99,102,241,.2)", color: "#c7d2fe", padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: adminActionLoading === review.id ? 0.5 : 1 }}
                                 onClick={() => adminSaveCorrection(review.id, null)}
                               >
                                 Сохранить правки
                               </button>
                               <button
-                                disabled={adminActionLoading === review.id}
+                                disabled={!review?.id || adminActionLoading === review.id}
                                 style={{ border: 0, borderRadius: 12, background: "rgba(34,197,94,.2)", color: "#bbf7d0", padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: adminActionLoading === review.id ? 0.5 : 1 }}
                                 onClick={() => adminSaveCorrection(review.id, "approved")}
                               >
@@ -1430,7 +1470,10 @@ export default function App() {
                       console.error("review card render error", error, review);
                       return (
                         <div key={review?.id} style={{ border: "1px solid rgba(220,38,38,.2)", borderRadius: 20, background: "rgba(220,38,38,.05)", padding: 20, color: "#fecaca", fontSize: 13 }}>
-                          Ошибка отображения review {review?.id || "unknown"}
+                          <div>Ошибка отображения review {review?.id}</div>
+                          <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, color: "#94a3b8", marginTop: 6 }}>
+                            {String(error?.message || error)}
+                          </pre>
                         </div>
                       );
                     }
