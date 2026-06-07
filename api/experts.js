@@ -18,8 +18,10 @@ export default async function handler(req, res) {
         return await handleListRequests(req, res);
       case "updateRequestStatus":
         return await handleUpdateRequestStatus(req, res);
+      case "debug":
+        return await handleDebug(req, res);
       default:
-        return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
+        return res.status(400).json({ ok: false, error: "Unknown experts action", action });
     }
   } catch (error) {
     return res.status(500).json({ ok: false, error: error.message || "Internal error" });
@@ -85,6 +87,15 @@ async function handleRegister(req, res) {
       return res.status(400).json({ ok: false, error: "Некорректная роль" });
     }
 
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({
+        ok: false,
+        error: "Missing Supabase env vars",
+        hasUrl: Boolean(process.env.SUPABASE_URL),
+        hasServiceKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      });
+    }
+
     const { generateExpertCode } = await import("../lib/expertCode.js");
     const accessCode = generateExpertCode();
 
@@ -102,7 +113,6 @@ async function handleRegister(req, res) {
         organization: privacy ? null : null,
         access_code: accessCode,
         is_active: true,
-        source: "self_register",
       })
       .select("id, name, role, specialty")
       .single();
@@ -113,7 +123,8 @@ async function handleRegister(req, res) {
         ok: false,
         error: "Ошибка регистрации. Попробуйте позже.",
         details: error.message,
-        code: error.code,
+        code: error.code || null,
+        hint: error.hint || null,
       });
     }
 
@@ -215,4 +226,13 @@ async function handleUpdateRequestStatus(req, res) {
   } catch (error) {
     return res.status(500).json({ ok: false, error: error.message || "Ошибка обновления статуса заявки" });
   }
+}
+
+async function handleDebug(req, res) {
+  return res.status(200).json({
+    ok: true,
+    hasUrl: Boolean(process.env.SUPABASE_URL),
+    hasServiceKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    privacySafeMode: getPrivacySafeMode(),
+  });
 }

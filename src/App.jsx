@@ -202,7 +202,7 @@ export default function App() {
         return;
       }
       if (!res.ok || !data?.ok) {
-        showToast(`Ошибка регистрации: ${data?.error || data?.details || res.statusText}`, "error");
+        showToast(`Ошибка регистрации: ${data?.details || data?.error || res.statusText}`, "error");
         return;
       }
       setRegistrationResult(data);
