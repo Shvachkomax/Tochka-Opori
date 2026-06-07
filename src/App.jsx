@@ -2071,7 +2071,7 @@ export default function App() {
                     style={s.textarea}
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder="Например: последние недели плохо сплю, тревожусь, не могу собраться, часто думаю о потере…"
+                    placeholder="Например: последние недели плохо сплю, тревожусь, не могу собраться, стало трудно заниматься обычными делами…"
                   />
                   <button
                     style={s.wide}
