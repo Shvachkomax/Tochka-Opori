@@ -793,22 +793,22 @@ export default function App() {
             marginBottom: 12,
             padding: hl ? "14px 18px" : 0,
             borderRadius: hl ? 14 : 0,
-            background: hl ? "rgba(99,102,241,.12)" : "transparent",
-            border: hl ? "1px solid rgba(99,102,241,.3)" : "none",
+            background: hl ? "#E2EBE4" : "transparent",
+            border: hl ? "1px solid rgba(125,154,137,.3)" : "none",
           }}
         >
           <div
             style={{
               fontWeight: hl ? 700 : 600,
               fontSize: hl ? 16 : 15,
-              color: hl ? "#c7d2fe" : "#e2e8f0",
+              color: hl ? "#2E2A25" : "#2E2A25",
               marginBottom: s.lines.some((l) => l.trim()) ? 6 : 0,
             }}
           >
             {s.num}. {s.title}
           </div>
           {s.lines.some((l) => l.trim()) && (
-            <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7, color: "#94a3b8" }}>
+            <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7, color: "#7A7268" }}>
               {s.lines.join("\n").trim()}
             </div>
           )}
@@ -1080,9 +1080,9 @@ export default function App() {
   const s = {
     page: {
       minHeight: "100vh",
-      background: "#050817",
-      color: "white",
-      fontFamily: "Inter, system-ui, Arial",
+      background: "#F6F0E7",
+      color: "#2E2A25",
+      fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
       padding: "32px",
     },
     wrap: { maxWidth: 1200, margin: "0 auto" },
@@ -1092,16 +1092,16 @@ export default function App() {
       alignItems: "center",
       marginBottom: 80,
     },
-    logo: { fontSize: 28, fontWeight: 800 },
-    sub: { color: "#94a3b8", marginTop: 4 },
+    logo: { fontSize: 28, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif" },
+    sub: { color: "#7A7268", marginTop: 4, fontSize: 14 },
     crisis: {
-      background: "#dc2626",
+      background: "#B85C4A",
       color: "white",
       border: 0,
       borderRadius: 22,
-      padding: "16px 24px",
-      fontWeight: 800,
-      fontSize: 16,
+      padding: "14px 22px",
+      fontWeight: 700,
+      fontSize: 15,
       cursor: "pointer",
     },
     grid: {
@@ -1112,12 +1112,13 @@ export default function App() {
     },
     badge: {
       display: "inline-block",
-      border: "1px solid rgba(255,255,255,.14)",
-      background: "rgba(255,255,255,.06)",
+      border: "1px solid rgba(46,42,37,.12)",
+      background: "#FFFDF8",
       borderRadius: 999,
-      padding: "12px 18px",
-      color: "#cbd5e1",
+      padding: "10px 16px",
+      color: "#7A7268",
       marginBottom: 28,
+      fontSize: 13,
     },
     h1: {
       fontSize: 68,
@@ -1125,9 +1126,10 @@ export default function App() {
       fontWeight: 900,
       margin: 0,
       letterSpacing: "-0.05em",
+      fontFamily: "Georgia, \"PT Serif\", serif",
     },
     p: {
-      color: "#cbd5e1",
+      color: "#7A7268",
       fontSize: 20,
       lineHeight: 1.7,
       maxWidth: 680,
@@ -1135,38 +1137,38 @@ export default function App() {
     row: {
       display: "flex",
       gap: 14,
-      marginTop: 28,
+      marginTop: 32,
       flexWrap: "wrap",
     },
     primary: {
       border: 0,
       borderRadius: 22,
-      background: "white",
-      color: "#020617",
+      background: "#7D9A89",
+      color: "white",
       padding: "16px 24px",
-      fontWeight: 800,
+      fontWeight: 700,
       fontSize: 16,
       cursor: "pointer",
     },
     secondary: {
-      border: "1px solid rgba(255,255,255,.18)",
+      border: "1px solid rgba(46,42,37,.18)",
       borderRadius: 22,
-      background: "rgba(255,255,255,.06)",
-      color: "white",
+      background: "#FFFDF8",
+      color: "#2E2A25",
       padding: "16px 24px",
-      fontWeight: 800,
-      fontSize: 16,
+      fontWeight: 600,
+      fontSize: 15,
       cursor: "pointer",
     },
     card: {
-      border: "1px solid rgba(255,255,255,.12)",
-      background: "rgba(255,255,255,.08)",
+      border: "1px solid rgba(46,42,37,.1)",
+      background: "#FFFDF8",
       borderRadius: 36,
       padding: 28,
-      boxShadow: "0 30px 80px rgba(0,0,0,.35)",
+      boxShadow: "0 4px 24px rgba(46,42,37,.06)",
     },
     inner: {
-      background: "rgba(2,6,23,.75)",
+      background: "#FAF6EF",
       borderRadius: 30,
       padding: 26,
       marginTop: 22,
@@ -1175,10 +1177,10 @@ export default function App() {
       width: "100%",
       minHeight: 180,
       resize: "vertical",
-      border: "1px solid rgba(255,255,255,.12)",
+      border: "1px solid rgba(46,42,37,.12)",
       borderRadius: 24,
-      background: "transparent",
-      color: "white",
+      background: "#FAF6EF",
+      color: "#2E2A25",
       padding: 20,
       fontSize: 16,
       outline: "none",
@@ -1189,31 +1191,31 @@ export default function App() {
       marginTop: 18,
       border: 0,
       borderRadius: 24,
-      background: "white",
-      color: "#020617",
+      background: "#7D9A89",
+      color: "white",
       padding: "18px 22px",
-      fontWeight: 900,
+      fontWeight: 700,
       fontSize: 16,
       cursor: "pointer",
     },
     error: {
       marginTop: 16,
-      background: "rgba(220,38,38,.18)",
-      color: "#fecaca",
+      background: "rgba(184,92,74,.1)",
+      color: "#B85C4A",
       padding: 16,
       borderRadius: 18,
     },
     result: {
       marginTop: 24,
-      border: "1px solid rgba(255,255,255,.12)",
-      background: "rgba(255,255,255,.06)",
+      border: "1px solid rgba(46,42,37,.1)",
+      background: "#FFFDF8",
       borderRadius: 28,
       padding: 24,
     },
-    label: { color: "#94a3b8", fontSize: 14, marginTop: 18, marginBottom: 6 },
-    label2: { color: "#94a3b8", fontSize: 14, marginTop: 22, marginBottom: 6 },
+    label: { color: "#7A7268", fontSize: 14, marginTop: 18, marginBottom: 6 },
+    label2: { color: "#7A7268", fontSize: 14, marginTop: 22, marginBottom: 6 },
     questionCard: {
-      background: "rgba(255,255,255,.06)",
+      background: "#FAF6EF",
       borderRadius: 18,
       padding: 16,
       marginBottom: 14,
@@ -1229,38 +1231,38 @@ export default function App() {
       marginBottom: 18,
     },
     tab: {
-      border: "1px solid rgba(255,255,255,.12)",
-      background: "rgba(255,255,255,.04)",
-      color: "white",
+      border: "1px solid rgba(46,42,37,.12)",
+      background: "transparent",
+      color: "#7A7268",
       borderRadius: 14,
       padding: "10px 16px",
       cursor: "pointer",
     },
     activeTab: {
-      border: "1px solid rgba(255,255,255,.18)",
-      background: "white",
-      color: "#020617",
+      border: "1px solid #7D9A89",
+      background: "#E2EBE4",
+      color: "#2E2A25",
       borderRadius: 14,
       padding: "10px 16px",
       fontWeight: 700,
       cursor: "pointer",
     },
     reportBlock: {
-      background: "rgba(255,255,255,.05)",
+      background: "#FAF6EF",
       borderRadius: 20,
       padding: 20,
     },
     expertBox: {
       marginTop: 24,
-      border: "1px solid rgba(255,255,255,.12)",
-      background: "rgba(255,255,255,.05)",
+      border: "1px solid rgba(46,42,37,.1)",
+      background: "#FAF6EF",
       borderRadius: 24,
       padding: 20,
     },
     overlay: {
       position: "fixed",
       top: 0, left: 0, right: 0, bottom: 0,
-      background: "rgba(0,0,0,.65)",
+      background: "rgba(46,42,37,.45)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -1268,13 +1270,13 @@ export default function App() {
       padding: 20,
     },
     modal: {
-      background: "#0f172a",
+      background: "#FFFDF8",
       borderRadius: 28,
       padding: 28,
       maxWidth: 560,
       width: "100%",
-      border: "1px solid rgba(255,255,255,.1)",
-      boxShadow: "0 30px 80px rgba(0,0,0,.5)",
+      border: "1px solid rgba(46,42,37,.1)",
+      boxShadow: "0 8px 40px rgba(46,42,37,.12)",
     },
     modalTitle: {
       fontSize: 26,
@@ -1282,8 +1284,8 @@ export default function App() {
       marginBottom: 12,
     },
     modalWarning: {
-      background: "rgba(220,38,38,.15)",
-      color: "#fecaca",
+      background: "rgba(184,92,74,.1)",
+      color: "#B85C4A",
       padding: 14,
       borderRadius: 16,
       fontSize: 15,
@@ -1294,10 +1296,10 @@ export default function App() {
       width: "100%",
       minHeight: 100,
       resize: "vertical",
-      border: "1px solid rgba(255,255,255,.12)",
+      border: "1px solid rgba(46,42,37,.12)",
       borderRadius: 16,
-      background: "rgba(2,6,23,.55)",
-      color: "white",
+      background: "#FAF6EF",
+      color: "#2E2A25",
       padding: 14,
       fontSize: 15,
       outline: "none",
@@ -1306,10 +1308,10 @@ export default function App() {
     },
     crisisInput: {
       width: "100%",
-      border: "1px solid rgba(255,255,255,.12)",
+      border: "1px solid rgba(46,42,37,.12)",
       borderRadius: 16,
-      background: "rgba(2,6,23,.55)",
-      color: "white",
+      background: "#FAF6EF",
+      color: "#2E2A25",
       padding: "14px 14px",
       fontSize: 15,
       outline: "none",
@@ -1323,18 +1325,18 @@ export default function App() {
     },
     crisisWarning: {
       marginTop: 14,
-      background: "rgba(220,38,38,.22)",
-      border: "1px solid rgba(248,113,113,.35)",
-      color: "#fecaca",
+      background: "rgba(184,92,74,.08)",
+      border: "1px solid rgba(184,92,74,.2)",
+      color: "#B85C4A",
       padding: 16,
       borderRadius: 18,
       lineHeight: 1.5,
     },
     crisisConfirmation: {
       marginTop: 14,
-      background: "rgba(34,197,94,.16)",
-      border: "1px solid rgba(74,222,128,.35)",
-      color: "#bbf7d0",
+      background: "rgba(125,154,137,.12)",
+      border: "1px solid rgba(125,154,137,.3)",
+      color: "#5F7D6C",
       padding: 16,
       borderRadius: 18,
       lineHeight: 1.5,
@@ -1349,29 +1351,29 @@ export default function App() {
       borderRadius: 16,
       fontWeight: 600,
       fontSize: 15,
-      boxShadow: "0 8px 30px rgba(0,0,0,.5)",
+      boxShadow: "0 4px 20px rgba(46,42,37,.12)",
       animation: "toastIn 0.3s ease",
       textAlign: "center",
       maxWidth: "calc(100vw - 40px)",
     },
     toastSuccess: {
-      background: "rgba(34,197,94,.2)",
-      border: "1px solid rgba(74,222,128,.4)",
-      color: "#bbf7d0",
+      background: "#E2EBE4",
+      border: "1px solid rgba(125,154,137,.4)",
+      color: "#2E2A25",
     },
     toastError: {
-      background: "rgba(220,38,38,.2)",
-      border: "1px solid rgba(248,113,113,.4)",
-      color: "#fecaca",
+      background: "rgba(184,92,74,.1)",
+      border: "1px solid rgba(184,92,74,.3)",
+      color: "#B85C4A",
     },
     answerInput: {
       width: "100%",
       minHeight: 80,
       resize: "vertical",
-      border: "1px solid rgba(255,255,255,.12)",
+      border: "1px solid rgba(46,42,37,.12)",
       borderRadius: 16,
-      background: "rgba(2,6,23,.55)",
-      color: "white",
+      background: "#FAF6EF",
+      color: "#2E2A25",
       padding: 14,
       fontSize: 15,
       outline: "none",
@@ -1917,25 +1919,26 @@ export default function App() {
     }
   }
 `}</style>
-      <div style={s.wrap}>
+          <div style={s.wrap}>
         <header style={s.header} className="app-header">
-          <div>
-            <div style={s.logo}>🧠 Точка опоры</div>
-            <div style={s.sub}>Анонимно. Безопасно. Можно просто начать говорить.</div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <span style={{ fontSize: 32, lineHeight: 1, color: "#7D9A89" }}>●</span>
+            <span style={{ fontSize: 22, fontFamily: "Georgia, \"PT Serif\", serif", color: "#7A7268", marginTop: 2 }}>⌒</span>
+            <span style={s.logo}> Точка опоры</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {expertData && (
               <div style={{
-                background: "rgba(99,102,241,.15)", border: "1px solid rgba(99,102,241,.3)",
-                borderRadius: 22, padding: "8px 16px", fontSize: 13, color: "#c7d2fe",
+                background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
+                borderRadius: 22, padding: "8px 16px", fontSize: 13, color: "#5F7D6C",
                 display: "flex", alignItems: "center", gap: 8,
               }}>
-                <span>🔬 {expertData.name}, {expertData.role}</span>
+                <span>{expertData.name}, {expertData.role}</span>
                 <button
                   onClick={handleExpertLogout}
                   style={{
-                    background: "none", border: "1px solid rgba(255,255,255,.2)", borderRadius: 10,
-                    color: "#94a3b8", padding: "4px 10px", fontSize: 11, cursor: "pointer",
+                    background: "none", border: "1px solid rgba(46,42,37,.15)", borderRadius: 10,
+                    color: "#7A7268", padding: "4px 10px", fontSize: 11, cursor: "pointer",
                   }}
                 >
                   Выйти
@@ -1943,67 +1946,66 @@ export default function App() {
               </div>
             )}
             <button
-              style={{
-                ...s.secondary, fontSize: 13, padding: "10px 16px",
-                border: "1px solid rgba(99,102,241,.3)", background: "rgba(99,102,241,.08)",
-              }}
+              style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
               onClick={() => setExpertModalOpen(true)}
             >
-              🔬 Для специалистов
+              Для специалистов
             </button>
             <button
               style={s.crisis}
               onClick={() => setCrisisOpen(true)}
             >
-              ⚠ Мне срочно нужна помощь
+              Срочная помощь
             </button>
           </div>
         </header>
 
         <main style={s.grid} className="app-grid">
           <section>
+            <div style={s.badge}>Анонимно. Спокойно. Без диагноза на скорую руку.</div>
+
             <h1 style={s.h1} className="app-hero-title">
-              Расскажите, что с вами происходит — голосом или текстом.
+              Найдём точку опоры
             </h1>
             <p style={s.p} className="app-hero-text">
-              Сервис поможет мягко разобрать состояние, определить возможный
-              спектр проблемы и предложить понятный план действий.
+              Расскажите, что с вами происходит — голосом или текстом. Сервис поможет мягко разобрать состояние, заметить важные признаки и предложить понятный следующий шаг.
             </p>
 
             <div style={s.row} className="app-actions">
-              <button style={s.primary} onClick={() => setMode("voice")}>
-                🎙 Рассказать голосом
+              <button style={s.primary} onClick={() => setMode("text")}>
+                Начать разговор
               </button>
-              <button style={s.secondary} onClick={() => setMode("text")}>
-                ⌨ Написать текстом
+              <button style={s.secondary} onClick={() => setMode("voice")}>
+                Рассказать голосом
               </button>
               <button
-                style={{ ...s.secondary, border: "1px solid rgba(99,102,241,.4)", background: "rgba(99,102,241,.12)" }}
+                style={{ ...s.secondary, marginTop: 8 }}
                 onClick={() => setSessionModalOpen(true)}
               >
-                🔄 Продолжить разговор
+                Продолжить разговор
               </button>
             </div>
 
-            <p style={{ ...s.sub, marginTop: 24 }}>
-              Сервис не ставит диагноз. Решение о диагнозе и лечении принимает
-              врач.
+            <p style={{ color: "#7A7268", fontSize: 13, marginTop: 24, lineHeight: 1.5 }}>
+              Сервис не ставит диагноз. Решение о диагнозе и лечении принимает специалист.
             </p>
           </section>
 
           <section style={s.card} className="app-card">
-            <div style={s.sub}>Первичный вход</div>
-            <div style={{ fontSize: 28, fontWeight: 900 }}>
-              Анонимный разговор
+            <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif" }}>
+              С чего начать?
+            </div>
+            <div style={{ color: "#7A7268", fontSize: 14, marginTop: 6 }}>
+              Опишите состояние своими словами.
             </div>
 
             <div style={s.inner}>
               {mode === "voice" ? (
                 <div style={{ textAlign: "center", padding: "40px 20px" }}>
                   <div style={{ fontSize: 58 }}>🎙</div>
-                  <h2>Голосовой режим</h2>
+                  <h2 style={{ fontSize: 22, fontWeight: 700 }}>Голосовой режим</h2>
 
-                  <p style={{ color: "#94a3b8", lineHeight: 1.6 }}>
+                  <p style={{ color: "#7A7268", lineHeight: 1.6 }}>
                     Нажмите "Начать запись", расскажите о своем состоянии, затем остановите запись.
                     Мы расшифруем голос и перенесем текст в обычное поле.
                   </p>
@@ -2013,7 +2015,7 @@ export default function App() {
                       {transcribing ? "Расшифровываем..." : "Начать запись"}
                     </button>
                   ) : (
-                    <button style={{ ...s.wide, background: "#dc2626", color: "white" }} onClick={stopRecording}>
+                    <button style={{ ...s.wide, background: "#B85C4A", color: "white" }} onClick={stopRecording}>
                       Остановить и расшифровать
                     </button>
                   )}
@@ -2026,7 +2028,7 @@ export default function App() {
 
                   <div style={{
                     marginTop: 12,
-                    color: recordingTime > 45 ? "#fca5a5" : "#94a3b8",
+                    color: recordingTime > 45 ? "#B85C4A" : "#7A7268",
                     fontSize: 14
                   }}>
                     {recording
@@ -2040,7 +2042,7 @@ export default function App() {
                     style={s.textarea}
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder="Например: последние месяцы я плохо сплю, тревожусь, не могу собраться, часто думаю о потере..."
+                    placeholder="Например: последние недели плохо сплю, тревожусь, не могу собраться, часто думаю о потере…"
                   />
                   <button
                     style={s.wide}
@@ -2049,12 +2051,12 @@ export default function App() {
                   >
                     {loading
                       ? "Формируем вопросы..."
-                      : "Начать анонимный разбор состояния"}
+                      : "Начать разбор"}
                   </button>
                 </>
               ) : phase === "questions" ? (
                 <>
-                  <div style={{ marginBottom: 16, color: "#94a3b8" }}>
+                  <div style={{ marginBottom: 16, color: "#7A7268" }}>
                     Раунд уточнения {dialogDepth}
                   </div>
                   {questions?.map((q, index) => (
@@ -2104,8 +2106,8 @@ export default function App() {
                             marginTop: 8,
                             color:
                               questionRecordingTime > 45
-                                ? "#fca5a5"
-                                : "#94a3b8",
+                                ? "#B85C4A"
+                                : "#7A7268",
                             fontSize: 14,
                           }}
                         >
@@ -2133,18 +2135,18 @@ export default function App() {
 
             {phase === "report" && result && (
               <div style={s.result}>
-                <h2 style={{ marginTop: 0 }}>Предварительный отчёт</h2>
+                <h2 style={{ marginTop: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 22 }}>Результат разбора</h2>
 
                 {publicCode && (
                   <div style={{
-                    background: "rgba(99,102,241,.12)", border: "1px solid rgba(99,102,241,.3)",
+                    background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
                     borderRadius: 16, padding: "12px 16px", marginBottom: 16,
                     display: "flex", justifyContent: "space-between", alignItems: "center",
                   }}>
-                    <span style={{ color: "#a5b4fc", fontSize: 13 }}>
+                    <span style={{ color: "#5F7D6C", fontSize: 13 }}>
                       Код диалога для продолжения:
                     </span>
-                    <span style={{ fontWeight: 900, fontSize: 18, color: "#c7d2fe", letterSpacing: 1 }}>
+                    <span style={{ fontWeight: 900, fontSize: 18, color: "#2E2A25", letterSpacing: 1 }}>
                       {publicCode}
                     </span>
                   </div>
@@ -2184,18 +2186,18 @@ export default function App() {
 
                 {sessionReviewOpen && (
                   <div style={s.expertBox}>
-                    <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>Оценка сессии</h3>
+                    <h3 style={{ margin: "0 0 16px", fontSize: 18, fontFamily: "Georgia, \"PT Serif\", serif" }}>Оценка сессии</h3>
 
                     <label style={s.label}>Оценка пациентом</label>
-                    <div style={{ marginBottom: 6, color: "#94a3b8", fontSize: 13 }}>Насколько полезным был разбор? 1–5</div>
+                    <div style={{ marginBottom: 6, color: "#7A7268", fontSize: 13 }}>Насколько полезным был разбор? 1–5</div>
                     <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                       {[1, 2, 3, 4, 5].map((n) => (
                         <button
                           key={n}
                           style={{
-                            width: 44, height: 44, borderRadius: 12, border: "1px solid rgba(255,255,255,.12)",
-                            background: patientRating === n ? "white" : "rgba(255,255,255,.06)",
-                            color: patientRating === n ? "#020617" : "white",
+                            width: 44, height: 44, borderRadius: 12, border: "1px solid rgba(46,42,37,.12)",
+                            background: patientRating === n ? "#7D9A89" : "#FAF6EF",
+                            color: patientRating === n ? "white" : "#2E2A25",
                             fontWeight: 800, fontSize: 18, cursor: "pointer",
                           }}
                           onClick={() => setPatientRating(n)}
@@ -2221,7 +2223,7 @@ export default function App() {
                       placeholder="Например: вопросы были слишком общими, заключение непонятно..."
                     />
 
-                    <div style={{ borderTop: "1px solid rgba(255,255,255,.08)", margin: "20px 0" }} />
+                    <div style={{ borderTop: "1px solid rgba(46,42,37,.1)", margin: "20px 0" }} />
 
                     <label style={s.label}>Оценка специалистом</label>
 
@@ -2344,7 +2346,7 @@ export default function App() {
                 )}
 
                 <button
-                  style={{ ...s.wide, marginTop: 20 }}
+                  style={{ ...s.secondary, width: "100%", marginTop: 20 }}
                   onClick={handleReset}
                 >
                   Начать заново
@@ -2394,13 +2396,13 @@ export default function App() {
                       ? "Расшифровываем..."
                       : crisisRecording
                         ? "Остановить и расшифровать"
-                        : "🎙 Рассказать голосом"}
+                        : "Рассказать голосом"}
                   </button>
 
                   <div
                     style={{
                       marginTop: 8,
-                      color: crisisRecordingTime > 45 ? "#fca5a5" : "#94a3b8",
+                      color: crisisRecordingTime > 45 ? "#B85C4A" : "#7A7268",
                       fontSize: 14,
                     }}
                   >
@@ -2423,7 +2425,7 @@ export default function App() {
                     <button style={s.wide} onClick={submitCrisisRequest}>
                       Жду звонка специалиста
                     </button>
-                    <button style={s.wide} onClick={continueFromCrisis}>
+                    <button style={{ ...s.secondary, width: "100%", marginTop: 0 }} onClick={continueFromCrisis}>
                       Продолжить анонимный разбор
                     </button>
                   </div>
@@ -2437,7 +2439,7 @@ export default function App() {
             <div style={s.modal} className="modal" onClick={(e) => e.stopPropagation()}>
               <div style={s.modalTitle}>Продолжить разговор</div>
 
-              <p style={{ color: "#94a3b8", lineHeight: 1.6, marginBottom: 20 }}>
+              <p style={{ color: "#7A7268", lineHeight: 1.6, marginBottom: 20 }}>
                 Введите код диалога, который был показан после завершения предыдущей сессии.
               </p>
 
@@ -2525,15 +2527,15 @@ export default function App() {
               {registrationResult ? (
                 <>
                   <div style={s.modalTitle}>Режим специалиста активирован</div>
-                  <p style={{ color: "#bbf7d0", lineHeight: 1.6, marginBottom: 16, background: "rgba(34,197,94,.12)", padding: "14px 18px", borderRadius: 14, fontSize: 14 }}>
+                  <p style={{ color: "#5F7D6C", lineHeight: 1.6, marginBottom: 16, background: "#E2EBE4", padding: "14px 18px", borderRadius: 14, fontSize: 14 }}>
                     Вы зарегистрированы как специалист. Ваш профиль привязан к этому устройству.
                   </p>
-                  <div style={{ background: "rgba(99,102,241,.12)", border: "1px solid rgba(99,102,241,.25)", borderRadius: 14, padding: "16px 18px", marginBottom: 16 }}>
-                    <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 6 }}>Ваш код специалиста</div>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: "#a5b4fc", letterSpacing: 1, fontFamily: "monospace" }}>
+                  <div style={{ background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", borderRadius: 14, padding: "16px 18px", marginBottom: 16 }}>
+                    <div style={{ color: "#7A7268", fontSize: 12, marginBottom: 6 }}>Ваш код специалиста</div>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace" }}>
                       {registrationResult.access_code}
                     </div>
-                    <div style={{ color: "#64748b", fontSize: 12, marginTop: 8 }}>
+                    <div style={{ color: "#7A7268", fontSize: 12, marginTop: 8 }}>
                       Сохраните этот код. С ним вы сможете войти как специалист с другого устройства.
                     </div>
                   </div>
@@ -2548,11 +2550,11 @@ export default function App() {
                 </>
               ) : !showRegisterForm ? (
                 <>
-                  <div style={s.modalTitle}>Режим специалиста</div>
+                  <div style={s.modalTitle}>Кабинет специалиста</div>
 
                   {/* Block A: existing code */}
                   <div style={{ marginBottom: 20 }}>
-                    <div style={{ color: "#e2e8f0", fontWeight: 600, fontSize: 14, marginBottom: 10 }}>У меня уже есть код</div>
+                    <div style={{ color: "#2E2A25", fontWeight: 600, fontSize: 14, marginBottom: 10 }}>У меня уже есть код</div>
                     <input
                       style={s.crisisInput}
                       value={expertCodeInput}
@@ -2572,16 +2574,16 @@ export default function App() {
                   </div>
 
                   {/* Divider */}
-                  <div style={{ borderTop: "1px solid rgba(255,255,255,.08)", margin: "16px 0" }} />
+                  <div style={{ borderTop: "1px solid rgba(46,42,37,.1)", margin: "16px 0" }} />
 
                   {/* Block B: first time registration */}
                   <div>
-                    <div style={{ color: "#e2e8f0", fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Я впервые здесь</div>
-                    <p style={{ color: "#94a3b8", lineHeight: 1.6, marginBottom: 14, fontSize: 13 }}>
+                    <div style={{ color: "#2E2A25", fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Я впервые здесь</div>
+                    <p style={{ color: "#7A7268", lineHeight: 1.6, marginBottom: 14, fontSize: 13 }}>
                       Если вы врач, психолог или другой специалист и участвуете в тестировании, заполните короткую форму. Доступ включится сразу.
                     </p>
                     <button
-                      style={{ ...s.wide, background: "rgba(99,102,241,.15)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,.3)" }}
+                      style={{ ...s.wide, background: "#FAF6EF", color: "#5F7D6C", border: "1px solid rgba(125,154,137,.3)" }}
                       onClick={() => { setShowRegisterForm(true); resetRegisterForm(); }}
                     >
                       Зарегистрироваться как специалист
@@ -2598,7 +2600,7 @@ export default function App() {
               ) : (
                 <>
                   <div style={s.modalTitle}>Регистрация специалиста</div>
-                  <p style={{ color: "#94a3b8", lineHeight: 1.6, marginBottom: 16, fontSize: 13 }}>
+                  <p style={{ color: "#7A7268", lineHeight: 1.6, marginBottom: 16, fontSize: 13 }}>
                     Заполните форму. После регистрации вы получите код специалиста и доступ включится сразу.
                   </p>
 
