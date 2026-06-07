@@ -1,5 +1,32 @@
 import React, { useRef, useState } from "react";
 
+function LogoMark({ size = 44 }) {
+  return (
+    <svg
+      width={size}
+      height={size * (44 / 48)}
+      viewBox="0 0 48 44"
+      fill="none"
+      aria-label="Точка опоры"
+      style={{ display: "block", flexShrink: 0 }}
+    >
+      {/* Bowl / support — стабильная опора */}
+      <path d="M8 30 C8 44, 40 44, 40 30" stroke="#5F7D6C" strokeWidth="3" strokeLinecap="round" />
+      {/* Amorphous state — мягкое, нестабильное состояние */}
+      <path d="M24 6 C14 6, 8 12, 9 20 C9 26, 15 28, 23 27 C29 28, 37 25, 38 18 C39 11, 33 6, 24 6 Z" fill="#7D9A89" fillOpacity="0.25" />
+      {/* Denser core */}
+      <path d="M24 12 C18 12, 14 16, 14 20 C14 24, 18 25, 24 25 C30 25, 34 22, 34 18 C34 14, 30 12, 24 12 Z" fill="#7D9A89" fillOpacity="0.45" />
+      {/* Scatter dots — фрагменты / мысли */}
+      <circle cx="14" cy="8" r="1.5" fill="#7D9A89" fillOpacity="0.5" />
+      <circle cx="35" cy="10" r="1.2" fill="#7D9A89" fillOpacity="0.4" />
+      <circle cx="28" cy="3" r="1" fill="#7D9A89" fillOpacity="0.35" />
+      <circle cx="21" cy="4" r="0.9" fill="#7D9A89" fillOpacity="0.45" />
+      <circle cx="38" cy="16" r="0.8" fill="#7D9A89" fillOpacity="0.3" />
+      <circle cx="10" cy="16" r="0.8" fill="#7D9A89" fillOpacity="0.3" />
+    </svg>
+  );
+}
+
 export default function App() {
   const [mode, setMode] = useState("text");
   const [text, setText] = useState("");
@@ -1921,10 +1948,12 @@ export default function App() {
 `}</style>
           <div style={s.wrap}>
         <header style={s.header} className="app-header">
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span style={{ fontSize: 32, lineHeight: 1, color: "#7D9A89" }}>●</span>
-            <span style={{ fontSize: 22, fontFamily: "Georgia, \"PT Serif\", serif", color: "#7A7268", marginTop: 2 }}>⌒</span>
-            <span style={s.logo}> Точка опоры</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <LogoMark size={40} />
+            <div>
+              <div style={s.logo}>Точка опоры</div>
+              <div style={s.sub}>Анонимно. Спокойно. Без диагноза на скорую руку.</div>
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {expertData && (
