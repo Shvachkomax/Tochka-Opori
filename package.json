@@ -21,6 +21,7 @@
     "vite": "latest"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "pg": "^8.21.0"
   }
 }

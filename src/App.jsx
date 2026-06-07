@@ -142,10 +142,10 @@ export default function App() {
     if (!code) return;
     setExpertLoggingIn(true);
     try {
-      const res = await fetch("/api/expert-login", {
+      const res = await fetch("/api/experts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ access_code: code }),
+        body: JSON.stringify({ action: "login", access_code: code }),
       });
       const data = await res.json();
       if (data.ok && data.expert) {
@@ -183,10 +183,11 @@ export default function App() {
 
     setRegisterSending(true);
     try {
-      const res = await fetch("/api/register-expert", {
+      const res = await fetch("/api/experts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          action: "register",
           name: f.name.trim(),
           role: f.role,
           specialty: f.specialty ? f.specialty.trim() : "",
@@ -218,10 +219,10 @@ export default function App() {
   async function adminLoadRequests(filterStatus) {
     const st = filterStatus || adminReqFilter;
     try {
-      const res = await fetch("/api/list-expert-requests", {
+      const res = await fetch("/api/experts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: st, limit: 100 }),
+        body: JSON.stringify({ action: "listRequests", status: st, limit: 100 }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -232,10 +233,10 @@ export default function App() {
 
   async function adminUpdateRequestStatus(requestId, status) {
     try {
-      await fetch("/api/update-expert-request-status", {
+      await fetch("/api/experts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: requestId, status, admin_secret: adminPassword }),
+        body: JSON.stringify({ action: "updateRequestStatus", request_id: requestId, status, admin_secret: adminPassword }),
       });
       showToast("Статус заявки обновлён");
       adminLoadRequests(adminReqFilter);
@@ -314,10 +315,11 @@ export default function App() {
 
     setCrisisSubmitting(true);
     try {
-      const res = await fetch("/api/save-crisis-request", {
+      const res = await fetch("/api/crisis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          action: "save",
           crisis_text: crisisText,
           contact: crisisContact,
           public_code: publicCode || null,
@@ -697,10 +699,10 @@ export default function App() {
         if (!sessionId) setSessionId(sid);
 
         // Save session to Supabase (works on localhost and Vercel)
-        fetch("/api/save-session", {
+        fetch("/api/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+          body: JSON.stringify({ action: "save",
             sessionId: sid,
             patient_text: text,
             conversationHistory: [
@@ -745,10 +747,10 @@ export default function App() {
                 expert_role: expertData?.role || null,
                 expert_specialty: expertData?.specialty || null,
               };
-              fetch("/api/save-review", {
+              fetch("/api/reviews", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(review),
+                body: JSON.stringify({ action: "save", ...review }),
               }).catch(() => {});
             } else {
               showToast(result.error || "Ошибка сохранения сессии", "error");
@@ -975,10 +977,10 @@ export default function App() {
   async function adminLogin() {
     if (!adminPassword) return;
     try {
-      const res = await fetch("/api/admin-verify", {
+      const res = await fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword }),
+        body: JSON.stringify({ action: "verify", password: adminPassword }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -998,10 +1000,10 @@ export default function App() {
     const exp = expertFilter !== undefined ? expertFilter : adminExpertFilter;
     setAdminLoading(true);
     try {
-      const res = await fetch("/api/list-reviews", {
+      const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: st, environment: env, expert_filter: exp, limit: 100 }),
+        body: JSON.stringify({ action: "list", status: st, environment: env, expert_filter: exp, limit: 100 }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -1022,10 +1024,10 @@ export default function App() {
   async function adminUpdateStatus(reviewId, status) {
     setAdminActionLoading(reviewId);
     try {
-      const res = await fetch("/api/update-review-status", {
+      const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ review_id: reviewId, status, admin_secret: adminPassword }),
+        body: JSON.stringify({ action: "updateStatus", review_id: reviewId, status, admin_secret: adminPassword }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -1112,10 +1114,10 @@ export default function App() {
       if (newStatus) {
         body.status = newStatus;
       }
-      const res = await fetch("/api/update-review-status", {
+      const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, action: "saveCorrection" }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -1146,7 +1148,11 @@ export default function App() {
     const st = filterStatus !== undefined ? filterStatus : adminCrisisFilter;
     setAdminCrisisLoading(true);
     try {
-      const res = await fetch(`/api/list-crisis-requests?status=${encodeURIComponent(st)}&limit=100&admin_secret=${encodeURIComponent(adminPassword)}`);
+      const res = await fetch("/api/crisis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "list", status: st, limit: 100, admin_secret: adminPassword }),
+      });
       const data = await res.json();
       if (data.ok) {
         setAdminCrisisRequests(data.requests || []);
@@ -1163,10 +1169,10 @@ export default function App() {
   async function adminUpdateCrisisStatus(requestId, status) {
     setAdminCrisisActionLoading(requestId);
     try {
-      const res = await fetch("/api/update-crisis-request-status", {
+      const res = await fetch("/api/crisis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ request_id: requestId, status, admin_secret: adminPassword }),
+        body: JSON.stringify({ action: "updateStatus", request_id: requestId, status, admin_secret: adminPassword }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -2652,10 +2658,10 @@ export default function App() {
                           style={s.wide}
                           onClick={async () => {
                             try {
-                              await fetch("/api/save-review", {
+                              await fetch("/api/reviews", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify(buildCaseReview()),
+                                body: JSON.stringify({ action: "save", ...buildCaseReview() }),
                               });
                               alert("Сохранено локально");
                             } catch {
@@ -2777,23 +2783,14 @@ export default function App() {
                     try {
                       const code = sessionCodeInput.trim();
 
-                      // Try Supabase first
-                      let res = await fetch("/api/load-session", {
+                      let res = await fetch("/api/session", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ publicCode: code }),
+                        body: JSON.stringify({ action: "load", publicCode: code }),
                       });
                       let data = await res.json();
-
-                      // Fallback to local fs
                       if (!res.ok || !data.ok) {
-                        res = await fetch("/api/get-session", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ code }),
-                        });
-                        data = await res.json();
-                        if (!res.ok) throw new Error(data.error || "Сессия не найдена");
+                        throw new Error(data.error || "Сессия не найдена");
                       }
 
                       const s = data.session;

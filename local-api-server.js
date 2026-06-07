@@ -6,22 +6,11 @@ dotenv.config({ path: ".env.local" });
 
 import analyzeHandler from "./api/analyze.js";
 import transcribeHandler from "./api/transcribe.js";
-import saveSessionHandler from "./api/save-session.js";
-import loadSessionHandler from "./api/load-session.js";
-import saveReviewHandler from "./api/save-review.js";
-import getSessionHandler from "./api/get-session.js";
-import checkEnvHandler from "./api/check-env.js";
-import listReviewsHandler from "./api/list-reviews.js";
-import updateReviewStatusHandler from "./api/update-review-status.js";
-import adminVerifyHandler from "./api/admin-verify.js";
-import expertLoginHandler from "./api/expert-login.js";
-import requestExpertAccessHandler from "./api/request-expert-access.js";
-import listExpertRequestsHandler from "./api/list-expert-requests.js";
-import updateExpertRequestStatusHandler from "./api/update-expert-request-status.js";
-import registerExpertHandler from "./api/register-expert.js";
-import saveCrisisRequestHandler from "./api/save-crisis-request.js";
-import listCrisisRequestsHandler from "./api/list-crisis-requests.js";
-import updateCrisisRequestStatusHandler from "./api/update-crisis-request-status.js";
+import sessionHandler from "./api/session.js";
+import reviewsHandler from "./api/reviews.js";
+import expertsHandler from "./api/experts.js";
+import adminHandler from "./api/admin.js";
+import crisisHandler from "./api/crisis.js";
 
 const PORT = 3001;
 
@@ -71,53 +60,20 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     if (nodeReq.url.startsWith("/api/transcribe")) {
       return transcribeHandler(req, res);
     }
-    if (nodeReq.url.startsWith("/api/save-session")) {
-      return saveSessionHandler(req, res);
+    if (nodeReq.url.startsWith("/api/session")) {
+      return sessionHandler(req, res);
     }
-    if (nodeReq.url.startsWith("/api/load-session")) {
-      return loadSessionHandler(req, res);
+    if (nodeReq.url.startsWith("/api/reviews")) {
+      return reviewsHandler(req, res);
     }
-    if (nodeReq.url.startsWith("/api/save-review")) {
-      return saveReviewHandler(req, res);
+    if (nodeReq.url.startsWith("/api/experts")) {
+      return expertsHandler(req, res);
     }
-    if (nodeReq.url.startsWith("/api/get-session")) {
-      return getSessionHandler(req, res);
+    if (nodeReq.url.startsWith("/api/admin")) {
+      return adminHandler(req, res);
     }
-    if (nodeReq.url.startsWith("/api/check-env")) {
-      return checkEnvHandler(req, res);
-    }
-    if (nodeReq.url.startsWith("/api/list-reviews")) {
-      return listReviewsHandler(req, res);
-    }
-    if (nodeReq.url.startsWith("/api/update-review-status")) {
-      return updateReviewStatusHandler(req, res);
-    }
-    if (nodeReq.url.startsWith("/api/admin-verify")) {
-      return adminVerifyHandler(req, res);
-    }
-    if (nodeReq.url.startsWith("/api/expert-login")) {
-      return expertLoginHandler(req, res);
-    }
-    if (nodeReq.url.startsWith("/api/request-expert-access")) {
-      return requestExpertAccessHandler(req, res);
-    }
-    if (nodeReq.url.startsWith("/api/list-expert-requests")) {
-      return listExpertRequestsHandler(req, res);
-    }
-    if (nodeReq.url.startsWith("/api/update-expert-request-status")) {
-      return updateExpertRequestStatusHandler(req, res);
-    }
-    if (nodeReq.url.startsWith("/api/register-expert")) {
-      return registerExpertHandler(req, res);
-    }
-    if (nodeReq.url.startsWith("/api/save-crisis-request")) {
-      return saveCrisisRequestHandler(req, res);
-    }
-    if (nodeReq.url.startsWith("/api/list-crisis-requests")) {
-      return listCrisisRequestsHandler(req, res);
-    }
-    if (nodeReq.url.startsWith("/api/update-crisis-request-status")) {
-      return updateCrisisRequestStatusHandler(req, res);
+    if (nodeReq.url.startsWith("/api/crisis")) {
+      return crisisHandler(req, res);
     }
 
     nodeRes.writeHead(404, { "Content-Type": "application/json" });
