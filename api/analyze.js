@@ -412,42 +412,67 @@ ${
   }
 
   const MODEL_TRIAGE = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
+  const MODEL_FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
   const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
 
-  console.log("Using AI model for triage:", MODEL_TRIAGE);
-
   try {
-    const body = {
-      model: MODEL_TRIAGE,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.3,
-      max_tokens: depth <= 2 ? 600 : 1500,
-    };
+    const modelErrors = new Set(["model_not_found", "insufficient_quota", "invalid_request_error"]);
+    const unsupportedParamPattern = /unsupported|reasoning_effort|not supported|does not support/i;
 
-    if (REASONING_EFFORT) {
-      body.reasoning_effort = REASONING_EFFORT;
-    }
+    let modelUsed = MODEL_TRIAGE;
+    let response, data;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      console.log("Using AI model for triage:", modelUsed);
 
-    const data = await response.json();
+      const body = {
+        model: modelUsed,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.3,
+        max_tokens: depth <= 2 ? 600 : 1500,
+      };
 
-    if (!response.ok || data.error) {
-      if (depth === 0) {
-        return res.status(200).json({ type: "questions", questions: fallbackQuestions });
+      if (REASONING_EFFORT && !modelUsed.includes("mini")) {
+        body.reasoning_effort = REASONING_EFFORT;
       }
-      return res.status(200).json({ type: "final", user_report: fallbackFinal, doctor_report: "" });
+
+      const rawResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const rawData = await rawResponse.json();
+
+      if (!rawResponse.ok || rawData.error) {
+        const errorType = rawData.error?.type || rawData.error?.code || "";
+        const errorMsg = rawData.error?.message || "";
+
+        if (
+          attempt === 0 &&
+          (modelErrors.has(errorType) || unsupportedParamPattern.test(errorMsg))
+        ) {
+          console.log(`Model ${modelUsed} failed (${errorType}: ${errorMsg}), falling back to ${MODEL_FALLBACK}`);
+          modelUsed = MODEL_FALLBACK;
+          continue;
+        }
+
+        if (depth === 0) {
+          return res.status(200).json({ type: "questions", questions: fallbackQuestions });
+        }
+        return res.status(200).json({ type: "final", user_report: fallbackFinal, doctor_report: "" });
+      }
+
+      response = rawResponse;
+      data = rawData;
+      break;
     }
 
     const raw = data.choices?.[0]?.message?.content?.trim();
