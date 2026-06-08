@@ -1,3 +1,55 @@
+import { runTextAnalysis } from "../lib/aiClient.js";
+
+function buildAntiRepeatBlock(convHistory) {
+  if (!Array.isArray(convHistory) || convHistory.length === 0) return "";
+
+  const previousQuestions = [];
+  const previousAnswers = [];
+  const knownTopics = new Set();
+
+  for (const entry of convHistory) {
+    if (entry.role === "assistant" && Array.isArray(entry.questions)) {
+      for (const q of entry.questions) {
+        if (q && q.length > 10) {
+          previousQuestions.push(q);
+          knownTopics.add(q.slice(0, 40));
+        }
+      }
+    }
+    if (entry.role === "user") {
+      const text = entry.content || "";
+      if (text && text.length > 5) {
+        previousAnswers.push(text.slice(0, 80));
+      }
+      if (entry.answers) {
+        for (const val of Object.values(entry.answers)) {
+          if (val && val.length > 5) {
+            previousAnswers.push(val.slice(0, 80));
+          }
+        }
+      }
+    }
+  }
+
+  if (previousQuestions.length === 0) return "";
+
+  return `
+Уже спрашивали (не повторять):
+${previousQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
+
+Уже отвечено:
+${previousAnswers.map((a, i) => `${i + 1}. ${a}`).join("\n")}
+
+Правило:
+- Не задавай вопрос, если ответ уже есть в истории.
+- Не повторяй вопрос другими словами.
+- Каждый новый раунд уточняет только незакрытые зоны:
+  safety/risk, timeline, trigger/context, sleep, substances/medications,
+  body tension, functioning, resources/support, selected support practices.
+- Если вопрос уже был задан или пациент уже ответил, не возвращайся к нему без явной причины.
+`;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -85,6 +137,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       type: "questions",
       questions: fallbackQuestions,
+      model_used: "none",
+      fallback_used: false,
     });
   }
 
@@ -111,6 +165,8 @@ export default async function handler(req, res) {
           .map(([key, val]) => `Вопрос ${parseInt(key) + 1}: ${val || "нет ответа"}`)
           .join("\n")
       : "";
+
+  const antiRepeatBlock = buildAntiRepeatBlock(convHistory);
 
   const systemPrompt = `Ты — AI-ассистент первичного mental health triage (выявление сигналов). Твоя задача — выявление сигналов, а не постановка диагноза.
 
@@ -398,6 +454,8 @@ ${
 - Что раньше помогало переживать трудные периоды?
 - Есть ли возможность в ближайшие 24 часа снизить нагрузку?
 
+${antiRepeatBlock}
+
 Если нужно больше информации — верни JSON:
 { "type": "questions", "questions": ["вопрос 1", "вопрос 2", ...] }
 
@@ -416,96 +474,39 @@ ${
   const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
 
   try {
-    const modelErrors = new Set(["model_not_found", "insufficient_quota", "invalid_request_error"]);
-    const unsupportedParamPattern = /unsupported|reasoning_effort|not supported|does not support/i;
+    const result = await runTextAnalysis({
+      systemPrompt,
+      userPrompt,
+      model: MODEL_TRIAGE,
+      fallbackModel: MODEL_FALLBACK,
+      reasoningEffort: REASONING_EFFORT,
+    });
 
-    let modelUsed = MODEL_TRIAGE;
-    let response, data;
-
-    for (let attempt = 0; attempt < 2; attempt++) {
-      console.log("Using AI model for triage:", modelUsed);
-
-      const body = {
-        model: modelUsed,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.3,
-        max_tokens: depth <= 2 ? 600 : 1500,
-      };
-
-      if (REASONING_EFFORT && !modelUsed.includes("mini")) {
-        body.reasoning_effort = REASONING_EFFORT;
-      }
-
-      const rawResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-
-      const rawData = await rawResponse.json();
-
-      if (!rawResponse.ok || rawData.error) {
-        const errorType = rawData.error?.type || rawData.error?.code || "";
-        const errorMsg = rawData.error?.message || "";
-
-        if (
-          attempt === 0 &&
-          (modelErrors.has(errorType) || unsupportedParamPattern.test(errorMsg))
-        ) {
-          console.log(`Model ${modelUsed} failed (${errorType}: ${errorMsg}), falling back to ${MODEL_FALLBACK}`);
-          modelUsed = MODEL_FALLBACK;
-          continue;
-        }
-
-        if (depth === 0) {
-          return res.status(200).json({ type: "questions", questions: fallbackQuestions });
-        }
-        return res.status(200).json({ type: "final", user_report: fallbackFinal, doctor_report: "" });
-      }
-
-      response = rawResponse;
-      data = rawData;
-      break;
-    }
-
-    const raw = data.choices?.[0]?.message?.content?.trim();
+    const raw = result.raw;
+    const parsed = result.parsed;
+    const modelUsed = result.model_used;
+    const fallbackUsed = result.fallback_used;
 
     if (!raw) {
       if (depth === 0) {
-        return res.status(200).json({ type: "questions", questions: fallbackQuestions });
+        return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: modelUsed, fallback_used: fallbackUsed });
       }
-      return res.status(200).json({ type: "final", user_report: fallbackFinal, doctor_report: "" });
+      return res.status(200).json({ type: "final", user_report: fallbackFinal, doctor_report: "", model_used: modelUsed, fallback_used: fallbackUsed });
     }
 
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
+    if (!parsed) {
       if (depth === 0) {
-        return res.status(200).json({ type: "questions", questions: fallbackQuestions });
+        return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: modelUsed, fallback_used: fallbackUsed });
       }
-      const cleaned = raw
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch (e2) {
-        return res.status(200).json({ type: "final", user_report: raw, doctor_report: "" });
-      }
+      return res.status(200).json({ type: "final", user_report: raw, doctor_report: "", model_used: modelUsed, fallback_used: fallbackUsed });
     }
 
     if (parsed.type === "questions" && Array.isArray(parsed.questions)) {
       return res.status(200).json({
         type: "questions",
         questions: parsed.questions.filter(Boolean).slice(0, 7),
+        model_used: modelUsed,
+        fallback_used: fallbackUsed,
       });
     }
 
@@ -516,11 +517,12 @@ ${
       ? userPart
       : `===USER_REPORT===\n\n${userPart}\n\n===DOCTOR_REPORT===\n\n${doctorPart}`;
 
-    return res.status(200).json({ type: "final", report });
+    return res.status(200).json({ type: "final", report, model_used: modelUsed, fallback_used: fallbackUsed });
   } catch (error) {
+    console.error("Analyze error:", error.message);
     if (depth === 0) {
-      return res.status(200).json({ type: "questions", questions: fallbackQuestions });
+      return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: MODEL_TRIAGE, fallback_used: true });
     }
-    return res.status(200).json({ type: "final", report: fallbackFinal });
+    return res.status(200).json({ type: "final", report: fallbackFinal, model_used: MODEL_TRIAGE, fallback_used: true });
   }
 }
