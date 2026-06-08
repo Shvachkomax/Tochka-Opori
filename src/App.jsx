@@ -1222,6 +1222,27 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  async function adminDownloadJsonl(status) {
+    const st = status || "approved";
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "exportJsonl", admin_secret: adminPassword, status: st }),
+      });
+      const text = await res.text();
+      const blob = new Blob([text], { type: "application/jsonl" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reviews-${st}-${new Date().toISOString().split("T")[0]}.jsonl`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      showToast("Ошибка экспорта: " + e.message);
+    }
+  }
+
   async function adminLoadCrisisRequests(filterStatus) {
     const st = filterStatus !== undefined ? filterStatus : adminCrisisFilter;
     setAdminCrisisLoading(true);
@@ -2196,11 +2217,16 @@ export default function App() {
                 </div>
               )}
 
-              {/* Future export button placeholder */}
-              {/*
-                TODO: "Экспортировать approved reviews в JSONL"
-                <button>Экспортировать одобренные в JSONL</button>
-              */}
+              <button
+                onClick={() => adminDownloadJsonl("approved")}
+                style={{
+                  background: "#16213e", color: "#7bc0e8", border: "1px solid #2a3a5c",
+                  padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13,
+                  marginTop: 8,
+                }}
+              >
+                Экспортировать одобренные в JSONL
+              </button>
 
               {/* Future /admin/experts page placeholder */}
               {/*

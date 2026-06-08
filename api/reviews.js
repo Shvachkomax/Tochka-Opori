@@ -21,6 +21,8 @@ export default async function handler(req, res) {
         return await handleUpdateStatus(req, res);
       case "saveCorrection":
         return await handleSaveCorrection(req, res);
+      case "exportJsonl":
+        return await handleExportJsonl(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -341,5 +343,62 @@ async function handleSaveCorrection(req, res) {
     });
   } catch (error) {
     return res.status(500).json({ ok: false, error: "Fatal save correction error", details: error?.message || String(error) });
+  }
+}
+
+async function handleExportJsonl(req, res) {
+  try {
+    const { admin_secret, status } = req.body || {};
+
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret) {
+      return res.status(500).json({ ok: false, error: "ADMIN_SECRET is not configured" });
+    }
+    if (!admin_secret || admin_secret !== adminSecret) {
+      return res.status(401).json({ ok: false, error: "Invalid admin_secret" });
+    }
+
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceKey) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    const exportStatus = status || "approved";
+
+    const { data, error } = await supabase
+      .from("case_reviews")
+      .select("*")
+      .filter("json_data->>status", "eq", exportStatus)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return res.status(500).json({
+        ok: false, error: "Failed to fetch reviews for export",
+        details: error.message, code: error.code || null,
+      });
+    }
+
+    const lines = (data || []).map((review) => {
+      const { id, created_at, json_data, ...rest } = review;
+      return JSON.stringify({
+        ...(json_data || {}),
+        export_id: id,
+        export_created_at: created_at,
+        ...rest,
+        doctor_correction: rest.doctor_correction || json_data?.doctor_feedback || null,
+        protocol_update: rest.protocol_update || json_data?.doctor_feedback?.protocol_update || null,
+      });
+    }).join("\n");
+
+    const filename = `reviews-${exportStatus}-${new Date().toISOString().split("T")[0]}.jsonl`;
+
+    res.setHeader("Content-Type", "application/jsonl");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.status(200).send(lines || "");
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal exportJsonl error", details: error?.message || String(error) });
   }
 }
