@@ -182,6 +182,7 @@ export default function App() {
   const [adminCrisisFilter, setAdminCrisisFilter] = useState("new");
   const [adminCrisisLoading, setAdminCrisisLoading] = useState(false);
   const [adminCrisisActionLoading, setAdminCrisisActionLoading] = useState(null);
+  const [adminDarkMode, setAdminDarkMode] = useState(true);
 
   function showToast(message, type = "success") {
     setToast({ message, type, key: Date.now() });
@@ -1642,8 +1643,62 @@ export default function App() {
   };
 
   if (isAdminPage) {
+    const t = adminDarkMode
+      ? { bg: "#050817", text: "white", cardBg: "rgba(255,255,255,.03)", cardBorder: "rgba(255,255,255,.08)",
+          border: "rgba(255,255,255,.12)", tabBg: "rgba(255,255,255,.06)", tabActive: "white", tabActiveText: "#020617",
+          inputBg: "rgba(2,6,23,.55)", inputBorder: "rgba(255,255,255,.12)", inputText: "white",
+          accent: "#7bc0e8", muted: "#94a3b8", secondary: "#16213e", secondaryBorder: "#2a3a5c",
+          success: "#bbf7d0", error: "#fecaca", highlight: "rgba(59,130,246,.15)",
+          badgeApproved: "#14532d", badgeApprovedText: "#bbf7d0",
+          badgeRejected: "#7f1d1d", badgeRejectedText: "#fecaca",
+          badgePending: "#1e3a5f", badgePendingText: "#93c5fd",
+          danger: "#ef4444", dangerBg: "rgba(239,68,68,.1)",
+          crisisCard: "rgba(255,255,255,.04)", crisisText: "#e2e8f0", crisisMuted: "#64748b",
+          crisisBorder: "rgba(255,255,255,.1)", crisisAccent: "#a5b4fc",
+          cardLabel: "#64748b", cardValue: "#e2e8f0",
+          filterBg: "rgba(255,255,255,.06)", filterText: "white", filterBorder: "rgba(255,255,255,.12)",
+          jsonlBtn: "#16213e", jsonlBtnBorder: "#2a3a5c", jsonlBtnText: "#7bc0e8",
+          badgeInProgress: "rgba(59,130,246,.2)", badgeInProgressText: "#93c5fd",
+          badgeClosed: "rgba(34,197,94,.2)", badgeClosedText: "#bbf7d0",
+          badgeFalseAlarm: "rgba(100,116,139,.2)", badgeFalseAlarmText: "#cbd5e1",
+          badgeNew: "rgba(220,38,38,.2)", badgeNewText: "#fecaca",
+          badgeHighRisk: "rgba(220,38,38,.2)", badgeHighRiskText: "#fecaca",
+          riskMarker: "#fca5a5", riskMarkerBg: "rgba(220,38,38,.15)",
+          crisisActionPrimary: "rgba(59,130,246,.2)", crisisActionPrimaryText: "#93c5fd",
+          crisisActionSuccess: "rgba(34,197,94,.2)", crisisActionSuccessText: "#bbf7d0",
+          crisisActionNeutral: "rgba(100,116,139,.2)", crisisActionNeutralText: "#cbd5e1",
+          crisisActionJsonl: "rgba(255,255,255,.06)", crisisActionJsonlText: "#94a3b8",
+          crisisActionJsonlBorder: "rgba(255,255,255,.12)",
+        }
+      : { bg: "#f3f1ec", text: "#1a1a1a", cardBg: "#ffffff", cardBorder: "#dcd8d0",
+          border: "#d4cec4", tabBg: "#e6e2da", tabActive: "#2e2a25", tabActiveText: "#ffffff",
+          inputBg: "#ffffff", inputBorder: "#d4cec4", inputText: "#1a1a1a",
+          accent: "#2563eb", muted: "#6b7280", secondary: "#e8e4dc", secondaryBorder: "#d4cec4",
+          success: "#166534", error: "#991b1b", highlight: "rgba(37,99,235,.08)",
+          badgeApproved: "#dcfce7", badgeApprovedText: "#166534",
+          badgeRejected: "#fee2e2", badgeRejectedText: "#991b1b",
+          badgePending: "#dbeafe", badgePendingText: "#1e40af",
+          danger: "#dc2626", dangerBg: "rgba(220,38,38,.06)",
+          crisisCard: "#ffffff", crisisText: "#374151", crisisMuted: "#6b7280",
+          crisisBorder: "#dcd8d0", crisisAccent: "#4f46e5",
+          cardLabel: "#6b7280", cardValue: "#1a1a1a",
+          filterBg: "#ffffff", filterText: "#1a1a1a", filterBorder: "#d4cec4",
+          jsonlBtn: "#e8e4dc", jsonlBtnBorder: "#d4cec4", jsonlBtnText: "#2563eb",
+          badgeInProgress: "#dbeafe", badgeInProgressText: "#1e40af",
+          badgeClosed: "#dcfce7", badgeClosedText: "#166534",
+          badgeFalseAlarm: "#f3f4f6", badgeFalseAlarmText: "#6b7280",
+          badgeNew: "#fee2e2", badgeNewText: "#991b1b",
+          badgeHighRisk: "#fee2e2", badgeHighRiskText: "#991b1b",
+          riskMarker: "#fca5a5", riskMarkerBg: "rgba(220,38,38,.08)",
+          crisisActionPrimary: "#dbeafe", crisisActionPrimaryText: "#1e40af",
+          crisisActionSuccess: "#dcfce7", crisisActionSuccessText: "#166534",
+          crisisActionNeutral: "#f3f4f6", crisisActionNeutralText: "#6b7280",
+          crisisActionJsonl: "#f3f4f6", crisisActionJsonlText: "#6b7280",
+          crisisActionJsonlBorder: "#d4cec4",
+        };
+
     return (
-      <div style={{ minHeight: "100vh", background: "#050817", color: "white", fontFamily: "Inter, system-ui, Arial", padding: 32 }}>
+      <div style={{ minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "Inter, system-ui, Arial", padding: 32 }}>
         <style>{`
   * { box-sizing: border-box; }
   @keyframes toastIn {
@@ -1655,7 +1710,18 @@ export default function App() {
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 40 }}>
             <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>🧠 Админ-панель / Отзывы о сессиях</h1>
-            <a href="/" style={{ color: "#94a3b8", fontSize: 14 }}>← На главную</a>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                onClick={() => setAdminDarkMode(!adminDarkMode)}
+                style={{
+                  background: t.tabBg, color: t.text, border: `1px solid ${t.border}`,
+                  padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13,
+                }}
+              >
+                {adminDarkMode ? "☀️ Светлая" : "🌙 Тёмная"}
+              </button>
+              <a href="/" style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>← На главную</a>
+            </div>
           </div>
 
           {!adminAuthed ? (
@@ -1664,8 +1730,8 @@ export default function App() {
               <input
                 type="password"
                 style={{
-                  width: "100%", border: "1px solid rgba(255,255,255,.12)", borderRadius: 16,
-                  background: "rgba(2,6,23,.55)", color: "white", padding: "14px", fontSize: 15,
+                  width: "100%", border: `1px solid ${t.inputBorder}`, borderRadius: 16,
+                  background: t.inputBg, color: t.inputText, padding: "14px", fontSize: 15,
                   outline: "none", boxSizing: "border-box", marginBottom: 16,
                 }}
                 value={adminPassword}
@@ -1675,7 +1741,7 @@ export default function App() {
               />
               <button
                 style={{
-                  width: "100%", border: 0, borderRadius: 24, background: "white", color: "#020617",
+                  width: "100%", border: 0, borderRadius: 24, background: t.accent, color: "#fff",
                   padding: "18px 22px", fontWeight: 900, fontSize: 16, cursor: "pointer",
                 }}
                 onClick={adminLogin}
@@ -1690,8 +1756,8 @@ export default function App() {
                 <button
                   style={{
                     border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    background: adminReqTab === "reviews" ? "white" : "rgba(255,255,255,.06)",
-                    color: adminReqTab === "reviews" ? "#020617" : "white",
+                    background: adminReqTab === "reviews" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "reviews" ? t.tabActiveText : t.text,
                   }}
                   onClick={() => setAdminReqTab("reviews")}
                 >
@@ -1700,8 +1766,8 @@ export default function App() {
                 <button
                   style={{
                     border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    background: adminReqTab === "crisis" ? "white" : "rgba(255,255,255,.06)",
-                    color: adminReqTab === "crisis" ? "#020617" : "white",
+                    background: adminReqTab === "crisis" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "crisis" ? t.tabActiveText : t.text,
                   }}
                   onClick={() => { setAdminReqTab("crisis"); adminLoadCrisisRequests(adminCrisisFilter); }}
                 >
@@ -1710,8 +1776,8 @@ export default function App() {
                 <button
                   style={{
                     border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    background: adminReqTab === "requests" ? "white" : "rgba(255,255,255,.06)",
-                    color: adminReqTab === "requests" ? "#020617" : "white",
+                    background: adminReqTab === "requests" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "requests" ? t.tabActiveText : t.text,
                   }}
                   onClick={() => { setAdminReqTab("requests"); adminLoadRequests(adminReqFilter); }}
                 >
@@ -1721,7 +1787,7 @@ export default function App() {
 
               {adminReqTab === "crisis" ? (
                 <>
-                  <div style={{ color: "#94a3b8", fontSize: 13, lineHeight: 1.5, marginBottom: 16, padding: 16, border: "1px solid rgba(255,255,255,.08)", borderRadius: 16, background: "rgba(255,255,255,.03)" }}>
+                  <div style={{ color: t.muted, fontSize: 13, lineHeight: 1.5, marginBottom: 16, padding: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.cardBg }}>
                     Сохранение срочных обращений временно отключено в privacy-safe режиме. Обращения не сохраняются в базу данных.
                   </div>
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
@@ -1729,8 +1795,8 @@ export default function App() {
                       value={adminCrisisFilter}
                       onChange={(e) => { const v = e.target.value; setAdminCrisisFilter(v); adminLoadCrisisRequests(v); }}
                       style={{
-                        border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
-                        color: "white", padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                        border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
+                        color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
                       }}
                     >
                       <option value="new">Новые</option>
@@ -1741,8 +1807,8 @@ export default function App() {
                     </select>
                     <button
                       style={{
-                        border: "1px solid rgba(255,255,255,.18)", borderRadius: 12, background: "rgba(255,255,255,.06)",
-                        color: "white", padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                        border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
+                        color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
                       }}
                       onClick={() => adminLoadCrisisRequests(adminCrisisFilter)}
                     >
@@ -1751,42 +1817,42 @@ export default function App() {
                   </div>
 
                   {adminCrisisLoading ? (
-                    <div style={{ color: "#94a3b8", textAlign: "center", padding: 60 }}>Загрузка...</div>
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Загрузка...</div>
                   ) : adminCrisisRequests.length === 0 ? (
-                    <div style={{ color: "#94a3b8", textAlign: "center", padding: 60 }}>Нет обращений</div>
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Нет обращений</div>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                       {adminCrisisRequests.map((req) => (
                         <div key={req.id} style={{
-                          border: "1px solid rgba(255,255,255,.1)", borderRadius: 20,
-                          background: "rgba(255,255,255,.04)", padding: 20,
+                          border: `1px solid ${t.crisisBorder}`, borderRadius: 20,
+                          background: t.crisisCard, padding: 20,
                         }}>
                           <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                              <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                              <span style={{ color: t.crisisMuted, fontSize: 12 }}>
                                 {new Date(req.created_at).toLocaleString("ru-RU")}
                               </span>
                               <span style={{
                                 fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
-                                background: req.status === "in_progress" ? "rgba(59,130,246,.2)" : req.status === "closed" ? "rgba(34,197,94,.2)" : req.status === "false_alarm" ? "rgba(100,116,139,.2)" : "rgba(220,38,38,.2)",
-                                color: req.status === "in_progress" ? "#93c5fd" : req.status === "closed" ? "#bbf7d0" : req.status === "false_alarm" ? "#cbd5e1" : "#fecaca",
+                                background: req.status === "in_progress" ? t.badgeInProgress : req.status === "closed" ? t.badgeClosed : req.status === "false_alarm" ? t.badgeFalseAlarm : t.badgeNew,
+                                color: req.status === "in_progress" ? t.badgeInProgressText : req.status === "closed" ? t.badgeClosedText : req.status === "false_alarm" ? t.badgeFalseAlarmText : t.badgeNewText,
                               }}>
                                 {req.status === "new" ? "Новое" : req.status === "in_progress" ? "В работе" : req.status === "closed" ? "Закрыто" : req.status === "false_alarm" ? "Тестовое" : req.status}
                               </span>
-                              <span style={{ color: "#64748b", fontSize: 12 }}>
+                              <span style={{ color: t.crisisMuted, fontSize: 12 }}>
                                 {req.environment} / {req.source}
                               </span>
                               {req.high_risk_detected && (
                                 <span style={{
                                   fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
-                                  background: "rgba(220,38,38,.2)", color: "#fecaca",
+                                  background: t.badgeHighRisk, color: t.badgeHighRiskText,
                                 }}>
                                   Высокий риск
                                 </span>
                               )}
                             </div>
                             {req.public_code && (
-                              <span style={{ fontWeight: 700, fontSize: 13, color: "#a5b4fc", letterSpacing: 0.5 }}>
+                              <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisAccent, letterSpacing: 0.5 }}>
                                 {req.public_code}
                               </span>
                             )}
@@ -1794,26 +1860,26 @@ export default function App() {
 
                           {req.crisis_text && (
                             <div style={{ marginBottom: 8 }}>
-                              <div style={{ color: "#64748b", fontSize: 11, marginBottom: 2 }}>Ситуация</div>
-                              <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{req.crisis_text}</div>
+                              <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 2 }}>Ситуация</div>
+                              <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5 }}>{req.crisis_text}</div>
                             </div>
                           )}
 
                           {req.contact && (
                             <div style={{ marginBottom: 8 }}>
-                              <div style={{ color: "#64748b", fontSize: 11, marginBottom: 2 }}>Контакт</div>
-                              <div style={{ color: "#e2e8f0", fontSize: 13 }}>{req.contact}</div>
+                              <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 2 }}>Контакт</div>
+                              <div style={{ color: t.crisisText, fontSize: 13 }}>{req.contact}</div>
                             </div>
                           )}
 
                           {req.risk_markers && Array.isArray(req.risk_markers) && req.risk_markers.length > 0 && (
                             <div style={{ marginBottom: 8 }}>
-                              <div style={{ color: "#64748b", fontSize: 11, marginBottom: 2 }}>Маркеры риска</div>
+                              <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 2 }}>Маркеры риска</div>
                               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                                 {req.risk_markers.map((m, i) => (
                                   <span key={i} style={{
                                     fontSize: 11, padding: "2px 6px", borderRadius: 4,
-                                    background: "rgba(220,38,38,.15)", color: "#fca5a5",
+                                    background: t.riskMarkerBg, color: t.riskMarker,
                                   }}>{m}</span>
                                 ))}
                               </div>
@@ -1821,7 +1887,7 @@ export default function App() {
                           )}
 
                           {req.admin_comment && (
-                            <div style={{ marginBottom: 8, color: "#94a3b8", fontSize: 13, fontStyle: "italic" }}>
+                            <div style={{ marginBottom: 8, color: t.crisisMuted, fontSize: 13, fontStyle: "italic" }}>
                               Комментарий: {req.admin_comment}
                             </div>
                           )}
@@ -1831,7 +1897,7 @@ export default function App() {
                               <button
                                 disabled={adminCrisisActionLoading === req.id}
                                 style={{
-                                  border: 0, borderRadius: 12, background: "rgba(59,130,246,.2)", color: "#93c5fd",
+                                  border: 0, borderRadius: 12, background: t.crisisActionPrimary, color: t.crisisActionPrimaryText,
                                   padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
                                   opacity: adminCrisisActionLoading === req.id ? 0.5 : 1,
                                 }}
@@ -1844,7 +1910,7 @@ export default function App() {
                               <button
                                 disabled={adminCrisisActionLoading === req.id}
                                 style={{
-                                  border: 0, borderRadius: 12, background: "rgba(34,197,94,.2)", color: "#bbf7d0",
+                                  border: 0, borderRadius: 12, background: t.crisisActionSuccess, color: t.crisisActionSuccessText,
                                   padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
                                   opacity: adminCrisisActionLoading === req.id ? 0.5 : 1,
                                 }}
@@ -1856,7 +1922,7 @@ export default function App() {
                             <button
                               disabled={adminCrisisActionLoading === req.id}
                               style={{
-                                border: 0, borderRadius: 12, background: "rgba(100,116,139,.2)", color: "#cbd5e1",
+                                border: 0, borderRadius: 12, background: t.crisisActionNeutral, color: t.crisisActionNeutralText,
                                 padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
                                 opacity: adminCrisisActionLoading === req.id ? 0.5 : 1,
                               }}
@@ -1866,8 +1932,8 @@ export default function App() {
                             </button>
                             <button
                               style={{
-                                border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
-                                color: "#94a3b8", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                                border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                                color: t.crisisActionJsonlText, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
                               }}
                               onClick={() => adminDownloadCrisisJson(req)}
                             >
@@ -1886,8 +1952,8 @@ export default function App() {
                       value={adminReqFilter}
                       onChange={(e) => { const v = e.target.value; setAdminReqFilter(v); adminLoadRequests(v); }}
                       style={{
-                        border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
-                        color: "white", padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                        border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
+                        color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
                       }}
                     >
                       <option value="pending">Ожидают</option>
@@ -1897,8 +1963,8 @@ export default function App() {
                     </select>
                     <button
                       style={{
-                        border: "1px solid rgba(255,255,255,.18)", borderRadius: 12, background: "rgba(255,255,255,.06)",
-                        color: "white", padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                        border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
+                        color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
                       }}
                       onClick={() => adminLoadRequests(adminReqFilter)}
                     >
@@ -1907,23 +1973,23 @@ export default function App() {
                   </div>
 
                   {adminRequests.length === 0 ? (
-                    <div style={{ color: "#94a3b8", textAlign: "center", padding: 60 }}>Нет заявок</div>
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Нет заявок</div>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                       {adminRequests.map((req) => (
                         <div key={req.id} style={{
-                          border: "1px solid rgba(255,255,255,.1)", borderRadius: 20,
-                          background: "rgba(255,255,255,.04)", padding: 20,
+                          border: `1px solid ${t.crisisBorder}`, borderRadius: 20,
+                          background: t.crisisCard, padding: 20,
                         }}>
                           <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                              <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                              <span style={{ color: t.crisisMuted, fontSize: 12 }}>
                                 {new Date(req.created_at).toLocaleString("ru-RU")}
                               </span>
                               <span style={{
                                 fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
-                                background: req.status === "approved" ? "rgba(34,197,94,.2)" : req.status === "rejected" ? "rgba(220,38,38,.2)" : "rgba(234,179,8,.2)",
-                                color: req.status === "approved" ? "#bbf7d0" : req.status === "rejected" ? "#fecaca" : "#fde68a",
+                                background: req.status === "approved" ? t.badgeClosed : req.status === "rejected" ? t.badgeNew : t.badgePending,
+                                color: req.status === "approved" ? t.badgeClosedText : req.status === "rejected" ? t.badgeNewText : t.badgePendingText,
                               }}>
                                 {req.status}
                               </span>
@@ -1931,10 +1997,10 @@ export default function App() {
                           </div>
 
                           <div style={{ marginBottom: 8 }}>
-                            <span style={{ fontWeight: 700, color: "#e2e8f0" }}>{req.name}</span>
-                            <span style={{ color: "#94a3b8", marginLeft: 8 }}>{req.role}</span>
+                            <span style={{ fontWeight: 700, color: t.crisisText }}>{req.name}</span>
+                            <span style={{ color: t.crisisMuted, marginLeft: 8 }}>{req.role}</span>
                           </div>
-                          <div style={{ color: "#64748b", fontSize: 13, marginBottom: 8 }}>
+                          <div style={{ color: t.cardLabel, fontSize: 13, marginBottom: 8 }}>
                             {req.email && <span>Email: {req.email}  </span>}
                             {req.telegram && <span>Telegram: {req.telegram}  </span>}
                             {req.specialty && <span>Специализация: {req.specialty}  </span>}
@@ -1942,20 +2008,20 @@ export default function App() {
                             {req.organization && <span>Организация: {req.organization}</span>}
                           </div>
                           {req.comment && (
-                            <div style={{ color: "#94a3b8", fontSize: 13, fontStyle: "italic", marginBottom: 8 }}>
+                            <div style={{ color: t.crisisMuted, fontSize: 13, fontStyle: "italic", marginBottom: 8 }}>
                               "{req.comment}"
                             </div>
                           )}
 
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             {req.status !== "approved" && (
-                              <button style={{ border: 0, borderRadius: 12, background: "rgba(34,197,94,.2)", color: "#bbf7d0", padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                              <button style={{ border: 0, borderRadius: 12, background: t.badgeClosed, color: t.badgeClosedText, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
                                 onClick={() => adminUpdateRequestStatus(req.id, "approved")}>
                                 Одобрить
                               </button>
                             )}
                             {req.status !== "rejected" && (
-                              <button style={{ border: 0, borderRadius: 12, background: "rgba(220,38,38,.2)", color: "#fecaca", padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                              <button style={{ border: 0, borderRadius: 12, background: t.badgeNew, color: t.badgeNewText, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
                                 onClick={() => adminUpdateRequestStatus(req.id, "rejected")}>
                                 Отклонить
                               </button>
@@ -1979,8 +2045,8 @@ export default function App() {
                   value={adminFilter}
                   onChange={(e) => { const v = e.target.value; setAdminFilter(v); adminLoadReviews(v, adminEnv); }}
                   style={{
-                    border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
-                    color: "white", padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                    border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
+                    color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
                   }}
                 >
                   <option value="all">Все</option>
@@ -1994,8 +2060,8 @@ export default function App() {
                   value={adminEnv}
                   onChange={(e) => { const v = e.target.value; setAdminEnv(v); adminLoadReviews(adminFilter, v); }}
                   style={{
-                    border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
-                    color: "white", padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                    border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
+                    color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
                   }}
                 >
                   <option value="production">Production</option>
@@ -2006,8 +2072,8 @@ export default function App() {
                   value={adminExpertFilter}
                   onChange={(e) => { const v = e.target.value; setAdminExpertFilter(v); adminLoadReviews(adminFilter, adminEnv, v); }}
                   style={{
-                    border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
-                    color: "white", padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                    border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
+                    color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
                   }}
                 >
                   <option value="all">Все отзывы</option>
@@ -2016,8 +2082,8 @@ export default function App() {
                 </select>
                 <button
                   style={{
-                    border: "1px solid rgba(255,255,255,.18)", borderRadius: 12, background: "rgba(255,255,255,.06)",
-                    color: "white", padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                    border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
+                    color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
                   }}
                   onClick={() => adminLoadReviews()}
                 >
@@ -2027,9 +2093,9 @@ export default function App() {
 
               {/* Reviews list */}
               {adminLoading ? (
-                <div style={{ color: "#94a3b8", textAlign: "center", padding: 60 }}>Загрузка...</div>
+                <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Загрузка...</div>
               ) : adminReviews.length === 0 ? (
-                <div style={{ color: "#94a3b8", textAlign: "center", padding: 60 }}>Нет записей</div>
+                <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Нет записей</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   {adminReviews.map((review) => {
@@ -2056,55 +2122,55 @@ export default function App() {
                       <div
                         key={review.id}
                         style={{
-                          border: "1px solid rgba(255,255,255,.1)", borderRadius: 20,
-                          background: "rgba(255,255,255,.04)", padding: 20,
+                          border: `1px solid ${t.crisisBorder}`, borderRadius: 20,
+                          background: t.crisisCard, padding: 20,
                         }}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                            <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                            <span style={{ color: t.crisisMuted, fontSize: 12 }}>
                               {safeDate(review.created_at)}
                             </span>
                             <span style={{
                               fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
-                              background: status === "approved" ? "rgba(34,197,94,.2)" : status === "rejected" ? "rgba(220,38,38,.2)" : status === "needs_review" ? "rgba(234,179,8,.2)" : status === "local_auto_saved" ? "rgba(99,102,241,.2)" : "rgba(255,255,255,.1)",
-                              color: status === "approved" ? "#bbf7d0" : status === "rejected" ? "#fecaca" : status === "needs_review" ? "#fde68a" : status === "local_auto_saved" ? "#c7d2fe" : "#94a3b8",
+                              background: status === "approved" ? t.badgeClosed : status === "rejected" ? t.badgeNew : status === "needs_review" ? t.badgePending : status === "local_auto_saved" ? t.badgeInProgress : t.badgeFalseAlarm,
+                              color: status === "approved" ? t.badgeClosedText : status === "rejected" ? t.badgeNewText : status === "needs_review" ? t.badgePendingText : status === "local_auto_saved" ? t.badgeInProgressText : t.badgeFalseAlarmText,
                             }}>
                               {status}
                             </span>
-                            <span style={{ color: "#64748b", fontSize: 12 }}>
+                            <span style={{ color: t.cardLabel, fontSize: 12 }}>
                               {environment} / {source}
                             </span>
                           </div>
                           {publicCode !== "—" && (
-                            <span style={{ fontWeight: 700, fontSize: 13, color: "#a5b4fc", letterSpacing: 0.5 }}>
+                            <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisAccent, letterSpacing: 0.5 }}>
                               {publicCode}
                             </span>
                           )}
                         </div>
 
                         {expertName && (
-                          <div style={{ marginBottom: 10, fontSize: 12, color: "#a5b4fc" }}>
+                          <div style={{ marginBottom: 10, fontSize: 12, color: t.crisisAccent }}>
                             🔬 {expertName}{expertRole ? `, ${expertRole}` : ""}{expertSpecialty ? ` (${expertSpecialty})` : ""}{city ? ` · ${city}` : ""}{organization ? ` · ${organization}` : ""}
                           </div>
                         )}
 
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
                           <div>
-                            <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>PATIENT TEXT</div>
-                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shortText(patientText, 200)}</div>
+                            <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 4 }}>PATIENT TEXT</div>
+                            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5 }}>{shortText(patientText, 200)}</div>
                           </div>
                           <div>
-                            <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>USER REPORT</div>
-                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shortText(userReport, 200)}</div>
+                            <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 4 }}>USER REPORT</div>
+                            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5 }}>{shortText(userReport, 200)}</div>
                           </div>
                           <div>
-                            <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>DOCTOR REPORT</div>
-                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shortText(doctorReport, 200)}</div>
+                            <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 4 }}>DOCTOR REPORT</div>
+                            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5 }}>{shortText(doctorReport, 200)}</div>
                           </div>
                           <div>
-                            <div style={{ color: "#64748b", fontSize: 11, marginBottom: 4 }}>DOCTOR FEEDBACK</div>
-                            <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.5 }}>{shortText(doctorFeedbackComment, 200)}</div>
+                            <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 4 }}>DOCTOR FEEDBACK</div>
+                            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5 }}>{shortText(doctorFeedbackComment, 200)}</div>
                           </div>
                         </div>
 
@@ -2112,7 +2178,7 @@ export default function App() {
                           <button
                             disabled={!review?.id || adminActionLoading === review.id}
                             style={{
-                              border: 0, borderRadius: 12, background: "rgba(34,197,94,.2)", color: "#bbf7d0",
+                              border: 0, borderRadius: 12, background: t.badgeClosed, color: t.badgeClosedText,
                               padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
                               opacity: adminActionLoading === review.id ? 0.5 : 1,
                             }}
@@ -2123,7 +2189,7 @@ export default function App() {
                           <button
                             disabled={!review?.id || adminActionLoading === review.id}
                             style={{
-                              border: 0, borderRadius: 12, background: "rgba(220,38,38,.2)", color: "#fecaca",
+                              border: 0, borderRadius: 12, background: t.badgeNew, color: t.badgeNewText,
                               padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
                               opacity: adminActionLoading === review.id ? 0.5 : 1,
                             }}
@@ -2134,7 +2200,7 @@ export default function App() {
                           <button
                             disabled={!review?.id || adminActionLoading === review.id}
                             style={{
-                              border: 0, borderRadius: 12, background: "rgba(234,179,8,.2)", color: "#fde68a",
+                              border: 0, borderRadius: 12, background: t.badgePending, color: t.badgePendingText,
                               padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
                               opacity: adminActionLoading === review.id ? 0.5 : 1,
                             }}
@@ -2145,8 +2211,8 @@ export default function App() {
                           <button
                             disabled={!review?.id}
                             style={{
-                              border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)",
-                              color: "#94a3b8", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                              color: t.crisisActionJsonlText, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
                             }}
                             onClick={() => adminDownloadJson(review)}
                           >
@@ -2155,8 +2221,8 @@ export default function App() {
                           <button
                             disabled={!review?.id}
                             style={{
-                              border: "1px solid rgba(99,102,241,.3)", borderRadius: 12, background: "rgba(99,102,241,.08)",
-                              color: "#a5b4fc", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                              color: t.crisisAccent, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
                             }}
                             onClick={() => openCorrectionForm(review)}
                           >
@@ -2165,8 +2231,8 @@ export default function App() {
                         </div>
 
                         {editingReview === review.id && (
-                          <div style={{ marginTop: 16, borderTop: "1px solid rgba(255,255,255,.08)", paddingTop: 16 }}>
-                            <div style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Редакция отзыва</div>
+                          <div style={{ marginTop: 16, borderTop: `1px solid ${t.cardBorder}`, paddingTop: 16 }}>
+                            <div style={{ color: t.crisisText, fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Редакция отзыва</div>
 
                             <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="Что было неверно в вопросах?" value={correctionForm?.wrong_questions || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, wrong_questions: e.target.value })} />
                             <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="Какие вопросы нужно было добавить?" value={correctionForm?.missing_questions || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, missing_questions: e.target.value })} />
@@ -2179,20 +2245,20 @@ export default function App() {
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                               <button
                                 disabled={!review?.id || adminActionLoading === review.id}
-                                style={{ border: 0, borderRadius: 12, background: "rgba(99,102,241,.2)", color: "#c7d2fe", padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: adminActionLoading === review.id ? 0.5 : 1 }}
+                                style={{ border: 0, borderRadius: 12, background: t.badgeInProgress, color: t.badgeInProgressText, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: adminActionLoading === review.id ? 0.5 : 1 }}
                                 onClick={() => adminSaveCorrection(review.id, null)}
                               >
                                 Сохранить правки
                               </button>
                               <button
                                 disabled={!review?.id || adminActionLoading === review.id}
-                                style={{ border: 0, borderRadius: 12, background: "rgba(34,197,94,.2)", color: "#bbf7d0", padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: adminActionLoading === review.id ? 0.5 : 1 }}
+                                style={{ border: 0, borderRadius: 12, background: t.badgeClosed, color: t.badgeClosedText, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: adminActionLoading === review.id ? 0.5 : 1 }}
                                 onClick={() => adminSaveCorrection(review.id, "approved")}
                               >
                                 Одобрить после правки
                               </button>
                               <button
-                                style={{ border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.06)", color: "#94a3b8", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
+                                style={{ border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl, color: t.crisisActionJsonlText, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
                                 onClick={closeCorrectionForm}
                               >
                                 Отмена
@@ -2205,9 +2271,9 @@ export default function App() {
                     } catch (error) {
                       console.error("review card render error", error, review);
                       return (
-                        <div key={review?.id} style={{ border: "1px solid rgba(220,38,38,.2)", borderRadius: 20, background: "rgba(220,38,38,.05)", padding: 20, color: "#fecaca", fontSize: 13 }}>
+                        <div key={review?.id} style={{ border: `1px solid ${t.badgeNew}`, borderRadius: 20, background: t.dangerBg, padding: 20, color: t.badgeNewText, fontSize: 13 }}>
                           <div>Ошибка отображения review {review?.id}</div>
-                          <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, color: "#94a3b8", marginTop: 6 }}>
+                          <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, color: t.muted, marginTop: 6 }}>
                             {String(error?.message || error)}
                           </pre>
                         </div>
@@ -2220,7 +2286,7 @@ export default function App() {
               <button
                 onClick={() => adminDownloadJsonl("approved")}
                 style={{
-                  background: "#16213e", color: "#7bc0e8", border: "1px solid #2a3a5c",
+                  background: t.jsonlBtn, color: t.jsonlBtnText, border: `1px solid ${t.jsonlBtnBorder}`,
                   padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13,
                   marginTop: 8,
                 }}
@@ -2244,11 +2310,12 @@ export default function App() {
             style={{
               position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
               zIndex: 2000, padding: "14px 24px", borderRadius: 16, fontWeight: 600, fontSize: 15,
-              boxShadow: "0 8px 30px rgba(0,0,0,.5)", animation: "toastIn 0.3s ease",
+              boxShadow: adminDarkMode ? "0 8px 30px rgba(0,0,0,.5)" : "0 4px 20px rgba(0,0,0,.1)",
+              animation: "toastIn 0.3s ease",
               textAlign: "center", maxWidth: "calc(100vw - 40px)",
               ...(toast.type === "error"
-                ? { background: "rgba(220,38,38,.2)", border: "1px solid rgba(248,113,113,.4)", color: "#fecaca" }
-                : { background: "rgba(34,197,94,.2)", border: "1px solid rgba(74,222,128,.4)", color: "#bbf7d0" }),
+                ? { background: t.dangerBg, border: `1px solid ${t.badgeNewText}`, color: t.badgeNewText }
+                : { background: t.highlight, border: `1px solid ${t.badgeClosedText}`, color: t.badgeClosedText }),
             }}
           >
             {toast.message}
