@@ -111,6 +111,57 @@ export default function App() {
     anchor.click();
   }
 
+  async function downloadReportPDF() {
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+    const user = userPart || "—";
+    const doctor = doctorPart || "—";
+    let y = 20;
+    doc.setFontSize(14);
+    doc.text("Отчёт для вас", 20, y);
+    y += 8;
+    doc.setFontSize(10);
+    const userLines = doc.splitTextToSize(user.replace(/===USER_REPORT===/g, "").trim(), 170);
+    userLines.forEach((line) => {
+      if (y > 275) { doc.addPage(); y = 20; }
+      doc.text(line, 20, y);
+      y += 5;
+    });
+    y += 10;
+    doc.setFontSize(14);
+    doc.text("Отчёт для специалиста", 20, y);
+    y += 8;
+    doc.setFontSize(10);
+    const doctorLines = doc.splitTextToSize(doctor.replace(/===DOCTOR_REPORT===/g, "").trim(), 170);
+    doctorLines.forEach((line) => {
+      if (y > 275) { doc.addPage(); y = 20; }
+      doc.text(line, 20, y);
+      y += 5;
+    });
+    doc.save(`otchet-${publicCode || "tochka-opori"}.pdf`);
+  }
+
+  function downloadReportDOCX() {
+    const user = userPart || "—";
+    const doctor = doctorPart || "—";
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Отчёт Точка Опора</title></head>
+<body style="font-family:'PT Serif',Georgia,serif;max-width:700px;margin:40px auto;line-height:1.7">
+<h1>Отчёт для вас</h1>
+${user.replace(/===USER_REPORT===/g, "").trim().split("\n").map(l => `<p>${l}</p>`).join("\n")}
+<hr style="margin:30px 0">
+<h1>Отчёт для специалиста</h1>
+${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l}</p>`).join("\n")}
+</body></html>`;
+    const blob = new Blob([html], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `otchet-${publicCode || "tochka-opori"}.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function addPracticeToPlan(practiceId) {
     const practice = PRACTICES.find(p => p.id === practiceId);
     if (!practice) return;
@@ -2666,6 +2717,20 @@ export default function App() {
                     onClick={() => setActiveTab("doctor")}
                   >
                     Для специалиста
+                  </button>
+                  <button
+                    onClick={downloadReportPDF}
+                    style={{ ...s.tab, fontSize: 12, marginLeft: "auto" }}
+                    title="Скачать PDF"
+                  >
+                    📄 PDF
+                  </button>
+                  <button
+                    onClick={downloadReportDOCX}
+                    style={{ ...s.tab, fontSize: 12 }}
+                    title="Скачать DOCX"
+                  >
+                    📝 DOCX
                   </button>
                 </div>
 
