@@ -471,7 +471,14 @@ export default function App() {
             body: audioBlob,
           });
 
-          const data = await response.json();
+          let data;
+          const responseText = await response.text();
+          try {
+            data = JSON.parse(responseText);
+          } catch {
+            console.error("Transcribe: non-JSON response", response.status, responseText.slice(0, 200));
+            throw new Error("Сервер вернул пустой ответ (попробуйте перезапустить сервер)");
+          }
 
           if (!response.ok) {
             throw new Error(data.error || "Не удалось расшифровать голос");
@@ -557,7 +564,14 @@ export default function App() {
             body: audioBlob,
           });
 
-          const data = await response.json();
+          const responseText = await response.text();
+          let data;
+          try {
+            data = JSON.parse(responseText);
+          } catch {
+            console.error("Transcribe: non-JSON response", response.status, responseText.slice(0, 200));
+            throw new Error("Сервер вернул пустой ответ (попробуйте перезапустить сервер)");
+          }
 
           if (!response.ok) {
             throw new Error(data.error || "Не удалось расшифровать голос");
@@ -645,7 +659,14 @@ export default function App() {
             body: audioBlob,
           });
 
-          const data = await response.json();
+          const responseText = await response.text();
+          let data;
+          try {
+            data = JSON.parse(responseText);
+          } catch {
+            console.error("Transcribe: non-JSON response", response.status, responseText.slice(0, 200));
+            throw new Error("Сервер вернул пустой ответ (попробуйте перезапустить сервер)");
+          }
 
           if (!response.ok) {
             throw new Error(data.error || "Не удалось расшифровать голос");

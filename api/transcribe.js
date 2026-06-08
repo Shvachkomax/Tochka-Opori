@@ -28,6 +28,11 @@ export default async function handler(req, res) {
 
     const audioBuffer = await readRequestBody(req);
 
+    console.log("Transcribe request:", {
+      contentType: req.headers["content-type"],
+      size: audioBuffer?.length || 0
+    });
+
     if (!audioBuffer || audioBuffer.length < 1000) {
       return res.status(400).json({
         error: "Audio file is too small"
@@ -56,7 +61,16 @@ export default async function handler(req, res) {
       body: formData
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      console.error("OpenAI transcribe: non-JSON response", response.status, responseText.slice(0, 300));
+      return res.status(500).json({
+        error: "OpenAI вернул пустой ответ"
+      });
+    }
 
     if (!response.ok || data.error) {
       return res.status(500).json({
