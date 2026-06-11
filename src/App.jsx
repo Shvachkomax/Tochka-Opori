@@ -235,6 +235,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [adminCrisisActionLoading, setAdminCrisisActionLoading] = useState(null);
   const [adminDarkMode, setAdminDarkMode] = useState(true);
 
+  // Training table state
+  const [trainingSessions, setTrainingSessions] = useState([]);
+  const [trainingLoading, setTrainingLoading] = useState(false);
+  const [trainingFilter, setTrainingFilter] = useState({ status: "all", expected_case_type: "all", ai_detected_case_type: "all", session_kind: "all", model_used: "all", public_code: "" });
+  const [trainingEditId, setTrainingEditId] = useState(null);
+  const [trainingEditData, setTrainingEditData] = useState({});
+  const [trainingNewRow, setTrainingNewRow] = useState(null);
+
+  // Create training from review state
+  const [trainingFormReviewId, setTrainingFormReviewId] = useState(null);
+  const [trainingFormData, setTrainingFormData] = useState({ scenario_played: "", expected_case_type: "", session_kind: "initial", expert_comment: "", public_code: "" });
+  const [trainingFormPublicCodeAuto, setTrainingFormPublicCodeAuto] = useState(false);
+
   function showToast(message, type = "success") {
     setToast({ message, type, key: Date.now() });
   }
@@ -1124,6 +1137,183 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }
 
+  async function loadTrainingSessions() {
+    setTrainingLoading(true);
+    try {
+      const body = { action: "listTrainingSessions", ...trainingFilter };
+      if (expertData) {
+        body.expert_id = expertData.id;
+      } else {
+        body.admin_secret = adminPassword;
+      }
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions(data.sessions || []);
+      } else {
+        showToast(data.error || "Ошибка загрузки", "error");
+      }
+    } catch {
+      showToast("Ошибка загрузки таблицы тренировок", "error");
+    } finally {
+      setTrainingLoading(false);
+    }
+  }
+
+  async function saveTrainingSession(row) {
+    try {
+      const body = { action: "saveTrainingSession", ...row };
+      if (expertData) body.expert_id = expertData.id;
+      else body.admin_secret = adminPassword;
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Сохранено");
+        if (data.session) {
+          setTrainingSessions((prev) => {
+            const idx = prev.findIndex((s) => s.id === data.session.id);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = data.session;
+              return next;
+            }
+            return [data.session, ...prev];
+          });
+        }
+        return data;
+      }
+      showToast(data.error || "Ошибка", "error");
+      return null;
+    } catch {
+      showToast("Ошибка сохранения", "error");
+      return null;
+    }
+  }
+
+  async function updateTrainingSession(id, updates) {
+    try {
+      const body = { action: "updateTrainingSession", id, updates };
+      if (expertData) body.expert_id = expertData.id;
+      else body.admin_secret = adminPassword;
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => {
+          const idx = prev.findIndex((s) => s.id === id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = data.session;
+            return next;
+          }
+          return prev;
+        });
+        showToast("Сохранено");
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка сохранения", "error");
+    }
+  }
+
+  async function deleteTrainingSession(id) {
+    if (!confirm("Удалить запись?")) return;
+    try {
+      const body = { action: "deleteTrainingSession", id, admin_secret: adminPassword };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
+        showToast("Удалено");
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка удаления", "error");
+    }
+  }
+
+  async function createTrainingFromReview() {
+    if (!trainingFormReviewId) return;
+    try {
+      const body = {
+        action: "createTrainingFromReview",
+        review_id: trainingFormReviewId,
+        ...trainingFormData,
+      };
+      if (expertData) body.expert_id = expertData.id;
+      else body.admin_secret = adminPassword;
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Создано");
+        setTrainingSessions((prev) => [data.session, ...prev]);
+        setTrainingFormReviewId(null);
+        setTrainingFormData({ scenario_played: "", expected_case_type: "", session_kind: "initial", expert_comment: "", public_code: "" });
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка создания", "error");
+    }
+  }
+
+  async function downloadTrainingCsv() {
+    try {
+      const body = { action: "exportTrainingCsv", ...trainingFilter };
+      if (expertData) body.expert_id = expertData.id;
+      else body.admin_secret = adminPassword;
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `training-sessions-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      showToast("Ошибка выгрузки", "error");
+    }
+  }
+
+  function openTrainingForm(review) {
+    const json = getReviewJson(review);
+    let code = review.public_code || json.public_code || json.publicCode || json.session?.public_code || json.sessionCode || json.code || "";
+    setTrainingFormReviewId(review.id);
+    setTrainingFormData({
+      scenario_played: "",
+      expected_case_type: "",
+      session_kind: "initial",
+      expert_comment: "",
+      public_code: code,
+    });
+    setTrainingFormPublicCodeAuto(!!code);
+  }
+
   async function adminLoadReviews(filterStatus, filterEnv, expertFilter) {
     const st = filterStatus !== undefined ? filterStatus : adminFilter;
     const env = filterEnv !== undefined ? filterEnv : adminEnv;
@@ -1378,6 +1568,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 
   const isAdminPage = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+  const isTrainingPage = typeof window !== "undefined" && window.location.pathname === "/admin/training";
 
   const s = {
     page: {
@@ -1760,7 +1951,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 40 }}>
-            <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>🧠 Админ-панель / Отзывы о сессиях</h1>
+            <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>{isTrainingPage ? "🧠 Таблица тренировок" : "🧠 Админ-панель / Отзывы о сессиях"}</h1>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <button
                 onClick={() => setAdminDarkMode(!adminDarkMode)}
@@ -1833,6 +2024,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   onClick={() => { setAdminReqTab("requests"); adminLoadRequests(adminReqFilter); }}
                 >
                   Заявки специалистов
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "training" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "training" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setAdminReqTab("training"); loadTrainingSessions(); }}
+                >
+                  Таблица тренировок
                 </button>
               </div>
 
@@ -2088,6 +2289,168 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     и генерации access_code. Заполнять вручную.
                   */}
                 </>
+              ) : adminReqTab === "training" ? (
+                <>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
+                  <select value={trainingFilter.status} onChange={(e) => setTrainingFilter((f) => ({ ...f, status: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
+                    <option value="all">Все статусы</option>
+                    <option value="new">new</option>
+                    <option value="reviewed">reviewed</option>
+                    <option value="needs_prompt_update">needs_prompt_update</option>
+                    <option value="approved_for_learning">approved_for_learning</option>
+                    <option value="rejected">rejected</option>
+                    <option value="archived">archived</option>
+                  </select>
+                  <select value={trainingFilter.expected_case_type} onChange={(e) => setTrainingFilter((f) => ({ ...f, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
+                    <option value="all">Все типы кейсов</option>
+                    <option value="anxiety">anxiety</option><option value="sleep">sleep</option><option value="depression_like">depression_like</option><option value="grief">grief</option><option value="trauma">trauma</option><option value="body_tension">body_tension</option><option value="adhd_like">adhd_like</option><option value="substance">substance</option><option value="alcohol">alcohol</option><option value="bipolar_red_flags">bipolar_red_flags</option><option value="psychosis_red_flags">psychosis_red_flags</option><option value="acute_psychosis">acute_psychosis</option><option value="suicide_risk">suicide_risk</option><option value="self_harm_risk">self_harm_risk</option><option value="medication_issue">medication_issue</option><option value="mixed">mixed</option><option value="other">other</option>
+                  </select>
+                  <select value={trainingFilter.session_kind} onChange={(e) => setTrainingFilter((f) => ({ ...f, session_kind: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
+                    <option value="all">Все типы сессий</option>
+                    <option value="initial">initial</option><option value="follow_up">follow_up</option><option value="diary_check">diary_check</option><option value="support_toolkit_check">support_toolkit_check</option><option value="crisis_check">crisis_check</option><option value="doctor_review">doctor_review</option><option value="other">other</option>
+                  </select>
+                  <input value={trainingFilter.public_code} onChange={(e) => setTrainingFilter((f) => ({ ...f, public_code: e.target.value }))} placeholder="Код ТОЧКА-XXXX-XXXX" style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, outline: "none", width: 200 }} />
+                  <button onClick={() => loadTrainingSessions()} style={{ border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg, color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                    {trainingLoading ? "Загрузка..." : `Обновить (${trainingSessions.length})`}
+                  </button>
+                  <button onClick={downloadTrainingCsv} style={{ border: `1px solid ${t.jsonlBtnBorder}`, borderRadius: 12, background: t.jsonlBtn, color: t.jsonlBtnText, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                    Скачать CSV
+                  </button>
+                </div>
+
+                {trainingNewRow && (
+                  <div style={{ border: `1px solid ${t.accent}`, borderRadius: 16, background: t.cardBg, padding: 16, marginBottom: 16 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: t.text }}>Новая строка</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                      <input placeholder="Код пациента" value={trainingNewRow.public_code || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, public_code: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
+                      <select value={trainingNewRow.session_kind || "initial"} onChange={(e) => setTrainingNewRow((r) => ({ ...r, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
+                        <option value="initial">initial</option><option value="follow_up">follow_up</option><option value="diary_check">diary_check</option><option value="support_toolkit_check">support_toolkit_check</option><option value="crisis_check">crisis_check</option><option value="doctor_review">doctor_review</option><option value="other">other</option>
+                      </select>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                      <input placeholder="Сценарий" value={trainingNewRow.scenario_played || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
+                      <select value={trainingNewRow.expected_case_type || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
+                        <option value="">Тип кейса</option>
+                        <option value="anxiety">anxiety</option><option value="sleep">sleep</option><option value="depression_like">depression_like</option><option value="grief">grief</option><option value="trauma">trauma</option><option value="body_tension">body_tension</option><option value="adhd_like">adhd_like</option><option value="substance">substance</option><option value="alcohol">alcohol</option><option value="bipolar_red_flags">bipolar_red_flags</option><option value="psychosis_red_flags">psychosis_red_flags</option><option value="acute_psychosis">acute_psychosis</option><option value="suicide_risk">suicide_risk</option><option value="self_harm_risk">self_harm_risk</option><option value="medication_issue">medication_issue</option><option value="mixed">mixed</option><option value="other">other</option>
+                      </select>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={async () => { const r = await saveTrainingSession(trainingNewRow); if (r) setTrainingNewRow(null); }} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Сохранить</button>
+                      <button onClick={() => setTrainingNewRow(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Отмена</button>
+                    </div>
+                  </div>
+                )}
+
+                {!trainingNewRow && (
+                  <button onClick={() => setTrainingNewRow({ session_kind: "initial", status: "new" })} style={{ border: `1px dashed ${t.accent}`, borderRadius: 12, background: "transparent", color: t.accent, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer", marginBottom: 16 }}>
+                    + Добавить строку
+                  </button>
+                )}
+
+                {trainingLoading ? (
+                  <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Загрузка...</div>
+                ) : trainingSessions.length === 0 ? (
+                  <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Нет записей</div>
+                ) : (
+                  <div style={{ overflowX: "auto", fontSize: 12 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1400 }}>
+                      <thead>
+                        <tr style={{ background: t.tabBg }}>
+                          {["Дата","Код","#","Тип сессии","Эксперт","Сценарий","Ожидаемый тип","AI тип","Детекция 1-5","Модель","Fallback","Вопросы 1-5","Отчёт 1-5","Safety 1-5","Язык 1-5","Toolkit 1-5","Продолж. 1-5","Повторы","Риски","Рекомендация","Контекст","Статус","Вывод","Проблема","Комментарий","Действие","Продолж."].map((h) => (
+                            <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontWeight: 700, color: t.muted, borderBottom: `1px solid ${t.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                          ))}
+                          <th style={{ padding: "8px 6px", borderBottom: `1px solid ${t.border}`, width: 80 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trainingSessions.map((s) => {
+                          const isEditing = trainingEditId === s.id;
+                          const ed = isEditing ? trainingEditData : {};
+                          return (
+                            <tr key={s.id} style={{ borderBottom: `1px solid ${t.cardBorder}` }}>
+                              <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.created_at ? new Date(s.created_at).toLocaleDateString("ru-RU") : ""}</td>
+                              <td style={{ padding: "6px", fontWeight: 700, color: t.accent, fontSize: 12, whiteSpace: "nowrap" }}>{s.public_code || "—"}</td>
+                              <td style={{ padding: "6px", color: t.text }}>{s.session_sequence ?? ""}</td>
+                              <td style={{ padding: "6px" }}>{isEditing
+                                ? <select value={ed.session_kind || s.session_kind || "initial"} onChange={(e) => setTrainingEditData((d) => ({ ...d, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
+                                : <span style={{ color: t.text }}>{s.session_kind || ""}</span>}</td>
+                              <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.expert_name || (s.expert_role ? s.expert_role : "") || "—"}</td>
+                              <td style={{ padding: "6px" }}>{isEditing
+                                ? <input value={ed.scenario_played ?? s.scenario_played ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
+                                : <span style={{ color: t.text }}>{s.scenario_played || ""}</span>}</td>
+                              <td style={{ padding: "6px" }}>{isEditing
+                                ? <select value={ed.expected_case_type ?? s.expected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}><option value="">—</option>{["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
+                                : <span style={{ color: t.text }}>{s.expected_case_type || ""}</span>}</td>
+                              <td style={{ padding: "6px" }}>{isEditing
+                                ? <input value={ed.ai_detected_case_type ?? s.ai_detected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, ai_detected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 80 }} />
+                                : <span style={{ color: t.text }}>{s.ai_detected_case_type || ""}</span>}</td>
+                              <td style={{ padding: "6px" }}>{isEditing
+                                ? <input type="number" min="1" max="5" value={ed.detection_quality ?? s.detection_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, detection_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                : <span style={{ color: s.detection_quality >= 4 ? t.success : s.detection_quality <= 2 ? t.error : t.text }}>{s.detection_quality ?? ""}</span>}</td>
+                              <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.model_used || "—"}</td>
+                              <td style={{ padding: "6px", color: s.fallback_used ? t.error : t.muted, fontSize: 11 }}>{s.fallback_used ? "Да" : "—"}</td>
+                              <td style={{ padding: "6px" }}>{isEditing
+                                ? <input type="number" min="1" max="5" value={ed.questions_quality ?? s.questions_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, questions_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                : <span style={{ color: s.questions_quality >= 4 ? t.success : s.questions_quality <= 2 ? t.error : t.text }}>{s.questions_quality ?? ""}</span>}</td>
+                              <td style={{ padding: "6px" }}>{isEditing
+                                ? <input type="number" min="1" max="5" value={ed.report_quality ?? s.report_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, report_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                : <span style={{ color: s.report_quality >= 4 ? t.success : s.report_quality <= 2 ? t.error : t.text }}>{s.report_quality ?? ""}</span>}</td>
+                              <td style={{ padding: "6px" }}>{isEditing
+                                ? <input type="number" min="1" max="5" value={ed.safety_quality ?? s.safety_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, safety_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                : <span style={{ color: s.safety_quality >= 4 ? t.success : s.safety_quality <= 2 ? t.error : t.text }}>{s.safety_quality ?? ""}</span>}</td>
+                              <td style={{ padding: "6px" }}>{isEditing
+                                ? <input type="number" min="1" max="5" value={ed.language_quality ?? s.language_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, language_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                : <span style={{ color: s.language_quality >= 4 ? t.success : s.language_quality <= 2 ? t.error : t.text }}>{s.language_quality ?? ""}</span>}</td>
+                              <td style={{ padding: "6px" }}>{isEditing
+                                ? <input type="number" min="1" max="5" value={ed.support_toolkit_quality ?? s.support_toolkit_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, support_toolkit_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                : <span style={{ color: s.support_toolkit_quality >= 4 ? t.success : s.support_toolkit_quality <= 2 ? t.error : t.text }}>{s.support_toolkit_quality ?? ""}</span>}</td>
+                              <td style={{ padding: "6px" }}>{isEditing
+                                ? <input type="number" min="1" max="5" value={ed.continuation_quality ?? s.continuation_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, continuation_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                : <span style={{ color: s.continuation_quality >= 4 ? t.success : s.continuation_quality <= 2 ? t.error : t.text }}>{s.continuation_quality ?? ""}</span>}</td>
+                              <td style={{ padding: "6px", color: s.repeated_questions ? t.error : t.muted, fontSize: 11 }}>{s.repeated_questions ? "Да" : "—"}</td>
+                              <td style={{ padding: "6px", color: s.missed_risk_flags ? t.error : t.muted, fontSize: 11 }}>{s.missed_risk_flags ? "Да" : "—"}</td>
+                              <td style={{ padding: "6px", color: s.wrong_recommendation ? t.error : t.muted, fontSize: 11 }}>{s.wrong_recommendation ? "Да" : "—"}</td>
+                              <td style={{ padding: "6px", color: s.remembered_context ? t.success : t.muted, fontSize: 11 }}>{s.remembered_context ? "Да" : "—"}</td>
+                              <td style={{ padding: "6px" }}>{isEditing
+                                ? <select value={ed.status ?? s.status ?? "new"} onChange={(e) => setTrainingEditData((d) => ({ ...d, status: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["new","reviewed","needs_prompt_update","approved_for_learning","rejected","archived"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
+                                : <span style={{
+                                    fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
+                                    background: s.status === "approved_for_learning" ? t.badgeClosed : s.status === "rejected" ? t.badgeNew : s.status === "reviewed" ? t.badgeInProgress : t.badgePending,
+                                    color: s.status === "approved_for_learning" ? t.badgeClosedText : s.status === "rejected" ? t.badgeNewText : s.status === "reviewed" ? t.badgeInProgressText : t.badgePendingText,
+                                  }}>{s.status || "new"}</span>}</td>
+                              <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
+                                ? <input value={ed.short_summary ?? s.short_summary ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, short_summary: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
+                                : <span style={{ color: t.text, fontSize: 11 }}>{s.short_summary || ""}</span>}</td>
+                              <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
+                                ? <input value={ed.main_problem ?? s.main_problem ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, main_problem: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
+                                : <span style={{ color: t.text, fontSize: 11 }}>{s.main_problem || ""}</span>}</td>
+                              <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
+                                ? <input value={ed.expert_comment ?? s.expert_comment ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, expert_comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
+                                : <span style={{ color: t.text, fontSize: 11 }}>{s.expert_comment || ""}</span>}</td>
+                              <td style={{ padding: "6px", maxWidth: 100 }}>{isEditing
+                                ? <input value={ed.action_needed ?? s.action_needed ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, action_needed: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
+                                : <span style={{ color: t.text, fontSize: 11 }}>{s.action_needed || ""}</span>}</td>
+                              <td style={{ padding: "6px", maxWidth: 100 }}>{isEditing
+                                ? <input value={ed.continuation_comment ?? s.continuation_comment ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, continuation_comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
+                                : <span style={{ color: t.text, fontSize: 11 }}>{s.continuation_comment || ""}</span>}</td>
+                              <td style={{ padding: "6px", whiteSpace: "nowrap" }}>
+                                {isEditing ? (
+                                  <>
+                                    <button onClick={async () => { await updateTrainingSession(s.id, trainingEditData); setTrainingEditId(null); setTrainingEditData({}); }} style={{ border: 0, borderRadius: 6, background: t.accent, color: "#fff", padding: "4px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", marginRight: 4 }}>Сохранить</button>
+                                    <button onClick={() => { setTrainingEditId(null); setTrainingEditData({}); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: t.tabBg, color: t.text, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>Отмена</button>
+                                  </>
+                                ) : (
+                                  <button onClick={() => { setTrainingEditId(s.id); setTrainingEditData({}); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: "transparent", color: t.accent, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>✎</button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                </>
               ) : (
               <>
               {/* Reviews filters */}
@@ -2275,12 +2638,48 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                               border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
                               color: t.crisisAccent, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
                             }}
+                            onClick={() => {
+                              setTrainingFormReviewId(review.id);
+                              setTrainingFormData((d) => ({ ...d, public_code: review.public_code || "" }));
+                            }}
+                          >
+                            + В таблицу тренировок
+                          </button>
+                          <button
+                            disabled={!review?.id}
+                            style={{
+                              border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                              color: t.crisisAccent, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                            }}
                             onClick={() => openCorrectionForm(review)}
                           >
                             Редактировать
                           </button>
                         </div>
 
+                        {trainingFormReviewId === review.id && (
+                          <div style={{ marginTop: 16, borderTop: `1px solid ${t.cardBorder}`, paddingTop: 16 }}>
+                            <div style={{ color: t.crisisText, fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Добавление в таблицу тренировок</div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                              <input placeholder="Код пациента" value={trainingFormData.public_code || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, public_code: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
+                              <select value={trainingFormData.session_kind || "initial"} onChange={(e) => setTrainingFormData((d) => ({ ...d, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
+                                <option value="initial">initial</option><option value="follow_up">follow_up</option><option value="diary_check">diary_check</option><option value="support_toolkit_check">support_toolkit_check</option><option value="crisis_check">crisis_check</option><option value="doctor_review">doctor_review</option><option value="other">other</option>
+                              </select>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                              <input placeholder="Сценарий" value={trainingFormData.scenario_played || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
+                              <select value={trainingFormData.expected_case_type || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
+                                <option value="">Тип кейса</option>
+                                {["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            </div>
+                            <textarea value={trainingFormData.expert_comment || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, expert_comment: e.target.value }))} placeholder="Комментарий эксперта" style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", width: "100%", minHeight: 40, marginBottom: 10, resize: "vertical" }} />
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button onClick={createTrainingFromReview} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Создать</button>
+                              <button onClick={() => setTrainingFormReviewId(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Отмена</button>
+                            </div>
+                          </div>
+                        )}
                         {editingReview === review.id && (
                           <div style={{ marginTop: 16, borderTop: `1px solid ${t.cardBorder}`, paddingTop: 16 }}>
                             <div style={{ color: t.crisisText, fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Редакция отзыва</div>
