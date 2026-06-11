@@ -248,6 +248,49 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [trainingFormData, setTrainingFormData] = useState({ scenario_played: "", expected_case_type: "", session_kind: "initial", expert_comment: "", public_code: "" });
   const [trainingFormPublicCodeAuto, setTrainingFormPublicCodeAuto] = useState(false);
 
+  const SESSION_KIND_LABELS = {
+    initial: "Первичная сессия",
+    follow_up: "Повторная сессия",
+    diary_check: "Проверка дневника",
+    support_toolkit_check: "Проверка практик",
+    crisis_check: "Срочное обращение",
+    doctor_review: "Врачебный разбор",
+    other: "Другое",
+  };
+
+  const CASE_TYPE_LABELS = {
+    anxiety: "Тревога",
+    sleep: "Сон",
+    depression_like: "Депрессивные признаки",
+    grief: "Утрата / горе",
+    trauma: "Травматический опыт",
+    body_tension: "Телесное напряжение",
+    adhd_like: "Нарушение внимания / исполнительные функции",
+    substance: "ПАВ / вещества",
+    alcohol: "Алкоголь",
+    bipolar_red_flags: "Биполярные красные флаги",
+    psychosis_red_flags: "Психотические красные флаги",
+    acute_psychosis: "Острый психоз",
+    suicide_risk: "Суицидальный риск",
+    self_harm_risk: "Риск самоповреждения",
+    medication_issue: "Вопросы лекарств",
+    mixed: "Смешанный случай",
+    other: "Другое",
+  };
+
+  const STATUS_LABELS = {
+    new: "Новый",
+    reviewed: "Просмотрен",
+    needs_prompt_update: "Нужно обновить промпт",
+    approved_for_learning: "Одобрен для обучения",
+    rejected: "Отклонён",
+    archived: "Архив",
+  };
+
+  const sk = (v) => SESSION_KIND_LABELS[v] || v;
+  const ct = (v) => CASE_TYPE_LABELS[v] || v;
+  const st = (v) => STATUS_LABELS[v] || v;
+
   function showToast(message, type = "success") {
     setToast({ message, type, key: Date.now() });
   }
@@ -2294,20 +2337,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
                   <select value={trainingFilter.status} onChange={(e) => setTrainingFilter((f) => ({ ...f, status: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
                     <option value="all">Все статусы</option>
-                    <option value="new">new</option>
-                    <option value="reviewed">reviewed</option>
-                    <option value="needs_prompt_update">needs_prompt_update</option>
-                    <option value="approved_for_learning">approved_for_learning</option>
-                    <option value="rejected">rejected</option>
-                    <option value="archived">archived</option>
+                    {["new","reviewed","needs_prompt_update","approved_for_learning","rejected","archived"].map((o) => <option key={o} value={o}>{st(o)}</option>)}
                   </select>
                   <select value={trainingFilter.expected_case_type} onChange={(e) => setTrainingFilter((f) => ({ ...f, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
-                    <option value="all">Все типы кейсов</option>
-                    <option value="anxiety">anxiety</option><option value="sleep">sleep</option><option value="depression_like">depression_like</option><option value="grief">grief</option><option value="trauma">trauma</option><option value="body_tension">body_tension</option><option value="adhd_like">adhd_like</option><option value="substance">substance</option><option value="alcohol">alcohol</option><option value="bipolar_red_flags">bipolar_red_flags</option><option value="psychosis_red_flags">psychosis_red_flags</option><option value="acute_psychosis">acute_psychosis</option><option value="suicide_risk">suicide_risk</option><option value="self_harm_risk">self_harm_risk</option><option value="medication_issue">medication_issue</option><option value="mixed">mixed</option><option value="other">other</option>
+                    <option value="all">Все типы случаев</option>
+                    {["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}
                   </select>
                   <select value={trainingFilter.session_kind} onChange={(e) => setTrainingFilter((f) => ({ ...f, session_kind: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
                     <option value="all">Все типы сессий</option>
-                    <option value="initial">initial</option><option value="follow_up">follow_up</option><option value="diary_check">diary_check</option><option value="support_toolkit_check">support_toolkit_check</option><option value="crisis_check">crisis_check</option><option value="doctor_review">doctor_review</option><option value="other">other</option>
+                    {["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}
                   </select>
                   <input value={trainingFilter.public_code} onChange={(e) => setTrainingFilter((f) => ({ ...f, public_code: e.target.value }))} placeholder="Код ТОЧКА-XXXX-XXXX" style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, outline: "none", width: 200 }} />
                   <button onClick={() => loadTrainingSessions()} style={{ border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg, color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
@@ -2324,14 +2362,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
                       <input placeholder="Код пациента" value={trainingNewRow.public_code || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, public_code: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
                       <select value={trainingNewRow.session_kind || "initial"} onChange={(e) => setTrainingNewRow((r) => ({ ...r, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
-                        <option value="initial">initial</option><option value="follow_up">follow_up</option><option value="diary_check">diary_check</option><option value="support_toolkit_check">support_toolkit_check</option><option value="crisis_check">crisis_check</option><option value="doctor_review">doctor_review</option><option value="other">other</option>
+                        {["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}
                       </select>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-                      <input placeholder="Сценарий" value={trainingNewRow.scenario_played || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
+                      <input placeholder="Что играем в этой сессии?" value={trainingNewRow.scenario_played || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
                       <select value={trainingNewRow.expected_case_type || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
-                        <option value="">Тип кейса</option>
-                        <option value="anxiety">anxiety</option><option value="sleep">sleep</option><option value="depression_like">depression_like</option><option value="grief">grief</option><option value="trauma">trauma</option><option value="body_tension">body_tension</option><option value="adhd_like">adhd_like</option><option value="substance">substance</option><option value="alcohol">alcohol</option><option value="bipolar_red_flags">bipolar_red_flags</option><option value="psychosis_red_flags">psychosis_red_flags</option><option value="acute_psychosis">acute_psychosis</option><option value="suicide_risk">suicide_risk</option><option value="self_harm_risk">self_harm_risk</option><option value="medication_issue">medication_issue</option><option value="mixed">mixed</option><option value="other">other</option>
+                        <option value="">Ожидаемый тип случая</option>
+                        {["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}
                       </select>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
@@ -2356,7 +2394,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1400 }}>
                       <thead>
                         <tr style={{ background: t.tabBg }}>
-                          {["Дата","Код","#","Тип сессии","Эксперт","Сценарий","Ожидаемый тип","AI тип","Детекция 1-5","Модель","Fallback","Вопросы 1-5","Отчёт 1-5","Safety 1-5","Язык 1-5","Toolkit 1-5","Продолж. 1-5","Повторы","Риски","Рекомендация","Контекст","Статус","Вывод","Проблема","Комментарий","Действие","Продолж."].map((h) => (
+                          {["Дата","Код пациента","Номер сессии","Тип сессии","Эксперт","Сценарий","Ожидаемый тип случая","Что распознала система","Качество распознавания","Модель","Fallback","Вопросы","Отчёт","Safety","Язык","Практики","Продолжение","Повторы","Риски","Рекомендация","Контекст","Статус","Краткий вывод","Проблема","Комментарий","Действие","Продолж."].map((h) => (
                             <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontWeight: 700, color: t.muted, borderBottom: `1px solid ${t.border}`, whiteSpace: "nowrap" }}>{h}</th>
                           ))}
                           <th style={{ padding: "8px 6px", borderBottom: `1px solid ${t.border}`, width: 80 }}></th>
@@ -2372,15 +2410,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                               <td style={{ padding: "6px", fontWeight: 700, color: t.accent, fontSize: 12, whiteSpace: "nowrap" }}>{s.public_code || "—"}</td>
                               <td style={{ padding: "6px", color: t.text }}>{s.session_sequence ?? ""}</td>
                               <td style={{ padding: "6px" }}>{isEditing
-                                ? <select value={ed.session_kind || s.session_kind || "initial"} onChange={(e) => setTrainingEditData((d) => ({ ...d, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
-                                : <span style={{ color: t.text }}>{s.session_kind || ""}</span>}</td>
+                                ? <select value={ed.session_kind || s.session_kind || "initial"} onChange={(e) => setTrainingEditData((d) => ({ ...d, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}</select>
+                                : <span style={{ color: t.text }}>{sk(s.session_kind) || ""}</span>}</td>
                               <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.expert_name || (s.expert_role ? s.expert_role : "") || "—"}</td>
                               <td style={{ padding: "6px" }}>{isEditing
                                 ? <input value={ed.scenario_played ?? s.scenario_played ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
                                 : <span style={{ color: t.text }}>{s.scenario_played || ""}</span>}</td>
                               <td style={{ padding: "6px" }}>{isEditing
-                                ? <select value={ed.expected_case_type ?? s.expected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}><option value="">—</option>{["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
-                                : <span style={{ color: t.text }}>{s.expected_case_type || ""}</span>}</td>
+                                ? <select value={ed.expected_case_type ?? s.expected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}><option value="">—</option>{["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}</select>
+                                : <span style={{ color: t.text }}>{ct(s.expected_case_type) || ""}</span>}</td>
                               <td style={{ padding: "6px" }}>{isEditing
                                 ? <input value={ed.ai_detected_case_type ?? s.ai_detected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, ai_detected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 80 }} />
                                 : <span style={{ color: t.text }}>{s.ai_detected_case_type || ""}</span>}</td>
@@ -2412,12 +2450,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                               <td style={{ padding: "6px", color: s.wrong_recommendation ? t.error : t.muted, fontSize: 11 }}>{s.wrong_recommendation ? "Да" : "—"}</td>
                               <td style={{ padding: "6px", color: s.remembered_context ? t.success : t.muted, fontSize: 11 }}>{s.remembered_context ? "Да" : "—"}</td>
                               <td style={{ padding: "6px" }}>{isEditing
-                                ? <select value={ed.status ?? s.status ?? "new"} onChange={(e) => setTrainingEditData((d) => ({ ...d, status: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["new","reviewed","needs_prompt_update","approved_for_learning","rejected","archived"].map((o) => <option key={o} value={o}>{o}</option>)}</select>
+                                ? <select value={ed.status ?? s.status ?? "new"} onChange={(e) => setTrainingEditData((d) => ({ ...d, status: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["new","reviewed","needs_prompt_update","approved_for_learning","rejected","archived"].map((o) => <option key={o} value={o}>{st(o)}</option>)}</select>
                                 : <span style={{
                                     fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
                                     background: s.status === "approved_for_learning" ? t.badgeClosed : s.status === "rejected" ? t.badgeNew : s.status === "reviewed" ? t.badgeInProgress : t.badgePending,
                                     color: s.status === "approved_for_learning" ? t.badgeClosedText : s.status === "rejected" ? t.badgeNewText : s.status === "reviewed" ? t.badgeInProgressText : t.badgePendingText,
-                                  }}>{s.status || "new"}</span>}</td>
+                                  }}>{st(s.status) || "Новый"}</span>}</td>
                               <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
                                 ? <input value={ed.short_summary ?? s.short_summary ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, short_summary: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
                                 : <span style={{ color: t.text, fontSize: 11 }}>{s.short_summary || ""}</span>}</td>
@@ -2663,14 +2701,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
                               <input placeholder="Код пациента" value={trainingFormData.public_code || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, public_code: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
                               <select value={trainingFormData.session_kind || "initial"} onChange={(e) => setTrainingFormData((d) => ({ ...d, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
-                                <option value="initial">initial</option><option value="follow_up">follow_up</option><option value="diary_check">diary_check</option><option value="support_toolkit_check">support_toolkit_check</option><option value="crisis_check">crisis_check</option><option value="doctor_review">doctor_review</option><option value="other">other</option>
+                                {["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}
                               </select>
                             </div>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-                              <input placeholder="Сценарий" value={trainingFormData.scenario_played || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
+                              <input placeholder="Что играем в этой сессии?" value={trainingFormData.scenario_played || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
                               <select value={trainingFormData.expected_case_type || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
-                                <option value="">Тип кейса</option>
-                                {["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{o}</option>)}
+                                <option value="">Ожидаемый тип случая</option>
+                                {["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}
                               </select>
                             </div>
                             <textarea value={trainingFormData.expert_comment || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, expert_comment: e.target.value }))} placeholder="Комментарий эксперта" style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", width: "100%", minHeight: 40, marginBottom: 10, resize: "vertical" }} />

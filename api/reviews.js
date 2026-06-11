@@ -812,16 +812,63 @@ async function handleExportTrainingCsv(req, res) {
       return res.status(500).json({ ok: false, error: "Failed to fetch for CSV", details: error.message });
     }
 
-    const headers = [
-      "id", "created_at", "public_code", "session_sequence", "session_kind",
-      "follow_up_after_days", "expert_name", "expert_role",
-      "scenario_played", "expected_case_type", "ai_detected_case_type",
-      "ai_detected_secondary_types", "detection_quality", "model_used", "fallback_used",
-      "questions_quality", "report_quality", "safety_quality", "language_quality",
-      "support_toolkit_quality", "continuation_quality",
-      "repeated_questions", "missed_risk_flags", "wrong_recommendation", "remembered_context",
-      "status", "short_summary", "main_problem", "expert_comment", "action_needed",
-      "classification_comment", "continuation_comment", "approved_for_learning",
+    const SESSION_KIND_LABELS = {
+      initial: "Первичная сессия",
+      follow_up: "Повторная сессия",
+      diary_check: "Проверка дневника",
+      support_toolkit_check: "Проверка практик",
+      crisis_check: "Срочное обращение",
+      doctor_review: "Врачебный разбор",
+      other: "Другое",
+    };
+    const CASE_TYPE_LABELS = {
+      anxiety: "Тревога", sleep: "Сон", depression_like: "Депрессивные признаки",
+      grief: "Утрата / горе", trauma: "Травматический опыт", body_tension: "Телесное напряжение",
+      adhd_like: "Нарушение внимания / исполнительные функции", substance: "ПАВ / вещества",
+      alcohol: "Алкоголь", bipolar_red_flags: "Биполярные красные флаги",
+      psychosis_red_flags: "Психотические красные флаги", acute_psychosis: "Острый психоз",
+      suicide_risk: "Суицидальный риск", self_harm_risk: "Риск самоповреждения",
+      medication_issue: "Вопросы лекарств", mixed: "Смешанный случай", other: "Другое",
+    };
+    const STATUS_LABELS = {
+      new: "Новый", reviewed: "Просмотрен", needs_prompt_update: "Нужно обновить промпт",
+      approved_for_learning: "Одобрен для обучения", rejected: "Отклонён", archived: "Архив",
+    };
+
+    const csvColumns = [
+      { key: "id", label: "ID" },
+      { key: "created_at", label: "Дата создания" },
+      { key: "public_code", label: "Код пациента" },
+      { key: "session_sequence", label: "Номер сессии" },
+      { key: "session_kind", label: "Тип сессии" },
+      { key: "follow_up_after_days", label: "Дней до повторной" },
+      { key: "expert_name", label: "Имя эксперта" },
+      { key: "expert_role", label: "Роль эксперта" },
+      { key: "scenario_played", label: "Сценарий" },
+      { key: "expected_case_type", label: "Ожидаемый тип случая" },
+      { key: "ai_detected_case_type", label: "Что распознала система" },
+      { key: "ai_detected_secondary_types", label: "Вторичные признаки" },
+      { key: "detection_quality", label: "Качество распознавания" },
+      { key: "model_used", label: "Модель" },
+      { key: "fallback_used", label: "Fallback" },
+      { key: "questions_quality", label: "Вопросы" },
+      { key: "report_quality", label: "Отчёт" },
+      { key: "safety_quality", label: "Safety" },
+      { key: "language_quality", label: "Язык" },
+      { key: "support_toolkit_quality", label: "Практики" },
+      { key: "continuation_quality", label: "Продолжение" },
+      { key: "repeated_questions", label: "Повторы" },
+      { key: "missed_risk_flags", label: "Пропущены риски" },
+      { key: "wrong_recommendation", label: "Неверная рекомендация" },
+      { key: "remembered_context", label: "Учла контекст" },
+      { key: "status", label: "Статус" },
+      { key: "short_summary", label: "Краткий вывод" },
+      { key: "main_problem", label: "Основная проблема" },
+      { key: "expert_comment", label: "Комментарий эксперта" },
+      { key: "action_needed", label: "Что исправить" },
+      { key: "classification_comment", label: "Комментарий по классификации" },
+      { key: "continuation_comment", label: "Комментарий по продолжению" },
+      { key: "approved_for_learning", label: "Одобрен для обучения" },
     ];
 
     const csvEscape = (v) => {
@@ -833,12 +880,16 @@ async function handleExportTrainingCsv(req, res) {
       return s;
     };
 
-    const lines = [headers.join(",")];
+    const headerLine = csvColumns.map((c) => c.label).join(",");
+    const lines = [headerLine];
     for (const row of data || []) {
-      const vals = headers.map((h) => {
-        const v = row[h];
-        if (h === "ai_detected_secondary_types" && Array.isArray(v)) return v.join("; ");
-        if (h === "fallback_used" || h === "repeated_questions" || h === "missed_risk_flags" || h === "wrong_recommendation" || h === "remembered_context" || h === "approved_for_learning") return v ? "1" : "0";
+      const vals = csvColumns.map((c) => {
+        let v = row[c.key];
+        if (c.key === "session_kind") v = SESSION_KIND_LABELS[v] || v;
+        if (c.key === "expected_case_type" || c.key === "ai_detected_case_type") v = CASE_TYPE_LABELS[v] || v;
+        if (c.key === "status") v = STATUS_LABELS[v] || v;
+        if (c.key === "ai_detected_secondary_types" && Array.isArray(v)) return v.map((t) => CASE_TYPE_LABELS[t] || t).join("; ");
+        if (["fallback_used","repeated_questions","missed_risk_flags","wrong_recommendation","remembered_context","approved_for_learning"].includes(c.key)) return v ? "1" : "0";
         return csvEscape(v);
       });
       lines.push(vals.join(","));
