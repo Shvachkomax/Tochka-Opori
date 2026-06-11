@@ -1,38 +1,5 @@
 import React, { useRef, useState } from "react";
 
-function LogoMark({ size = 44 }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 48 48"
-      fill="none"
-      aria-label="Точка опоры"
-      style={{ display: "block", flexShrink: 0 }}
-    >
-      {/* Bowl / support — широкая устойчивая чаша */}
-      <path d="M4 26 C4 44 44 44 44 26 C44 28 4 28 4 26 Z" fill="#6F8F7B" />
-      {/* Bowl inner depth */}
-      <path d="M7 28 C7 42 41 42 41 28 C41 29 7 29 7 28 Z" fill="#5A7E68" fillOpacity="0.2" />
-      {/* Bowl rim accent */}
-      <path d="M4 26 C4 28 44 28 44 26" fill="none" stroke="#8AAB91" strokeWidth="1" strokeOpacity="0.5" />
-      {/* Amorphous state — soft outer halo, опирается на чашу */}
-      <path d="M24 4 C10 4 4 14 5 22 C6 28 12 33 24 32 C36 33 42 28 43 22 C44 14 38 4 24 4 Z" fill="#A9B8A5" fillOpacity="0.15" />
-      {/* Main form */}
-      <path d="M24 8 C14 8 8 16 9 22 C10 27 16 31 24 30 C32 31 38 27 39 22 C40 16 34 8 24 8 Z" fill="#A9B8A5" fillOpacity="0.3" />
-      {/* Dense core */}
-      <path d="M24 14 C16 14 12 19 13 24 C14 28 18 31 24 30 C30 31 34 28 35 24 C36 19 32 14 24 14 Z" fill="#A9B8A5" fillOpacity="0.5" />
-      {/* Scatter dots — фрагменты / рассеянные мысли */}
-      <circle cx="14" cy="9" r="1.5" fill="#C9D1C2" fillOpacity="0.6" />
-      <circle cx="36" cy="11" r="1.3" fill="#C9D1C2" fillOpacity="0.5" />
-      <circle cx="28" cy="3" r="1.1" fill="#C9D1C2" fillOpacity="0.4" />
-      <circle cx="20" cy="4" r="1" fill="#C9D1C2" fillOpacity="0.45" />
-      <circle cx="39" cy="18" r="0.9" fill="#C9D1C2" fillOpacity="0.35" />
-      <circle cx="10" cy="17" r="0.8" fill="#C9D1C2" fillOpacity="0.35" />
-    </svg>
-  );
-}
-
 export default function App() {
   const [mode, setMode] = useState("text");
   const [text, setText] = useState("");
@@ -2831,8 +2798,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     overflow-x: hidden;
   }
 
-  @media (max-width: 768px) {
-    .app-page {
+    .app-logo {
+      height: 48px;
+      width: auto;
+    }
+    @media (max-width: 768px) {
+      .app-logo {
+        height: 36px;
+      }
+    }
+    @media (max-width: 768px) {
+      .app-page {
       padding: 18px !important;
     }
 
@@ -2912,7 +2888,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           <div style={s.wrap}>
         <header style={s.header} className="app-header">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <LogoMark size={40} />
+            <img
+              src="/logo-tochka-opory-header.png"
+              alt="Точка опоры"
+              className="app-logo"
+              style={{ display: "block", flexShrink: 0, objectFit: "contain", height: 48, width: "auto" }}
+            />
             <div>
               <div style={s.logo}>Точка опоры</div>
               <div style={s.sub}>Анонимно. Безопасно. Можно просто поговорить.</div>
