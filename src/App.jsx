@@ -2799,12 +2799,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 
     .app-logo {
-      height: 48px;
+      height: 96px;
       width: auto;
     }
     @media (max-width: 768px) {
       .app-logo {
-        height: 36px;
+        height: 72px;
       }
     }
     @media (max-width: 768px) {
@@ -2892,7 +2892,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               src="/logo-tochka-opory-header.png"
               alt="Точка опоры"
               className="app-logo"
-              style={{ display: "block", flexShrink: 0, objectFit: "contain", height: 48, width: "auto" }}
+              style={{ display: "block", flexShrink: 0, objectFit: "contain", height: 96, width: "auto" }}
             />
             <div>
               <div style={s.logo}>Точка опоры</div>
