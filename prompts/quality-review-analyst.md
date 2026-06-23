@@ -40,4 +40,64 @@
 Не изменяй код и промпты.
 Подготовь только предложения для рассмотрения человеком.
 
-Ответь строгим JSON строго по указанной схеме. Не добавляй пояснений вне JSON.
+Ответь строгим JSON строго по этой схеме, ничего кроме JSON:
+
+{
+  "summary": "Краткий общий вывод по всей группе кейсов (обычный текст, не объект)",
+  "strengths": [
+    {
+      "title": "Что работает хорошо",
+      "case_count": 5,
+      "description": "Описание"
+    }
+  ],
+  "recurring_problems": [
+    {
+      "title": "Название проблемы",
+      "case_count": 4,
+      "severity": "medium",
+      "description": "Описание",
+      "example_review_ids": ["uuid"]
+    }
+  ],
+  "safety_findings": [
+    {
+      "title": "Проблема безопасности",
+      "case_count": 2,
+      "description": "Описание"
+    }
+  ],
+  "language_findings": [
+    {
+      "title": "Языковая проблема",
+      "description": "Описание"
+    }
+  ],
+  "missed_domains": [
+    {
+      "title": "Пропущенный домен",
+      "case_count": 3,
+      "description": "Описание"
+    }
+  ],
+  "recommendations": [
+    {
+      "title": "Что предлагается изменить",
+      "priority": "high",
+      "reason": "Почему",
+      "case_count": 4,
+      "description": "Детали",
+      "suggested_change": "Конкретное изменение",
+      "target_file": "prompts/triage-system.md",
+      "risk_of_change": "Возможный риск",
+      "requires_human_review": true
+    }
+  ],
+  "regression_tests": [
+    {
+      "scenario": "Описание сценария",
+      "expected_behavior": "Ожидаемое поведение"
+    }
+  ],
+  "risk_of_changes": "Общая оценка рисков изменений (текст)"
+}

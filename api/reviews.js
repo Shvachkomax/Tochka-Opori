@@ -1096,7 +1096,7 @@ async function handleGenerateQualityInsight(req, res) {
       date_to: dateTo,
       model_used: result.model_used,
       fallback_used: result.fallback_used || false,
-      summary: parsed.summary || null,
+      summary: typeof parsed.summary === "string" ? parsed.summary : (parsed.summary?.overall_observations?.join(". ") || parsed.summary?.scope_note || JSON.stringify(parsed.summary) || null),
       strengths: parsed.strengths || [],
       recurring_problems: parsed.recurring_problems || [],
       safety_findings: parsed.safety_findings || [],
