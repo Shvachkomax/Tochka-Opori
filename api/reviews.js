@@ -1,6 +1,8 @@
 import { getSupabase } from "../lib/supabase.js";
 import { createClient } from "@supabase/supabase-js";
-import { maskSensitiveData, getPrivacySafeMode } from "../lib/sanitize.js";
+import { maskSensitiveData, getPrivacySafeMode, maskText } from "../lib/sanitize.js";
+import { runTextAnalysis } from "../lib/aiClient.js";
+import { readFileSync, existsSync } from "node:fs";
 
 const ALLOWED_STATUSES = ["pending", "approved", "rejected", "needs_review", "local_auto_saved"];
 const TRAINING_STATUSES = ["new", "reviewed", "needs_prompt_update", "approved_for_learning", "rejected", "archived"];
@@ -52,6 +54,16 @@ export default async function handler(req, res) {
         return await handleCreateTrainingFromReview(req, res);
       case "exportTrainingCsv":
         return await handleExportTrainingCsv(req, res);
+      case "getQualityAnalysisStats":
+        return await handleGetQualityAnalysisStats(req, res);
+      case "generateQualityInsight":
+        return await handleGenerateQualityInsight(req, res);
+      case "listQualityInsights":
+        return await handleListQualityInsights(req, res);
+      case "getQualityInsight":
+        return await handleGetQualityInsight(req, res);
+      case "updateQualityInsightStatus":
+        return await handleUpdateQualityInsightStatus(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -901,5 +913,402 @@ async function handleExportTrainingCsv(req, res) {
     return res.status(200).send("\uFEFF" + lines.join("\n"));
   } catch (error) {
     return res.status(500).json({ ok: false, error: "Fatal exportTrainingCsv error", details: error?.message || String(error) });
+  }
+}
+
+async function handleGetQualityAnalysisStats(req, res) {
+  try {
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { data: lastInsight } = await supabase
+      .from("quality_review_insights")
+      .select("created_at, review_count, review_ids")
+      .eq("analysis_type", "new_approved")
+      .in("status", ["new", "under_review", "accepted", "partially_accepted"])
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    const lastAnalysis = lastInsight && lastInsight.length > 0 ? lastInsight[0] : null;
+
+    let query = supabase
+      .from("case_reviews")
+      .select("id", { count: "exact", head: false })
+      .filter("json_data->>status", "eq", "approved")
+      .filter("json_data->>approved_for_training", "eq", "true")
+      .is("quality_analysis_id", null);
+
+    const { data: newReviews, error: countError, count } = await query;
+
+    if (countError) {
+      return res.status(500).json({ ok: false, error: "Failed to count reviews", details: countError.message });
+    }
+
+    const newCount = count || (newReviews ? newReviews.length : 0);
+    const reviewIds = (newReviews || []).map((r) => r.id);
+
+    return res.status(200).json({
+      ok: true,
+      new_approved_count: newCount,
+      unanalyzed_review_ids: reviewIds,
+      last_analysis_at: lastAnalysis?.created_at || null,
+      last_analysis_review_count: lastAnalysis?.review_count || 0,
+      recommended_to_analyze: newCount >= 10,
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal getQualityAnalysisStats error", details: error?.message || String(error) });
+  }
+}
+
+async function handleGenerateQualityInsight(req, res) {
+  try {
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { analysis_type, review_ids: selectedIds, admin_secret } = req.body || {};
+    const mode = analysis_type || "new_approved";
+
+    let targetReviewIds = [];
+
+    if (mode === "selected" && Array.isArray(selectedIds) && selectedIds.length > 0) {
+      targetReviewIds = selectedIds;
+    } else {
+      const { data: newReviews } = await supabase
+        .from("case_reviews")
+        .select("id")
+        .filter("json_data->>status", "eq", "approved")
+        .filter("json_data->>approved_for_training", "eq", "true")
+        .is("quality_analysis_id", null)
+        .order("created_at", { ascending: true })
+        .limit(30);
+
+      targetReviewIds = (newReviews || []).map((r) => r.id);
+    }
+
+    if (targetReviewIds.length === 0) {
+      return res.status(200).json({ ok: false, error: "Нет кейсов для анализа" });
+    }
+
+    const { data: reviews, error: fetchError } = await supabase
+      .from("case_reviews")
+      .select("*")
+      .in("id", targetReviewIds);
+
+    if (fetchError) {
+      return res.status(500).json({ ok: false, error: "Failed to fetch reviews", details: fetchError.message });
+    }
+
+    const privacy = getPrivacySafeMode();
+
+    const preparedCases = (reviews || []).map((review) => {
+      const json = review.json_data || {};
+      if (privacy) {
+        json.patient_input = maskText(json.patient_input || "");
+        json.patient_text = maskText(json.patient_text || "");
+        json.input = maskText(json.input || "");
+        json.user_report = maskText(json.user_report || "");
+        json.doctor_report = maskText(json.doctor_report || "");
+      }
+      return {
+        review_id: review.id,
+        public_code: review.public_code || json.public_code || json.publicCode || null,
+        case_type: json.ai_detected_case_type || json.aiDiagnosis || null,
+        scenario_played: json.scenario_played || null,
+        questions: json.questions ? json.questions.slice(0, 30) : [],
+        answers: json.answers ? Object.entries(json.answers).slice(0, 30).map(([k, v]) => ({ q: k, a: typeof v === "string" ? v.slice(0, 300) : JSON.stringify(v).slice(0, 300) })) : [],
+        patient_report: (json.user_report || "").slice(0, 2000),
+        doctor_report: (json.doctor_report || "").slice(0, 2000),
+        expert_assessment: json.expert_assessment || json.doctor_feedback?.expert_assessment || null,
+        doctor_correction: json.doctor_feedback?.corrected_user_report ? {
+          corrected_user_report: (json.doctor_feedback.corrected_user_report || "").slice(0, 1000),
+          corrected_doctor_report: (json.doctor_feedback.corrected_doctor_report || "").slice(0, 1000),
+          wrong_questions: json.doctor_feedback.wrong_questions || null,
+          missing_questions: json.doctor_feedback.missing_questions || null,
+        } : null,
+        quality_scores: {
+          questions: json.doctor_feedback?.questions_quality || null,
+          report: json.doctor_feedback?.report_quality || null,
+          safety: json.doctor_feedback?.safety_quality || null,
+          language: json.doctor_feedback?.language_quality || null,
+        },
+        model_used: json.model_used || json.model || null,
+        is_follow_up: json.isContinuation || json.is_follow_up || false,
+      };
+    });
+
+    const systemPrompt = readSystemPrompt();
+    const userPrompt = JSON.stringify(preparedCases, null, 2);
+
+    const qualityModel = process.env.AI_MODEL_QUALITY_REVIEW || process.env.AI_MODEL_REPORT || process.env.AI_MODEL_TRIAGE || "gpt-5.5";
+    const qualityFallback = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
+    const reasoningEffort = process.env.AI_QUALITY_REASONING_EFFORT || "medium";
+
+    let result;
+    try {
+      result = await runTextAnalysis({
+        systemPrompt,
+        userPrompt,
+        model: qualityModel,
+        fallbackModel: qualityFallback,
+        reasoningEffort,
+      });
+    } catch (aiError) {
+      console.log("Quality insight AI error", { message: aiError?.message, code: aiError?.code });
+      return res.status(500).json({
+        ok: false,
+        error: "Ошибка AI-анализа: " + (aiError?.message || "неизвестная ошибка"),
+        technical: aiError?.code || null,
+      });
+    }
+
+    if (!result || !result.parsed) {
+      console.log("Quality insight AI returned unparseable response", { raw: result?.raw?.slice(0, 200) });
+      return res.status(500).json({
+        ok: false,
+        error: "AI вернул невалидный ответ. Кейсы не отмечены как проанализированные. Попробуйте снова.",
+      });
+    }
+
+    const parsed = result.parsed;
+    const dateFrom = (reviews || []).length > 0 ? reviews.reduce((a, b) => a.created_at < b.created_at ? a : b).created_at : null;
+    const dateTo = (reviews || []).length > 0 ? reviews.reduce((a, b) => a.created_at > b.created_at ? a : b).created_at : null;
+
+    const insightPayload = {
+      analysis_type: mode,
+      status: "new",
+      review_count: targetReviewIds.length,
+      review_ids: targetReviewIds,
+      date_from: dateFrom,
+      date_to: dateTo,
+      model_used: result.model_used,
+      fallback_used: result.fallback_used || false,
+      summary: parsed.summary || null,
+      strengths: parsed.strengths || [],
+      recurring_problems: parsed.recurring_problems || [],
+      safety_findings: parsed.safety_findings || [],
+      language_findings: parsed.language_findings || [],
+      missed_domains: parsed.missed_domains || [],
+      recommendations: parsed.recommendations || [],
+      proposed_prompt_changes: parsed.proposed_prompt_changes || [],
+      proposed_logic_changes: parsed.proposed_logic_changes || [],
+      regression_tests: parsed.regression_tests || [],
+      risk_of_changes: parsed.risk_of_changes || null,
+    };
+
+    const { data: insight, error: insertError } = await supabase
+      .from("quality_review_insights")
+      .insert(insightPayload)
+      .select()
+      .single();
+
+    if (insertError) {
+      console.log("Quality insight insert error", { message: insertError.message });
+      return res.status(500).json({
+        ok: false,
+        error: "Не удалось сохранить обзор. Кейсы не отмечены как проанализированные. Попробуйте снова.",
+        details: insertError.message,
+      });
+    }
+
+    const insightId = insight.id;
+
+    for (const reviewId of targetReviewIds) {
+      const { error: updateError } = await supabase
+        .from("case_reviews")
+        .update({
+          quality_analysis_id: insightId,
+          quality_analyzed_at: new Date().toISOString(),
+        })
+        .eq("id", reviewId);
+
+      if (updateError) {
+        console.log("Failed to update review quality_analysis_id", { reviewId, error: updateError.message });
+      }
+    }
+
+    console.log("Quality insight generation", {
+      reviewCount: targetReviewIds.length,
+      modelUsed: result.model_used,
+      fallbackUsed: result.fallback_used || false,
+      analysisType: mode,
+      insightId,
+    });
+
+    return res.status(200).json({
+      ok: true,
+      insight_id: insightId,
+      review_count: targetReviewIds.length,
+      model_used: result.model_used,
+      fallback_used: result.fallback_used || false,
+      message: `Обзор создан: ${targetReviewIds.length} кейсов, модель ${result.model_used}`,
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal generateQualityInsight error", details: error?.message || String(error) });
+  }
+}
+
+function readSystemPrompt() {
+  try {
+    const promptPath = new URL("../prompts/quality-review-analyst.md", import.meta.url);
+    if (existsSync(promptPath)) {
+      return readFileSync(promptPath, "utf-8");
+    }
+    const fs = existsSync;
+    const altPath = "./prompts/quality-review-analyst.md";
+    if (existsSync(altPath)) {
+      return readFileSync(altPath, "utf-8");
+    }
+  } catch {}
+  return "Ты анализируешь группу экспертно проверенных диалогов сервиса психического triage «Точка опоры». Ответь строгим JSON.";
+}
+
+async function handleListQualityInsights(req, res) {
+  try {
+    const { isAdmin, expertId } = authorizeExpert(req);
+    if (!isAdmin && !expertId) {
+      return res.status(401).json({ ok: false, error: "Access denied" });
+    }
+
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    let query = supabase
+      .from("quality_review_insights")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!isAdmin && expertId) {
+      query = query.eq("created_by_expert_id", expertId);
+    }
+
+    const { data, error } = await query.limit(50);
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: "Failed to load insights", details: error.message });
+    }
+
+    return res.status(200).json({ ok: true, insights: data || [], count: Array.isArray(data) ? data.length : 0 });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal listQualityInsights error", details: error?.message || String(error) });
+  }
+}
+
+async function handleGetQualityInsight(req, res) {
+  try {
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { insight_id } = req.body || {};
+    if (!insight_id) {
+      return res.status(400).json({ ok: false, error: "Missing insight_id" });
+    }
+
+    const { data, error } = await supabase
+      .from("quality_review_insights")
+      .select("*")
+      .eq("id", insight_id)
+      .single();
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: "Failed to load insight", details: error.message });
+    }
+
+    if (!data) {
+      return res.status(404).json({ ok: false, error: "Insight not found" });
+    }
+
+    return res.status(200).json({ ok: true, insight: data });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal getQualityInsight error", details: error?.message || String(error) });
+  }
+}
+
+async function handleUpdateQualityInsightStatus(req, res) {
+  try {
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { insight_id, status, admin_comment } = req.body || {};
+    if (!insight_id) {
+      return res.status(400).json({ ok: false, error: "Missing insight_id" });
+    }
+
+    const allowedStatuses = ["new", "under_review", "accepted", "partially_accepted", "rejected", "archived"];
+    if (!status || !allowedStatuses.includes(status)) {
+      return res.status(400).json({ ok: false, error: "Invalid status" });
+    }
+
+    const updates = { status, updated_at: new Date().toISOString() };
+    if (admin_comment !== undefined) {
+      updates.admin_comment = admin_comment;
+    }
+
+    if (status === "under_review") {
+      updates.reviewed_at = new Date().toISOString();
+    }
+    if (status === "accepted" || status === "partially_accepted") {
+      updates.accepted_at = new Date().toISOString();
+    }
+    if (status === "rejected") {
+      updates.rejected_at = new Date().toISOString();
+    }
+
+    const { data, error } = await supabase
+      .from("quality_review_insights")
+      .update(updates)
+      .eq("id", insight_id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: "Failed to update insight status", details: error.message });
+    }
+
+    const statusLabels = {
+      new: "Новый",
+      under_review: "Рассматривается",
+      accepted: "Принят к работе",
+      partially_accepted: "Принят частично",
+      rejected: "Отклонён",
+      archived: "Архив",
+    };
+
+    return res.status(200).json({
+      ok: true,
+      insight: data,
+      message: `Статус обновлён: ${statusLabels[status] || status}`,
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal updateQualityInsightStatus error", details: error?.message || String(error) });
   }
 }

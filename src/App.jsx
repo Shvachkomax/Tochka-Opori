@@ -215,6 +215,31 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [trainingFormData, setTrainingFormData] = useState({ scenario_played: "", expected_case_type: "", session_kind: "initial", expert_comment: "", public_code: "" });
   const [trainingFormPublicCodeAuto, setTrainingFormPublicCodeAuto] = useState(false);
 
+  // Quality insight state
+  const [qualityInsights, setQualityInsights] = useState([]);
+  const [qualityStats, setQualityStats] = useState({ new_approved_count: 0, last_analysis_at: null, recommended_to_analyze: false });
+  const [qualityLoading, setQualityLoading] = useState(false);
+  const [qualityGenerating, setQualityGenerating] = useState(false);
+  const [qualitySelectedReviewIds, setQualitySelectedReviewIds] = useState([]);
+  const [qualityConfirmOpen, setQualityConfirmOpen] = useState(false);
+  const [qualityDetailInsight, setQualityDetailInsight] = useState(null);
+
+  const QUALITY_STATUS_LABELS = {
+    new: "Новый",
+    under_review: "Рассматривается",
+    accepted: "Принят к работе",
+    partially_accepted: "Принят частично",
+    rejected: "Отклонён",
+    archived: "Архив",
+  };
+
+  const QUALITY_SEVERITY_LABELS = {
+    low: "Низкий",
+    medium: "Средний",
+    high: "Высокий",
+    critical: "Критический",
+  };
+
   const SESSION_KIND_LABELS = {
     initial: "Первичная сессия",
     follow_up: "Повторная сессия",
@@ -1310,6 +1335,173 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }
 
+  async function loadQualityStats() {
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getQualityAnalysisStats", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setQualityStats({
+          new_approved_count: data.new_approved_count || 0,
+          unanalyzed_review_ids: data.unanalyzed_review_ids || [],
+          last_analysis_at: data.last_analysis_at || null,
+          last_analysis_review_count: data.last_analysis_review_count || 0,
+          recommended_to_analyze: data.recommended_to_analyze || false,
+        });
+      }
+    } catch {
+      showToast("Ошибка загрузки статистики", "error");
+    }
+  }
+
+  async function loadQualityInsights() {
+    setQualityLoading(true);
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listQualityInsights", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setQualityInsights(data.insights || []);
+      } else {
+        showToast(data.error || "Ошибка загрузки обзоров", "error");
+      }
+    } catch {
+      showToast("Ошибка загрузки обзоров", "error");
+    } finally {
+      setQualityLoading(false);
+    }
+  }
+
+  async function generateQualityInsight() {
+    setQualityGenerating(true);
+    setQualityConfirmOpen(false);
+    try {
+      const body = {
+        action: "generateQualityInsight",
+        admin_secret: adminPassword,
+        analysis_type: qualitySelectedReviewIds.length > 0 ? "selected" : "new_approved",
+      };
+      if (qualitySelectedReviewIds.length > 0) {
+        body.review_ids = qualitySelectedReviewIds;
+      }
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Обзор создан");
+        setQualitySelectedReviewIds([]);
+        await loadQualityStats();
+        await loadQualityInsights();
+      } else {
+        showToast(data.error || "Ошибка создания обзора", "error");
+      }
+    } catch {
+      showToast("Ошибка создания обзора", "error");
+    } finally {
+      setQualityGenerating(false);
+    }
+  }
+
+  async function loadQualityInsightDetail(insightId) {
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getQualityInsight", admin_secret: adminPassword, insight_id: insightId }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setQualityDetailInsight(data.insight);
+      } else {
+        showToast(data.error || "Ошибка загрузки обзора", "error");
+      }
+    } catch {
+      showToast("Ошибка загрузки обзора", "error");
+    }
+  }
+
+  async function updateQualityInsightStatus(insightId, status) {
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateQualityInsightStatus", admin_secret: adminPassword, insight_id: insightId, status }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Статус обновлён");
+        setQualityInsights((prev) => prev.map((i) => i.id === insightId ? { ...i, status } : i));
+        if (qualityDetailInsight && qualityDetailInsight.id === insightId) {
+          setQualityDetailInsight((prev) => ({ ...prev, status }));
+        }
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка обновления статуса", "error");
+    }
+  }
+
+  function toggleReviewSelection(reviewId) {
+    setQualitySelectedReviewIds((prev) =>
+      prev.includes(reviewId) ? prev.filter((id) => id !== reviewId) : [...prev, reviewId]
+    );
+  }
+
+  function copyOpenCodeTask(insight) {
+    if (!insight || !insight.recommendations || insight.recommendations.length === 0) {
+      showToast("Нет принятых рекомендаций для копирования", "error");
+      return;
+    }
+    const acceptedRels = insight.recommendations;
+    if (acceptedRels.length === 0) {
+      showToast("Нет рекомендаций для задания", "error");
+      return;
+    }
+    const lines = [
+      "## Задание для OpenCode",
+      "",
+      "### Найденные проблемы",
+    ];
+    for (const rel of acceptedRels) {
+      lines.push(`- **${rel.title}** (приоритет: ${rel.priority || "средний"}, подтверждающих кейсов: ${rel.case_count || "—"})`);
+      if (rel.description) lines.push(`  - Описание: ${rel.description}`);
+      if (rel.suggested_change) lines.push(`  - Предлагаемое изменение: ${rel.suggested_change}`);
+      if (rel.target_file) lines.push(`  - Файл: ${rel.target_file}`);
+      if (rel.risk_of_change) lines.push(`  - Риск: ${rel.risk_of_change}`);
+      lines.push("");
+    }
+    lines.push("### Регрессионные тесты");
+    if (insight.regression_tests && insight.regression_tests.length > 0) {
+      for (const test of insight.regression_tests) {
+        lines.push(`- Сценарий: ${test.scenario || test.scenario || "—"}`);
+        if (test.expected_behavior) lines.push(`  - Ожидаемое поведение: ${test.expected_behavior}`);
+      }
+    } else {
+      lines.push("(не указаны)");
+    }
+    lines.push("");
+    lines.push("### Требования");
+    lines.push("- Показать diff перед любыми изменениями");
+    lines.push("- Не делать автоматический push без проверки");
+    lines.push("- Не менять production без явного подтверждения");
+
+    navigator.clipboard.writeText(lines.join("\n")).then(() => {
+      showToast("Задание скопировано в буфер обмена");
+    }).catch(() => {
+      showToast("Ошибка копирования", "error");
+    });
+  }
+
   function openTrainingForm(review) {
     const json = getReviewJson(review);
     let code = review.public_code || json.public_code || json.publicCode || json.session?.public_code || json.sessionCode || json.code || "";
@@ -1949,6 +2141,153 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           crisisActionJsonlBorder: "#d4cec4",
         };
 
+    const detailQualityInsightView = (d, t) => {
+      return (
+        <div style={{ marginTop: 16, borderTop: `1px solid ${t.cardBorder}`, paddingTop: 16 }}>
+          {/* Summary */}
+          {d.summary && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.cardLabel, fontSize: 11, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>Общий вывод</div>
+              <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6 }}>{d.summary}</div>
+            </div>
+          )}
+
+          {/* Strengths */}
+          {d.strengths && d.strengths.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.success, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Что работает хорошо</div>
+              {d.strengths.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6, background: t.highlight }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title}</div>
+                  {item.case_count && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>Кейсов: {item.case_count}</div>}
+                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Recurring Problems */}
+          {d.recurring_problems && d.recurring_problems.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.error, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Повторяющиеся проблемы</div>
+              {d.recurring_problems.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.error}`, borderRadius: 8, marginBottom: 6, background: t.dangerBg }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title}</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                      background: item.severity === "critical" ? t.badgeNew
+                        : item.severity === "high" ? t.badgeHighRisk
+                        : item.severity === "medium" ? t.badgePending
+                        : t.badgeFalseAlarm,
+                      color: item.severity === "critical" ? t.badgeNewText
+                        : item.severity === "high" ? t.badgeHighRiskText
+                        : item.severity === "medium" ? t.badgePendingText
+                        : t.badgeFalseAlarmText,
+                    }}>
+                      {QUALITY_SEVERITY_LABELS[item.severity] || item.severity || "—"}
+                    </span>
+                  </div>
+                  {item.case_count && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>Кейсов: {item.case_count}</div>}
+                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Safety Findings */}
+          {d.safety_findings && d.safety_findings.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.danger, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Безопасность</div>
+              {d.safety_findings.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.danger}`, borderRadius: 8, marginBottom: 6, background: t.dangerBg }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title || item}</div>
+                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Missed Domains */}
+          {d.missed_domains && d.missed_domains.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.error, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Пропущенные домены</div>
+              {d.missed_domains.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title || item}</div>
+                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Language Findings */}
+          {d.language_findings && d.language_findings.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.accent, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Язык и стиль</div>
+              {d.language_findings.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title || item}</div>
+                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Recommendations */}
+          {d.recommendations && d.recommendations.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.accent, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Предлагаемые изменения</div>
+              {d.recommendations.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title}</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                      background: item.priority === "critical" || item.priority === "high" ? t.badgeNew : t.badgePending,
+                      color: item.priority === "critical" || item.priority === "high" ? t.badgeNewText : t.badgePendingText,
+                    }}>
+                      {item.priority || "—"}
+                    </span>
+                  </div>
+                  {item.case_count && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>Кейсов: {item.case_count}</div>}
+                  {item.reason && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.reason}</div>}
+                  {item.suggested_change && (
+                    <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4, padding: "6px 8px", background: t.highlight, borderRadius: 6 }}>
+                      <span style={{ fontWeight: 600 }}>Изменение:</span> {item.suggested_change}
+                    </div>
+                  )}
+                  {item.target_file && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>Файл: {item.target_file}</div>}
+                  {item.risk_of_change && <div style={{ fontSize: 11, color: t.muted }}>Риск: {item.risk_of_change}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Risk Assessment */}
+          {d.risk_of_changes && (
+            <div style={{ marginBottom: 16, padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8 }}>
+              <div style={{ color: t.cardLabel, fontSize: 11, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Риски изменений</div>
+              <div style={{ fontSize: 13, color: t.crisisText }}>{d.risk_of_changes}</div>
+            </div>
+          )}
+
+          {/* Regression Tests */}
+          {d.regression_tests && d.regression_tests.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.muted, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Регрессионные тесты</div>
+              {d.regression_tests.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6 }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, color: t.crisisText }}>{item.scenario}</div>
+                  {item.expected_behavior && <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>Ожидается: {item.expected_behavior}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    };
+
     return (
       <div style={{ minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "Inter, system-ui, Arial", padding: 32 }}>
         <style>{`
@@ -2044,6 +2383,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   onClick={() => { setAdminReqTab("training"); loadTrainingSessions(); }}
                 >
                   Таблица тренировок
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "quality" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "quality" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setAdminReqTab("quality"); loadQualityStats(); loadQualityInsights(); }}
+                >
+                  Обзоры качества
                 </button>
               </div>
 
@@ -2456,6 +2805,224 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 )}
                 </>
+              ) : adminReqTab === "quality" ? (
+                <>
+
+                {/* Quality insight stats counter */}
+                <div style={{ marginBottom: 24, padding: 20, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.cardBg }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+                    <div>
+                      <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 8px 0" }}>Обзоры качества</h2>
+                      <div style={{ color: t.muted, fontSize: 14, lineHeight: 1.6 }}>
+                        Система рекомендует формировать обзор после каждых 10 новых одобренных кейсов.
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 36, fontWeight: 900, color: qualityStats.recommended_to_analyze ? t.danger : t.accent }}>
+                        {qualityStats.new_approved_count}
+                      </div>
+                      <div style={{ color: t.muted, fontSize: 13 }}>новых одобренных кейсов</div>
+                    </div>
+                  </div>
+
+                  {qualityStats.last_analysis_at && (
+                    <div style={{ color: t.muted, fontSize: 13, marginTop: 8 }}>
+                      Последний обзор: {new Date(qualityStats.last_analysis_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                      {qualityStats.last_analysis_review_count > 0 ? ` (${qualityStats.last_analysis_review_count} кейсов)` : ""}
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                    <button
+                      onClick={() => {
+                        if (qualityStats.new_approved_count === 0 && qualitySelectedReviewIds.length === 0) {
+                          showToast("Нет кейсов для анализа", "error");
+                          return;
+                        }
+                        setQualityConfirmOpen(true);
+                      }}
+                      disabled={qualityGenerating}
+                      style={{
+                        border: 0, borderRadius: 14, padding: "12px 24px", fontWeight: 700, fontSize: 15, cursor: qualityGenerating ? "not-allowed" : "pointer",
+                        background: qualityStats.recommended_to_analyze ? t.danger : t.accent,
+                        color: qualityStats.recommended_to_analyze ? "#fff" : "#fff",
+                        opacity: qualityGenerating ? 0.6 : 1,
+                      }}
+                    >
+                      {qualityGenerating ? "Анализируем..." : qualitySelectedReviewIds.length > 0
+                        ? `Сформировать обзор выбранных (${qualitySelectedReviewIds.length})`
+                        : "Сформировать обзор новых кейсов"}
+                    </button>
+                    <button
+                      onClick={() => { loadQualityStats(); loadQualityInsights(); }}
+                      style={{
+                        border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
+                        color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                      }}
+                    >
+                      Обновить
+                    </button>
+                  </div>
+
+                  {qualityStats.new_approved_count > 0 && qualityStats.new_approved_count < 5 && (
+                    <div style={{ color: t.muted, fontSize: 13, marginTop: 8, padding: "8px 12px", border: `1px solid ${t.border}`, borderRadius: 8, background: t.highlight }}>
+                      Кейсов пока мало. Выводы могут быть предварительными.
+                    </div>
+                  )}
+
+                  {qualityStats.recommended_to_analyze && (
+                    <div style={{ color: t.danger, fontSize: 15, fontWeight: 700, marginTop: 8, padding: "8px 12px", border: `1px solid ${t.danger}`, borderRadius: 8, background: t.dangerBg }}>
+                      Пора сформировать новый обзор
+                    </div>
+                  )}
+                </div>
+
+                {/* Quality insights list */}
+                {qualityLoading ? (
+                  <div style={{ color: t.muted, textAlign: "center", padding: 40 }}>Загрузка...</div>
+                ) : qualityInsights.length === 0 ? (
+                  <div style={{ color: t.muted, textAlign: "center", padding: 40 }}>Нет сохранённых обзоров</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {qualityInsights.map((insight) => {
+                      const isDetailView = qualityDetailInsight && qualityDetailInsight.id === insight.id;
+                      const d = isDetailView ? qualityDetailInsight : insight;
+                      return (
+                        <div key={insight.id} style={{
+                          border: `1px solid ${t.cardBorder}`, borderRadius: 20,
+                          background: t.crisisCard, padding: 20,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                              <span style={{ fontWeight: 700, fontSize: 16 }}>Обзор качества</span>
+                              <span style={{ color: t.crisisMuted, fontSize: 13 }}>
+                                от {new Date(insight.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                              </span>
+                              <span style={{
+                                fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                                background: insight.status === "accepted" || insight.status === "partially_accepted" ? t.badgeClosed
+                                  : insight.status === "rejected" ? t.badgeNew
+                                  : insight.status === "under_review" ? t.badgeInProgress
+                                  : insight.status === "archived" ? t.badgeFalseAlarm
+                                  : t.badgePending,
+                                color: insight.status === "accepted" || insight.status === "partially_accepted" ? t.badgeClosedText
+                                  : insight.status === "rejected" ? t.badgeNewText
+                                  : insight.status === "under_review" ? t.badgeInProgressText
+                                  : insight.status === "archived" ? t.badgeFalseAlarmText
+                                  : t.badgePendingText,
+                              }}>
+                                {QUALITY_STATUS_LABELS[insight.status] || insight.status}
+                              </span>
+                            </div>
+                            <div style={{ color: t.crisisMuted, fontSize: 13 }}>
+                              {insight.review_count} кейсов
+                              {insight.model_used ? ` · ${insight.model_used}` : ""}
+                              {insight.fallback_used ? " · fallback" : ""}
+                            </div>
+                          </div>
+
+                          {!isDetailView && insight.summary && (
+                            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
+                              {insight.summary.slice(0, 300)}{insight.summary.length > 300 ? "..." : ""}
+                            </div>
+                          )}
+
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button
+                              onClick={async () => {
+                                if (isDetailView) {
+                                  setQualityDetailInsight(null);
+                                } else {
+                                  await loadQualityInsightDetail(insight.id);
+                                }
+                              }}
+                              style={{
+                                border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg,
+                                color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              {isDetailView ? "Свернуть" : "Подробнее"}
+                            </button>
+                            <select
+                              value={insight.status}
+                              onChange={(e) => updateQualityInsightStatus(insight.id, e.target.value)}
+                              style={{
+                                border: `1px solid ${t.inputBorder}`, borderRadius: 8, background: t.inputBg,
+                                color: t.inputText, padding: "6px 12px", fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              {["new","under_review","accepted","partially_accepted","rejected","archived"].map((s) => (
+                                <option key={s} value={s}>{QUALITY_STATUS_LABELS[s]}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => copyOpenCodeTask(insight)}
+                              style={{
+                                border: `1px solid ${t.jsonlBtnBorder}`, borderRadius: 8, background: t.jsonlBtn,
+                                color: t.jsonlBtnText, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              Скопировать задание для OpenCode
+                            </button>
+                          </div>
+
+                          {isDetailView && d && detailQualityInsightView(d, t)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Confirm dialog */}
+                {qualityConfirmOpen && (
+                  <div style={{
+                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                    background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center",
+                    justifyContent: "center", zIndex: 1000,
+                  }} onClick={() => setQualityConfirmOpen(false)}>
+                    <div style={{
+                      background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
+                      padding: 24, maxWidth: 500, width: "90%",
+                    }} onClick={(e) => e.stopPropagation()}>
+                      <h3 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 700 }}>Сформировать обзор</h3>
+                      <p style={{ color: t.crisisText, fontSize: 14, lineHeight: 1.6, margin: "0 0 16px" }}>
+                        {qualitySelectedReviewIds.length > 0
+                          ? `В анализ войдут ${qualitySelectedReviewIds.length} выбранных кейсов.`
+                          : `В анализ войдут ${qualityStats.new_approved_count} новых одобренных кейсов.`
+                        }
+                        {qualityStats.new_approved_count > 30 && qualitySelectedReviewIds.length === 0 && (
+                          <><br />В этот обзор войдут 30 из {qualityStats.new_approved_count} новых одобренных кейсов. После анализа останется ещё {qualityStats.new_approved_count - 30}.</>
+                        )}
+                        <br /><br />
+                        Это не изменит промпты или production автоматически.
+                      </p>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          onClick={generateQualityInsight}
+                          disabled={qualityGenerating}
+                          style={{
+                            flex: 1, border: 0, borderRadius: 12, background: t.accent, color: "#fff",
+                            padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: qualityGenerating ? "not-allowed" : "pointer",
+                            opacity: qualityGenerating ? 0.6 : 1,
+                          }}
+                        >
+                          {qualityGenerating ? "Анализируем..." : "Продолжить"}
+                        </button>
+                        <button
+                          onClick={() => setQualityConfirmOpen(false)}
+                          style={{
+                            flex: 1, border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
+                            color: t.text, padding: "12px 20px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                          }}
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                </>
               ) : (
               <>
               {/* Reviews filters */}
@@ -2547,6 +3114,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                            {status === "approved" && (
+                              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", fontSize: 11, color: t.muted }}>
+                                <input
+                                  type="checkbox"
+                                  checked={qualitySelectedReviewIds.includes(review.id)}
+                                  onChange={() => toggleReviewSelection(review.id)}
+                                  style={{ cursor: "pointer" }}
+                                />
+                                В обзор
+                              </label>
+                            )}
                             <span style={{ color: t.crisisMuted, fontSize: 12 }}>
                               {safeDate(review.created_at)}
                             </span>
