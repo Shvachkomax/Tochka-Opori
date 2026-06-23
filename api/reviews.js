@@ -1162,18 +1162,19 @@ async function handleGenerateQualityInsight(req, res) {
 }
 
 function readSystemPrompt() {
-  try {
-    const promptPath = new URL("../prompts/quality-review-analyst.md", import.meta.url);
-    if (existsSync(promptPath)) {
-      return readFileSync(promptPath, "utf-8");
-    }
-    const fs = existsSync;
-    const altPath = "./prompts/quality-review-analyst.md";
-    if (existsSync(altPath)) {
-      return readFileSync(altPath, "utf-8");
-    }
-  } catch {}
-  return "Ты анализируешь группу экспертно проверенных диалогов сервиса психического triage «Точка опоры». Ответь строгим JSON.";
+  const candidates = [
+    new URL("../prompts/quality-review-analyst.md", import.meta.url),
+    "./prompts/quality-review-analyst.md",
+    "/var/task/prompts/quality-review-analyst.md",
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (existsSync(candidate)) {
+        return readFileSync(candidate, "utf-8");
+      }
+    } catch {}
+  }
+  return 'Ты анализируешь группу экспертно проверенных диалогов сервиса психического triage «Точка опоры». Ответь строгим JSON и ничего кроме JSON.';
 }
 
 async function handleListQualityInsights(req, res) {
