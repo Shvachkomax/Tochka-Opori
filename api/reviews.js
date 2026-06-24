@@ -64,6 +64,8 @@ export default async function handler(req, res) {
         return await handleGetQualityInsight(req, res);
       case "updateQualityInsightStatus":
         return await handleUpdateQualityInsightStatus(req, res);
+      case "getSessionTimeline":
+        return await handleGetSessionTimeline(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -1311,5 +1313,211 @@ async function handleUpdateQualityInsightStatus(req, res) {
     });
   } catch (error) {
     return res.status(500).json({ ok: false, error: "Fatal updateQualityInsightStatus error", details: error?.message || String(error) });
+  }
+}
+
+async function handleGetSessionTimeline(req, res) {
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { isAdmin, expertId, expertCode } = authorizeExpert(req);
+    if (!isAdmin && !expertId) {
+      return res.status(401).json({ ok: false, error: "Access denied" });
+    }
+
+    const { public_code } = req.body || {};
+    if (!public_code || typeof public_code !== "string" || !public_code.trim()) {
+      return res.status(400).json({ ok: false, error: "Missing public_code" });
+    }
+
+    const code = public_code.trim();
+
+    // 1. Search sessions
+    const { data: sessions } = await supabase
+      .from("sessions")
+      .select("*")
+      .or(`public_code.eq.${code},json_data->>public_code.eq.${code},json_data->>sessionCode.eq.${code},json_data->>code.eq.${code}`)
+      .order("created_at", { ascending: true });
+
+    // 2. Search case_reviews
+    const { data: caseReviews } = await supabase
+      .from("case_reviews")
+      .select("*")
+      .or(`public_code.eq.${code},session_public_code.eq.${code},json_data->>public_code.eq.${code},json_data->>session_public_code.eq.${code},json_data->>publicCode.eq.${code},json_data->>sessionCode.eq.${code},json_data->>code.eq.${code}`)
+      .order("created_at", { ascending: true });
+
+    // 3. Search training_sessions
+    const { data: trainingSessions } = await supabase
+      .from("training_sessions")
+      .select("*")
+      .eq("public_code", code)
+      .order("created_at", { ascending: true });
+
+    // Build a unified items list from sessions + case_reviews + training_sessions
+    const items = [];
+
+    // Check if expert has access to this code
+    const hasAccessToCode = (itemExpertId) => {
+      if (isAdmin) return true;
+      return itemExpertId === expertId;
+    };
+
+    // Process sessions
+    if (sessions) {
+      for (const s of sessions) {
+        if (!hasAccessToCode(s.expert_id)) continue;
+        items.push({
+          source: "session",
+          session_id: s.session_id || s.id,
+          case_review_id: null,
+          training_session_id: null,
+          created_at: s.created_at,
+          session_sequence: null,
+          session_kind: s.session_kind || "initial",
+          status: s.status || null,
+          model_used: s.model_used || s.json_data?.model_used || null,
+          fallback_used: Boolean(s.fallback_used || s.json_data?.fallback_used),
+          patient_text_preview: (s.patient_text || s.json_data?.patient_text || s.json_data?.input || "").slice(0, 200),
+          user_report_available: !!(s.user_report || s.json_data?.user_report),
+          doctor_report_available: !!(s.doctor_report || s.json_data?.doctor_report),
+          conversation_available: !!(s.conversation_history || s.json_data?.conversation_history || s.json_data?.conversationHistory),
+          support_plan_available: !!(s.support_plan || s.json_data?.support_plan),
+          diary_available: !!(s.diary || s.json_data?.diary),
+          expert_id: s.expert_id,
+          expert_name: s.expert_name || null,
+          json_data: s.json_data || null,
+        });
+      }
+    }
+
+    // Process case_reviews
+    if (caseReviews) {
+      for (const r of caseReviews) {
+        if (!hasAccessToCode(r.expert_id)) continue;
+        const j = r.json_data || {};
+        items.push({
+          source: "case_review",
+          session_id: r.session_id || null,
+          case_review_id: r.id,
+          training_session_id: null,
+          created_at: r.created_at,
+          session_sequence: null,
+          session_kind: j.session_kind || "initial",
+          status: j.status || null,
+          model_used: j.model_used || null,
+          fallback_used: Boolean(j.fallback_used),
+          patient_text_preview: (j.patient_text || j.input || j.patient_input || "").slice(0, 200),
+          user_report_available: !!(j.user_report || j.patient_report),
+          doctor_report_available: !!(j.doctor_report || j.specialist_report),
+          conversation_available: !!(j.conversation_history || j.conversationHistory || j.questions),
+          support_plan_available: !!(j.support_plan),
+          diary_available: !!(j.diary),
+          expert_id: r.expert_id,
+          expert_name: r.expert_name || null,
+          json_data: j,
+        });
+      }
+    }
+
+    // Process training_sessions
+    if (trainingSessions) {
+      for (const t of trainingSessions) {
+        if (!hasAccessToCode(t.expert_id)) continue;
+        items.push({
+          source: "training_session",
+          session_id: t.session_id || null,
+          case_review_id: t.case_review_id || null,
+          training_session_id: t.id,
+          created_at: t.created_at,
+          session_sequence: t.session_sequence || null,
+          session_kind: t.session_kind || "initial",
+          status: t.status || null,
+          model_used: t.model_used || null,
+          fallback_used: Boolean(t.fallback_used),
+          patient_text_preview: (t.short_summary || t.main_problem || "").slice(0, 200),
+          user_report_available: false,
+          doctor_report_available: false,
+          conversation_available: false,
+          support_plan_available: false,
+          diary_available: false,
+          expert_id: t.expert_id,
+          expert_name: t.expert_name || null,
+          json_data: t.json_data || null,
+          // Training-specific fields
+          scenario_played: t.scenario_played || null,
+          expected_case_type: t.expected_case_type || null,
+          ai_detected_case_type: t.ai_detected_case_type || null,
+          detection_quality: t.detection_quality || null,
+          questions_quality: t.questions_quality || null,
+          report_quality: t.report_quality || null,
+          safety_quality: t.safety_quality || null,
+          language_quality: t.language_quality || null,
+          support_toolkit_quality: t.support_toolkit_quality || null,
+          continuation_quality: t.continuation_quality || null,
+          repeated_questions: Boolean(t.repeated_questions),
+          missed_risk_flags: Boolean(t.missed_risk_flags),
+          wrong_recommendation: Boolean(t.wrong_recommendation),
+          remembered_context: Boolean(t.remembered_context),
+          expert_comment: t.expert_comment || null,
+        });
+      }
+    }
+
+    // Sort by created_at, then by id for ties
+    items.sort((a, b) => {
+      const da = new Date(a.created_at).getTime();
+      const db = new Date(b.created_at).getTime();
+      if (da !== db) return da - db;
+      return (a.session_id || a.case_review_id || a.training_session_id || "").localeCompare(
+        b.session_id || b.case_review_id || b.training_session_id || ""
+      );
+    });
+
+    // Assign display sequence
+    let displaySeq = 1;
+    for (const item of items) {
+      item.display_sequence = item.session_sequence || displaySeq;
+      if (!item.session_sequence) displaySeq++;
+    }
+
+    // Calculate intervals
+    for (let i = 0; i < items.length; i++) {
+      if (i === 0) {
+        items[i].interval_after_previous = null;
+      } else {
+        const prev = new Date(items[i - 1].created_at);
+        const curr = new Date(items[i].created_at);
+        const diffMs = curr.getTime() - prev.getTime();
+        const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffHours < 1) {
+          items[i].interval_after_previous = "В тот же день";
+        } else if (diffHours < 24) {
+          items[i].interval_after_previous = `Через ${diffHours} ч.`;
+        } else if (diffDays === 1) {
+          items[i].interval_after_previous = "На следующий день";
+        } else {
+          const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          items[i].interval_after_previous = `Через ${days} д.`;
+        }
+      }
+
+      // Remove json_data from response to keep it lightweight
+      delete items[i].json_data;
+    }
+
+    return res.status(200).json({
+      ok: true,
+      public_code: code,
+      session_count: items.length,
+      single_session_message: items.length === 1 ? "Других обращений по этому коду пока нет" : null,
+      items,
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal getSessionTimeline error", details: error?.message || String(error) });
   }
 }

@@ -228,6 +228,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [qualityConfirmOpen, setQualityConfirmOpen] = useState(false);
   const [qualityDetailInsight, setQualityDetailInsight] = useState(null);
 
+  // Session timeline state
+  const [timelineData, setTimelineData] = useState(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineCode, setTimelineCode] = useState(null);
+  const [timelineCache, setTimelineCache] = useState({});
+
   const QUALITY_STATUS_LABELS = {
     new: "Новый",
     under_review: "Рассматривается",
@@ -1871,7 +1877,75 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   function closeModal() {
     setModalData(null);
+    setTimelineData(null);
+    setTimelineCode(null);
   }
+
+  async function loadSessionTimeline(code) {
+    if (!code || code === "—") return;
+    if (timelineCode === code && timelineData) return; // already loaded
+
+    // Check cache
+    if (timelineCache[code]) {
+      setTimelineData(timelineCache[code]);
+      setTimelineCode(code);
+      return;
+    }
+
+    setTimelineLoading(true);
+    setTimelineCode(code);
+    try {
+      const body = { action: "getSessionTimeline", public_code: code };
+      if (adminPassword) body.admin_secret = adminPassword;
+      if (expertData?.expert_id) {
+        body.expert_id = expertData.expert_id;
+        if (expertData?.access_code) body.expert_code = expertData.access_code;
+      }
+
+      const resp = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const result = await resp.json();
+
+      if (result.ok) {
+        setTimelineData(result);
+        setTimelineCache((prev) => ({ ...prev, [code]: result }));
+      } else {
+        showToast(result.error || "Не удалось загрузить линию сессий", "error");
+        setTimelineData(null);
+      }
+    } catch (e) {
+      showToast("Не удалось загрузить линию сессий", "error");
+      setTimelineData(null);
+    } finally {
+      setTimelineLoading(false);
+    }
+  }
+
+  const SESSION_KIND_LABELS_TIMELINE = {
+    initial: "Первичная сессия",
+    follow_up: "Повторная сессия",
+    diary_check: "Проверка дневника",
+    support_toolkit_check: "Проверка практик",
+    crisis_check: "Срочное обращение",
+    doctor_review: "Врачебный разбор",
+    other: "Другое",
+  };
+
+  const STATUS_LABELS_TIMELINE = {
+    approved: "Одобрено",
+    rejected: "Отклонено",
+    pending: "Ожидание",
+    needs_review: "Нужна доработка",
+    local_auto_saved: "Черновик",
+    new: "Новый",
+    reviewed: "Просмотрен",
+    needs_prompt_update: "Нужно обновить промпт",
+    approved_for_learning: "Одобрен для обучения",
+    archived: "Архив",
+  };
 
   const isAdminPage = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
   const isTrainingPage = typeof window !== "undefined" && window.location.pathname === "/admin/training";
@@ -3483,9 +3557,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                               {environment} / {source}
                             </span>
                           </div>
-                          {publicCode !== "—" && (
-                            <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisAccent, letterSpacing: 0.5 }}>
+                          {publicCode !== "—" ? (
+                            <span
+                              onClick={() => loadSessionTimeline(publicCode)}
+                              title="Показать все сессии по этому коду"
+                              style={{ fontWeight: 700, fontSize: 13, color: t.crisisAccent, letterSpacing: 0.5, cursor: "pointer", textDecoration: "underline dotted", textUnderlineOffset: 3 }}
+                            >
                               {publicCode}
+                            </span>
+                          ) : (
+                            <span style={{ fontWeight: 700, fontSize: 13, color: t.muted, letterSpacing: 0.5 }}>
+                              Код продолжения не сохранён
                             </span>
                           )}
                         </div>
@@ -3693,6 +3775,135 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   Скопировать
                 </button>
                 <button onClick={closeModal} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                  Закрыть
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(timelineLoading || timelineData) && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center",
+            justifyContent: "center", zIndex: 3001, padding: 20,
+          }} onClick={() => { setTimelineData(null); setTimelineCode(null); }}>
+            <div style={{
+              background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
+              padding: 24, maxWidth: 700, width: "100%", maxHeight: "90vh",
+              display: "flex", flexDirection: "column",
+            }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Линия сессий</h3>
+                  {timelineCode && <div style={{ color: t.accent, fontSize: 14, fontWeight: 600, marginTop: 4 }}>{timelineCode}</div>}
+                </div>
+                <button onClick={() => { setTimelineData(null); setTimelineCode(null); }} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>✕</button>
+              </div>
+
+              <div style={{ flex: 1, overflowY: "auto" }}>
+                {timelineLoading && (
+                  <div style={{ padding: 32, textAlign: "center", color: t.muted, fontSize: 14 }}>
+                    Загружаем линию сессий…
+                  </div>
+                )}
+
+                {!timelineLoading && timelineData && (
+                  <div>
+                    <div style={{ color: t.cardLabel, fontSize: 13, marginBottom: 16 }}>
+                      Найдено обращений: {timelineData.session_count}
+                      {timelineData.single_session_message && (
+                        <span style={{ display: "block", marginTop: 4, fontStyle: "italic" }}>{timelineData.single_session_message}</span>
+                      )}
+                    </div>
+
+                    {timelineData.items && timelineData.items.length > 0 && timelineData.items.map((item, idx) => {
+                      const seq = item.display_sequence || idx + 1;
+                      const kindLabel = SESSION_KIND_LABELS_TIMELINE[item.session_kind] || item.session_kind || "Сессия";
+                      const dateStr = item.created_at ? new Date(item.created_at).toLocaleString("ru-RU", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+                      const statusLabel = STATUS_LABELS_TIMELINE[item.status] || item.status || "—";
+
+                      return (
+                        <div key={`${item.session_id || item.case_review_id || item.training_session_id || idx}-${idx}`} style={{
+                          marginBottom: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 14, padding: 16,
+                          background: t.crisisCard,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                width: 28, height: 28, borderRadius: "50%", background: t.accent, color: "#fff",
+                                fontWeight: 700, fontSize: 13,
+                              }}>{seq}</span>
+                              <span style={{ fontWeight: 700, fontSize: 14 }}>{kindLabel}</span>
+                            </div>
+                            <span style={{
+                              fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 8,
+                              background: item.status === "approved" ? t.badgeClosed : item.status === "rejected" ? t.badgeNew : t.badgePending,
+                              color: item.status === "approved" ? t.badgeClosedText : item.status === "rejected" ? t.badgeNewText : t.badgePendingText,
+                            }}>{statusLabel}</span>
+                          </div>
+
+                          <div style={{ color: t.cardLabel, fontSize: 12, marginBottom: 4 }}>{dateStr}</div>
+
+                          {item.interval_after_previous && (
+                            <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 8, fontStyle: "italic" }}>
+                              {item.interval_after_previous}
+                            </div>
+                          )}
+
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+                            {item.model_used && <span style={{ fontSize: 11, color: t.muted, background: t.tabBg, padding: "2px 8px", borderRadius: 6 }}>{item.model_used}</span>}
+                            {item.fallback_used && <span style={{ fontSize: 11, color: t.muted, background: t.tabBg, padding: "2px 8px", borderRadius: 6 }}>fallback</span>}
+                            {item.expert_name && <span style={{ fontSize: 11, color: t.muted }}>Эксперт: {item.expert_name}</span>}
+                          </div>
+
+                          {item.patient_text_preview && (
+                            <div style={{ color: t.crisisText, fontSize: 12, lineHeight: 1.5, marginBottom: 8, maxHeight: 60, overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {item.patient_text_preview}
+                            </div>
+                          )}
+
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                            {item.user_report_available && <span style={{ fontSize: 10, color: t.cardLabel }}>📋 Отчёт для пациента</span>}
+                            {item.doctor_report_available && <span style={{ fontSize: 10, color: t.cardLabel }}>📋 Отчёт для специалиста</span>}
+                            {item.conversation_available && <span style={{ fontSize: 10, color: t.cardLabel }}>💬 Диалог</span>}
+                            {item.support_plan_available && <span style={{ fontSize: 10, color: t.cardLabel }}>📋 Практики</span>}
+                            {item.diary_available && <span style={{ fontSize: 10, color: t.cardLabel }}>📓 Дневник</span>}
+                          </div>
+
+                          {/* Training-specific fields */}
+                          {item.source === "training_session" && (
+                            <div style={{ background: t.tabBg, borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                              {item.scenario_played && <div style={{ fontSize: 11, marginBottom: 2 }}><span style={{ color: t.cardLabel }}>Сценарий:</span> <span style={{ color: t.crisisText }}>{item.scenario_played}</span></div>}
+                              {item.expected_case_type && <div style={{ fontSize: 11, marginBottom: 2 }}><span style={{ color: t.cardLabel }}>Ожидаемый тип:</span> <span style={{ color: t.crisisText }}>{item.expected_case_type}</span></div>}
+                              {item.ai_detected_case_type && <div style={{ fontSize: 11, marginBottom: 2 }}><span style={{ color: t.cardLabel }}>Распознано:</span> <span style={{ color: t.crisisText }}>{item.ai_detected_case_type}</span></div>}
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                                {item.detection_quality && <span style={{ fontSize: 10, color: t.cardLabel }}>Распознавание: {item.detection_quality}</span>}
+                                {item.questions_quality && <span style={{ fontSize: 10, color: t.cardLabel }}>Вопросы: {item.questions_quality}</span>}
+                                {item.report_quality && <span style={{ fontSize: 10, color: t.cardLabel }}>Отчёт: {item.report_quality}</span>}
+                                {item.safety_quality && <span style={{ fontSize: 10, color: t.cardLabel }}>Safety: {item.safety_quality}</span>}
+                              </div>
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                                {item.repeated_questions && <span style={{ fontSize: 10, color: t.badgeNewText }}>Повторы вопросов</span>}
+                                {item.missed_risk_flags && <span style={{ fontSize: 10, color: t.badgeNewText }}>Пропущены риски</span>}
+                                {item.wrong_recommendation && <span style={{ fontSize: 10, color: t.badgeNewText }}>Неверная рекомендация</span>}
+                                {item.remembered_context && <span style={{ fontSize: 10, color: t.badgeClosedText }}>Учтён контекст</span>}
+                              </div>
+                              {item.expert_comment && (
+                                <div style={{ fontSize: 11, marginTop: 4, color: t.crisisText, fontStyle: "italic" }}>{item.expert_comment}</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                <button onClick={() => { setTimelineData(null); setTimelineCode(null); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
                   Закрыть
                 </button>
               </div>
