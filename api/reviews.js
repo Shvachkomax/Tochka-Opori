@@ -66,6 +66,8 @@ export default async function handler(req, res) {
         return await handleUpdateQualityInsightStatus(req, res);
       case "getSessionTimeline":
         return await handleGetSessionTimeline(req, res);
+      case "getSessionTimelineDetails":
+        return await handleGetSessionTimelineDetails(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -1179,6 +1181,29 @@ function readSystemPrompt() {
   return 'Ты анализируешь группу экспертно проверенных диалогов сервиса психического triage «Точка опоры». Ответь строгим JSON и ничего кроме JSON.';
 }
 
+function buildTrainingObject(t) {
+  return {
+    scenario_played: t.scenario_played || "",
+    expected_case_type: t.expected_case_type || "",
+    ai_detected_case_type: t.ai_detected_case_type || "",
+    ai_detected_secondary_types: t.ai_detected_secondary_types || [],
+    detection_quality: t.detection_quality || null,
+    questions_quality: t.questions_quality || null,
+    report_quality: t.report_quality || null,
+    safety_quality: t.safety_quality || null,
+    language_quality: t.language_quality || null,
+    support_toolkit_quality: t.support_toolkit_quality || null,
+    continuation_quality: t.continuation_quality || null,
+    repeated_questions: Boolean(t.repeated_questions),
+    missed_risk_flags: Boolean(t.missed_risk_flags),
+    wrong_recommendation: Boolean(t.wrong_recommendation),
+    remembered_context: Boolean(t.remembered_context),
+    expert_comment: t.expert_comment || "",
+    missed_domain: t.missed_domain || "",
+    action_needed: t.action_needed || "",
+  };
+}
+
 async function handleListQualityInsights(req, res) {
   try {
     const { isAdmin, expertId } = authorizeExpert(req);
@@ -1519,5 +1544,375 @@ async function handleGetSessionTimeline(req, res) {
     });
   } catch (error) {
     return res.status(500).json({ ok: false, error: "Fatal getSessionTimeline error", details: error?.message || String(error) });
+  }
+}
+
+async function handleGetSessionTimelineDetails(req, res) {
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { isAdmin, expertId } = authorizeExpert(req);
+    if (!isAdmin && !expertId) {
+      return res.status(401).json({ ok: false, error: "access_denied" });
+    }
+
+    const { case_review_id, session_id, training_session_id, public_code } = req.body || {};
+
+    if (!case_review_id && !session_id && !training_session_id) {
+      return res.status(400).json({ ok: false, error: "Missing identifier: case_review_id, session_id, or training_session_id required" });
+    }
+
+    const privacy = getPrivacySafeMode();
+
+    // Helper to check ownership
+    function checkAccess(record) {
+      if (isAdmin) return true;
+      if (!record) return false;
+      return record.expert_id === expertId;
+    }
+
+    let session = {};
+
+    // Load from case_reviews
+    if (case_review_id) {
+      const { data: review, error: fetchError } = await supabase
+        .from("case_reviews")
+        .select("*")
+        .eq("id", case_review_id)
+        .maybeSingle();
+
+      if (fetchError) {
+        return res.status(500).json({ ok: false, error: "Failed to fetch case review", details: fetchError.message });
+      }
+
+      if (!review) {
+        return res.status(404).json({ ok: false, error: "Case review not found" });
+      }
+
+      if (!checkAccess(review)) {
+        return res.status(403).json({ ok: false, error: "access_denied" });
+      }
+
+      // If public_code provided, verify it matches
+      if (public_code && review.public_code && review.public_code !== public_code) {
+        return res.status(403).json({ ok: false, error: "access_denied" });
+      }
+
+      const j = review.json_data || {};
+      const df = j.doctor_feedback || review.doctor_feedback || {};
+
+      session = {
+        session_id: review.session_id || null,
+        case_review_id: review.id,
+        training_session_id: null,
+        created_at: review.created_at,
+        session_kind: j.session_kind || "initial",
+        session_sequence: j.session_sequence || null,
+        status: j.status || null,
+        model_used: j.model_used || null,
+        fallback_used: Boolean(j.fallback_used),
+        expert_id: review.expert_id,
+        expert_name: review.expert_name || null,
+        patient_text: j.patient_text || j.input || j.patient_input || j.text || "",
+        conversation_history: j.conversation_history || j.conversationHistory || [],
+        user_report: j.user_report || j.patient_report || "",
+        doctor_report: j.doctor_report || j.specialist_report || "",
+        doctor_feedback: df,
+        doctor_correction: df.corrected_user_report || df.corrected_doctor_report ? {
+          corrected_user_report: df.corrected_user_report || "",
+          corrected_doctor_report: df.corrected_doctor_report || "",
+          wrong_questions: df.wrong_questions || "",
+          missing_questions: df.missing_questions || "",
+          bad_question_wording: df.bad_question_wording || "",
+        } : null,
+        corrected_user_report: df.corrected_user_report || "",
+        corrected_doctor_report: df.corrected_doctor_report || "",
+        correction_comment: df.correction_comment || review.correction_comment || "",
+        protocol_update: df.protocol_update || review.protocol_update || "",
+        support_plan: j.support_plan || null,
+        diary: j.diary || null,
+        continuation_comment: j.continuation_comment || "",
+      };
+
+      // Parse conversation_history if string
+      if (typeof session.conversation_history === "string") {
+        try { session.conversation_history = JSON.parse(session.conversation_history); } catch { session.conversation_history = []; }
+      }
+      if (!Array.isArray(session.conversation_history)) session.conversation_history = [];
+
+      // Build from questions/answers if no conversation
+      if (session.conversation_history.length === 0 && Array.isArray(j.questions)) {
+        const msgs = [];
+        const ans = j.answers || {};
+        j.questions.forEach((q, i) => {
+          msgs.push({ role: "assistant", content: q, round: i + 1 });
+          const ak = Object.keys(ans)[i];
+          if (ak !== undefined) {
+            msgs.push({ role: "user", content: typeof ans[ak] === "string" ? ans[ak] : JSON.stringify(ans[ak]), round: i + 1 });
+          }
+        });
+        session.conversation_history = msgs;
+      }
+
+      // Also try to link to a training_session via case_review_id
+      const { data: linkedTraining } = await supabase
+        .from("training_sessions")
+        .select("*")
+        .eq("case_review_id", case_review_id)
+        .maybeSingle();
+
+      if (linkedTraining) {
+        session.training_session_id = linkedTraining.id;
+        session.training = {
+          scenario_played: linkedTraining.scenario_played || "",
+          expected_case_type: linkedTraining.expected_case_type || "",
+          ai_detected_case_type: linkedTraining.ai_detected_case_type || "",
+          ai_detected_secondary_types: linkedTraining.ai_detected_secondary_types || [],
+          detection_quality: linkedTraining.detection_quality || null,
+          questions_quality: linkedTraining.questions_quality || null,
+          report_quality: linkedTraining.report_quality || null,
+          safety_quality: linkedTraining.safety_quality || null,
+          language_quality: linkedTraining.language_quality || null,
+          support_toolkit_quality: linkedTraining.support_toolkit_quality || null,
+          continuation_quality: linkedTraining.continuation_quality || null,
+          repeated_questions: Boolean(linkedTraining.repeated_questions),
+          missed_risk_flags: Boolean(linkedTraining.missed_risk_flags),
+          wrong_recommendation: Boolean(linkedTraining.wrong_recommendation),
+          remembered_context: Boolean(linkedTraining.remembered_context),
+          expert_comment: linkedTraining.expert_comment || "",
+          missed_domain: linkedTraining.missed_domain || "",
+          action_needed: linkedTraining.action_needed || "",
+        };
+      }
+    }
+
+    // Load from sessions
+    if (session_id && !session.case_review_id) {
+      const { data: s, error: fetchError } = await supabase
+        .from("sessions")
+        .select("*")
+        .eq("session_id", session_id)
+        .maybeSingle();
+
+      if (fetchError) {
+        return res.status(500).json({ ok: false, error: "Failed to fetch session", details: fetchError.message });
+      }
+
+      if (!s) {
+        return res.status(404).json({ ok: false, error: "Session not found" });
+      }
+
+      if (!checkAccess(s)) {
+        return res.status(403).json({ ok: false, error: "access_denied" });
+      }
+
+      if (public_code && s.public_code && s.public_code !== public_code) {
+        return res.status(403).json({ ok: false, error: "access_denied" });
+      }
+
+      const sj = s.json_data || {};
+
+      session = {
+        session_id: s.session_id,
+        case_review_id: null,
+        training_session_id: null,
+        created_at: s.created_at,
+        session_kind: s.session_kind || "initial",
+        session_sequence: null,
+        status: s.status || null,
+        model_used: s.model_used || null,
+        fallback_used: Boolean(s.fallback_used),
+        expert_id: s.expert_id,
+        expert_name: s.expert_name || null,
+        patient_text: s.patient_text || sj.patient_text || sj.input || "",
+        conversation_history: s.conversation_history || sj.conversation_history || sj.conversationHistory || [],
+        user_report: s.user_report || sj.user_report || "",
+        doctor_report: s.doctor_report || sj.doctor_report || "",
+        doctor_feedback: sj.doctor_feedback || {},
+        doctor_correction: null,
+        corrected_user_report: "",
+        corrected_doctor_report: "",
+        correction_comment: "",
+        protocol_update: "",
+        support_plan: s.support_plan || sj.support_plan || null,
+        diary: s.diary || sj.diary || null,
+        continuation_comment: sj.continuation_comment || "",
+      };
+
+      if (typeof session.conversation_history === "string") {
+        try { session.conversation_history = JSON.parse(session.conversation_history); } catch { session.conversation_history = []; }
+      }
+      if (!Array.isArray(session.conversation_history)) session.conversation_history = [];
+
+      // Try to link case_review by session_id
+      const { data: linkedReview } = await supabase
+        .from("case_reviews")
+        .select("*")
+        .eq("session_id", session_id)
+        .maybeSingle();
+
+      if (linkedReview && checkAccess(linkedReview)) {
+        session.case_review_id = linkedReview.id;
+        const lj = linkedReview.json_data || {};
+        const ldf = lj.doctor_feedback || {};
+
+        // Merge in additional data from case_review
+        if (!session.doctor_report) session.doctor_report = lj.doctor_report || lj.specialist_report || "";
+        if (!session.user_report) session.user_report = lj.user_report || lj.patient_report || "";
+        if (ldf.corrected_user_report || ldf.corrected_doctor_report) {
+          session.doctor_correction = {
+            corrected_user_report: ldf.corrected_user_report || "",
+            corrected_doctor_report: ldf.corrected_doctor_report || "",
+            wrong_questions: ldf.wrong_questions || "",
+            missing_questions: ldf.missing_questions || "",
+            bad_question_wording: ldf.bad_question_wording || "",
+          };
+        }
+        if (ldf.correction_comment) session.correction_comment = ldf.correction_comment;
+        if (ldf.corrected_user_report) session.corrected_user_report = ldf.corrected_user_report;
+        if (ldf.corrected_doctor_report) session.corrected_doctor_report = ldf.corrected_doctor_report;
+        session.doctor_feedback = ldf;
+      }
+
+      // Try to link training_session by session_id
+      const { data: linkedTraining } = await supabase
+        .from("training_sessions")
+        .select("*")
+        .eq("session_id", session_id)
+        .maybeSingle();
+
+      if (linkedTraining) {
+        session.training_session_id = linkedTraining.id;
+        session.training = buildTrainingObject(linkedTraining);
+      }
+    }
+
+    // Load from training_sessions directly
+    if (training_session_id && !session.case_review_id && !session.session_id) {
+      const { data: t, error: fetchError } = await supabase
+        .from("training_sessions")
+        .select("*")
+        .eq("id", training_session_id)
+        .maybeSingle();
+
+      if (fetchError) {
+        return res.status(500).json({ ok: false, error: "Failed to fetch training session", details: fetchError.message });
+      }
+
+      if (!t) {
+        return res.status(404).json({ ok: false, error: "Training session not found" });
+      }
+
+      if (!checkAccess(t)) {
+        return res.status(403).json({ ok: false, error: "access_denied" });
+      }
+
+      if (public_code && t.public_code && t.public_code !== public_code) {
+        return res.status(403).json({ ok: false, error: "access_denied" });
+      }
+
+      session = {
+        session_id: t.session_id || null,
+        case_review_id: t.case_review_id || null,
+        training_session_id: t.id,
+        created_at: t.created_at,
+        session_kind: t.session_kind || "initial",
+        session_sequence: t.session_sequence || null,
+        status: t.status || null,
+        model_used: t.model_used || null,
+        fallback_used: Boolean(t.fallback_used),
+        expert_id: t.expert_id,
+        expert_name: t.expert_name || null,
+        patient_text: t.short_summary || t.main_problem || "",
+        conversation_history: [],
+        user_report: "",
+        doctor_report: "",
+        doctor_feedback: {},
+        doctor_correction: null,
+        corrected_user_report: "",
+        corrected_doctor_report: "",
+        correction_comment: "",
+        protocol_update: "",
+        support_plan: null,
+        diary: null,
+        continuation_comment: t.continuation_comment || "",
+        training: buildTrainingObject(t),
+      };
+
+      // Try to link case_review for more data
+      if (t.case_review_id) {
+        const { data: linkedReview } = await supabase
+          .from("case_reviews")
+          .select("*")
+          .eq("id", t.case_review_id)
+          .maybeSingle();
+
+        if (linkedReview && checkAccess(linkedReview)) {
+          const lj = linkedReview.json_data || {};
+          session.case_review_id = linkedReview.id;
+          session.patient_text = lj.patient_text || lj.input || lj.patient_input || session.patient_text || "";
+          session.conversation_history = lj.conversation_history || lj.conversationHistory || [];
+          session.user_report = lj.user_report || lj.patient_report || session.user_report || "";
+          session.doctor_report = lj.doctor_report || lj.specialist_report || session.doctor_report || "";
+
+          const ldf = lj.doctor_feedback || {};
+          session.doctor_feedback = ldf;
+          if (ldf.corrected_user_report || ldf.corrected_doctor_report) {
+            session.doctor_correction = {
+              corrected_user_report: ldf.corrected_user_report || "",
+              corrected_doctor_report: ldf.corrected_doctor_report || "",
+              wrong_questions: ldf.wrong_questions || "",
+              missing_questions: ldf.missing_questions || "",
+              bad_question_wording: ldf.bad_question_wording || "",
+            };
+          }
+
+          if (typeof session.conversation_history === "string") {
+            try { session.conversation_history = JSON.parse(session.conversation_history); } catch { session.conversation_history = []; }
+          }
+          if (!Array.isArray(session.conversation_history)) session.conversation_history = [];
+        }
+      }
+    }
+
+    // Apply privacy-safe masking
+    if (privacy) {
+      session.patient_text = maskText(session.patient_text || "");
+      session.user_report = maskText(session.user_report || "");
+      session.doctor_report = maskText(session.doctor_report || "");
+      session.conversation_history = (session.conversation_history || []).map((msg) => ({
+        ...msg,
+        content: maskText(msg.content || ""),
+      }));
+      if (session.diary) {
+        if (typeof session.diary === "string") {
+          session.diary = maskText(session.diary);
+        } else if (typeof session.diary === "object") {
+          session.diary = maskSensitiveData(session.diary);
+        }
+      }
+      if (session.support_plan) {
+        if (typeof session.support_plan === "string") {
+          session.support_plan = maskText(session.support_plan);
+        } else if (typeof session.support_plan === "object") {
+          session.support_plan = maskSensitiveData(session.support_plan);
+        }
+      }
+      const df = session.doctor_feedback || {};
+      for (const key of Object.keys(df)) {
+        if (typeof df[key] === "string") df[key] = maskText(df[key]);
+      }
+    }
+
+    return res.status(200).json({
+      ok: true,
+      public_code: public_code || null,
+      session: session,
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal getSessionTimelineDetails error", details: error?.message || String(error) });
   }
 }
