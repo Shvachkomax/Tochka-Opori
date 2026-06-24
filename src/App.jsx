@@ -215,6 +215,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [trainingFormData, setTrainingFormData] = useState({ scenario_played: "", expected_case_type: "", session_kind: "initial", expert_comment: "", public_code: "" });
   const [trainingFormPublicCodeAuto, setTrainingFormPublicCodeAuto] = useState(false);
 
+  // Expandable review sections state
+  const [expandedSections, setExpandedSections] = useState({});
+  const [modalData, setModalData] = useState(null);
+
   // Quality insight state
   const [qualityInsights, setQualityInsights] = useState([]);
   const [qualityStats, setQualityStats] = useState({ new_approved_count: 0, last_analysis_at: null, recommended_to_analyze: false });
@@ -1769,6 +1773,106 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     return shortText(text, max);
   }
 
+  function normalizeReviewDetails(review) {
+    const json = getReviewJson(review);
+    const j = json || {};
+
+    // Patient text: search broadly
+    const patientText =
+      review?.patient_text || review?.text || review?.input_text ||
+      j.patient_text || j.text || j.input_text || j.original_text ||
+      j.patient_input || j.input ||
+      j.session?.initial_text || j.session?.patient_text ||
+      "";
+
+    // Conversation history: search camelCase + snake_case + nested
+    let conversationHistory =
+      review?.conversation_history || review?.conversationHistory ||
+      j.conversation_history || j.conversationHistory ||
+      j.session?.conversation_history || j.session?.conversationHistory ||
+      [];
+
+    if (typeof conversationHistory === "string") {
+      try { conversationHistory = JSON.parse(conversationHistory); } catch { conversationHistory = []; }
+    }
+    if (!Array.isArray(conversationHistory)) conversationHistory = [];
+
+    // User report / patient report
+    const userReport =
+      review?.user_report || review?.patient_report ||
+      j.user_report || j.patient_report ||
+      j.result?.user_report || j.report?.user_report ||
+      j.session?.user_report ||
+      "";
+
+    // Doctor report / specialist report
+    const doctorReport =
+      review?.doctor_report || review?.specialist_report ||
+      j.doctor_report || j.specialist_report ||
+      j.result?.doctor_report || j.report?.doctor_report ||
+      j.session?.doctor_report ||
+      "";
+
+    // Try to extract reports from ai_result if present
+    if (!userReport && !doctorReport && j.ai_result) {
+      try {
+        const ai = typeof j.ai_result === "string" ? JSON.parse(j.ai_result) : j.ai_result;
+        if (ai && typeof ai === "object") {
+          if (!userReport && (ai.user_report || ai.patient_report)) {
+            conversationHistory = ai.conversation_history || ai.conversationHistory || conversationHistory;
+          }
+        }
+      } catch {}
+    }
+
+    // Doctor feedback
+    const doctorFeedback =
+      review?.doctor_feedback || review?.expert_feedback || review?.feedback ||
+      j.doctor_feedback || j.expert_feedback || j.feedback ||
+      {};
+
+    const df = typeof doctorFeedback === "object" && !Array.isArray(doctorFeedback) ? doctorFeedback : {};
+
+    // Build questions/answers into conversation if not already present
+    if (conversationHistory.length === 0 && Array.isArray(j.questions)) {
+      const qs = j.questions;
+      const ans = j.answers || {};
+      conversationHistory = qs.map((q, i) => ({
+        role: "assistant",
+        content: q,
+        round: i + 1,
+      }));
+      const answerEntries = Object.entries(ans);
+      answerEntries.forEach(([key, val], i) => {
+        conversationHistory.push({
+          role: "user",
+          content: typeof val === "string" ? val : JSON.stringify(val),
+          round: i + 1,
+        });
+      });
+      conversationHistory.sort((a, b) => (a.round || 0) - (b.round || 0));
+    }
+
+    return { patientText, conversationHistory, userReport, doctorReport, doctorFeedback: df };
+  }
+
+  function toggleSection(reviewId, section) {
+    const key = `${reviewId}-${section}`;
+    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function isSectionOpen(reviewId, section) {
+    return !!expandedSections[`${reviewId}-${section}`];
+  }
+
+  function openModal(title, content) {
+    setModalData({ title, content });
+  }
+
+  function closeModal() {
+    setModalData(null);
+  }
+
   const isAdminPage = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
   const isTrainingPage = typeof window !== "undefined" && window.location.pathname === "/admin/training";
 
@@ -2284,6 +2388,244 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               ))}
             </div>
           )}
+        </div>
+      );
+    };
+
+    const renderReviewSections = (review, json, t, data) => {
+      const { patientText, userReport, doctorReport, doctorFeedbackComment, conversationHistory } = data;
+      const sections = [
+        {
+          key: "patient",
+          label: "Текст пациента",
+          hasData: !!patientText,
+          summary: shortText(patientText, 200),
+          fullContent: patientText,
+        },
+        {
+          key: "dialogue",
+          label: "Диалог с системой",
+          hasData: conversationHistory.length > 0 || (Array.isArray(json.questions) && json.questions.length > 0),
+          summary: conversationHistory.length > 0
+            ? `Сообщений: ${conversationHistory.length}`
+            : Array.isArray(json.questions) ? `Вопросов: ${json.questions.length}` : "",
+          fullContent: null,
+          isDialogue: true,
+        },
+        {
+          key: "userReport",
+          label: "Отчёт для пациента",
+          hasData: !!userReport,
+          summary: shortText(userReport, 200),
+          fullContent: userReport,
+        },
+        {
+          key: "doctorReport",
+          label: "Отчёт для специалиста",
+          hasData: !!doctorReport,
+          summary: shortText(doctorReport, 200),
+          fullContent: doctorReport,
+        },
+        {
+          key: "feedback",
+          label: "Отзыв специалиста",
+          hasData: !!doctorFeedbackComment || Object.keys(data.doctorFeedback || {}).length > 0,
+          summary: doctorFeedbackComment
+            ? shortText(doctorFeedbackComment, 200)
+            : Object.keys(data.doctorFeedback || {}).length > 0 ? "Есть данные обратной связи" : "",
+          fullContent: null,
+          isFeedback: true,
+          feedbackData: data.doctorFeedback,
+        },
+      ];
+
+      return (
+        <div style={{ marginBottom: 12 }}>
+          {sections.map((sec) => {
+            const open = isSectionOpen(review.id, sec.key);
+            const canOpen = sec.hasData || sec.isDialogue;
+            return (
+              <div key={sec.key} style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+                <div
+                  onClick={() => canOpen && toggleSection(review.id, sec.key)}
+                  style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "10px 14px", cursor: canOpen ? "pointer" : "default",
+                    background: open ? t.highlight : "transparent",
+                    userSelect: "none",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: canOpen ? t.crisisText : t.muted }}>
+                      {sec.label}
+                    </span>
+                    {!open && sec.hasData && sec.summary && (
+                      <span style={{ color: t.cardLabel, fontSize: 12, marginLeft: 8, maxWidth: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {sec.summary}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {!canOpen && <span style={{ color: t.muted, fontSize: 11 }}>Нет сохранённых данных</span>}
+                    {canOpen && <span style={{ color: t.cardLabel, fontSize: 11, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▾</span>}
+                  </div>
+                </div>
+
+                {open && canOpen && (
+                  <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
+                    {sec.isDialogue ? renderDialogueContent(review, json, t, conversationHistory)
+                      : sec.isFeedback ? renderFeedbackContent(review, json, t, data.doctorFeedback, doctorFeedbackComment)
+                      : renderTextContent(review, sec, t)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    const renderTextContent = (review, sec, t) => {
+      const text = sec.fullContent || "";
+      return (
+        <div>
+          <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 300, overflowY: "auto" }}>
+            {sec.isDialogue ? null : text}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            {text.length > 250 && (
+              <button onClick={() => openModal(sec.label, text)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                Открыть в большом окне
+              </button>
+            )}
+            {text && (
+              <button onClick={() => { navigator.clipboard.writeText(text); showToast("Скопировано"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                Скопировать
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const renderDialogueContent = (review, json, t, conversationHistory) => {
+      const messages = conversationHistory.length > 0 ? conversationHistory
+        : (Array.isArray(json.questions) ? buildDialogueFromQA(json) : []);
+
+      const fullText = messages.map((m) => {
+        const role = m.role === "user" ? "Пациент" : "Точка опоры";
+        return `[${role}]${m.round ? ` (раунд ${m.round})` : ""}\n${m.content || ""}`;
+      }).join("\n\n---\n\n");
+
+      return (
+        <div>
+          {messages.length === 0 ? (
+            <div style={{ color: t.muted, fontSize: 13 }}>Нет сохранённых данных диалога</div>
+          ) : (
+            <div style={{ maxHeight: 400, overflowY: "auto" }}>
+              {messages.map((msg, i) => {
+                const isUser = msg.role === "user";
+                return (
+                  <div key={i} style={{
+                    marginBottom: 10, padding: "10px 12px",
+                    background: isUser ? t.highlight : "transparent",
+                    borderLeft: `3px solid ${isUser ? t.accent : t.muted}`,
+                    borderRadius: "0 8px 8px 0",
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700, fontSize: 12, color: isUser ? t.accent : t.muted }}>
+                        {isUser ? "Пациент" : "Точка опоры"}
+                      </span>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        {msg.round && <span style={{ color: t.cardLabel, fontSize: 10 }}>раунд {msg.round}</span>}
+                        {msg.created_at && <span style={{ color: t.cardLabel, fontSize: 10 }}>{new Date(msg.created_at).toLocaleString("ru-RU")}</span>}
+                      </div>
+                    </div>
+                    <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                      {msg.content || ""}
+                    </div>
+                    {msg.type && <div style={{ color: t.cardLabel, fontSize: 10, marginTop: 4 }}>{msg.type}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            {messages.length > 0 && (
+              <button onClick={() => openModal("Диалог", fullText)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                Открыть в большом окне
+              </button>
+            )}
+            {fullText && (
+              <button onClick={() => { navigator.clipboard.writeText(fullText); showToast("Скопировано"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                Скопировать диалог
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const buildDialogueFromQA = (json) => {
+      const msgs = [];
+      const qs = json.questions || [];
+      const ans = json.answers || {};
+      qs.forEach((q, i) => {
+        msgs.push({ role: "assistant", content: q, round: i + 1 });
+        const answerKey = Object.keys(ans)[i];
+        if (answerKey !== undefined) {
+          msgs.push({ role: "user", content: typeof ans[answerKey] === "string" ? ans[answerKey] : JSON.stringify(ans[answerKey]), round: i + 1 });
+        }
+      });
+      return msgs;
+    };
+
+    const renderFeedbackContent = (review, json, t, feedback, feedbackComment) => {
+      const df = feedback || {};
+      const items = [];
+      if (df.wrong_questions) items.push({ label: "Неверные вопросы", value: df.wrong_questions });
+      if (df.missing_questions) items.push({ label: "Пропущенные вопросы", value: df.missing_questions });
+      if (df.bad_question_wording) items.push({ label: "Некорректные формулировки", value: df.bad_question_wording });
+      if (df.corrected_user_report) items.push({ label: "Скорректированный отчёт (пациент)", value: df.corrected_user_report });
+      if (df.corrected_doctor_report) items.push({ label: "Скорректированный отчёт (специалист)", value: df.corrected_doctor_report });
+      if (df.protocol_update) items.push({ label: "Обновление протокола", value: df.protocol_update });
+      if (df.correction_comment) items.push({ label: "Комментарий к правке", value: df.correction_comment });
+      if (df.generalComment) items.push({ label: "Общий комментарий", value: df.generalComment });
+      if (review?.correction_comment) items.push({ label: "Комментарий администратора", value: review.correction_comment });
+
+      if (items.length === 0 && !feedbackComment) {
+        return <div style={{ color: t.muted, fontSize: 13 }}>Нет сохранённых данных обратной связи</div>;
+      }
+
+      const fullText = items.map((i) => `${i.label}:\n${i.value}`).join("\n\n---\n\n");
+
+      return (
+        <div>
+          {feedbackComment && (
+            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6, marginBottom: 8, fontStyle: "italic" }}>{feedbackComment}</div>
+          )}
+          {items.length > 0 && (
+            <div style={{ maxHeight: 400, overflowY: "auto" }}>
+              {items.map((item, i) => (
+                <div key={i} style={{ marginBottom: 10, padding: "8px 10px", border: `1px solid ${t.cardBorder}`, borderRadius: 8 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: t.cardLabel, marginBottom: 4 }}>{item.label}</div>
+                  <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            {items.length > 0 && (
+              <button onClick={() => openModal("Отзыв специалиста", fullText)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                Открыть в большом окне
+              </button>
+            )}
+            {fullText && (
+              <button onClick={() => { navigator.clipboard.writeText(fullText); showToast("Скопировано"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                Скопировать
+              </button>
+            )}
+          </div>
         </div>
       );
     };
@@ -3089,11 +3431,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     const json = getReviewJson(review);
                     const correction = getDoctorCorrection(review);
                     const corrected = getCorrectedJson(review);
+                    const norm = normalizeReviewDetails(review);
 
-                    const patientText = safeText(json.patient_input || json.patient_text || json.input || "");
-                    const userReport = safeText(json.user_report || "");
-                    const doctorReport = safeText(json.doctor_report || "");
-                    const doctorFeedbackComment = safeText(json.doctor_feedback?.generalComment || "");
+                    const patientText = safeText(norm.patientText);
+                    const userReport = safeText(norm.userReport);
+                    const doctorReport = safeText(norm.doctorReport);
+                    const doctorFeedbackComment = safeText(norm.doctorFeedback?.generalComment || "");
+                    const conversationHistory = norm.conversationHistory;
                     const status = safeText(json.status, "legacy");
                     const source = safeText(json.source, "—");
                     const environment = safeText(json.environment, "—");
@@ -3152,24 +3496,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           </div>
                         )}
 
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                          <div>
-                            <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 4 }}>PATIENT TEXT</div>
-                            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5 }}>{shortText(patientText, 200)}</div>
-                          </div>
-                          <div>
-                            <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 4 }}>USER REPORT</div>
-                            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5 }}>{shortText(userReport, 200)}</div>
-                          </div>
-                          <div>
-                            <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 4 }}>DOCTOR REPORT</div>
-                            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5 }}>{shortText(doctorReport, 200)}</div>
-                          </div>
-                          <div>
-                            <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 4 }}>DOCTOR FEEDBACK</div>
-                            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5 }}>{shortText(doctorFeedbackComment, 200)}</div>
-                          </div>
-                        </div>
+                        {renderReviewSections(review, json, t, { patientText, userReport, doctorReport, doctorFeedbackComment, conversationHistory, doctorFeedback: norm.doctorFeedback })}
 
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           <button
@@ -3336,6 +3663,42 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           </>
           )}
         </div>
+
+        {modalData && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center",
+            justifyContent: "center", zIndex: 3000, padding: 20,
+          }} onClick={closeModal}>
+            <div style={{
+              background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
+              padding: 24, maxWidth: 800, width: "100%", maxHeight: "90vh",
+              display: "flex", flexDirection: "column",
+            }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{modalData.title}</h3>
+                <button onClick={closeModal} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>✕</button>
+              </div>
+              <div style={{
+                flex: 1, overflowY: "auto", color: t.crisisText, fontSize: 14,
+                lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
+              }}>
+                {modalData.content}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(modalData.content); showToast("Скопировано"); }}
+                  style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                >
+                  Скопировать
+                </button>
+                <button onClick={closeModal} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                  Закрыть
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {toast.message && (
           <div
