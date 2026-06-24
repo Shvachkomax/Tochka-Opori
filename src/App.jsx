@@ -234,6 +234,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [timelineCode, setTimelineCode] = useState(null);
   const [timelineCache, setTimelineCache] = useState({});
   const [timelineView, setTimelineView] = useState("list"); // "list" | "detail"
+  const [timelineLargeSection, setTimelineLargeSection] = useState(null);
   const [sessionDetailsData, setSessionDetailsData] = useState(null);
   const [sessionDetailsLoading, setSessionDetailsLoading] = useState(false);
   const [sessionDetailsCache, setSessionDetailsCache] = useState({});
@@ -2760,21 +2761,94 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       );
     };
 
+    function getConversationMessageText(msg) {
+      if (!msg) return "";
+      if (typeof msg === "string") return msg;
+      if (typeof msg.content === "string") return msg.content;
+      if (Array.isArray(msg.content)) {
+        return msg.content.map((part) => {
+          if (typeof part === "string") return part;
+          return part?.text || part?.content || part?.value || "";
+        }).filter(Boolean).join("\n");
+      }
+      return msg.text || msg.message || msg.value || msg.answer || msg.question || msg.transcript || "";
+    }
+
+    function formatConversationForCopy(conversation) {
+      return (conversation || [])
+        .filter((m) => {
+          const role = (m.role || "").toLowerCase();
+          return !["system", "developer", "tool", "reasoning"].includes(role);
+        })
+        .map((m) => {
+          const role = m.role === "user" || m.role === "patient" ? "Пациент" : "Точка опоры";
+          return `[${role}]${m.round ? ` (раунд ${m.round})` : ""}\n${getConversationMessageText(m)}`;
+        })
+        .filter(Boolean)
+        .join("\n\n---\n\n");
+    }
+
+    function formatAnonymizedSession(sd) {
+      if (!sd) return "";
+      const parts = [];
+      parts.push(`Текст пациента:\n${sd.patient_text || "—"}`);
+      const ch = sd.conversation_history || [];
+      if (ch.length > 0) parts.push(`Диалог:\n${formatConversationForCopy(ch)}`);
+      parts.push(`Отчёт для пациента:\n${sd.user_report || "—"}`);
+      parts.push(`Отчёт для специалиста:\n${sd.doctor_report || "—"}`);
+      if (sd.correction_comment) parts.push(`Экспертная правка:\n${sd.correction_comment}`);
+      const tr = sd.training;
+      if (tr) {
+        const tlines = [];
+        if (tr.scenario_played) tlines.push(`Сценарий: ${tr.scenario_played}`);
+        if (tr.expected_case_type) tlines.push(`Ожидаемый тип: ${tr.expected_case_type}`);
+        if (tr.ai_detected_case_type) tlines.push(`Распознано: ${tr.ai_detected_case_type}`);
+        if (tr.expert_comment) tlines.push(`Комментарий: ${tr.expert_comment}`);
+        parts.push(`Оценка тренировки:\n${tlines.join("\n")}`);
+      }
+      return parts.join("\n\n=====\n\n");
+    }
+
+    async function copyToClipboard(text, successMessage) {
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast(successMessage || "Скопировано");
+      } catch {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); showToast(successMessage || "Скопировано"); } catch {}
+        ta.remove();
+      }
+    }
+
     const renderSessionTimelineDetail = (sd, t) => {
       if (!sd) return null;
 
+      const conversationHistory = sd.conversation_history || [];
+      const normalizedMessages = conversationHistory
+        .filter((m) => {
+          const role = (m.role || "").toLowerCase();
+          return !["system", "developer", "tool", "reasoning"].includes(role);
+        })
+        .filter((m) => getConversationMessageText(m).trim());
+
+      const dialogueText = formatConversationForCopy(normalizedMessages);
+
       const sections = [];
-      let secIdx = 0;
 
       const addSection = (key, label, content, defaultOpen) => {
-        secIdx++;
         const open = defaultOpen && !!content;
-        const short = content && typeof content === "string" ? content.slice(0, 200) : "";
         sections.push(
           <div key={key} style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
             <div
               onClick={() => {
-                const k = `timeline-detail-${key}`;
+                if (!content) return;
+                const k = `tl-${key}`;
                 setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
               }}
               style={{
@@ -2799,11 +2873,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                   {content.length > 250 && (
-                    <button onClick={() => openModal(label, content)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                    <button
+                      onClick={() => setTimelineLargeSection({ title: label, content })}
+                      style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
+                    >
                       Открыть в большом окне
                     </button>
                   )}
-                  <button onClick={() => { navigator.clipboard.writeText(content); showToast("Скопировано"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                  <button
+                    onClick={() => copyToClipboard(content, `${label} скопирован`)}
+                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
+                  >
                     Скопировать
                   </button>
                 </div>
@@ -2816,46 +2896,42 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       // 1. Patient text
       addSection("patient", "Текст пациента", sd.patient_text, true);
 
-      // 2. Conversation history
-      const conversationHistory = sd.conversation_history || [];
-      const dialogueText = conversationHistory.length > 0
-        ? conversationHistory.map((m) => {
-            const role = m.role === "user" || m.role === "patient" ? "Пациент" : "Точка опоры";
-            return `[${role}]${m.round ? ` (раунд ${m.round})` : ""}\n${m.content || ""}`;
-          }).join("\n\n---\n\n")
-        : "";
-
+      // 2. Dialogue
       sections.push(
         <div key="dialogue" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
           <div
             onClick={() => {
-              const k = "timeline-detail-dialogue";
+              if (normalizedMessages.length === 0) return;
+              const k = "tl-dialogue";
               setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
             }}
             style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "10px 14px", cursor: conversationHistory.length > 0 ? "pointer" : "default",
+              padding: "10px 14px", cursor: normalizedMessages.length > 0 ? "pointer" : "default",
               background: t.highlight,
               userSelect: "none",
             }}
           >
-            <span style={{ fontWeight: 700, fontSize: 13, color: conversationHistory.length > 0 ? t.crisisText : t.muted }}>
+            <span style={{ fontWeight: 700, fontSize: 13, color: normalizedMessages.length > 0 ? t.crisisText : t.muted }}>
               Диалог с системой
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {conversationHistory.length === 0 && <span style={{ color: t.muted, fontSize: 11 }}>Нет сохранённых данных</span>}
-              {conversationHistory.length > 0 && (
+              {normalizedMessages.length === 0 && conversationHistory.length > 0 && (
+                <span style={{ color: t.muted, fontSize: 11 }}>В этой записи сохранились роли сообщений, но текст диалога отсутствует.</span>
+              )}
+              {normalizedMessages.length === 0 && conversationHistory.length === 0 && (
+                <span style={{ color: t.muted, fontSize: 11 }}>Нет сохранённых данных</span>
+              )}
+              {normalizedMessages.length > 0 && (
                 <span style={{ color: t.cardLabel, fontSize: 11, transform: "rotate(180deg)", transition: "transform .2s" }}>▾</span>
               )}
             </div>
           </div>
-          {conversationHistory.length > 0 && (
+          {normalizedMessages.length > 0 && (
             <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
               <div style={{ maxHeight: 400, overflowY: "auto" }}>
-                {conversationHistory.map((msg, i) => {
+                {normalizedMessages.map((msg, i) => {
                   const isUser = msg.role === "user" || msg.role === "patient";
-                  const isSystem = msg.role === "system" || msg.role === "developer" || msg.role === "tool" || msg.role === "reasoning";
-                  if (isSystem) return null;
                   return (
                     <div key={i} style={{
                       marginBottom: 10, padding: "10px 12px",
@@ -2873,7 +2949,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         </div>
                       </div>
                       <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                        {msg.content || ""}
+                        {getConversationMessageText(msg)}
                       </div>
                     </div>
                   );
@@ -2881,12 +2957,18 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 {dialogueText && (
-                  <button onClick={() => openModal("Диалог", dialogueText)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                  <button
+                    onClick={() => setTimelineLargeSection({ title: "Диалог с системой", content: dialogueText })}
+                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
+                  >
                     Открыть в большом окне
                   </button>
                 )}
                 {dialogueText && (
-                  <button onClick={() => { navigator.clipboard.writeText(dialogueText); showToast("Скопировано"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                  <button
+                    onClick={() => copyToClipboard(dialogueText, "Диалог скопирован")}
+                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
+                  >
                     Скопировать диалог
                   </button>
                 )}
@@ -2896,19 +2978,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         </div>
       );
 
-      // 3. User report + corrected version
+      // 3-10: sections using addSection
       addSection("user_report", "Отчёт для пациента", sd.user_report, false);
       if (sd.doctor_correction?.corrected_user_report) {
         addSection("corrected_user", "Исправленная версия (пациент)", sd.corrected_user_report, false);
       }
 
-      // 4. Doctor report + corrected version
       addSection("doctor_report", "Отчёт для специалиста", sd.doctor_report, false);
       if (sd.doctor_correction?.corrected_doctor_report) {
         addSection("corrected_doctor", "Исправленная версия (специалист)", sd.corrected_doctor_report, false);
       }
 
-      // 5. Doctor feedback
       const df = sd.doctor_feedback || {};
       const feedbackItems = [];
       if (df.wrong_questions) feedbackItems.push({ label: "Неверные вопросы", value: df.wrong_questions });
@@ -2918,32 +2998,26 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const feedbackText = feedbackItems.map((i) => `${i.label}:\n${i.value}`).join("\n\n---\n\n");
       addSection("feedback", "Отзыв специалиста", feedbackText || df.correction_comment || "", false);
 
-      // 6. Expert correction
       const correctionParts = [];
       if (sd.correction_comment) correctionParts.push(`Комментарий к правке:\n${sd.correction_comment}`);
       if (sd.protocol_update) correctionParts.push(`Обновление протокола:\n${sd.protocol_update}`);
       if (sd.doctor_correction?.wrong_questions) correctionParts.push(`Неверные вопросы:\n${sd.doctor_correction.wrong_questions}`);
       if (sd.doctor_correction?.missing_questions) correctionParts.push(`Пропущенные вопросы:\n${sd.doctor_correction.missing_questions}`);
       if (sd.doctor_correction?.bad_question_wording) correctionParts.push(`Некорректные формулировки:\n${sd.doctor_correction.bad_question_wording}`);
-      const correctionText = correctionParts.join("\n\n---\n\n");
-      addSection("expert_correction", "Экспертная правка", correctionText, false);
+      addSection("expert_correction", "Экспертная правка", correctionParts.join("\n\n---\n\n"), false);
 
-      // 7. Diary
       const diaryStr = sd.diary
         ? (typeof sd.diary === "string" ? sd.diary : JSON.stringify(sd.diary, null, 2))
         : "";
       addSection("diary", "Дневник состояния", diaryStr, false);
 
-      // 8. Support plan
       const spStr = sd.support_plan
         ? (typeof sd.support_plan === "string" ? sd.support_plan : JSON.stringify(sd.support_plan, null, 2))
         : "";
       addSection("support_plan", "Выбранные практики", spStr, false);
 
-      // 9. Continuation comment
       addSection("continuation", "Комментарий по продолжению", sd.continuation_comment, false);
 
-      // 10. Training evaluation
       const tr = sd.training;
       if (tr) {
         const trainingLines = [];
@@ -2982,35 +3056,40 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         addSection("training", "Оценка тренировочной сессии", trainingLines.join("\n"), false);
       }
 
+      // Large section overlay (within detail modal)
+      if (timelineLargeSection) {
+        return (
+          <div>
+            <button
+              onClick={() => setTimelineLargeSection(null)}
+              style={{ border: 0, background: "transparent", color: t.accent, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 12 }}
+            >
+              ← Назад к сессии
+            </button>
+            <h4 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 700 }}>{timelineLargeSection.title}</h4>
+            <div style={{
+              color: t.crisisText, fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
+              maxHeight: "calc(90vh - 280px)", overflowY: "auto", marginBottom: 12,
+            }}>
+              {timelineLargeSection.content}
+            </div>
+            <button
+              onClick={() => copyToClipboard(timelineLargeSection.content, `${timelineLargeSection.title} скопирован`)}
+              style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+            >
+              Скопировать
+            </button>
+          </div>
+        );
+      }
+
       return <div>{sections}</div>;
     };
 
     function copySessionDetails(sd) {
       if (!sd) return;
-      const parts = [];
-      parts.push(`Текст пациента:\n${sd.patient_text || "—"}`);
-      const ch = sd.conversation_history || [];
-      if (ch.length > 0) {
-        const dialogue = ch.map((m) => {
-          const role = m.role === "user" || m.role === "patient" ? "Пациент" : "Точка опоры";
-          return `[${role}]${m.round ? ` (раунд ${m.round})` : ""}\n${m.content || ""}`;
-        }).join("\n\n---\n\n");
-        parts.push(`Диалог:\n${dialogue}`);
-      }
-      parts.push(`Отчёт для пациента:\n${sd.user_report || "—"}`);
-      parts.push(`Отчёт для специалиста:\n${sd.doctor_report || "—"}`);
-      if (sd.correction_comment) parts.push(`Экспертная правка:\n${sd.correction_comment}`);
-      const tr = sd.training;
-      if (tr) {
-        const tlines = [];
-        if (tr.scenario_played) tlines.push(`Сценарий: ${tr.scenario_played}`);
-        if (tr.expected_case_type) tlines.push(`Ожидаемый тип: ${tr.expected_case_type}`);
-        if (tr.ai_detected_case_type) tlines.push(`Распознано: ${tr.ai_detected_case_type}`);
-        if (tr.expert_comment) tlines.push(`Комментарий: ${tr.expert_comment}`);
-        parts.push(`Оценка тренировки:\n${tlines.join("\n")}`);
-      }
-      navigator.clipboard.writeText(parts.join("\n\n=====\n\n"));
-      showToast("Скопировано");
+      const text = formatAnonymizedSession(sd);
+      copyToClipboard(text, "Обезличенная сессия скопирована");
     }
 
     return (
@@ -4255,7 +4334,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     ← Назад к линии сессий
                   </button>
                   <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
-                    Сессия №{sessionDetailsData.session_sequence || ""}
+                    Сессия{sessionDetailsData.session_sequence ? ` №${sessionDetailsData.session_sequence}` : ""}
                   </h3>
                   <div style={{ color: t.accent, fontSize: 14, fontWeight: 600, marginTop: 2 }}>
                     {SESSION_KIND_LABELS_TIMELINE[sessionDetailsData.session_kind] || sessionDetailsData.session_kind || "Сессия"}
@@ -4290,7 +4369,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             key={toast.key}
             style={{
               position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
-              zIndex: 2000, padding: "14px 24px", borderRadius: 16, fontWeight: 600, fontSize: 15,
+              zIndex: 3010, padding: "14px 24px", borderRadius: 16, fontWeight: 600, fontSize: 15,
               boxShadow: adminDarkMode ? "0 8px 30px rgba(0,0,0,.5)" : "0 4px 20px rgba(0,0,0,.1)",
               animation: "toastIn 0.3s ease",
               textAlign: "center", maxWidth: "calc(100vw - 40px)",
