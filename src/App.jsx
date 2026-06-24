@@ -1887,6 +1887,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setTimelineView("list");
     setSessionDetailsData(null);
     setSessionDetailsError(null);
+    setSessionDetailsLoading(false);
   }
 
   async function loadSessionTimeline(code) {
@@ -4095,7 +4096,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
             background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center",
             justifyContent: "center", zIndex: 3001, padding: 20,
-          }} onClick={() => { setTimelineData(null); setTimelineCode(null); }}>
+          }} onClick={() => { closeModal(); }}>
             <div style={{
               background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
               padding: 24, maxWidth: 700, width: "100%", maxHeight: "90vh",
@@ -4106,7 +4107,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Линия сессий</h3>
                   {timelineCode && <div style={{ color: t.accent, fontSize: 14, fontWeight: 600, marginTop: 4 }}>{timelineCode}</div>}
                 </div>
-                <button onClick={() => { setTimelineData(null); setTimelineCode(null); }} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>✕</button>
+                <button onClick={() => { closeModal(); }} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>✕</button>
               </div>
 
               <div style={{ flex: 1, overflowY: "auto" }}>
@@ -4225,7 +4226,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
 
               <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button onClick={() => { setTimelineData(null); setTimelineCode(null); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                <button onClick={() => { closeModal(); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
                   Закрыть
                 </button>
               </div>

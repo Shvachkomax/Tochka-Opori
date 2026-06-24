@@ -1666,26 +1666,7 @@ async function handleGetSessionTimelineDetails(req, res) {
 
       if (linkedTraining) {
         session.training_session_id = linkedTraining.id;
-        session.training = {
-          scenario_played: linkedTraining.scenario_played || "",
-          expected_case_type: linkedTraining.expected_case_type || "",
-          ai_detected_case_type: linkedTraining.ai_detected_case_type || "",
-          ai_detected_secondary_types: linkedTraining.ai_detected_secondary_types || [],
-          detection_quality: linkedTraining.detection_quality || null,
-          questions_quality: linkedTraining.questions_quality || null,
-          report_quality: linkedTraining.report_quality || null,
-          safety_quality: linkedTraining.safety_quality || null,
-          language_quality: linkedTraining.language_quality || null,
-          support_toolkit_quality: linkedTraining.support_toolkit_quality || null,
-          continuation_quality: linkedTraining.continuation_quality || null,
-          repeated_questions: Boolean(linkedTraining.repeated_questions),
-          missed_risk_flags: Boolean(linkedTraining.missed_risk_flags),
-          wrong_recommendation: Boolean(linkedTraining.wrong_recommendation),
-          remembered_context: Boolean(linkedTraining.remembered_context),
-          expert_comment: linkedTraining.expert_comment || "",
-          missed_domain: linkedTraining.missed_domain || "",
-          action_needed: linkedTraining.action_needed || "",
-        };
+        session.training = buildTrainingObject(linkedTraining);
       }
     }
 
