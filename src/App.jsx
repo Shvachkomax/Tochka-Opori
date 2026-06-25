@@ -23,6 +23,8 @@ export default function App() {
   const [transcribing, setTranscribing] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [recordingTime, setRecordingTime] = useState(0);
+  const [voiceObservations, setVoiceObservations] = useState([]);
+  const voiceMsgCounterRef = useRef(0);
 
   const [sessionReviewOpen, setSessionReviewOpen] = useState(false);
   const [patientRating, setPatientRating] = useState(0);
@@ -171,6 +173,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     wrong_questions: "", missing_questions: "", bad_question_wording: "",
     corrected_user_report: "", corrected_doctor_report: "",
     protocol_update: "", correction_comment: "",
+    voice_accuracy: "", voice_usefulness: "", voice_influenced: "",
+    voice_confirmed: [], voice_comment: "",
   });
 
   // Expert state
@@ -600,7 +604,21 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             throw new Error(data.error || "Не удалось расшифровать голос");
           }
 
-          setText(data.text || "");
+          const transcript = data.text || "";
+          setText(transcript);
+          if (data.voice_observations) {
+            const msgId = `voice-${Date.now()}-${++voiceMsgCounterRef.current}`;
+            setVoiceObservations((prev) => {
+              if (prev.some((e) => e.messageId === msgId)) return prev;
+              return [...prev, {
+                messageId: msgId,
+                round: 0,
+                createdAt: new Date().toISOString(),
+                transcript,
+                analysis: data.voice_observations,
+              }];
+            });
+          }
           setMode("text");
         } catch (error) {
           setVoiceError(error.message || "Ошибка расшифровки");
@@ -697,6 +715,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             ...prev,
             [index]: data.text || "",
           }));
+          if (data.voice_observations) {
+            const msgId = `voice-${Date.now()}-${++voiceMsgCounterRef.current}`;
+            setVoiceObservations((prev) => {
+              if (prev.some((e) => e.messageId === msgId)) return prev;
+              return [...prev, {
+                messageId: msgId,
+                round: dialogDepth,
+                createdAt: new Date().toISOString(),
+                transcript: data.text || "",
+                analysis: data.voice_observations,
+              }];
+            });
+          }
         } catch (error) {
           setVoiceError(error.message || "Ошибка расшифровки");
         } finally {
@@ -854,6 +885,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           homeTasks,
           resourceFactors,
           supportPlan,
+          voiceObservations,
         }),
       });
 
@@ -908,6 +940,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             resourceFactors: resourceFactors || "",
             questions,
             answers,
+            voiceObservations: voiceObservations || null,
           }),
         })
           .then((r) => r.json())
@@ -930,6 +963,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
                 patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
                 doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
+                voice_observations: voiceObservations || null,
                 expert_id: expertData?.id || null,
                 expert_name: expertData?.name || null,
                 expert_role: expertData?.role || null,
@@ -1612,6 +1646,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const json = getReviewJson(review);
       const correction = getDoctorCorrection(review);
       const corrected = getCorrectedJson(review);
+      const voiceReview = json?.voice_analysis_review || review?.voice_analysis_review || {};
 
       setCorrectionForm({
         wrong_questions: correction.wrong_questions || json?.doctor_feedback?.wrong_questions || "",
@@ -1621,6 +1656,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         corrected_doctor_report: corrected.corrected_doctor_report || correction.corrected_doctor_report || json?.corrected_doctor_report || "",
         protocol_update: review?.protocol_update || correction.protocol_update || "",
         correction_comment: review?.correction_comment || correction.correction_comment || "",
+        voice_accuracy: voiceReview.accuracy || "",
+        voice_usefulness: voiceReview.usefulness || "",
+        voice_influenced: voiceReview.influenced_decision || "",
+        voice_confirmed: voiceReview.confirmed_features || [],
+        voice_comment: voiceReview.comment || "",
       });
       setEditingReview(review?.id);
     } catch (error) {
@@ -1635,6 +1675,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function adminSaveCorrection(reviewId, newStatus) {
     setAdminActionLoading(reviewId);
     try {
+      const voiceReview = {};
+      if (correctionForm.voice_accuracy) voiceReview.accuracy = correctionForm.voice_accuracy;
+      if (correctionForm.voice_usefulness) voiceReview.usefulness = correctionForm.voice_usefulness;
+      if (correctionForm.voice_influenced) voiceReview.influenced_decision = correctionForm.voice_influenced;
+      if (correctionForm.voice_confirmed?.length) voiceReview.confirmed_features = correctionForm.voice_confirmed;
+      if (correctionForm.voice_comment) voiceReview.comment = correctionForm.voice_comment;
+      if (Object.keys(voiceReview).length > 0) {
+        voiceReview.reviewed_at = new Date().toISOString();
+      }
+
       const body = {
         review_id: reviewId,
         admin_secret: adminPassword,
@@ -1648,6 +1698,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         },
         protocol_update: correctionForm.protocol_update,
         correction_comment: correctionForm.correction_comment,
+        voice_analysis_review: Object.keys(voiceReview).length > 0 ? voiceReview : undefined,
       };
       if (newStatus) {
         body.status = newStatus;
@@ -3056,6 +3107,81 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         addSection("training", "Оценка тренировочной сессии", trainingLines.join("\n"), false);
       }
 
+      // Voice observations block
+      const vo = sd.voice_observations || sd.json_data?.voice_observations || null;
+      if (vo) {
+        const voList = Array.isArray(vo) ? vo : [vo];
+        const voiceContent = voList.map((v, vi) => {
+          const a = v.analysis || v;
+          if (a.status === "insufficient_audio") {
+            return `Сообщение ${vi + 1}: Качество записи недостаточно для надёжного описания особенностей речи.`;
+          }
+          if (a.status === "error" || a.status === "not_available") {
+            return null;
+          }
+          const lines = [];
+          if (a.summary) lines.push(a.summary);
+          if (a.alternative_explanations?.length) {
+            lines.push(`\nВозможные альтернативные объяснения:\n${a.alternative_explanations.map((e) => `- ${e}`).join("\n")}`);
+          }
+          if (a.suggested_followups?.length) {
+            lines.push(`\nЧто стоит уточнить:\n${a.suggested_followups.map((f) => `- ${f}`).join("\n")}`);
+          }
+          if (a.limitations?.length) {
+            lines.push(`\nОграничение:\n${a.limitations.map((l) => `- ${l}`).join("\n")}`);
+          }
+          return lines.join("\n");
+        }).filter(Boolean).join("\n\n---\n\n");
+
+        const voiceLabel = voList.length > 1
+          ? "Голосовые признаки"
+          : (voList[0]?.analysis?.status === "insufficient_audio" || voList[0]?.status === "insufficient_audio"
+              ? "Голосовые признаки — качество записи недостаточно"
+              : "Голосовые признаки");
+
+        sections.push(
+          <div key="voice" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+            <div
+              onClick={() => {
+                const k = "tl-voice";
+                setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
+              }}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "10px 14px", cursor: "pointer",
+                background: t.highlight,
+                userSelect: "none",
+              }}
+            >
+              <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>
+                {voiceLabel}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: t.muted, fontSize: 10, border: `1px solid ${t.muted}`, borderRadius: 4, padding: "1px 5px" }}>
+                  Экспериментально
+                </span>
+                <span style={{ color: t.cardLabel, fontSize: 11, transform: expandedSections["tl-voice"] ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▾</span>
+              </div>
+            </div>
+            {expandedSections["tl-voice"] && voiceContent && (
+              <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
+                <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 400, overflowY: "auto" }}>
+                  {voiceContent}
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button
+                    onClick={() => copyToClipboard(voiceContent, "Голосовые признаки скопированы")}
+                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
+                  >
+                    Скопировать
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
       // Large section overlay (within detail modal)
       if (timelineLargeSection) {
         return (
@@ -4071,6 +4197,71 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Исправленная версия отчета для специалиста" value={correctionForm?.corrected_doctor_report || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, corrected_doctor_report: e.target.value })} />
                             <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Предложение для изменения протокола / prompts" value={correctionForm?.protocol_update || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, protocol_update: e.target.value })} />
                             <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 12 }} placeholder="Комментарий редактора" value={correctionForm?.correction_comment || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, correction_comment: e.target.value })} />
+
+                            <div style={{ borderTop: `1px solid ${t.cardBorder}`, paddingTop: 12, marginBottom: 12 }}>
+                              <div style={{ color: t.crisisText, fontWeight: 700, fontSize: 13, marginBottom: 8 }}>
+                                Оценка голосового анализа <span style={{ color: t.muted, fontWeight: 400, fontSize: 11 }}>Экспериментально</span>
+                              </div>
+
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>Точность наблюдений</div>
+                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                  {[["correct", "Верно"], ["partially_correct", "Частично верно"], ["incorrect", "Неверно"], ["cannot_assess", "Невозможно оценить"]].map(([val, label]) => (
+                                    <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, color: t.crisisText, fontSize: 12, cursor: "pointer" }}>
+                                      <input type="radio" name="voice_accuracy" checked={correctionForm.voice_accuracy === val} onChange={() => setCorrectionForm({ ...correctionForm, voice_accuracy: val })} />
+                                      {label}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>Полезность</div>
+                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                  {[["useful", "Полезно"], ["mostly_useful", "Скорее полезно"], ["neutral", "Нейтрально"], ["mostly_harmful", "Скорее мешает"], ["harmful", "Мешает"]].map(([val, label]) => (
+                                    <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, color: t.crisisText, fontSize: 12, cursor: "pointer" }}>
+                                      <input type="radio" name="voice_usefulness" checked={correctionForm.voice_usefulness === val} onChange={() => setCorrectionForm({ ...correctionForm, voice_usefulness: val })} />
+                                      {label}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>Повлияло на решение специалиста</div>
+                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                  {[["yes", "Да"], ["no", "Нет"], ["partially", "Частично"]].map(([val, label]) => (
+                                    <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, color: t.crisisText, fontSize: 12, cursor: "pointer" }}>
+                                      <input type="radio" name="voice_influenced" checked={correctionForm.voice_influenced === val} onChange={() => setCorrectionForm({ ...correctionForm, voice_influenced: val })} />
+                                      {label}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>Подтверждённые признаки</div>
+                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                  {[["tempo", "Темп"], ["pauses", "Паузы"], ["volume", "Громкость"], ["prosody", "Выразительность"], ["tension", "Напряжение"], ["stability", "Изменчивость"], ["audio_quality", "Качество записи"]].map(([val, label]) => {
+                                    const checked = correctionForm.voice_confirmed?.includes(val);
+                                    return (
+                                      <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, color: t.crisisText, fontSize: 12, cursor: "pointer" }}>
+                                        <input type="checkbox" checked={checked} onChange={() => {
+                                          const current = correctionForm.voice_confirmed || [];
+                                          setCorrectionForm({
+                                            ...correctionForm,
+                                            voice_confirmed: checked ? current.filter((c) => c !== val) : [...current, val],
+                                          });
+                                        }} />
+                                        {label}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              <textarea style={{ ...s.crisisTextarea, minHeight: 50 }} placeholder="Комментарий специалиста к анализу звучания речи" value={correctionForm?.voice_comment || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, voice_comment: e.target.value })} />
+                            </div>
 
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                               <button

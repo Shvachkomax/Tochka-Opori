@@ -14,9 +14,11 @@
     "@supabase/supabase-js": "^2.107.0",
     "@vitejs/plugin-react": "latest",
     "dotenv": "^17.4.2",
+    "ebml": "^3.0.0",
     "framer-motion": "latest",
     "jspdf": "^4.2.1",
     "lucide-react": "latest",
+    "opusscript": "^0.1.1",
     "react": "latest",
     "react-dom": "latest",
     "vite": "latest"

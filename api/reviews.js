@@ -296,6 +296,7 @@ async function handleSaveCorrection(req, res) {
     const {
       review_id, status, admin_secret, action,
       doctor_correction, protocol_update, correction_comment,
+      voice_analysis_review,
     } = req.body || {};
 
     const adminSecret = process.env.ADMIN_SECRET;
@@ -358,6 +359,10 @@ async function handleSaveCorrection(req, res) {
       correction_comment: correction_comment || jsonData.correction_comment || null,
       protocol_update: protocol_update || jsonData.protocol_update || null,
     };
+
+    if (voice_analysis_review) {
+      updates.voice_analysis_review = voice_analysis_review;
+    }
 
     if (status && ALLOWED_STATUSES.includes(status)) {
       updates.status = status;
@@ -1604,24 +1609,25 @@ async function handleGetSessionTimelineDetails(req, res) {
       const j = review.json_data || {};
       const df = j.doctor_feedback || review.doctor_feedback || {};
 
-      session = {
-        session_id: review.session_id || null,
-        case_review_id: review.id,
-        training_session_id: null,
-        created_at: review.created_at,
-        session_kind: j.session_kind || "initial",
-        session_sequence: j.session_sequence || null,
-        status: j.status || null,
-        model_used: j.model_used || null,
-        fallback_used: Boolean(j.fallback_used),
-        expert_id: review.expert_id,
-        expert_name: review.expert_name || null,
-        patient_text: j.patient_text || j.input || j.patient_input || j.text || "",
-        conversation_history: j.conversation_history || j.conversationHistory || [],
-        user_report: j.user_report || j.patient_report || "",
-        doctor_report: j.doctor_report || j.specialist_report || "",
-        doctor_feedback: df,
-        doctor_correction: df.corrected_user_report || df.corrected_doctor_report ? {
+        session = {
+          session_id: review.session_id || null,
+          case_review_id: review.id,
+          training_session_id: null,
+          created_at: review.created_at,
+          session_kind: j.session_kind || "initial",
+          session_sequence: j.session_sequence || null,
+          status: j.status || null,
+          model_used: j.model_used || null,
+          fallback_used: Boolean(j.fallback_used),
+          expert_id: review.expert_id,
+          expert_name: review.expert_name || null,
+          patient_text: j.patient_text || j.input || j.patient_input || j.text || "",
+          conversation_history: j.conversation_history || j.conversationHistory || [],
+          user_report: j.user_report || j.patient_report || "",
+          doctor_report: j.doctor_report || j.specialist_report || "",
+          voice_observations: j.voice_observations || null,
+          doctor_feedback: df,
+          doctor_correction: df.corrected_user_report || df.corrected_doctor_report ? {
           corrected_user_report: df.corrected_user_report || "",
           corrected_doctor_report: df.corrected_doctor_report || "",
           wrong_questions: df.wrong_questions || "",
@@ -1712,6 +1718,7 @@ async function handleGetSessionTimelineDetails(req, res) {
         conversation_history: s.conversation_history || sj.conversation_history || sj.conversationHistory || [],
         user_report: s.user_report || sj.user_report || "",
         doctor_report: s.doctor_report || sj.doctor_report || "",
+        voice_observations: sj.voice_observations || null,
         doctor_feedback: sj.doctor_feedback || {},
         doctor_correction: null,
         corrected_user_report: "",
@@ -1743,6 +1750,7 @@ async function handleGetSessionTimelineDetails(req, res) {
         // Merge in additional data from case_review
         if (!session.doctor_report) session.doctor_report = lj.doctor_report || lj.specialist_report || "";
         if (!session.user_report) session.user_report = lj.user_report || lj.patient_report || "";
+        if (!session.voice_observations) session.voice_observations = lj.voice_observations || null;
         if (ldf.corrected_user_report || ldf.corrected_doctor_report) {
           session.doctor_correction = {
             corrected_user_report: ldf.corrected_user_report || "",

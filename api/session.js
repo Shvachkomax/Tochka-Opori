@@ -31,6 +31,7 @@ async function handleSave(req, res) {
       user_report, doctor_report, riskLevel, supportPlan,
       dialogDepth, previousPatientReport, previousDoctorReport,
       homeTasks, resourceFactors, questions, answers,
+      voiceObservations,
     } = req.body || {};
 
     if (!sessionId) {
@@ -81,6 +82,7 @@ async function handleSave(req, res) {
         resourceFactors: resourceFactors || "",
         questions: questions || null,
         answers: answers || {},
+        voiceObservations: voiceObservations || null,
       },
     };
 

@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan } = req.body || {};
+  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations } = req.body || {};
 
   if (!text || text.trim().length < 10) {
     return res.status(400).json({ error: "Опишите состояние подробнее" });
@@ -302,6 +302,23 @@ export default async function handler(req, res) {
 
 Полный речевой справочник: prompts/language-style.md.
 
+Голосовые признаки (voice_observations):
+Если переданы voice_observations, используй их только как дополнительный
+неспецифический источник информации.
+
+Не ставь диагноз по голосовым признакам.
+
+Разделяй:
+1. наблюдаемую особенность речи;
+2. возможные альтернативные объяснения;
+3. вопрос, который специалисту следует уточнить.
+
+Не усиливай уровень риска только на основании голоса.
+
+Голосовые признаки могут повысить приоритет уточняющего вопроса,
+но не могут самостоятельно служить основанием для вывода о депрессии,
+мании, психозе, интоксикации, суицидальном риске или неискренности.
+
 MIN_DEPTH = ${MIN_DEPTH}. Не завершай диалог до минимальной глубины ${MIN_DEPTH}, если нет низкой сложности, низкого риска и ясного объяснения.
 MAX_DEPTH = ${MAX_DEPTH}. После максимальной глубины ${MAX_DEPTH} заверши, указав ограничения.
 
@@ -416,6 +433,15 @@ ${text}
       decisionRule = `Ты еще не достиг минимальной глубины. Продолжай уточнение. Верни только вопросы.`;
     }
 
+    const voiceBlock = Array.isArray(voiceObservations) && voiceObservations.length > 0
+      ? `\nГолосовые признаки (экспериментальный анализ):\n${voiceObservations.map((vo) => {
+          const a = vo.analysis || {};
+          return `- Сообщение ${vo.messageId || vo.round || ""}: ${a.summary || "анализ недоступен"}`;
+        }).join("\n")}\n`
+      : (typeof voiceObservations === "object" && voiceObservations?.summary
+          ? `\nГолосовые признаки (экспериментальный анализ):\n${voiceObservations.summary}\n`
+          : "");
+
     userPrompt = `Текущий раунд: ${depth + 1}.
 ${decisionRule}
 
@@ -426,7 +452,7 @@ ${
   currentAnswersText
     ? `Ответы на предыдущие вопросы:\n${currentAnswersText}\n`
     : ""
-}Исходное описание пользователя: ${text}
+}${voiceBlock}Исходное описание пользователя: ${text}
 
 ${
   isContinuation && previousPatientReport
