@@ -219,6 +219,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [trainingFormData, setTrainingFormData] = useState({ scenario_played: "", expected_case_type: "", session_kind: "initial", expert_comment: "", public_code: "" });
   const [trainingFormPublicCodeAuto, setTrainingFormPublicCodeAuto] = useState(false);
 
+  // Trash / soft-delete state
+  const [trainingShowTrash, setTrainingShowTrash] = useState(false);
+  const [trainingSelection, setTrainingSelection] = useState(new Set());
+  const [trainingTrashConfirm, setTrainingTrashConfirm] = useState(null);
+  const [trainingPermanentConfirm, setTrainingPermanentConfirm] = useState(null);
+  const [trainingDeletionReason, setTrainingDeletionReason] = useState("");
+  const [trainingDeletionReasonCustom, setTrainingDeletionReasonCustom] = useState("");
+  const [trainingBulkConfirm, setTrainingBulkConfirm] = useState(null);
+
   // Expandable review sections state
   const [expandedSections, setExpandedSections] = useState({});
   const [modalData, setModalData] = useState(null);
@@ -1224,8 +1233,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   async function loadTrainingSessions() {
     setTrainingLoading(true);
+    setTrainingSelection(new Set());
     try {
-      const body = { action: "listTrainingSessions", ...trainingFilter };
+      const body = { action: "listTrainingSessions", ...trainingFilter, showTrash: trainingShowTrash };
       if (expertData) {
         body.expert_id = expertData.id;
       } else {
@@ -1325,12 +1335,146 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const data = await res.json();
       if (data.ok) {
         setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
-        showToast("Удалено");
+        showToast("Перемещено в корзину");
       } else {
         showToast(data.error || "Ошибка", "error");
       }
     } catch {
       showToast("Ошибка удаления", "error");
+    }
+  }
+
+  async function trashSingleTrainingSession(id) {
+    try {
+      const reason = trainingDeletionReason === "other" ? trainingDeletionReasonCustom || "other" : trainingDeletionReason;
+      const body = { action: "trashTrainingSession", id, admin_secret: adminPassword, expert_name: "admin", deletion_reason: reason };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
+        setTrainingTrashConfirm(null);
+        setTrainingDeletionReason("");
+        setTrainingDeletionReasonCustom("");
+        showToast("Перемещено в корзину");
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка перемещения в корзину", "error");
+    }
+  }
+
+  async function trashBulkTrainingSessions(ids) {
+    try {
+      const reason = trainingDeletionReason === "other" ? trainingDeletionReasonCustom || "other" : trainingDeletionReason;
+      const body = { action: "trashTrainingSessions", ids, admin_secret: adminPassword, expert_name: "admin", deletion_reason: reason };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
+        setTrainingSelection(new Set());
+        setTrainingBulkConfirm(null);
+        setTrainingDeletionReason("");
+        setTrainingDeletionReasonCustom("");
+        showToast(`Перемещено в корзину: ${data.count || ids.length}`);
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка перемещения в корзину", "error");
+    }
+  }
+
+  async function restoreSingleTrainingSession(id) {
+    try {
+      const body = { action: "restoreTrainingSession", id, admin_secret: adminPassword };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
+        showToast("Восстановлено");
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка восстановления", "error");
+    }
+  }
+
+  async function restoreBulkTrainingSessions(ids) {
+    try {
+      const body = { action: "restoreTrainingSessions", ids, admin_secret: adminPassword };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
+        setTrainingSelection(new Set());
+        setTrainingBulkConfirm(null);
+        showToast(`Восстановлено: ${data.count || ids.length}`);
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка восстановления", "error");
+    }
+  }
+
+  async function permanentDeleteTrainingSession(id) {
+    try {
+      const body = { action: "permanentlyDeleteTrainingSession", id, admin_secret: adminPassword };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
+        setTrainingTrashConfirm(null);
+        showToast("Запись удалена безвозвратно");
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка безвозвратного удаления", "error");
+    }
+  }
+
+  async function permanentDeleteBulkTrainingSessions(ids) {
+    try {
+      const body = { action: "permanentlyDeleteTrainingSessions", ids, admin_secret: adminPassword };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
+        setTrainingSelection(new Set());
+        setTrainingBulkConfirm(null);
+        showToast(`Удалено безвозвратно: ${data.count || ids.length}`);
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка безвозвратного удаления", "error");
     }
   }
 
@@ -1365,7 +1509,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   async function downloadTrainingCsv() {
     try {
-      const body = { action: "exportTrainingCsv", ...trainingFilter };
+      const body = { action: "exportTrainingCsv", ...trainingFilter, showTrash: trainingShowTrash };
       if (expertData) body.expert_id = expertData.id;
       else body.admin_secret = adminPassword;
       const res = await fetch("/api/reviews", {
@@ -1377,7 +1521,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `training-sessions-${new Date().toISOString().split("T")[0]}.csv`;
+      a.download = `${trainingShowTrash ? "training-sessions-trash" : "training-sessions"}-${new Date().toISOString().split("T")[0]}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -3581,6 +3725,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               ) : adminReqTab === "training" ? (
                 <>
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
+                  {/* Active / Trash toggle */}
+                  <button onClick={() => { setTrainingShowTrash(false); setTrainingSelection(new Set()); loadTrainingSessions(); }} style={{ border: 0, borderRadius: 12, padding: "10px 16px", fontWeight: 700, fontSize: 14, cursor: "pointer", background: !trainingShowTrash ? t.tabActive : t.tabBg, color: !trainingShowTrash ? t.tabActiveText : t.text }}>Активные записи</button>
+                  <button onClick={() => { setTrainingShowTrash(true); setTrainingSelection(new Set()); loadTrainingSessions(); }} style={{ border: 0, borderRadius: 12, padding: "10px 16px", fontWeight: 700, fontSize: 14, cursor: "pointer", background: trainingShowTrash ? t.tabActive : t.tabBg, color: trainingShowTrash ? t.tabActiveText : t.text }}>Корзина</button>
+
                   <select value={trainingFilter.status} onChange={(e) => setTrainingFilter((f) => ({ ...f, status: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
                     <option value="all">Все статусы</option>
                     {["new","reviewed","needs_prompt_update","approved_for_learning","rejected","archived"].map((o) => <option key={o} value={o}>{st(o)}</option>)}
@@ -3602,7 +3750,124 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </button>
                 </div>
 
-                {trainingNewRow && (
+                {/* Bulk action bar */}
+                {trainingSelection.size > 0 && (
+                  <div style={{ marginBottom: 16, padding: "12px 16px", border: `1px solid ${t.accent}`, borderRadius: 12, background: t.highlight, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    <span style={{ color: t.text, fontWeight: 700, fontSize: 14 }}>Выбрано: {trainingSelection.size}</span>
+                    {trainingShowTrash ? (
+                      <>
+                        <button onClick={() => setTrainingBulkConfirm("restore")} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Восстановить выбранные</button>
+                        <button onClick={() => setTrainingBulkConfirm("permanentDelete")} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Удалить выбранные навсегда</button>
+                      </>
+                    ) : (
+                      <button onClick={() => { setTrainingDeletionReason("bulk"); setTrainingBulkConfirm("trash"); }} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Удалить выбранные</button>
+                    )}
+                    <button onClick={() => setTrainingSelection(new Set())} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Снять выделение</button>
+                  </div>
+                )}
+
+                {/* Bulk confirm modal */}
+                {trainingBulkConfirm && (
+                  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+                    <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20, padding: 24, maxWidth: 500, width: "90%" }}>
+                      {trainingBulkConfirm === "trash" && (
+                        <>
+                          <div style={{ fontWeight: 800, fontSize: 18, color: t.crisisText, marginBottom: 12 }}>Переместить в корзину {trainingSelection.size} записей?</div>
+                          <div style={{ color: t.muted, fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>Исходные сессии и экспертные ревью удалены не будут.</div>
+                          <div style={{ marginBottom: 16 }}>
+                            <select value={trainingDeletionReason} onChange={(e) => setTrainingDeletionReason(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 14, width: "100%", outline: "none" }}>
+                              <option value="bulk">Массовое удаление</option>
+                              <option value="aborted">Оборванная сессия</option>
+                              <option value="duplicate">Дубликат</option>
+                              <option value="technical_test">Технический тест</option>
+                              <option value="erroneous">Ошибочная запись</option>
+                              <option value="insufficient_data">Недостаточно данных</option>
+                            </select>
+                          </div>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <button onClick={() => { setTrainingBulkConfirm(null); setTrainingDeletionReason("") }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Отмена</button>
+                            <button onClick={() => trashBulkTrainingSessions([...trainingSelection])} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Переместить в корзину</button>
+                          </div>
+                        </>
+                      )}
+                      {trainingBulkConfirm === "restore" && (
+                        <>
+                          <div style={{ fontWeight: 800, fontSize: 18, color: t.crisisText, marginBottom: 12 }}>Восстановить {trainingSelection.size} записей?</div>
+                          <div style={{ color: t.muted, fontSize: 14, marginBottom: 16 }}>Записи вернутся в активную таблицу.</div>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <button onClick={() => setTrainingBulkConfirm(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Отмена</button>
+                            <button onClick={() => restoreBulkTrainingSessions([...trainingSelection])} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Восстановить</button>
+                          </div>
+                        </>
+                      )}
+                      {trainingBulkConfirm === "permanentDelete" && (
+                        <>
+                          <div style={{ fontWeight: 800, fontSize: 18, color: t.error, marginBottom: 12 }}>Безвозвратно удалить {trainingSelection.size} записей?</div>
+                          <div style={{ color: t.muted, fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>
+                            Записи будут удалены без возможности восстановления.
+                            <br />Исходные сессии и case review останутся в базе.
+                          </div>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <button onClick={() => setTrainingBulkConfirm(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Отмена</button>
+                            <button onClick={() => permanentDeleteBulkTrainingSessions([...trainingSelection])} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Удалить навсегда</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Single trash confirm */}
+                {trainingTrashConfirm && (
+                  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+                    <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20, padding: 24, maxWidth: 500, width: "90%" }}>
+                      <div style={{ fontWeight: 800, fontSize: 18, color: t.crisisText, marginBottom: 8 }}>Удалить тренировочную запись?</div>
+                      <div style={{ color: t.text, fontSize: 14, marginBottom: 8 }}>
+                        <div>Код: {trainingTrashConfirm.public_code || "—"}</div>
+                        <div>Сценарий: {trainingTrashConfirm.scenario_played || "—"}</div>
+                        <div>Тип сессии: {sk(trainingTrashConfirm.session_kind) || "—"}</div>
+                      </div>
+                      <div style={{ color: t.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>Запись переместится в корзину. Исходная сессия и экспертное ревью останутся в базе.</div>
+                      <div style={{ marginBottom: 16 }}>
+                        <select value={trainingDeletionReason} onChange={(e) => setTrainingDeletionReason(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 14, width: "100%", outline: "none" }}>
+                          <option value="">Выберите причину</option>
+                          <option value="aborted">Оборванная сессия</option>
+                          <option value="duplicate">Дубликат</option>
+                          <option value="technical_test">Технический тест</option>
+                          <option value="erroneous">Ошибочная запись</option>
+                          <option value="insufficient_data">Недостаточно данных</option>
+                          <option value="other">Другое</option>
+                        </select>
+                        {trainingDeletionReason === "other" && (
+                          <input placeholder="Опишите причину" value={trainingDeletionReasonCustom || ""} onChange={(e) => setTrainingDeletionReasonCustom(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 14, width: "100%", outline: "none", marginTop: 8 }} />
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button onClick={() => { setTrainingTrashConfirm(null); setTrainingDeletionReason(""); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Отмена</button>
+                        <button onClick={() => trashSingleTrainingSession(trainingTrashConfirm.id)} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Переместить в корзину</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Permanent delete confirm */}
+                {trainingPermanentConfirm && (
+                  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+                    <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20, padding: 24, maxWidth: 500, width: "90%" }}>
+                      <div style={{ fontWeight: 800, fontSize: 18, color: t.error, marginBottom: 12 }}>Удалить запись без возможности восстановления?</div>
+                      <div style={{ color: t.muted, fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>
+                        Будет окончательно удалена только запись таблицы тренировок.
+                        <br />Исходная сессия и case review останутся в базе.
+                      </div>
+                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button onClick={() => { setTrainingPermanentConfirm(null) }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Отмена</button>
+                        <button onClick={() => { permanentDeleteTrainingSession(trainingPermanentConfirm.id); setTrainingPermanentConfirm(null); }} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Удалить навсегда</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!trainingShowTrash && trainingNewRow && (
                   <div style={{ border: `1px solid ${t.accent}`, borderRadius: 16, background: t.cardBg, padding: 16, marginBottom: 16 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: t.text }}>Новая строка</div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
@@ -3625,7 +3890,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 )}
 
-                {!trainingNewRow && (
+                {!trainingShowTrash && !trainingNewRow && (
                   <button onClick={() => setTrainingNewRow({ session_kind: "initial", status: "new" })} style={{ border: `1px dashed ${t.accent}`, borderRadius: 12, background: "transparent", color: t.accent, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer", marginBottom: 16 }}>
                     + Добавить строку
                   </button>
@@ -3640,93 +3905,138 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1400 }}>
                       <thead>
                         <tr style={{ background: t.tabBg }}>
-                          {["Дата","Код пациента","Номер сессии","Тип сессии","Эксперт","Сценарий","Ожидаемый тип случая","Что распознала система","Качество распознавания","Модель","Fallback","Вопросы","Отчёт","Safety","Язык","Практики","Продолжение","Повторы","Риски","Рекомендация","Контекст","Статус","Краткий вывод","Проблема","Комментарий","Действие","Продолж."].map((h) => (
-                            <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontWeight: 700, color: t.muted, borderBottom: `1px solid ${t.border}`, whiteSpace: "nowrap" }}>{h}</th>
-                          ))}
-                          <th style={{ padding: "8px 6px", borderBottom: `1px solid ${t.border}`, width: 80 }}></th>
+                          <th style={{ padding: "8px 6px", borderBottom: `1px solid ${t.border}`, width: 36 }}>
+                            <input type="checkbox" checked={trainingSessions.length > 0 && trainingSelection.size === trainingSessions.length} onChange={(e) => { if (e.target.checked) { setTrainingSelection(new Set(trainingSessions.map((s) => s.id))); } else { setTrainingSelection(new Set()); } }} />
+                          </th>
+                          {trainingShowTrash
+                            ? ["Дата удаления","Удалил","Причина","Дата создания","Код пациента","Номер сессии","Тип сессии","Эксперт","Сценарий","Ожидаемый тип случая","Модель","Статус","Краткий вывод"].map((h) => (
+                              <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontWeight: 700, color: t.muted, borderBottom: `1px solid ${t.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                            ))
+                            : ["Дата","Код пациента","Номер сессии","Тип сессии","Эксперт","Сценарий","Ожидаемый тип случая","Что распознала система","Качество распознавания","Модель","Fallback","Вопросы","Отчёт","Safety","Язык","Практики","Продолжение","Повторы","Риски","Рекомендация","Контекст","Статус","Краткий вывод","Проблема","Комментарий","Действие","Продолж."].map((h) => (
+                              <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontWeight: 700, color: t.muted, borderBottom: `1px solid ${t.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                            ))
+                          }
+                          <th style={{ padding: "8px 6px", borderBottom: `1px solid ${t.border}`, width: 100 }}></th>
                         </tr>
                       </thead>
                       <tbody>
                         {trainingSessions.map((s) => {
                           const isEditing = trainingEditId === s.id;
                           const ed = isEditing ? trainingEditData : {};
+                          const isSelected = trainingSelection.has(s.id);
                           return (
-                            <tr key={s.id} style={{ borderBottom: `1px solid ${t.cardBorder}` }}>
-                              <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.created_at ? new Date(s.created_at).toLocaleDateString("ru-RU") : ""}</td>
-                              <td style={{ padding: "6px", fontWeight: 700, color: t.accent, fontSize: 12, whiteSpace: "nowrap" }}>{s.public_code || "—"}</td>
-                              <td style={{ padding: "6px", color: t.text }}>{s.session_sequence ?? ""}</td>
-                              <td style={{ padding: "6px" }}>{isEditing
-                                ? <select value={ed.session_kind || s.session_kind || "initial"} onChange={(e) => setTrainingEditData((d) => ({ ...d, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}</select>
-                                : <span style={{ color: t.text }}>{sk(s.session_kind) || ""}</span>}</td>
-                              <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.expert_name || (s.expert_role ? s.expert_role : "") || "—"}</td>
-                              <td style={{ padding: "6px" }}>{isEditing
-                                ? <input value={ed.scenario_played ?? s.scenario_played ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
-                                : <span style={{ color: t.text }}>{s.scenario_played || ""}</span>}</td>
-                              <td style={{ padding: "6px" }}>{isEditing
-                                ? <select value={ed.expected_case_type ?? s.expected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}><option value="">—</option>{["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}</select>
-                                : <span style={{ color: t.text }}>{ct(s.expected_case_type) || ""}</span>}</td>
-                              <td style={{ padding: "6px" }}>{isEditing
-                                ? <input value={ed.ai_detected_case_type ?? s.ai_detected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, ai_detected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 80 }} />
-                                : <span style={{ color: t.text }}>{s.ai_detected_case_type || ""}</span>}</td>
-                              <td style={{ padding: "6px" }}>{isEditing
-                                ? <input type="number" min="1" max="5" value={ed.detection_quality ?? s.detection_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, detection_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                : <span style={{ color: s.detection_quality >= 4 ? t.success : s.detection_quality <= 2 ? t.error : t.text }}>{s.detection_quality ?? ""}</span>}</td>
-                              <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.model_used || "—"}</td>
-                              <td style={{ padding: "6px", color: s.fallback_used ? t.error : t.muted, fontSize: 11 }}>{s.fallback_used ? "Да" : "—"}</td>
-                              <td style={{ padding: "6px" }}>{isEditing
-                                ? <input type="number" min="1" max="5" value={ed.questions_quality ?? s.questions_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, questions_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                : <span style={{ color: s.questions_quality >= 4 ? t.success : s.questions_quality <= 2 ? t.error : t.text }}>{s.questions_quality ?? ""}</span>}</td>
-                              <td style={{ padding: "6px" }}>{isEditing
-                                ? <input type="number" min="1" max="5" value={ed.report_quality ?? s.report_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, report_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                : <span style={{ color: s.report_quality >= 4 ? t.success : s.report_quality <= 2 ? t.error : t.text }}>{s.report_quality ?? ""}</span>}</td>
-                              <td style={{ padding: "6px" }}>{isEditing
-                                ? <input type="number" min="1" max="5" value={ed.safety_quality ?? s.safety_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, safety_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                : <span style={{ color: s.safety_quality >= 4 ? t.success : s.safety_quality <= 2 ? t.error : t.text }}>{s.safety_quality ?? ""}</span>}</td>
-                              <td style={{ padding: "6px" }}>{isEditing
-                                ? <input type="number" min="1" max="5" value={ed.language_quality ?? s.language_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, language_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                : <span style={{ color: s.language_quality >= 4 ? t.success : s.language_quality <= 2 ? t.error : t.text }}>{s.language_quality ?? ""}</span>}</td>
-                              <td style={{ padding: "6px" }}>{isEditing
-                                ? <input type="number" min="1" max="5" value={ed.support_toolkit_quality ?? s.support_toolkit_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, support_toolkit_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                : <span style={{ color: s.support_toolkit_quality >= 4 ? t.success : s.support_toolkit_quality <= 2 ? t.error : t.text }}>{s.support_toolkit_quality ?? ""}</span>}</td>
-                              <td style={{ padding: "6px" }}>{isEditing
-                                ? <input type="number" min="1" max="5" value={ed.continuation_quality ?? s.continuation_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, continuation_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                : <span style={{ color: s.continuation_quality >= 4 ? t.success : s.continuation_quality <= 2 ? t.error : t.text }}>{s.continuation_quality ?? ""}</span>}</td>
-                              <td style={{ padding: "6px", color: s.repeated_questions ? t.error : t.muted, fontSize: 11 }}>{s.repeated_questions ? "Да" : "—"}</td>
-                              <td style={{ padding: "6px", color: s.missed_risk_flags ? t.error : t.muted, fontSize: 11 }}>{s.missed_risk_flags ? "Да" : "—"}</td>
-                              <td style={{ padding: "6px", color: s.wrong_recommendation ? t.error : t.muted, fontSize: 11 }}>{s.wrong_recommendation ? "Да" : "—"}</td>
-                              <td style={{ padding: "6px", color: s.remembered_context ? t.success : t.muted, fontSize: 11 }}>{s.remembered_context ? "Да" : "—"}</td>
-                              <td style={{ padding: "6px" }}>{isEditing
-                                ? <select value={ed.status ?? s.status ?? "new"} onChange={(e) => setTrainingEditData((d) => ({ ...d, status: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["new","reviewed","needs_prompt_update","approved_for_learning","rejected","archived"].map((o) => <option key={o} value={o}>{st(o)}</option>)}</select>
-                                : <span style={{
-                                    fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
-                                    background: s.status === "approved_for_learning" ? t.badgeClosed : s.status === "rejected" ? t.badgeNew : s.status === "reviewed" ? t.badgeInProgress : t.badgePending,
-                                    color: s.status === "approved_for_learning" ? t.badgeClosedText : s.status === "rejected" ? t.badgeNewText : s.status === "reviewed" ? t.badgeInProgressText : t.badgePendingText,
-                                  }}>{st(s.status) || "Новый"}</span>}</td>
-                              <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
-                                ? <input value={ed.short_summary ?? s.short_summary ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, short_summary: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
-                                : <span style={{ color: t.text, fontSize: 11 }}>{s.short_summary || ""}</span>}</td>
-                              <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
-                                ? <input value={ed.main_problem ?? s.main_problem ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, main_problem: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
-                                : <span style={{ color: t.text, fontSize: 11 }}>{s.main_problem || ""}</span>}</td>
-                              <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
-                                ? <input value={ed.expert_comment ?? s.expert_comment ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, expert_comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
-                                : <span style={{ color: t.text, fontSize: 11 }}>{s.expert_comment || ""}</span>}</td>
-                              <td style={{ padding: "6px", maxWidth: 100 }}>{isEditing
-                                ? <input value={ed.action_needed ?? s.action_needed ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, action_needed: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
-                                : <span style={{ color: t.text, fontSize: 11 }}>{s.action_needed || ""}</span>}</td>
-                              <td style={{ padding: "6px", maxWidth: 100 }}>{isEditing
-                                ? <input value={ed.continuation_comment ?? s.continuation_comment ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, continuation_comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
-                                : <span style={{ color: t.text, fontSize: 11 }}>{s.continuation_comment || ""}</span>}</td>
-                              <td style={{ padding: "6px", whiteSpace: "nowrap" }}>
-                                {isEditing ? (
-                                  <>
-                                    <button onClick={async () => { await updateTrainingSession(s.id, trainingEditData); setTrainingEditId(null); setTrainingEditData({}); }} style={{ border: 0, borderRadius: 6, background: t.accent, color: "#fff", padding: "4px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", marginRight: 4 }}>Сохранить</button>
-                                    <button onClick={() => { setTrainingEditId(null); setTrainingEditData({}); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: t.tabBg, color: t.text, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>Отмена</button>
-                                  </>
-                                ) : (
-                                  <button onClick={() => { setTrainingEditId(s.id); setTrainingEditData({}); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: "transparent", color: t.accent, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>✎</button>
-                                )}
+                            <tr key={s.id} style={{ borderBottom: `1px solid ${t.cardBorder}`, background: isSelected ? t.highlight : "transparent" }}>
+                              <td style={{ padding: "6px" }}>
+                                <input type="checkbox" checked={isSelected} onChange={() => { const next = new Set(trainingSelection); if (isSelected) next.delete(s.id); else next.add(s.id); setTrainingSelection(next); }} />
                               </td>
+                              {trainingShowTrash ? (
+                                <>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.deleted_at ? new Date(s.deleted_at).toLocaleDateString("ru-RU") : ""}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.deleted_by_expert_name || "—"}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, maxWidth: 120 }}>{s.deletion_reason || "—"}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.created_at ? new Date(s.created_at).toLocaleDateString("ru-RU") : ""}</td>
+                                  <td style={{ padding: "6px", fontWeight: 700, color: t.accent, fontSize: 12, whiteSpace: "nowrap" }}>{s.public_code || "—"}</td>
+                                  <td style={{ padding: "6px", color: t.text }}>{s.session_sequence ?? ""}</td>
+                                  <td style={{ padding: "6px", color: t.text }}>{sk(s.session_kind) || ""}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.expert_name || s.expert_role || "—"}</td>
+                                  <td style={{ padding: "6px", color: t.text }}>{s.scenario_played || ""}</td>
+                                  <td style={{ padding: "6px", color: t.text }}>{ct(s.expected_case_type) || ""}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.model_used || "—"}</td>
+                                  <td style={{ padding: "6px" }}>
+                                    <span style={{
+                                      fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
+                                      background: s.status === "approved_for_learning" ? t.badgeClosed : s.status === "rejected" ? t.badgeNew : s.status === "reviewed" ? t.badgeInProgress : t.badgePending,
+                                      color: s.status === "approved_for_learning" ? t.badgeClosedText : s.status === "rejected" ? t.badgeNewText : s.status === "reviewed" ? t.badgeInProgressText : t.badgePendingText,
+                                    }}>{st(s.status) || "Новый"}</span>
+                                  </td>
+                                  <td style={{ padding: "6px", maxWidth: 120, color: t.text, fontSize: 11 }}>{s.short_summary || ""}</td>
+                                  <td style={{ padding: "6px", whiteSpace: "nowrap" }}>
+                                    <button onClick={() => restoreSingleTrainingSession(s.id)} style={{ border: 0, borderRadius: 6, background: t.accent, color: "#fff", padding: "4px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", marginRight: 4 }}>Восстановить</button>
+                                    <button onClick={() => setTrainingPermanentConfirm(s)} style={{ border: 0, borderRadius: 6, background: t.error, color: "#fff", padding: "4px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>Удалить навсегда</button>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.created_at ? new Date(s.created_at).toLocaleDateString("ru-RU") : ""}</td>
+                                  <td style={{ padding: "6px", fontWeight: 700, color: t.accent, fontSize: 12, whiteSpace: "nowrap" }}>{s.public_code || "—"}</td>
+                                  <td style={{ padding: "6px", color: t.text }}>{s.session_sequence ?? ""}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <select value={ed.session_kind || s.session_kind || "initial"} onChange={(e) => setTrainingEditData((d) => ({ ...d, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}</select>
+                                    : <span style={{ color: t.text }}>{sk(s.session_kind) || ""}</span>}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.expert_name || (s.expert_role ? s.expert_role : "") || "—"}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input value={ed.scenario_played ?? s.scenario_played ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
+                                    : <span style={{ color: t.text }}>{s.scenario_played || ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <select value={ed.expected_case_type ?? s.expected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}><option value="">—</option>{["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}</select>
+                                    : <span style={{ color: t.text }}>{ct(s.expected_case_type) || ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input value={ed.ai_detected_case_type ?? s.ai_detected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, ai_detected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 80 }} />
+                                    : <span style={{ color: t.text }}>{s.ai_detected_case_type || ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.detection_quality ?? s.detection_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, detection_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.detection_quality >= 4 ? t.success : s.detection_quality <= 2 ? t.error : t.text }}>{s.detection_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.model_used || "—"}</td>
+                                  <td style={{ padding: "6px", color: s.fallback_used ? t.error : t.muted, fontSize: 11 }}>{s.fallback_used ? "Да" : "—"}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.questions_quality ?? s.questions_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, questions_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.questions_quality >= 4 ? t.success : s.questions_quality <= 2 ? t.error : t.text }}>{s.questions_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.report_quality ?? s.report_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, report_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.report_quality >= 4 ? t.success : s.report_quality <= 2 ? t.error : t.text }}>{s.report_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.safety_quality ?? s.safety_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, safety_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.safety_quality >= 4 ? t.success : s.safety_quality <= 2 ? t.error : t.text }}>{s.safety_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.language_quality ?? s.language_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, language_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.language_quality >= 4 ? t.success : s.language_quality <= 2 ? t.error : t.text }}>{s.language_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.support_toolkit_quality ?? s.support_toolkit_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, support_toolkit_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.support_toolkit_quality >= 4 ? t.success : s.support_toolkit_quality <= 2 ? t.error : t.text }}>{s.support_toolkit_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.continuation_quality ?? s.continuation_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, continuation_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.continuation_quality >= 4 ? t.success : s.continuation_quality <= 2 ? t.error : t.text }}>{s.continuation_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px", color: s.repeated_questions ? t.error : t.muted, fontSize: 11 }}>{s.repeated_questions ? "Да" : "—"}</td>
+                                  <td style={{ padding: "6px", color: s.missed_risk_flags ? t.error : t.muted, fontSize: 11 }}>{s.missed_risk_flags ? "Да" : "—"}</td>
+                                  <td style={{ padding: "6px", color: s.wrong_recommendation ? t.error : t.muted, fontSize: 11 }}>{s.wrong_recommendation ? "Да" : "—"}</td>
+                                  <td style={{ padding: "6px", color: s.remembered_context ? t.success : t.muted, fontSize: 11 }}>{s.remembered_context ? "Да" : "—"}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <select value={ed.status ?? s.status ?? "new"} onChange={(e) => setTrainingEditData((d) => ({ ...d, status: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["new","reviewed","needs_prompt_update","approved_for_learning","rejected","archived"].map((o) => <option key={o} value={o}>{st(o)}</option>)}</select>
+                                    : <span style={{
+                                        fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
+                                        background: s.status === "approved_for_learning" ? t.badgeClosed : s.status === "rejected" ? t.badgeNew : s.status === "reviewed" ? t.badgeInProgress : t.badgePending,
+                                        color: s.status === "approved_for_learning" ? t.badgeClosedText : s.status === "rejected" ? t.badgeNewText : s.status === "reviewed" ? t.badgeInProgressText : t.badgePendingText,
+                                      }}>{st(s.status) || "Новый"}</span>}</td>
+                                  <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
+                                    ? <input value={ed.short_summary ?? s.short_summary ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, short_summary: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
+                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.short_summary || ""}</span>}</td>
+                                  <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
+                                    ? <input value={ed.main_problem ?? s.main_problem ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, main_problem: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
+                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.main_problem || ""}</span>}</td>
+                                  <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
+                                    ? <input value={ed.expert_comment ?? s.expert_comment ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, expert_comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
+                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.expert_comment || ""}</span>}</td>
+                                  <td style={{ padding: "6px", maxWidth: 100 }}>{isEditing
+                                    ? <input value={ed.action_needed ?? s.action_needed ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, action_needed: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
+                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.action_needed || ""}</span>}</td>
+                                  <td style={{ padding: "6px", maxWidth: 100 }}>{isEditing
+                                    ? <input value={ed.continuation_comment ?? s.continuation_comment ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, continuation_comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
+                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.continuation_comment || ""}</span>}</td>
+                                  <td style={{ padding: "6px", whiteSpace: "nowrap" }}>
+                                    {isEditing ? (
+                                      <>
+                                        <button onClick={async () => { await updateTrainingSession(s.id, trainingEditData); setTrainingEditId(null); setTrainingEditData({}); }} style={{ border: 0, borderRadius: 6, background: t.accent, color: "#fff", padding: "4px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", marginRight: 4 }}>Сохранить</button>
+                                        <button onClick={() => { setTrainingEditId(null); setTrainingEditData({}); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: t.tabBg, color: t.text, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>Отмена</button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button onClick={() => { setTrainingEditId(s.id); setTrainingEditData({}); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: "transparent", color: t.accent, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer", marginRight: 4 }}>✎</button>
+                                        <button onClick={() => { setTrainingTrashConfirm(s); setTrainingDeletionReason(""); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: "transparent", color: t.muted, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>🗑</button>
+                                      </>
+                                    )}
+                                  </td>
+                                </>
+                              )}
                             </tr>
                           );
                         })}

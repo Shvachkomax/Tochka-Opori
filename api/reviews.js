@@ -50,6 +50,18 @@ export default async function handler(req, res) {
         return await handleUpdateTrainingSession(req, res);
       case "deleteTrainingSession":
         return await handleDeleteTrainingSession(req, res);
+      case "trashTrainingSession":
+        return await handleTrashTrainingSession(req, res);
+      case "trashTrainingSessions":
+        return await handleTrashTrainingSessions(req, res);
+      case "restoreTrainingSession":
+        return await handleRestoreTrainingSession(req, res);
+      case "restoreTrainingSessions":
+        return await handleRestoreTrainingSessions(req, res);
+      case "permanentlyDeleteTrainingSession":
+        return await handlePermanentDeleteTrainingSession(req, res);
+      case "permanentlyDeleteTrainingSessions":
+        return await handlePermanentlyDeleteTrainingSessions(req, res);
       case "createTrainingFromReview":
         return await handleCreateTrainingFromReview(req, res);
       case "exportTrainingCsv":
@@ -462,11 +474,19 @@ async function handleListTrainingSessions(req, res) {
 
     const { isAdmin, expertId } = authorizeExpert(req);
     const params = req.body || {};
+    const showTrash = params.showTrash === true;
 
     let query = supabase
       .from("training_sessions")
       .select("*")
       .order("created_at", { ascending: false });
+
+    // Active vs trash filter
+    if (showTrash) {
+      query = query.is("deleted_at", "not null");
+    } else {
+      query = query.is("deleted_at", null);
+    }
 
     if (!isAdmin && expertId) {
       query = query.eq("expert_id", expertId);
@@ -532,6 +552,7 @@ async function handleSaveTrainingSession(req, res) {
         .from("training_sessions")
         .select("session_sequence")
         .eq("public_code", sessionData.public_code)
+        .is("deleted_at", null)
         .order("session_sequence", { ascending: false })
         .limit(1);
 
@@ -677,9 +698,243 @@ async function handleDeleteTrainingSession(req, res) {
       return res.status(401).json({ ok: false, error: "Admin access required" });
     }
 
+    const { id, deletion_reason } = req.body || {};
+    if (!id) {
+      return res.status(400).json({ ok: false, error: "Missing id" });
+    }
+
+    // Soft delete: move to trash
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("training_sessions")
+      .update({
+        deleted_at: now,
+        deleted_by_expert_id: null,
+        deleted_by_expert_name: "admin",
+        deletion_reason: deletion_reason || null,
+      })
+      .eq("id", id);
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: "Failed to move to trash", details: error.message });
+    }
+
+    return res.status(200).json({ ok: true, message: "Перемещено в корзину" });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal deleteTrainingSession error", details: error?.message || String(error) });
+  }
+}
+
+async function handleTrashTrainingSession(req, res) {
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const { id, deletion_reason } = req.body || {};
+    if (!id) {
+      return res.status(400).json({ ok: false, error: "Missing id" });
+    }
+
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("training_sessions")
+      .update({
+        deleted_at: now,
+        deleted_by_expert_id: req.body.expert_id || null,
+        deleted_by_expert_name: req.body.expert_name || "admin",
+        deletion_reason: deletion_reason || null,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: "Failed to trash training session", details: error.message });
+    }
+
+    return res.status(200).json({ ok: true, message: "Перемещено в корзину", session: data });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal trashTrainingSession error", details: error?.message || String(error) });
+  }
+}
+
+async function handleTrashTrainingSessions(req, res) {
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const { ids, deletion_reason } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ ok: false, error: "Missing ids array" });
+    }
+
+    if (ids.length > 100) {
+      return res.status(400).json({ ok: false, error: "Maximum 100 sessions per request" });
+    }
+
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("training_sessions")
+      .update({
+        deleted_at: now,
+        deleted_by_expert_id: req.body.expert_id || null,
+        deleted_by_expert_name: req.body.expert_name || "admin",
+        deletion_reason: deletion_reason || null,
+      })
+      .in("id", ids)
+      .select();
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: "Failed to trash training sessions", details: error.message });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      message: `Перемещено в корзину: ${data?.length || 0}`,
+      count: data?.length || 0,
+      sessions: data || [],
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal trashTrainingSessions error", details: error?.message || String(error) });
+  }
+}
+
+async function handleRestoreTrainingSession(req, res) {
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
     const { id } = req.body || {};
     if (!id) {
       return res.status(400).json({ ok: false, error: "Missing id" });
+    }
+
+    const { data, error } = await supabase
+      .from("training_sessions")
+      .update({
+        deleted_at: null,
+        deleted_by_expert_id: null,
+        deleted_by_expert_name: null,
+        deletion_reason: null,
+      })
+      .eq("id", id)
+      .is("deleted_at", "not null")
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: "Failed to restore training session", details: error.message });
+    }
+
+    if (!data) {
+      return res.status(404).json({ ok: false, error: "Training session not found or not in trash" });
+    }
+
+    return res.status(200).json({ ok: true, message: "Восстановлено", session: data });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal restoreTrainingSession error", details: error?.message || String(error) });
+  }
+}
+
+async function handleRestoreTrainingSessions(req, res) {
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ ok: false, error: "Missing ids array" });
+    }
+
+    if (ids.length > 100) {
+      return res.status(400).json({ ok: false, error: "Maximum 100 sessions per request" });
+    }
+
+    const { data, error } = await supabase
+      .from("training_sessions")
+      .update({
+        deleted_at: null,
+        deleted_by_expert_id: null,
+        deleted_by_expert_name: null,
+        deletion_reason: null,
+      })
+      .in("id", ids)
+      .is("deleted_at", "not null")
+      .select();
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: "Failed to restore training sessions", details: error.message });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      message: `Восстановлено: ${data?.length || 0}`,
+      count: data?.length || 0,
+      sessions: data || [],
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal restoreTrainingSessions error", details: error?.message || String(error) });
+  }
+}
+
+async function handlePermanentDeleteTrainingSession(req, res) {
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const { id } = req.body || {};
+    if (!id) {
+      return res.status(400).json({ ok: false, error: "Missing id" });
+    }
+
+    // Verify the record is in trash before deleting
+    const { data: existing } = await supabase
+      .from("training_sessions")
+      .select("id, deleted_at")
+      .eq("id", id)
+      .single();
+
+    if (!existing) {
+      return res.status(404).json({ ok: false, error: "Training session not found" });
+    }
+
+    if (!existing.deleted_at) {
+      return res.status(400).json({ ok: false, error: "Cannot permanently delete active session. Move to trash first." });
     }
 
     const { error } = await supabase
@@ -688,12 +943,55 @@ async function handleDeleteTrainingSession(req, res) {
       .eq("id", id);
 
     if (error) {
-      return res.status(500).json({ ok: false, error: "Failed to delete", details: error.message });
+      return res.status(500).json({ ok: false, error: "Failed to permanently delete", details: error.message });
     }
 
-    return res.status(200).json({ ok: true, message: "Удалено" });
+    return res.status(200).json({ ok: true, message: "Запись удалена безвозвратно" });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: "Fatal deleteTrainingSession error", details: error?.message || String(error) });
+    return res.status(500).json({ ok: false, error: "Fatal permanentlyDeleteTrainingSession error", details: error?.message || String(error) });
+  }
+}
+
+async function handlePermanentlyDeleteTrainingSessions(req, res) {
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ ok: false, error: "Missing ids array" });
+    }
+
+    if (ids.length > 100) {
+      return res.status(400).json({ ok: false, error: "Maximum 100 sessions per request" });
+    }
+
+    // Only delete records that are in trash
+    const { data, error } = await supabase
+      .from("training_sessions")
+      .delete()
+      .in("id", ids)
+      .is("deleted_at", "not null")
+      .select();
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: "Failed to permanently delete sessions", details: error.message });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      message: `Удалено безвозвратно: ${data?.length || 0}`,
+      count: data?.length || 0,
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal permanentlyDeleteTrainingSessions error", details: error?.message || String(error) });
   }
 }
 
@@ -751,6 +1049,7 @@ async function handleCreateTrainingFromReview(req, res) {
       .from("training_sessions")
       .select("session_sequence")
       .eq("public_code", foundCode)
+      .is("deleted_at", null)
       .order("session_sequence", { ascending: false })
       .limit(1);
 
@@ -816,10 +1115,18 @@ async function handleExportTrainingCsv(req, res) {
     }
 
     const params = req.body || {};
+    const showTrash = params.showTrash === true;
+
     let query = supabase
       .from("training_sessions")
       .select("*")
       .order("created_at", { ascending: false });
+
+    if (showTrash) {
+      query = query.is("deleted_at", "not null");
+    } else {
+      query = query.is("deleted_at", null);
+    }
 
     if (!isAdmin && expertId) {
       query = query.eq("expert_id", expertId);
@@ -890,6 +1197,10 @@ async function handleExportTrainingCsv(req, res) {
       { key: "classification_comment", label: "Комментарий по классификации" },
       { key: "continuation_comment", label: "Комментарий по продолжению" },
       { key: "approved_for_learning", label: "Одобрен для обучения" },
+      // Trash columns (only populated in trash view)
+      { key: "deleted_at", label: "Дата удаления" },
+      { key: "deleted_by_expert_name", label: "Удалил" },
+      { key: "deletion_reason", label: "Причина удаления" },
     ];
 
     const csvEscape = (v) => {
@@ -916,7 +1227,9 @@ async function handleExportTrainingCsv(req, res) {
       lines.push(vals.join(","));
     }
 
-    const filename = `training-sessions-${new Date().toISOString().split("T")[0]}.csv`;
+    const filename = showTrash
+      ? `training-sessions-trash-${new Date().toISOString().split("T")[0]}.csv`
+      : `training-sessions-${new Date().toISOString().split("T")[0]}.csv`;
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     return res.status(200).send("\uFEFF" + lines.join("\n"));
@@ -1379,11 +1692,12 @@ async function handleGetSessionTimeline(req, res) {
       .or(`public_code.eq.${code},session_public_code.eq.${code},json_data->>public_code.eq.${code},json_data->>session_public_code.eq.${code},json_data->>publicCode.eq.${code},json_data->>sessionCode.eq.${code},json_data->>code.eq.${code}`)
       .order("created_at", { ascending: true });
 
-    // 3. Search training_sessions
+    // 3. Search training_sessions (exclude deleted)
     const { data: trainingSessions } = await supabase
       .from("training_sessions")
       .select("*")
       .eq("public_code", code)
+      .is("deleted_at", null)
       .order("created_at", { ascending: true });
 
     // Build a unified items list from sessions + case_reviews + training_sessions
