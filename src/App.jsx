@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { normalizeConversationHistory } from "../lib/conversation.js";
+import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback } from "../lib/conversation.js";
 
 export default function App() {
   const [mode, setMode] = useState("text");
@@ -1967,16 +1967,21 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     URL.revokeObjectURL(url);
   }
 
-  function safeText(value, fallback = "—") {
-    if (value === null || value === undefined) return fallback;
-    if (typeof value === "string") return value || fallback;
-    if (typeof value === "number" || typeof value === "boolean") return String(value);
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return fallback;
-    }
-  }
+      function safeText(value, fallback = "—") {
+        if (value === null || value === undefined) return fallback;
+        if (typeof value === "string") return value || fallback;
+        if (typeof value === "number" || typeof value === "boolean") return String(value);
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return fallback;
+        }
+      }
+
+      function safeReport(value, label) {
+        if (value && typeof value === "string" && value.trim()) return value;
+        return `${label} не был сохранён`;
+      }
 
   function shortText(value, max = 240) {
     const text = safeText(value, "");
@@ -1995,66 +2000,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     return shortText(text, max);
   }
 
-  function normalizeReviewDetails(review) {
-    const json = getReviewJson(review);
-    const j = json || {};
-
-    // Patient text: search broadly
-    const patientText =
-      review?.patient_text || review?.text || review?.input_text ||
-      j.patient_text || j.text || j.input_text || j.original_text ||
-      j.patient_input || j.input ||
-      j.session?.initial_text || j.session?.patient_text ||
-      "";
-
-    // Conversation history: find raw source then normalize
-    const rawHistory =
-      review?.conversation_history || review?.conversationHistory ||
-      j.conversation_history || j.conversationHistory ||
-      j.session?.conversation_history || j.session?.conversationHistory ||
-      [];
-
-    let conversationHistory = normalizeConversationHistory(rawHistory, j);
-
-    // User report / patient report
-    const userReport =
-      review?.user_report || review?.patient_report ||
-      j.user_report || j.patient_report ||
-      j.result?.user_report || j.report?.user_report ||
-      j.session?.user_report ||
-      "";
-
-    // Doctor report / specialist report
-    const doctorReport =
-      review?.doctor_report || review?.specialist_report ||
-      j.doctor_report || j.specialist_report ||
-      j.result?.doctor_report || j.report?.doctor_report ||
-      j.session?.doctor_report ||
-      "";
-
-    // Try to extract reports from ai_result if present
-    if (!userReport && !doctorReport && j.ai_result) {
-      try {
-        const ai = typeof j.ai_result === "string" ? JSON.parse(j.ai_result) : j.ai_result;
-        if (ai && typeof ai === "object") {
-          if (!userReport && (ai.user_report || ai.patient_report)) {
-            conversationHistory = normalizeConversationHistory(
-              ai.conversation_history || ai.conversationHistory || conversationHistory
-            );
-          }
-        }
-      } catch {}
-    }
-
-    // Doctor feedback
-    const doctorFeedback =
-      review?.doctor_feedback || review?.expert_feedback || review?.feedback ||
-      j.doctor_feedback || j.expert_feedback || j.feedback ||
-      {};
-
-    const df = typeof doctorFeedback === "object" && !Array.isArray(doctorFeedback) ? doctorFeedback : {};
-
-    return { patientText, conversationHistory, userReport, doctorReport, doctorFeedback: df };
+   function normalizeReviewDetails(review) {
+    return normalizeSessionDetails(review);
   }
 
   function toggleSection(reviewId, section) {
@@ -2714,13 +2661,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
     const renderReviewSections = (review, json, t, data) => {
       const { patientText, userReport, doctorReport, doctorFeedbackComment, conversationHistory } = data;
-      const sections = [
+        const sections = [
         {
           key: "patient",
           label: "Текст пациента",
           hasData: !!patientText,
           summary: shortText(patientText, 200),
           fullContent: patientText,
+          noDataMessage: null,
         },
         {
           key: "dialogue",
@@ -2731,6 +2679,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             : Array.isArray(json.questions) ? `Вопросов: ${json.questions.length}` : "",
           fullContent: null,
           isDialogue: true,
+          noDataMessage: "Текст диалога не был сохранён",
         },
         {
           key: "userReport",
@@ -2738,6 +2687,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           hasData: !!userReport,
           summary: shortText(userReport, 200),
           fullContent: userReport,
+          noDataMessage: "Отчёт для пациента не был сохранён",
         },
         {
           key: "doctorReport",
@@ -2745,6 +2695,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           hasData: !!doctorReport,
           summary: shortText(doctorReport, 200),
           fullContent: doctorReport,
+          noDataMessage: "Отчёт для специалиста не был сохранён",
         },
         {
           key: "feedback",
@@ -2756,6 +2707,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           fullContent: null,
           isFeedback: true,
           feedbackData: data.doctorFeedback,
+          noDataMessage: null,
         },
       ];
 
@@ -2786,7 +2738,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    {!canOpen && <span style={{ color: t.muted, fontSize: 11 }}>Нет сохранённых данных</span>}
+                    {!canOpen && <span style={{ color: t.muted, fontSize: 11 }}>{sec.noDataMessage || "Нет сохранённых данных"}</span>}
                     {canOpen && <span style={{ color: t.cardLabel, fontSize: 11, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▾</span>}
                   </div>
                 </div>
@@ -2969,9 +2921,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const parts = [];
       parts.push(`Текст пациента:\n${sd.patient_text || "—"}`);
       const ch = normalizeConversationHistory(sd.conversation_history || []);
-      if (ch.length > 0) parts.push(`Диалог:\n${formatConversationForCopy(ch)}`);
-      parts.push(`Отчёт для пациента:\n${sd.user_report || "—"}`);
-      parts.push(`Отчёт для специалиста:\n${sd.doctor_report || "—"}`);
+      parts.push(`Диалог:\n${ch.length > 0 ? formatConversationForCopy(ch) : "Текст диалога не был сохранён"}`);
+      parts.push(`Отчёт для пациента:\n${sd.user_report || "Отчёт для пациента не был сохранён"}`);
+      parts.push(`Отчёт для специалиста:\n${sd.doctor_report || "Отчёт для специалиста не был сохранён"}`);
       if (sd.correction_comment) parts.push(`Экспертная правка:\n${sd.correction_comment}`);
       const tr = sd.training;
       if (tr) {
@@ -3155,12 +3107,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       );
 
       // 3-10: sections using addSection
-      addSection("user_report", "Отчёт для пациента", sd.user_report, false);
+      addSection("user_report", "Отчёт для пациента", sd.user_report || "Отчёт для пациента не был сохранён", !!sd.user_report);
       if (sd.doctor_correction?.corrected_user_report) {
         addSection("corrected_user", "Исправленная версия (пациент)", sd.corrected_user_report, false);
       }
 
-      addSection("doctor_report", "Отчёт для специалиста", sd.doctor_report, false);
+      addSection("doctor_report", "Отчёт для специалиста", sd.doctor_report || "Отчёт для специалиста не был сохранён", !!sd.doctor_report);
       if (sd.doctor_correction?.corrected_doctor_report) {
         addSection("corrected_doctor", "Исправленная версия (специалист)", sd.corrected_doctor_report, false);
       }

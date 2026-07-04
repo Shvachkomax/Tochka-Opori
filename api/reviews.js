@@ -2,7 +2,7 @@ import { getSupabase } from "../lib/supabase.js";
 import { createClient } from "@supabase/supabase-js";
 import { maskSensitiveData, getPrivacySafeMode, maskText } from "../lib/sanitize.js";
 import { runTextAnalysis } from "../lib/aiClient.js";
-import { normalizeConversationHistory } from "../lib/conversation.js";
+import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback } from "../lib/conversation.js";
 import { readFileSync, existsSync } from "node:fs";
 
 const ALLOWED_STATUSES = ["pending", "approved", "rejected", "needs_review", "local_auto_saved"];
@@ -1726,8 +1726,8 @@ async function handleGetSessionTimeline(req, res) {
           model_used: s.model_used || s.json_data?.model_used || null,
           fallback_used: Boolean(s.fallback_used || s.json_data?.fallback_used),
           patient_text_preview: (s.patient_text || s.json_data?.patient_text || s.json_data?.input || "").slice(0, 200),
-          user_report_available: !!(s.user_report || s.json_data?.user_report),
-          doctor_report_available: !!(s.doctor_report || s.json_data?.doctor_report),
+          user_report_available: !!extractUserReport(s, s.json_data || {}),
+          doctor_report_available: !!extractDoctorReport(s, s.json_data || {}),
           conversation_available: !!(s.conversation_history || s.json_data?.conversation_history || s.json_data?.conversationHistory),
           support_plan_available: !!(s.support_plan || s.json_data?.support_plan),
           diary_available: !!(s.diary || s.json_data?.diary),
@@ -1755,8 +1755,8 @@ async function handleGetSessionTimeline(req, res) {
           model_used: j.model_used || null,
           fallback_used: Boolean(j.fallback_used),
           patient_text_preview: (j.patient_text || j.input || j.patient_input || "").slice(0, 200),
-          user_report_available: !!(j.user_report || j.patient_report),
-          doctor_report_available: !!(j.doctor_report || j.specialist_report),
+          user_report_available: !!extractUserReport(r, j),
+          doctor_report_available: !!extractDoctorReport(r, j),
           conversation_available: !!(j.conversation_history || j.conversationHistory || j.questions),
           support_plan_available: !!(j.support_plan),
           diary_available: !!(j.diary),
@@ -1922,7 +1922,6 @@ async function handleGetSessionTimelineDetails(req, res) {
       }
 
       const j = review.json_data || {};
-      const df = j.doctor_feedback || review.doctor_feedback || {};
 
         session = {
           session_id: review.session_id || null,
@@ -1938,25 +1937,35 @@ async function handleGetSessionTimelineDetails(req, res) {
           expert_name: review.expert_name || null,
           patient_text: j.patient_text || j.input || j.patient_input || j.text || "",
           conversation_history: j.conversation_history || j.conversationHistory || [],
-          user_report: j.user_report || j.patient_report || "",
-          doctor_report: j.doctor_report || j.specialist_report || "",
+          user_report: extractUserReport(review, j) || "",
+          doctor_report: extractDoctorReport(review, j) || "",
           voice_observations: j.voice_observations || null,
-          doctor_feedback: df,
-          doctor_correction: df.corrected_user_report || df.corrected_doctor_report ? {
-          corrected_user_report: df.corrected_user_report || "",
-          corrected_doctor_report: df.corrected_doctor_report || "",
-          wrong_questions: df.wrong_questions || "",
-          missing_questions: df.missing_questions || "",
-          bad_question_wording: df.bad_question_wording || "",
-        } : null,
-        corrected_user_report: df.corrected_user_report || "",
-        corrected_doctor_report: df.corrected_doctor_report || "",
-        correction_comment: df.correction_comment || review.correction_comment || "",
-        protocol_update: df.protocol_update || review.protocol_update || "",
+          doctor_feedback: extractExpertFeedback(review, j),
+          doctor_correction: null,
+          corrected_user_report: "",
+          corrected_doctor_report: "",
+          correction_comment: review.correction_comment || "",
+          protocol_update: review.protocol_update || "",
         support_plan: j.support_plan || null,
         diary: j.diary || null,
         continuation_comment: j.continuation_comment || "",
       };
+
+      // Fill correction fields from extracted doctor_feedback
+      const dfb = session.doctor_feedback || {};
+      if (dfb.correctedUserReport || dfb.correctedDoctorReport) {
+        session.doctor_correction = {
+          corrected_user_report: dfb.correctedUserReport || "",
+          corrected_doctor_report: dfb.correctedDoctorReport || "",
+          wrong_questions: dfb.wrongQuestions || "",
+          missing_questions: dfb.missingQuestions || "",
+          bad_question_wording: dfb.badQuestionWording || "",
+        };
+        session.corrected_user_report = dfb.correctedUserReport || "";
+        session.corrected_doctor_report = dfb.correctedDoctorReport || "";
+        session.correction_comment = dfb.correctionComment || session.correction_comment || "";
+        session.protocol_update = dfb.protocolUpdate || session.protocol_update || "";
+      }
 
       // Normalize conversation history (handles all formats + fallbacks)
       session.conversation_history = normalizeConversationHistory(session.conversation_history, j);
@@ -2014,10 +2023,10 @@ async function handleGetSessionTimelineDetails(req, res) {
         expert_name: s.expert_name || null,
         patient_text: s.patient_text || sj.patient_text || sj.input || "",
         conversation_history: s.conversation_history || sj.conversation_history || sj.conversationHistory || [],
-        user_report: s.user_report || sj.user_report || "",
-        doctor_report: s.doctor_report || sj.doctor_report || "",
+        user_report: extractUserReport(s, sj) || "",
+        doctor_report: extractDoctorReport(s, sj) || "",
         voice_observations: sj.voice_observations || null,
-        doctor_feedback: sj.doctor_feedback || {},
+        doctor_feedback: extractExpertFeedback(s, sj),
         doctor_correction: null,
         corrected_user_report: "",
         corrected_doctor_report: "",
@@ -2027,6 +2036,20 @@ async function handleGetSessionTimelineDetails(req, res) {
         diary: s.diary || sj.diary || null,
         continuation_comment: sj.continuation_comment || "",
       };
+
+      // Fill correction fields from extracted doctor_feedback
+      const dfb = session.doctor_feedback || {};
+      if (dfb.correctedUserReport || dfb.correctedDoctorReport) {
+        session.doctor_correction = {
+          corrected_user_report: dfb.correctedUserReport || "",
+          corrected_doctor_report: dfb.correctedDoctorReport || "",
+          wrong_questions: dfb.wrongQuestions || "",
+          missing_questions: dfb.missingQuestions || "",
+          bad_question_wording: dfb.badQuestionWording || "",
+        };
+        session.corrected_user_report = dfb.correctedUserReport || "";
+        session.corrected_doctor_report = dfb.correctedDoctorReport || "";
+      }
 
       // Normalize conversation history
       session.conversation_history = normalizeConversationHistory(session.conversation_history, sj);
@@ -2140,19 +2163,21 @@ async function handleGetSessionTimelineDetails(req, res) {
           session.case_review_id = linkedReview.id;
           session.patient_text = lj.patient_text || lj.input || lj.patient_input || session.patient_text || "";
           session.conversation_history = lj.conversation_history || lj.conversationHistory || [];
-          session.user_report = lj.user_report || lj.patient_report || session.user_report || "";
-          session.doctor_report = lj.doctor_report || lj.specialist_report || session.doctor_report || "";
+          session.user_report = extractUserReport(linkedReview, lj) || session.user_report || "";
+          session.doctor_report = extractDoctorReport(linkedReview, lj) || session.doctor_report || "";
+          session.doctor_feedback = extractExpertFeedback(linkedReview, lj);
 
-          const ldf = lj.doctor_feedback || {};
-          session.doctor_feedback = ldf;
-          if (ldf.corrected_user_report || ldf.corrected_doctor_report) {
+          const dfb = session.doctor_feedback || {};
+          if (dfb.correctedUserReport || dfb.correctedDoctorReport) {
             session.doctor_correction = {
-              corrected_user_report: ldf.corrected_user_report || "",
-              corrected_doctor_report: ldf.corrected_doctor_report || "",
-              wrong_questions: ldf.wrong_questions || "",
-              missing_questions: ldf.missing_questions || "",
-              bad_question_wording: ldf.bad_question_wording || "",
+              corrected_user_report: dfb.correctedUserReport || "",
+              corrected_doctor_report: dfb.correctedDoctorReport || "",
+              wrong_questions: dfb.wrongQuestions || "",
+              missing_questions: dfb.missingQuestions || "",
+              bad_question_wording: dfb.badQuestionWording || "",
             };
+            session.corrected_user_report = dfb.correctedUserReport || "";
+            session.corrected_doctor_report = dfb.correctedDoctorReport || "";
           }
 
           session.conversation_history = normalizeConversationHistory(session.conversation_history, lj);
