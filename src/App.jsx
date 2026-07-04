@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { normalizeConversationHistory } from "../lib/conversation.js";
 
 export default function App() {
   const [mode, setMode] = useState("text");
@@ -2006,17 +2007,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       j.session?.initial_text || j.session?.patient_text ||
       "";
 
-    // Conversation history: search camelCase + snake_case + nested
-    let conversationHistory =
+    // Conversation history: find raw source then normalize
+    const rawHistory =
       review?.conversation_history || review?.conversationHistory ||
       j.conversation_history || j.conversationHistory ||
       j.session?.conversation_history || j.session?.conversationHistory ||
       [];
 
-    if (typeof conversationHistory === "string") {
-      try { conversationHistory = JSON.parse(conversationHistory); } catch { conversationHistory = []; }
-    }
-    if (!Array.isArray(conversationHistory)) conversationHistory = [];
+    let conversationHistory = normalizeConversationHistory(rawHistory, j);
 
     // User report / patient report
     const userReport =
@@ -2040,7 +2038,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         const ai = typeof j.ai_result === "string" ? JSON.parse(j.ai_result) : j.ai_result;
         if (ai && typeof ai === "object") {
           if (!userReport && (ai.user_report || ai.patient_report)) {
-            conversationHistory = ai.conversation_history || ai.conversationHistory || conversationHistory;
+            conversationHistory = normalizeConversationHistory(
+              ai.conversation_history || ai.conversationHistory || conversationHistory
+            );
           }
         }
       } catch {}
@@ -2053,26 +2053,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       {};
 
     const df = typeof doctorFeedback === "object" && !Array.isArray(doctorFeedback) ? doctorFeedback : {};
-
-    // Build questions/answers into conversation if not already present
-    if (conversationHistory.length === 0 && Array.isArray(j.questions)) {
-      const qs = j.questions;
-      const ans = j.answers || {};
-      conversationHistory = qs.map((q, i) => ({
-        role: "assistant",
-        content: q,
-        round: i + 1,
-      }));
-      const answerEntries = Object.entries(ans);
-      answerEntries.forEach(([key, val], i) => {
-        conversationHistory.push({
-          role: "user",
-          content: typeof val === "string" ? val : JSON.stringify(val),
-          round: i + 1,
-        });
-      });
-      conversationHistory.sort((a, b) => (a.round || 0) - (b.round || 0));
-    }
 
     return { patientText, conversationHistory, userReport, doctorReport, doctorFeedback: df };
   }
@@ -2849,12 +2829,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     };
 
     const renderDialogueContent = (review, json, t, conversationHistory) => {
-      const messages = conversationHistory.length > 0 ? conversationHistory
-        : (Array.isArray(json.questions) ? buildDialogueFromQA(json) : []);
+      const messages = conversationHistory.length > 0 ? conversationHistory : normalizeConversationHistory([], json);
 
       const fullText = messages.map((m) => {
         const role = m.role === "user" ? "Пациент" : "Точка опоры";
-        return `[${role}]${m.round ? ` (раунд ${m.round})` : ""}\n${m.content || ""}`;
+        return `[${role}]${m.round ? ` (раунд ${m.round})` : ""}\n${m.text || ""}`;
       }).join("\n\n---\n\n");
 
       return (
@@ -2882,7 +2861,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       </div>
                     </div>
                     <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                      {msg.content || ""}
+                      {msg.text || msg.content || ""}
                     </div>
                     {msg.type && <div style={{ color: t.cardLabel, fontSize: 10, marginTop: 4 }}>{msg.type}</div>}
                   </div>
@@ -2904,20 +2883,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           </div>
         </div>
       );
-    };
-
-    const buildDialogueFromQA = (json) => {
-      const msgs = [];
-      const qs = json.questions || [];
-      const ans = json.answers || {};
-      qs.forEach((q, i) => {
-        msgs.push({ role: "assistant", content: q, round: i + 1 });
-        const answerKey = Object.keys(ans)[i];
-        if (answerKey !== undefined) {
-          msgs.push({ role: "user", content: typeof ans[answerKey] === "string" ? ans[answerKey] : JSON.stringify(ans[answerKey]), round: i + 1 });
-        }
-      });
-      return msgs;
     };
 
     const renderFeedbackContent = (review, json, t, feedback, feedbackComment) => {
@@ -2973,19 +2938,21 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     function getConversationMessageText(msg) {
       if (!msg) return "";
       if (typeof msg === "string") return msg;
-      if (typeof msg.content === "string") return msg.content;
+      if (typeof msg.text === "string" && msg.text.trim()) return msg.text;
+      if (typeof msg.content === "string" && msg.content.trim()) return msg.content;
       if (Array.isArray(msg.content)) {
         return msg.content.map((part) => {
           if (typeof part === "string") return part;
           return part?.text || part?.content || part?.value || "";
         }).filter(Boolean).join("\n");
       }
-      return msg.text || msg.message || msg.value || msg.answer || msg.question || msg.transcript || "";
+      return msg.message || msg.value || msg.answer || msg.question || msg.transcript || "";
     }
 
     function formatConversationForCopy(conversation) {
       return (conversation || [])
         .filter((m) => {
+          if (!m) return false;
           const role = (m.role || "").toLowerCase();
           return !["system", "developer", "tool", "reasoning"].includes(role);
         })
@@ -3001,7 +2968,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       if (!sd) return "";
       const parts = [];
       parts.push(`Текст пациента:\n${sd.patient_text || "—"}`);
-      const ch = sd.conversation_history || [];
+      const ch = normalizeConversationHistory(sd.conversation_history || []);
       if (ch.length > 0) parts.push(`Диалог:\n${formatConversationForCopy(ch)}`);
       parts.push(`Отчёт для пациента:\n${sd.user_report || "—"}`);
       parts.push(`Отчёт для специалиста:\n${sd.doctor_report || "—"}`);
@@ -3038,7 +3005,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     const renderSessionTimelineDetail = (sd, t) => {
       if (!sd) return null;
 
-      const conversationHistory = sd.conversation_history || [];
+      const conversationHistory = normalizeConversationHistory(sd.conversation_history || []);
       const normalizedMessages = conversationHistory
         .filter((m) => {
           const role = (m.role || "").toLowerCase();

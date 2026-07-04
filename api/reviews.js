@@ -2,6 +2,7 @@ import { getSupabase } from "../lib/supabase.js";
 import { createClient } from "@supabase/supabase-js";
 import { maskSensitiveData, getPrivacySafeMode, maskText } from "../lib/sanitize.js";
 import { runTextAnalysis } from "../lib/aiClient.js";
+import { normalizeConversationHistory } from "../lib/conversation.js";
 import { readFileSync, existsSync } from "node:fs";
 
 const ALLOWED_STATUSES = ["pending", "approved", "rejected", "needs_review", "local_auto_saved"];
@@ -1957,25 +1958,8 @@ async function handleGetSessionTimelineDetails(req, res) {
         continuation_comment: j.continuation_comment || "",
       };
 
-      // Parse conversation_history if string
-      if (typeof session.conversation_history === "string") {
-        try { session.conversation_history = JSON.parse(session.conversation_history); } catch { session.conversation_history = []; }
-      }
-      if (!Array.isArray(session.conversation_history)) session.conversation_history = [];
-
-      // Build from questions/answers if no conversation
-      if (session.conversation_history.length === 0 && Array.isArray(j.questions)) {
-        const msgs = [];
-        const ans = j.answers || {};
-        j.questions.forEach((q, i) => {
-          msgs.push({ role: "assistant", content: q, round: i + 1 });
-          const ak = Object.keys(ans)[i];
-          if (ak !== undefined) {
-            msgs.push({ role: "user", content: typeof ans[ak] === "string" ? ans[ak] : JSON.stringify(ans[ak]), round: i + 1 });
-          }
-        });
-        session.conversation_history = msgs;
-      }
+      // Normalize conversation history (handles all formats + fallbacks)
+      session.conversation_history = normalizeConversationHistory(session.conversation_history, j);
 
       // Also try to link to a training_session via case_review_id
       const { data: linkedTraining } = await supabase
@@ -2044,10 +2028,8 @@ async function handleGetSessionTimelineDetails(req, res) {
         continuation_comment: sj.continuation_comment || "",
       };
 
-      if (typeof session.conversation_history === "string") {
-        try { session.conversation_history = JSON.parse(session.conversation_history); } catch { session.conversation_history = []; }
-      }
-      if (!Array.isArray(session.conversation_history)) session.conversation_history = [];
+      // Normalize conversation history
+      session.conversation_history = normalizeConversationHistory(session.conversation_history, sj);
 
       // Try to link case_review by session_id
       const { data: linkedReview } = await supabase
@@ -2173,12 +2155,12 @@ async function handleGetSessionTimelineDetails(req, res) {
             };
           }
 
-          if (typeof session.conversation_history === "string") {
-            try { session.conversation_history = JSON.parse(session.conversation_history); } catch { session.conversation_history = []; }
-          }
-          if (!Array.isArray(session.conversation_history)) session.conversation_history = [];
+          session.conversation_history = normalizeConversationHistory(session.conversation_history, lj);
         }
       }
+
+      // Normalize standalone training session history too
+      session.conversation_history = normalizeConversationHistory(session.conversation_history);
     }
 
     // Apply privacy-safe masking
@@ -2188,7 +2170,7 @@ async function handleGetSessionTimelineDetails(req, res) {
       session.doctor_report = maskText(session.doctor_report || "");
       session.conversation_history = (session.conversation_history || []).map((msg) => ({
         ...msg,
-        content: maskText(msg.content || ""),
+        text: maskText(msg.text || ""),
       }));
       if (session.diary) {
         if (typeof session.diary === "string") {
