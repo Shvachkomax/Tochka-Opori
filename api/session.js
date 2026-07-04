@@ -16,6 +16,8 @@ export default async function handler(req, res) {
         return await handleLoad(req, res);
       case "updateSupportPlan":
         return await handleUpdateSupportPlan(req, res);
+      case "save_conversation_pairs":
+        return await handleSaveConversationPairs(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -65,6 +67,9 @@ async function handleSave(req, res) {
       .eq("session_id", sessionId)
       .maybeSingle();
 
+    // Preserve conversation_pairs from existing json_data
+    const existingPairs = existingRow?.json_data?.conversation_pairs || [];
+
     const payload = {
       session_id: sessionId,
       patient_text: maskedPatientText,
@@ -85,6 +90,7 @@ async function handleSave(req, res) {
         voiceObservations: voiceObservations || null,
         _debug: _debug || null,
         care_recommendation: care_recommendation || null,
+        ...(existingPairs.length > 0 ? { conversation_pairs: existingPairs } : {}),
       },
     };
 
@@ -149,11 +155,13 @@ async function handleLoad(req, res) {
     }
 
     const jsonData = data.json_data || {};
+    const pairs = jsonData.conversation_pairs || data.conversation_pairs || [];
     const session = {
       sessionId: data.session_id,
       publicCode: data.public_code,
       patient_input: data.patient_text,
       conversationHistory: data.conversation_history,
+      conversationPairs: Array.isArray(pairs) ? pairs : [],
       user_report: data.user_report,
       doctor_report: data.doctor_report,
       supportPlan: data.support_plan,
@@ -208,4 +216,70 @@ async function handleUpdateSupportPlan(req, res) {
   } catch (error) {
     return res.status(500).json({ ok: false, error: error.message || "Error updating support plan" });
   }
+}
+
+async function handleSaveConversationPairs(req, res) {
+  try {
+    const { sessionId, pairs } = req.body || {};
+
+    if (!sessionId) {
+      return res.status(400).json({ ok: false, error: "Missing sessionId" });
+    }
+
+    if (!Array.isArray(pairs)) {
+      return res.status(400).json({ ok: false, error: "pairs must be an array" });
+    }
+
+    const supabase = getSupabase();
+
+    const { data: existingRow } = await supabase
+      .from("sessions")
+      .select("id, json_data")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    const existingJson = existingRow?.json_data || {};
+    const existingPairs = Array.isArray(existingJson.conversation_pairs) ? existingJson.conversation_pairs : [];
+    const merged = mergePairs(existingPairs, pairs);
+
+    const payload = {
+      json_data: { ...existingJson, conversation_pairs: merged },
+      updated_at: new Date().toISOString(),
+    };
+
+    let error;
+    if (existingRow) {
+      ({ error } = await supabase.from("sessions").update(payload).eq("session_id", sessionId));
+    } else {
+      payload.session_id = sessionId;
+      ({ error } = await supabase.from("sessions").insert(payload));
+    }
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: error.message });
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message || "Error saving conversation pairs" });
+  }
+}
+
+function mergePairs(existing, incoming) {
+  const seen = new Set();
+  const merged = [];
+  for (const p of existing) {
+    if (p.round !== undefined && !seen.has(p.round)) {
+      seen.add(p.round);
+      merged.push(p);
+    }
+  }
+  for (const p of incoming) {
+    if (p.round !== undefined && !seen.has(p.round)) {
+      seen.add(p.round);
+      merged.push(p);
+    }
+  }
+  merged.sort((a, b) => (a.round || 0) - (b.round || 0));
+  return merged;
 }

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback } from "../lib/conversation.js";
+import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback, buildConversationPairs } from "../lib/conversation.js";
 
 export default function App() {
   const [mode, setMode] = useState("text");
@@ -925,6 +925,21 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         setAnswers({});
         setDialogDepth((d) => d + 1);
         setPhase("questions");
+
+        // Persist conversation pairs after each answer round
+        if (dialogDepth > 0 && sessionId) {
+          const pairs = buildConversationPairs(
+            [...conversationHistory, { role: "user", answers }],
+            { questions, answers, patient_input: text }
+          );
+          if (pairs.length > 0) {
+            fetch("/api/session", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "save_conversation_pairs", sessionId, pairs }),
+            }).catch(() => {});
+          }
+        }
       } else if (data.type === "final") {
         setResult(data.report || "");
         if (data._debug) setDebugInfo(data._debug);
@@ -936,16 +951,18 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         if (!sessionId) setSessionId(sid);
 
         // Save session to Supabase (works on localhost and Vercel)
+        const finalHistory = [
+          ...conversationHistory,
+          ...(dialogDepth > 0 ? [{ role: "user", answers }] : []),
+        ];
+
         fetch("/api/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "save",
             sessionId: sid,
             patient_text: text,
-            conversationHistory: [
-              ...conversationHistory,
-              ...(dialogDepth > 0 ? [{ role: "user", answers }] : []),
-            ],
+            conversationHistory: finalHistory,
             user_report: data.report?.split("===DOCTOR_REPORT===")[0]?.replace("===USER_REPORT===", "").trim() || "",
             doctor_report: data.report?.split("===DOCTOR_REPORT===")[1]?.trim() || "",
             riskLevel: null,
@@ -965,6 +982,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           .then((r) => r.json())
           .then((result) => {
             if (result.ok) {
+              // Also persist conversation pairs for all rounds at final save
+              const finalPairs = buildConversationPairs(finalHistory, { questions, answers, patient_input: text });
+              if (finalPairs.length > 0) {
+                fetch("/api/session", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "save_conversation_pairs", sessionId: sid, pairs: finalPairs }),
+                }).catch(() => {});
+              }
               const code = result.publicCode || publicCode || "";
               if (result.publicCode && !publicCode) {
                 setPublicCode(result.publicCode);
