@@ -54,6 +54,11 @@ export default function App() {
   const [previousDoctorReport, setPreviousDoctorReport] = useState("");
   const [homeTasks, setHomeTasks] = useState("");
   const [resourceFactors, setResourceFactors] = useState("");
+  const [debugInfo, setDebugInfo] = useState(null);
+  const [careRecommendation, setCareRecommendation] = useState(null);
+  const [showConsultPrep, setShowConsultPrep] = useState(false);
+  const [showMessageToClose, setShowMessageToClose] = useState(false);
+  const [messageText, setMessageText] = useState("");
 
   // Support Toolkit state
   const [supportPlan, setSupportPlan] = useState(null);
@@ -921,6 +926,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         setPhase("questions");
       } else if (data.type === "final") {
         setResult(data.report || "");
+        if (data._debug) setDebugInfo(data._debug);
+        if (data.care_recommendation) setCareRecommendation(data.care_recommendation);
         setActiveTab("user");
         setPhase("report");
 
@@ -950,6 +957,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             questions,
             answers,
             voiceObservations: voiceObservations || null,
+            _debug: data._debug || null,
+            care_recommendation: data.care_recommendation || null,
           }),
         })
           .then((r) => r.json())
@@ -1182,6 +1191,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setSpecialistIntentDone(false);
     setHomeTasks("");
     setResourceFactors("");
+    setDebugInfo(null);
+    setCareRecommendation(null);
+    setShowConsultPrep(false);
+    setShowMessageToClose(false);
+    setMessageText("");
     setRecording(false);
     setTranscribing(false);
     setVoiceError("");
@@ -3326,6 +3340,92 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         );
       }
 
+      // Care recommendation section
+      const storedCareRec = sd.json_data?.care_recommendation || null;
+      if (storedCareRec && storedCareRec.level) {
+        const levelLabel = { self_support: "Самоподдержка", professional_contact: "Обращение к специалисту", urgent_help: "Срочная помощь" };
+        const timeLabel = { today: "Сегодня", within_days: "В ближайшие дни", within_weeks: "В ближайшие недели", routine: "Планово" };
+        const levelColor = { self_support: "#5F7D6C", professional_contact: "#7A7268", urgent_help: "#B85C4A" };
+        sections.push(
+          <div key="care-rec" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: t.highlight, userSelect: "none" }}>
+              <span style={{ fontWeight: 700, fontSize: 13, color: levelColor[storedCareRec.level] || t.crisisText }}>
+                Маршрутизация: {levelLabel[storedCareRec.level] || storedCareRec.level}
+              </span>
+              <div style={{ display: "flex", gap: 6 }}>
+                {storedCareRec.timeframe && <span style={{ color: t.muted, fontSize: 10, border: `1px solid ${t.muted}`, borderRadius: 4, padding: "1px 5px" }}>{timeLabel[storedCareRec.timeframe] || storedCareRec.timeframe}</span>}
+              </div>
+            </div>
+            <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "10px 14px", fontSize: 12, lineHeight: 1.6, color: t.crisisText }}>
+              {storedCareRec.specialist_types?.length > 0 && (
+                <div style={{ marginBottom: 4 }}><b>Специалист:</b> {storedCareRec.specialist_types.join(", ")}</div>
+              )}
+              {storedCareRec.reasons?.length > 0 && (
+                <div style={{ marginBottom: 4 }}><b>Причины:</b> {storedCareRec.reasons.join(", ")}</div>
+              )}
+              {storedCareRec.interim_support?.length > 0 && (
+                <div style={{ marginBottom: 4 }}><b>Временная опора:</b>
+                  <ul style={{ margin: "2px 0 0", paddingLeft: 16 }}>
+                    {storedCareRec.interim_support.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </div>
+              )}
+              {storedCareRec.urgent_triggers?.length > 0 && (
+                <div><b>Триггеры срочной помощи:</b> {storedCareRec.urgent_triggers.join(", ")}</div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // Debug info section (raw model response, quality check, etc.)
+      const debugData = sd.json_data?._debug || null;
+      if (debugData) {
+        const debugLines = [];
+        if (debugData.prompt_version) debugLines.push(`Prompt version: ${debugData.prompt_version}`);
+        if (debugData.quality_check) {
+          debugLines.push(`Quality check: ${debugData.quality_check.pass ? "✅ пройдена" : "❌ нарушена"}`);
+          if (debugData.quality_check.violations?.length) {
+            debugLines.push(`Нарушения: ${debugData.quality_check.violations.join("; ")}`);
+          }
+        }
+        if (debugData.repair?.repairAttempted) {
+          debugLines.push(`Repair: ${debugData.repair.repairSucceeded ? "✅ успешно" : "❌ не удался"}`);
+        }
+        if (debugData.raw_model_response) {
+          debugLines.push(`\n--- RAW MODEL RESPONSE ---\n${debugData.raw_model_response}`);
+        }
+
+        sections.push(
+          <div key="debug" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+            <div
+              onClick={() => {
+                const k = "tl-debug";
+                setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
+              }}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "10px 14px", cursor: "pointer",
+                background: t.highlight,
+                userSelect: "none",
+              }}
+            >
+              <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>
+                🛠 Техническая информация (raw model response)
+              </span>
+              <span style={{ color: t.cardLabel, fontSize: 11, transform: expandedSections["tl-debug"] ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▾</span>
+            </div>
+            {expandedSections["tl-debug"] && (
+              <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
+                <div style={{ color: t.crisisText, fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 500, overflowY: "auto" }}>
+                  {debugLines.join("\n")}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
       // Large section overlay (within detail modal)
       if (timelineLargeSection) {
         return (
@@ -5256,10 +5356,71 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   >
                     📝 DOCX
                   </button>
+                  {expertData && (
+                    <button
+                      style={{
+                        ...s.tab,
+                        fontSize: 11,
+                        background: activeTab === "debug" ? "#EDE3D8" : "transparent",
+                        borderColor: activeTab === "debug" ? "#B8A690" : "rgba(46,42,37,.12)",
+                      }}
+                      onClick={() => setActiveTab(activeTab === "debug" ? "user" : "debug")}
+                    >
+                      🛠 Debug
+                    </button>
+                  )}
                 </div>
 
                 <div style={s.reportBlock} className="report-block">
-                  {activeTab === "user" ? (
+                  {activeTab === "debug" && expertData && debugInfo ? (
+                    <div style={{ fontSize: 12, lineHeight: 1.6, color: "#5F5A52" }}>
+                      <div style={{ fontWeight: 700, marginBottom: 10, color: "#2E2A25" }}>
+                        Техническая информация (только для специалиста)
+                      </div>
+                      <div style={{ display: "grid", gap: 8 }}>
+                        <div><b>Prompt version:</b> {debugInfo.prompt_version || "—"}</div>
+                        <div><b>Care level:</b> {debugInfo.care_recommendation?.level || "—"}</div>
+                        <div><b>Minimum level (backend):</b> {debugInfo.minimum_level || "—"}</div>
+                        <div><b>Quality check:</b> {debugInfo.quality_check?.pass ? "✅ пройдена" : "❌ нарушена"}</div>
+                        {debugInfo.quality_check?.violations?.length > 0 && (
+                          <div><b>Нарушения:</b> {debugInfo.quality_check.violations.join("; ")}</div>
+                        )}
+                        <div><b>Repair attempted:</b> {debugInfo.repair?.repairAttempted ? "да" : "нет"}</div>
+                        {debugInfo.repair?.repairAttempted && (
+                          <div><b>Repair result:</b> {debugInfo.repair.repairSucceeded ? "✅ успешно" : "❌ не удался"}</div>
+                        )}
+                        <details>
+                          <summary style={{ cursor: "pointer", fontWeight: 600, marginTop: 8 }}>Raw model response</summary>
+                          <pre style={{ background: "#F5F0E8", padding: 12, borderRadius: 8, marginTop: 6, fontSize: 11, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                            {debugInfo.raw_model_response || "—"}
+                          </pre>
+                        </details>
+                        <details>
+                          <summary style={{ cursor: "pointer", fontWeight: 600, marginTop: 4 }}>Parsed user_report</summary>
+                          <pre style={{ background: "#F5F0E8", padding: 12, borderRadius: 8, marginTop: 6, fontSize: 11, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                            {debugInfo.parsed_user_report || "—"}
+                          </pre>
+                        </details>
+                        <details>
+                          <summary style={{ cursor: "pointer", fontWeight: 600, marginTop: 4 }}>Parsed doctor_report</summary>
+                          <pre style={{ background: "#F5F0E8", padding: 12, borderRadius: 8, marginTop: 6, fontSize: 11, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                            {debugInfo.parsed_doctor_report || "—"}
+                          </pre>
+                        </details>
+                        {debugInfo.care_recommendation && (
+                          <details>
+                            <summary style={{ cursor: "pointer", fontWeight: 600, marginTop: 4 }}>Care recommendation</summary>
+                            <pre style={{ background: "#F5F0E8", padding: 12, borderRadius: 8, marginTop: 6, fontSize: 11, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                              {JSON.stringify(debugInfo.care_recommendation, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                        {debugInfo.care_repair && (
+                          <div><b>Care repair:</b> {debugInfo.care_repair.repairAttempted ? (debugInfo.care_repair.repairSucceeded ? "✅" : "❌") : "—"}</div>
+                        )}
+                      </div>
+                    </div>
+                  ) : activeTab === "user" ? (
                     renderUserReport(userPart)
                   ) : (
                     <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
@@ -5267,6 +5428,219 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     </div>
                   )}
                 </div>
+
+                {careRecommendation && (
+                  <div style={{ marginTop: 20 }}>
+                    {/* URGENT_HELP block */}
+                    {careRecommendation.level === "urgent_help" && (
+                      <div style={{
+                        background: "rgba(184,92,74,.12)", border: "2px solid #B85C4A",
+                        borderRadius: 18, padding: 20, marginBottom: 16,
+                      }}>
+                        <div style={{ fontSize: 18, fontWeight: 900, color: "#B85C4A", marginBottom: 10 }}>
+                          Нужна срочная помощь
+                        </div>
+                        <div style={{ color: "#2E2A25", lineHeight: 1.7, fontSize: 14, marginBottom: 16 }}>
+                          Здесь нужна срочная помощь сегодня. Пожалуйста, позвоните 112, обратитесь в ближайшее приёмное отделение или попросите близкого помочь вам добраться до помощи. Не оставайтесь сейчас один.
+                        </div>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          <a href="tel:112" style={{
+                            display: "inline-block", background: "#B85C4A", color: "white",
+                            borderRadius: 12, padding: "12px 20px", fontWeight: 700, fontSize: 15,
+                            textDecoration: "none", cursor: "pointer",
+                          }}>
+                            Позвонить 112
+                          </a>
+                          <button style={{
+                            border: "1px solid #B85C4A", background: "transparent", color: "#B85C4A",
+                            borderRadius: 12, padding: "12px 20px", fontWeight: 600, fontSize: 14,
+                            cursor: "pointer",
+                          }} onClick={() => {
+                            const msg = "Мне сейчас очень тяжело. Побудь со мной на связи, пожалуйста.";
+                            navigator.clipboard.writeText(msg);
+                            showToast("Сообщение скопировано");
+                          }}>
+                            Попросить близкого быть рядом
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* PROFESSIONAL_CONTACT block */}
+                    {careRecommendation.level === "professional_contact" && (
+                      <div style={{
+                        background: "#F5F0E8", border: "1px solid rgba(46,42,37,.15)",
+                        borderRadius: 18, padding: 20, marginBottom: 16,
+                      }}>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: "#2E2A25", marginBottom: 8 }}>
+                          Рекомендуем связаться со специалистом
+                        </div>
+                        {careRecommendation.timeframe && (
+                          <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
+                            {careRecommendation.timeframe === "today" ? "Связаться сегодня" :
+                             careRecommendation.timeframe === "within_days" ? "Связаться в ближайшие дни" :
+                             "Связаться в ближайшее время"}
+                          </div>
+                        )}
+                        {careRecommendation.specialist_types?.length > 0 && (
+                          <div style={{ fontSize: 13, color: "#5F7D6C", marginBottom: 14, lineHeight: 1.5 }}>
+                            {careRecommendation.specialist_types.map(st => ({
+                              psychologist: "психолог", clinical_psychologist: "клинический психолог",
+                              psychotherapist: "психотерапевт", psychiatrist: "психиатр",
+                              general_physician: "терапевт", neurologist: "невролог",
+                              emergency_service: "экстренная служба", crisis_service: "кризисная служба",
+                            }[st] || st)).join(", ")}
+                          </div>
+                        )}
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => setShowConsultPrep(true)}>
+                            Подготовиться к первой консультации
+                          </button>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
+                            const msg = "Мне сейчас тяжело. Мне не обязательно нужны советы, но мне важно, чтобы ты побыл(а) со мной на связи сегодня.";
+                            setMessageText(msg);
+                            setShowMessageToClose(true);
+                          }}>
+                            Составить сообщение близкому
+                          </button>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
+                            setShowSelfAssessment(true);
+                            setShowSupportToolkit(true);
+                          }}>
+                            Продолжить разговор здесь
+                          </button>
+                          {careRecommendation.level === "professional_contact" && (
+                            <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px", borderColor: "#B85C4A", color: "#B85C4A" }}
+                              onClick={() => {
+                                showToast("Если состояние ухудшается или есть риск — звоните 112 или 103");
+                              }}>
+                              Когда нужна срочная помощь
+                            </button>
+                          )}
+                        </div>
+                        {careRecommendation.interim_support?.length > 0 && (
+                          <div style={{ marginTop: 14, fontSize: 13, color: "#7A7268", lineHeight: 1.6 }}>
+                            <div style={{ fontWeight: 600, marginBottom: 4 }}>До консультации:</div>
+                            <ul style={{ margin: 0, paddingLeft: 18 }}>
+                              {careRecommendation.interim_support.map((s, i) => (
+                                <li key={i}>{s}</li>
+                              ))}
+                            </ul>
+                            <div style={{ marginTop: 6, fontStyle: "italic" }}>
+                              Эти шаги не заменят профессиональную помощь, но могут помочь пережить ближайшие часы или дни безопаснее.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* SELF_SUPPORT block */}
+                    {careRecommendation.level === "self_support" && (
+                      <div style={{
+                        background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
+                        borderRadius: 18, padding: 20, marginBottom: 16,
+                      }}>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: "#2E2A25", marginBottom: 8 }}>
+                          Что делать дальше
+                        </div>
+                        <div style={{ color: "#2E2A25", lineHeight: 1.7, fontSize: 14, marginBottom: 12 }}>
+                          Сейчас можно начать с поддержки близких и нескольких простых шагов. Если состояние не начнёт уменьшаться или станет сильнее, стоит обратиться к специалисту.
+                        </div>
+                        {careRecommendation.interim_support?.length > 0 && (
+                          <ul style={{ color: "#5F7D6C", fontSize: 13, lineHeight: 1.6, margin: "0 0 12px", paddingLeft: 18 }}>
+                            {careRecommendation.interim_support.map((s, i) => (
+                              <li key={i}>{s}</li>
+                            ))}
+                          </ul>
+                        )}
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
+                            setShowSelfAssessment(true);
+                            setShowSupportToolkit(true);
+                          }}>
+                            Посмотреть поддерживающие практики
+                          </button>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px", borderColor: "#B85C4A", color: "#B85C4A" }}
+                            onClick={() => {
+                              showToast("Если состояние ухудшается или есть риск — звоните 112 или 103");
+                            }}>
+                            Когда нужна срочная помощь
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Consultation prep modal */}
+                {showConsultPrep && (
+                  <div style={s.overlay} onClick={() => setShowConsultPrep(false)}>
+                    <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+                      <div style={s.modalTitle}>Подготовиться к первой консультации</div>
+                      <p style={{ color: "#7A7268", fontSize: 14, lineHeight: 1.6, marginBottom: 16 }}>
+                        Что важно рассказать специалисту:
+                      </p>
+                      <div style={{ background: "#FAF6EF", borderRadius: 14, padding: 16, marginBottom: 16, fontSize: 13, lineHeight: 1.7, color: "#2E2A25" }}>
+                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                          <li>Что произошло</li>
+                          <li>Как давно это продолжается</li>
+                          <li>Что происходит со сном</li>
+                          <li>Какие есть телесные симптомы</li>
+                          <li>Что изменилось в работе и повседневной жизни</li>
+                          <li>Были ли мысли о смерти или самоповреждении</li>
+                          <li>Какие лекарства, алкоголь или другие средства используются</li>
+                          <li>Кто сейчас может поддержать</li>
+                        </ul>
+                      </div>
+                      <button
+                        style={{ ...s.wide, background: "#7D9A89", color: "white" }}
+                        onClick={() => {
+                          const text = `Что произошло: ${text || "(будет заполнено при разговоре)"}
+      Как давно: ${conversationHistory?.length ? "обсуждено в диалоге" : "—"}
+      Сон: ${userPart?.match(/сон/i) ? "обсуждался" : "—"}
+      Телесные симптомы: ${userPart?.match(/телесн|бол|сердц|голов/i) ? "обсуждались" : "—"}
+      Изменения в жизни: ${userPart?.match(/работ|учёб/i) ? "обсуждались" : "—"}
+      Мысли о смерти: ${userPart?.match(/смерт|жить/i) ? "обсуждались" : "—"}
+      Лекарства/алкоголь: ${userPart?.match(/лекарств|алкоголь/i) ? "обсуждались" : "—"}
+      Поддержка: ${userPart?.match(/поддерж|близк/i) ? "обсуждалась" : "—"}`;
+                          navigator.clipboard.writeText(text);
+                          showToast("Краткое описание скопировано");
+                        }}
+                      >
+                        Скопировать краткое описание
+                      </button>
+                      <button style={{ ...s.secondary, marginTop: 10 }} onClick={() => setShowConsultPrep(false)}>
+                        Закрыть
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Message to close person modal */}
+                {showMessageToClose && (
+                  <div style={s.overlay} onClick={() => setShowMessageToClose(false)}>
+                    <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+                      <div style={s.modalTitle}>Сообщение близкому</div>
+                      <textarea
+                        style={{ ...s.textarea, minHeight: 100, marginBottom: 16 }}
+                        value={messageText}
+                        onChange={(e) => setMessageText(e.target.value)}
+                      />
+                      <button
+                        style={{ ...s.wide, background: "#7D9A89", color: "white" }}
+                        onClick={() => {
+                          navigator.clipboard.writeText(messageText);
+                          showToast("Сообщение скопировано");
+                        }}
+                      >
+                        Скопировать сообщение
+                      </button>
+                      <button style={{ ...s.secondary, marginTop: 10 }} onClick={() => setShowMessageToClose(false)}>
+                        Закрыть
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {!showSelfAssessment && !showSupportToolkit && !showSpecialistIntent && (
                   <div style={{ marginTop: 24, borderTop: "1px solid rgba(46,42,37,.1)", paddingTop: 20 }}>
@@ -5659,6 +6033,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           }
                         }
                       }
+
+                      // Restore debug + care recommendation from json_data
+                      if (s.json_data?._debug) setDebugInfo(s.json_data._debug);
+                      if (s.json_data?.care_recommendation) setCareRecommendation(s.json_data.care_recommendation);
 
                       // Restore questions/answers if present
                       const savedAnswers = s.answers || {};

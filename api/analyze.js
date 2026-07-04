@@ -50,6 +50,257 @@ ${previousAnswers.map((a, i) => `${i + 1}. ${a}`).join("\n")}
 `;
 }
 
+const PROMPT_VERSION = "3.1-care-routing";
+
+const PROHIBITED_TERMS_USER_REPORT = [
+  "эмоциональн(ая|ой|ую|ые|ых|ым) сфер",
+  "нейрокогнитивн(ая|ой|ую|ые|ых|ым) сфер",
+  "модифицирующие факторы",
+  "модифицирующих факторов",
+  "травматическ(ий|ого|ому|им|ом) контекст",
+  "психопатологическ",
+  "ресурсн(ый|ого|ому|ым|ом|ые|ых|ым) потенциал",
+  "выявлены сигналы",
+  "обнаружены сигналы",
+];
+
+function checkReportQuality(userReport, originalText, historyText) {
+  const violations = [];
+  if (!userReport) return { pass: false, violations: ["user_report is empty"] };
+
+  for (const pattern of PROHIBITED_TERMS_USER_REPORT) {
+    const re = new RegExp(pattern, "iu");
+    if (re.test(userReport)) {
+      violations.push(`prohibited term: ${pattern}`);
+    }
+  }
+
+  // Check "важно оценить" > 2
+  const vazhnoOcenit = (userReport.match(/важно оценить/gi) || []).length;
+  if (vazhnoOcenit > 2) violations.push(`"важно оценить" used ${vazhnoOcenit} times`);
+
+  // Check "требуется уточнение" > 1
+  const trebuetsya = (userReport.match(/требуется уточнение/gi) || []).length;
+  if (trebuetsya > 1) violations.push(`"требуется уточнение" used ${trebuetsya} times`);
+
+  // Check if it mentions any specific fact from original text
+  // Extract key nouns/entities from original text (simple heuristic)
+  const originalWords = (originalText || "").split(/\s+/).filter(w => w.length > 4);
+  const factMentions = originalWords.filter(w => {
+    const clean = w.replace(/[.,!?;:()"']/g, "").toLowerCase();
+    if (clean.length < 4) return false;
+    // Skip common words
+    const skip = ["который", "которая", "которые", "потому", "чтобы", "себя", "сейчас", "сегодня", "может", "очень", "просто", "тогда", "всегда", "никогда", "потом"];
+    if (skip.includes(clean)) return false;
+    return userReport.toLowerCase().includes(clean);
+  }).length;
+  if (factMentions < 2) violations.push(`too few concrete facts (${factMentions} mentions of user's words)`);
+
+  // Check for generic list style
+  const genericPhrases = [
+    "стресс", "конфликт", "болезнь", "веществ", "кофеин", "никотин",
+    "бады", "умеренн", "здоров",
+  ];
+  const genericCount = genericPhrases.filter(p =>
+    new RegExp(p, "iu").test(userReport)
+  ).length;
+  if (genericCount >= 4) violations.push(`generic checklist style (${genericCount} universal factors)`);
+
+  // Check главное событие is mentioned
+  if (originalText) {
+    const mainTopicWords = originalText
+      .split(/\s+/)
+      .filter(w => w.length > 5)
+      .slice(0, 20);
+    const mentioned = mainTopicWords.filter(w => {
+      const clean = w.replace(/[.,!?;:()"']/g, "").toLowerCase();
+      if (clean.length < 4) return false;
+      return userReport.toLowerCase().includes(clean);
+    }).length;
+    if (mentioned < 1) violations.push("главное событие из обращения не упомянуто");
+  }
+
+  return { pass: violations.length === 0, violations };
+}
+
+async function repairUserReport(rawResponse, userReport, doctorReport, violations, originalText, convHistory) {
+  const repairPrompt = `Ты — редактор отчётов для психологического сервиса "Точка опоры".
+
+Исходный диалог:
+${convHistory || ""}
+
+Исходное описание пользователя:
+${originalText || ""}
+
+Предыдущий user_report (нуждается в исправлении):
+${userReport}
+
+Нарушенные правила:
+${violations.join("\n")}
+
+Задача: перепиши ТОЛЬКО user_report. doctor_report не меняй.
+Строго соблюдай:
+1. 6 разделов: что происходит, что услышали, что не пропустить, на что опереться, что может помочь, следующий шаг.
+2. Живой человеческий язык, без канцелярита.
+3. Конкретные факты из диалога (минимум 2-3).
+4. Запрещено: "эмоциональная сфера", "нейрокогнитивная сфера", "модифицирующие факторы", "травматический контекст", "выявлены сигналы", "важно оценить", "требуется уточнение".
+5. Обращение к человеку ("вы", "вам", "ваш").
+
+Верни JSON:
+{ "user_report": "исправленный текст" }`;
+
+  try {
+    const result = await runTextAnalysis({
+      systemPrompt: "Ты — редактор отчётов для психологического сервиса. Исправляй user_report согласно инструкции.",
+      userPrompt: repairPrompt,
+      model: process.env.AI_MODEL_TRIAGE || "gpt-4.1-mini",
+      fallbackModel: process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini",
+      reasoningEffort: "low",
+    });
+    const repaired = result.parsed?.user_report;
+    if (repaired && repaired.length > 50) {
+      const recheck = checkReportQuality(repaired, originalText, convHistory);
+      if (recheck.pass) return { repaired, repairAttempted: true, repairSucceeded: true, repairFailed: false };
+    }
+    return { repaired: null, repairAttempted: true, repairSucceeded: false, repairFailed: true };
+  } catch {
+    return { repaired: null, repairAttempted: true, repairSucceeded: false, repairFailed: true };
+  }
+}
+
+const VALID_SPECIALIST_TYPES = [
+  "psychologist", "clinical_psychologist", "psychotherapist",
+  "psychiatrist", "general_physician", "neurologist",
+  "emergency_service", "crisis_service",
+];
+
+const VALID_REASONS = [
+  "severe_distress", "persistent_symptoms", "sleep_disruption",
+  "functional_impairment", "somatic_symptoms", "traumatic_uncertainty",
+  "grief", "substance_use", "hopelessness", "social_isolation",
+  "suicidal_thoughts", "self_harm_risk", "psychosis_red_flags",
+  "mania_red_flags", "risk_to_others",
+];
+
+function deriveMinimumCareLevel({
+  riskLevel, suicidalIntent, suicidalPlan, selfHarmRisk,
+  psychosisRedFlags, maniaRedFlags, riskToOthers,
+  functionalImpairment, severeDistress, somaticSymptoms,
+  traumaticUncertainty, sleepDisruption, substanceUse,
+}) {
+  if (suicidalIntent || suicidalPlan || psychosisRedFlags || maniaRedFlags || riskToOthers || riskLevel === "high") {
+    return "urgent_help";
+  }
+  if (selfHarmRisk || severeDistress || functionalImpairment || somaticSymptoms || traumaticUncertainty || sleepDisruption || substanceUse) {
+    return "professional_contact";
+  }
+  return "self_support";
+}
+
+function checkCareRecommendation(cr, conversationText) {
+  const violations = [];
+  if (!cr || !cr.level) {
+    violations.push("care_recommendation missing or has no level");
+    return { pass: false, violations };
+  }
+
+  const level = cr.level;
+  const timeframe = cr.timeframe;
+
+  // If risk is high, level cannot be self_support — handled by backend override
+  // Check timeframe consistency
+  if (level === "urgent_help" && timeframe !== "today") {
+    violations.push("urgent_help must have timeframe 'today'");
+  }
+  if (level === "professional_contact" && timeframe !== "within_days" && timeframe !== "today") {
+    violations.push("professional_contact must have timeframe 'within_days' or 'today'");
+  }
+
+  // specialist_types must be valid
+  if (Array.isArray(cr.specialist_types)) {
+    for (const st of cr.specialist_types) {
+      if (!VALID_SPECIALIST_TYPES.includes(st)) {
+        violations.push(`invalid specialist_type: ${st}`);
+      }
+    }
+  }
+
+  // reasons must be valid
+  if (Array.isArray(cr.reasons)) {
+    for (const r of cr.reasons) {
+      if (!VALID_REASONS.includes(r)) {
+        violations.push(`invalid reason: ${r}`);
+      }
+    }
+  }
+
+  // urgent_triggers only for urgent_help
+  if (cr.urgent_triggers?.length && level !== "urgent_help") {
+    violations.push("urgent_triggers only allowed for urgent_help level");
+  }
+
+  // If somatic symptoms present, must include general_physician or emergency_service
+  if (cr.reasons?.includes("somatic_symptoms")) {
+    if (!cr.specialist_types?.some(st => st === "general_physician" || st === "emergency_service")) {
+      violations.push("somatic_symptoms require general_physician or emergency_service in specialist_types");
+    }
+  }
+
+  // Traumatic uncertainty + sleep disruption → professional_contact minimum
+  if (cr.reasons?.includes("traumatic_uncertainty") && cr.reasons?.includes("sleep_disruption")) {
+    if (level === "self_support") {
+      violations.push("traumatic_uncertainty + sleep_disruption require at least professional_contact");
+    }
+  }
+
+  return { pass: violations.length === 0, violations };
+}
+
+async function repairCareRecommendation(originalText, historyText, cr, violations) {
+  const repairPrompt = `Ты — редактор маршрутизации помощи для психологического сервиса "Точка опоры".
+
+Исходный диалог:
+${historyText || ""}
+
+Исходное описание пользователя:
+${originalText || ""}
+
+Текущая care_recommendation (нуждается в исправлении):
+${JSON.stringify(cr, null, 2)}
+
+Нарушенные правила:
+${violations.join("\n")}
+
+Задача: исправь ТОЛЬКО care_recommendation.
+
+Правила:
+- level: self_support | professional_contact | urgent_help
+- timeframe: today | within_days | within_weeks | routine
+- specialist_types: ${VALID_SPECIALIST_TYPES.join(", ")}
+- reasons: ${VALID_REASONS.join(", ")}
+
+Верни JSON:
+{ "care_recommendation": { "level": "...", "timeframe": "...", "specialist_types": [], "reasons": [], "interim_support": [], "urgent_triggers": [] } }`;
+
+  try {
+    const result = await runTextAnalysis({
+      systemPrompt: "Ты — редактор маршрутизации помощи. Исправляй care_recommendation согласно инструкции.",
+      userPrompt: repairPrompt,
+      model: process.env.AI_MODEL_TRIAGE || "gpt-4.1-mini",
+      fallbackModel: process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini",
+      reasoningEffort: "low",
+    });
+    const repaired = result.parsed?.care_recommendation;
+    if (repaired && repaired.level) {
+      const recheck = checkCareRecommendation(repaired, historyText);
+      if (recheck.pass) return { repaired, repairAttempted: true, repairSucceeded: true };
+    }
+    return { repaired: null, repairAttempted: true, repairSucceeded: false };
+  } catch {
+    return { repaired: null, repairAttempted: true, repairSucceeded: false };
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -77,68 +328,24 @@ export default async function handler(req, res) {
 
   const fallbackFinal = `===USER_REPORT===
 
-Предварительный разбор для вас
+Спасибо, что поделились.
 
-В вашем описании заметны некоторые признаки эмоционального напряжения, усталости, нарушения сна и трудностей с концентрацией. Это не диагноз, а первичное выявление сигналов.
+Ваш разговор сохранён. Нам не удалось полностью обработать его сейчас, но вы сможете вернуться к нему позже по коду доступа.
 
-1. Что сейчас видно
-Обнаружены сигналы в эмоциональной сфере и нейрокогнитивной сфере. Требуется уточнение по травматическому контексту и модифицирующим факторам.
+Если вам нужно поговорить со специалистом — обратитесь к психологу или психотерапевту очно или онлайн.
 
-2. Что могло запустить или усиливать состояние
-Важно оценить возможные триггеры: стрессовые события, утрата, конфликты, болезни, перегрузка, вещества или соматические факторы.
-
-3. Какие ресурсы у вас уже есть
-Важно оценить социальную поддержку, доступные источники помощи и внутренние ресурсы.
-
-4. Что уже помогает или используется
-Требуется уточнение: принимаете ли вы какие-либо лекарства, используете ли безрецептурные средства (мелатонин, валериана), алкоголь, кофеин, никотин, БАДы. Важно обсудить это со специалистом.
-
-5. Что может помочь сегодня
-Снизить нагрузку, стабилизировать сон, записать основные жалобы. Избегать алкоголя и стимуляторов. Если есть близкий человек — поделиться с ним своим состоянием.
-
-6. План до следующего разговора
-Отмечать сон, записывать моменты усиления состояния, замечать, что хотя бы немного помогает. Вернуться к разговору через 2-3 дня.
-
-7. Когда нужна срочная помощь
-Если появляются мысли о причинении вреда себе или другим — звоните 112 или 103.
-
-8. Когда стоит обратиться к специалисту
-Рекомендуется обсудить это со специалистом — психологом, психотерапевтом или врачом-психиатром.
-
-Вопрос для следующего разговора:
-Что изменилось с прошлого раза — стало легче, тяжелее или осталось так же?
+Если состояние ухудшается или появляются мысли причинить себе вред — звоните 112 или 103. Не оставайтесь одни.
 
 ===DOCTOR_REPORT===
 
-Выявленные сигналы: эмоциональная сфера, нейрокогнитивная сфера — сигналы присутствуют. Травматический контекст, сфера риска — требуют уточнения.
-Маркеры риска: не оценены.
-Модифицирующие факторы: не оценены.
-Временная динамика: требует уточнения.
-Функциональные нарушения: требуют уточнения.
-Уверенность: низкая — недостаточно данных.
-Срочность: требует оценки.
-Рекомендации: консультация специалиста в плановом порядке.
-Ресурсы и поддержка пациента:
-- социальная поддержка: требует уточнения
-- защитные факторы: требует уточнения
-- готовность обращаться за помощью: не оценена
-- план до следующего контакта: стабилизация сна, снижение нагрузки
-- возможные барьеры: требуется уточнение
-Текущие препараты и способы самопомощи:
-- лекарства: не оценены
-- безрецептурные средства: не оценены
-- алкоголь: не оценён
-- кофеин: не оценён
-- никотин: не оценён
-- БАДы: не оценены
-- немедикаментозные стратегии: стабилизация сна, снижение нагрузки`;
+AI-assisted summary не сформирован из-за технической ошибки. Диалог сохранён для ручного разбора.`;
 
   if (!process.env.OPENAI_API_KEY) {
     return res.status(200).json({
       type: "questions",
       questions: fallbackQuestions,
       model_used: "none",
-      fallback_used: false,
+      fallback_used: true,
     });
   }
 
@@ -301,6 +508,76 @@ export default async function handler(req, res) {
 6. Перед тем как ответить пациенту, перепиши фразы, которые звучат как справка или медицинский протокол, на живой язык.
 
 Полный речевой справочник: prompts/language-style.md.
+
+--- ПРАВИЛА ФОРМИРОВАНИЯ ОТЧЁТА ДЛЯ КЛИЕНТА (user_report) ---
+
+Отчёт для клиента — это не медицинская справка и не перечень доменов.
+Это короткое, узнаваемое продолжение состоявшегося разговора.
+Человек должен увидеть в тексте свою ситуацию и понять, что его услышали.
+Не повторяй внутреннюю классификацию системы в user_report.
+Не перечисляй все возможные причины и факторы — выбирай только то, что связано с данным разговором.
+
+Запрещено использовать в user_report (допустимо только в doctor_report):
+- эмоциональная сфера / нейрокогнитивная сфера
+- модифицирующие факторы / травматический контекст
+- домены / маркеры / гипотезы
+- психопатологическая симптоматика
+- "требуется уточнение" / "важно оценить" / "выявлены сигналы"
+- ресурсный потенциал
+- "триггеры" как универсальное слово без конкретики
+
+Структура user_report при финальном ответе:
+
+1. Что с вами сейчас происходит — 2-4 предложения. Назвать главное событие и его влияние.
+
+2. Что мы услышали в разговоре — только конкретные проявления из диалога. Никаких универсальных списков.
+
+3. Что важно не пропустить — коротко: непосредственные риски, телесные симптомы (требующие врача), сон, алкоголь или препараты — только если обсуждалось. Не писать список всех возможных факторов одновременно.
+
+4. На что можно опереться — реальные ресурсы из разговора. Если ресурс не выявлен: "В разговоре пока не удалось найти человека или место, на которое вы можете опереться". Не писать "важно оценить социальную поддержку".
+
+5. Что может немного помочь сегодня — максимум 3 конкретных выполнимых действия. Без общих фраз: "снизить нагрузку", "стабилизировать сон", "избегать стресса". Конкретно: "выбрать одного человека и написать ему", "сделать паузу в проверке новостей", "поесть или выпить воды", "записать симптомы", "договориться о медосмотре".
+
+6. Следующий шаг — один понятный шаг. Например: "В следующем разговоре стоит подробнее обсудить сон, телесные симптомы и то, кто может быть рядом в ближайшие дни."
+
+Обязательное заземление в фактах:
+Перед формированием user_report выдели внутренне:
+1) главное событие; 2) главную трудность сейчас; 3) наиболее значимые проявления; 4) имеющиеся ресурсы; 5) ближайший реалистичный шаг.
+Не выводи этот служебный анализ отдельно, но обязательно используй его в тексте.
+Каждый user_report должен опираться минимум на 2-3 конкретных факта из разговора.
+
+Неопределённая утрата (ambiguous loss):
+Различай: подтверждённая смерть vs расставание vs человек пропал без вести vs потеряна связь, судьба неизвестна.
+Если судьба близкого неизвестна:
+- не пиши так, как будто смерть подтверждена;
+- не называй состояние завершённым горем;
+- используй: "мучительная неопределённость", "неопределённая утрата" — с пояснением;
+- признавай, что человеку трудно одновременно надеяться и готовиться к плохим новостям;
+- не предлагай "принять утрату", если факт утраты не подтверждён.
+
+Связь переживаний и тела:
+Если в разговоре есть соматические жалобы:
+- назови их конкретно (только если клиент сообщал);
+- объясни, что длительное напряжение может усиливать телесные ощущения;
+- не утверждай, что симптомы вызваны только тревогой;
+- укажи, что медицинские причины должны быть исключены;
+- при опасных симптомах — ясная рекомендация обратиться за неотложной помощью.
+Не используй "нейрокогнитивная сфера" для телесных жалоб.
+
+Запрет на отчёт-анкету:
+user_report не должен выглядеть как перечень вопросов, которые врач ещё не задал.
+Вместо "важно оценить социальную поддержку" → "Вы рассказали, что можете обратиться к сестре" или "Пока неясно, есть ли рядом человек, которому вы можете позвонить".
+Вместо "требуется уточнение по препаратам" → "Мы пока не обсудили лекарства и средства, которые вы принимаете. Это стоит уточнить в следующем разговоре".
+
+Стиль user_report (Нора Галь):
+- конкретный глагол вместо отглагольного существительного;
+- короткие предложения;
+- меньше пассивных конструкций;
+- не использовать канцелярские связки;
+- обращаться к человеку, а не описывать его как объект анализа;
+- один абзац — одна мысль.
+
+--- КОНЕЦ ПРАВИЛ ОТЧЁТА ДЛЯ КЛИЕНТА ---
 
 Голосовые признаки (voice_observations):
 Если переданы voice_observations, используй их только как дополнительный
@@ -485,8 +762,29 @@ ${antiRepeatBlock}
 Если нужно больше информации — верни JSON:
 { "type": "questions", "questions": ["вопрос 1", "вопрос 2", ...] }
 
-Если данных достаточно для предварительного заключения — верни JSON:
-{ "type": "final", "user_report": "текст для пользователя в мягкой форме\n\nВ вашем описании заметны некоторые признаки...\nЭто не диагноз.\nВажно уточнить...\n\n1. Что сейчас видно\n2. Что изменилось с прошлого раза\n3. Что помогло\n4. Что ухудшилось\n5. Какие ресурсы у вас уже есть\n6. Что уже помогает или используется (лекарства, упражнения, дыхание, дневник, мелатонин, валериана, снижение кофеина и т.д.)\n7. Что может помочь сегодня\n8. План до следующего разговора\n9. Когда нужна срочная помощь\n10. Когда стоит обратиться к специалисту\n\nВопрос для следующего разговора:\nЧто изменилось с прошлого раза — стало легче, тяжелее или осталось так же?", "doctor_report": "Выявленные сигналы: [сферы]\nМаркеры риска: [риски]\nМодифицирующие факторы: [контекст]\nВременная динамика: [динамика]\nФункциональные нарушения: [нарушения]\nУверенность: [уровень]\nСрочность: [срочность]\nРекомендации: [рекомендация]\nДинамика с прошлой сессии: [изменения]\nРесурсы и поддержка пациента:\n- социальная поддержка:\n- защитные факторы:\n- готовность обращаться за помощью:\n- план до следующего контакта:\n- возможные барьеры:\nТекущие препараты и способы самопомощи:\n- лекарства:\n- безрецептурные средства:\n- алкоголь:\n- кофеин:\n- никотин:\n- БАДы:\n- немедикаментозные стратегии:" }
+Если данных достаточно для предварительного заключения — верни JSON. Строго соблюдай структуру user_report из правил выше (6 разделов: что происходит, что услышали, что не пропустить, на что опереться, что может помочь, следующий шаг). Никаких "эмоциональная сфера", "модифицирующие факторы" и т.д. в user_report. Используй конкретные факты диалога. Пиши живым человеческим языком.
+
+Обязательно включи поле care_recommendation с маршрутизацией помощи:
+- level: self_support | professional_contact | urgent_help
+- timeframe: today | within_days | within_weeks | routine
+- specialist_types: один или несколько из psychologist, clinical_psychologist, psychotherapist, psychiatrist, general_physician, neurologist, emergency_service, crisis_service
+- reasons: один или несколько из severe_distress, persistent_symptoms, sleep_disruption, functional_impairment, somatic_symptoms, traumatic_uncertainty, grief, substance_use, hopelessness, social_isolation, suicidal_thoughts, self_harm_risk, psychosis_red_flags, mania_red_flags, risk_to_others
+- interim_support: максимум 3 временных шага до контакта со специалистом (строками)
+- urgent_triggers: только для urgent_help, список конкретных триггеров
+
+Логика выбора:
+- SELF_SUPPORT: нет риска, лёгкое/умеренное состояние, функционирование сохранено, симптомы кратковременные, есть поддержка, нет злоупотребления
+- PROFESSIONAL_CONTACT: состояние заметно мешает сну/работе/питанию, симптомы сохраняются неделями, усиливаются, сильная тревога, неопределённая утрата, травматический контекст, пугающие телесные симптомы, безысходность, изоляция, алкоголь/лекарства для совладания, требуется мед.оценка соматических жалоб
+- URGENT_HELP: суицидальное намерение/план/попытка, психоз, мания с опасным поведением, угроза другим, невозможность оставаться в безопасности, опасные телесные симптомы
+
+В разделе 6 user_report "Следующий шаг" обязательно используй маршрутизацию из care_recommendation level:
+- self_support: "Сейчас можно начать с нескольких простых шагов и поддержки близких. Если состояние не начнёт уменьшаться в ближайшие дни или станет сильнее, стоит обратиться к специалисту."
+- professional_contact: "Я бы рекомендовал в ближайшие дни связаться со специалистом." + конкретный тип специалиста, объяснение почему, и если есть телесные симптомы — отдельно рекомендация врача
+- urgent_help: "Здесь нужна срочная помощь сегодня. Пожалуйста, позвоните 112, обратитесь в ближайшее приёмное отделение или попросите близкого помочь вам добраться до помощи. Не оставайтесь сейчас один."
+
+Добавь в doctor_report раздел "Маршрутизация:" с care level, сроком, типом специалиста, причинами и interim_support.
+
+{ "type": "final", "user_report": "1. Что с вами сейчас происходит\n\n[2-4 предложения о главном событии и его влиянии]\n\n2. Что мы услышали в разговоре\n\n[конкретные проявления из диалога, 2-3 факта]\n\n3. Что важно не пропустить\n\n[коротко: риски, телесные симптомы, сон, алкоголь — только из диалога]\n\n4. На что можно опереться\n\n[реальные ресурсы из разговора или \"пока не удалось найти\"]\n\n5. Что может немного помочь сегодня\n\n[максимум 3 конкретных действия, связанных с ситуацией]\n\n6. Следующий шаг\n\n[один понятный шаг с маршрутизацией]", "doctor_report": "Выявленные сигналы: [сферы]\nМаркеры риска: [риски]\nМодифицирующие факторы: [контекст]\nВременная динамика: [динамика]\nФункциональные нарушения: [нарушения]\nУверенность: [уровень]\nСрочность: [срочность]\nРекомендации: [рекомендация]\nДинамика с прошлой сессии: [изменения]\nРесурсы и поддержка пациента:\n- социальная поддержка:\n- защитные факторы:\n- готовность обращаться за помощью:\n- план до следующего контакта:\n- возможные барьеры:\nТекущие препараты и способы самопомощи:\n- лекарства:\n- безрецептурные средства:\n- алкоголь:\n- кофеин:\n- никотин:\n- БАДы:\n- немедикаментозные стратегии:\nМаршрутизация:\n- уровень: [self_support | professional_contact | urgent_help]\n- срок: [today | within_days | within_weeks | routine]\n- специалист: [тип]\n- причины: [причины]\n- временная опора до консультации: [interim_support]", "care_recommendation": { "level": "professional_contact|self_support|urgent_help", "timeframe": "within_days|today|within_weeks|routine", "specialist_types": ["clinical_psychologist", "psychotherapist"], "reasons": ["severe_distress", "sleep_disruption"], "interim_support": ["шаг 1", "шаг 2", "шаг 3"], "urgent_triggers": [] } }
 
 ВАЖНО: Не завершай слишком рано. Если есть конкурирующие гипотезы или не хватает информации — продолжай уточнение.`;
 
@@ -536,19 +834,170 @@ ${antiRepeatBlock}
       });
     }
 
-    const userPart = parsed.user_report || "";
+    let userPart = parsed.user_report || "";
     const doctorPart = parsed.doctor_report || "";
+    let careRec = parsed.care_recommendation || null;
+
+    // Quality check and repair for user_report
+    let qualityCheck = { pass: true, violations: [] };
+    let repairInfo = { repairAttempted: false };
+
+    if (userPart) {
+      qualityCheck = checkReportQuality(userPart, text, historyText);
+      if (!qualityCheck.pass) {
+        console.log("User report quality check failed:", qualityCheck.violations.join("; "));
+        const repairResult = await repairUserReport(
+          raw, userPart, doctorPart, qualityCheck.violations, text, historyText
+        );
+        repairInfo = repairResult;
+        if (repairResult.repaired) {
+          userPart = repairResult.repaired;
+        }
+      }
+    }
+
+    // --- Care recommendation: backend minimum level override ---
+    // Detect signals from conversation
+    const fullConversation = (historyText || "") + " " + (text || "");
+    const hasSuicidalIntent = /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/i.test(fullConversation);
+    const hasSuicidalPlan = /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/i.test(fullConversation);
+    const hasPsychosis = /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/i.test(fullConversation);
+    const hasMania = /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/i.test(fullConversation);
+    const hasRiskToOthers = /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/i.test(fullConversation);
+    const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/i.test(fullConversation);
+    const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/i.test(fullConversation);
+    const hasSomaticSymptoms = /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/i.test(fullConversation);
+    const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/i.test(fullConversation);
+    const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/i.test(fullConversation);
+    const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/i.test(fullConversation);
+    const hasSelfHarm = /реж.*себ|самоповреж|причин.*себе.*вред/i.test(fullConversation);
+
+    const minimumLevel = deriveMinimumCareLevel({
+      riskLevel: null,
+      suicidalIntent: hasSuicidalIntent,
+      suicidalPlan: hasSuicidalPlan,
+      selfHarmRisk: hasSelfHarm,
+      psychosisRedFlags: hasPsychosis,
+      maniaRedFlags: hasMania,
+      riskToOthers: hasRiskToOthers,
+      functionalImpairment: hasFunctionalImpairment,
+      severeDistress: hasSevereDistress,
+      somaticSymptoms: hasSomaticSymptoms,
+      traumaticUncertainty: hasTraumaticUncertainty,
+      sleepDisruption: hasSleepDisruption,
+      substanceUse: hasSubstanceUse,
+    });
+
+    // Validate and enforce care_recommendation
+    let careRepairInfo = { repairAttempted: false };
+    let careCheck = { pass: true, violations: [] };
+
+    if (careRec) {
+      careCheck = checkCareRecommendation(careRec, fullConversation);
+      // Backend override: model cannot set below minimum
+      const levelOrder = { "self_support": 0, "professional_contact": 1, "urgent_help": 2 };
+      if (levelOrder[careRec.level] < levelOrder[minimumLevel]) {
+        careRec.level = minimumLevel;
+        careCheck.violations.push(`overridden to ${minimumLevel} (model set lower)`);
+        careCheck.pass = careCheck.violations.length === 0;
+      }
+      // Ensure timeframe consistency
+      if (careRec.level === "urgent_help" && careRec.timeframe !== "today") {
+        careRec.timeframe = "today";
+      }
+      if (careRec.level === "professional_contact" && careRec.timeframe !== "within_days" && careRec.timeframe !== "today") {
+        careRec.timeframe = "within_days";
+      }
+      if (!careCheck.pass) {
+        console.log("Care recommendation check failed:", careCheck.violations.join("; "));
+        const repairResult = await repairCareRecommendation(text, historyText, careRec, careCheck.violations);
+        careRepairInfo = repairResult;
+        if (repairResult.repaired) {
+          careRec = repairResult.repaired;
+          const recheck = checkCareRecommendation(careRec, fullConversation);
+          if (!recheck.pass) {
+            careCheck = recheck;
+          }
+        }
+      }
+    }
+
+    // If no careRec from model or repair failed, derive from minimum level
+    if (!careRec) {
+      careRec = {
+        level: minimumLevel,
+        timeframe: minimumLevel === "urgent_help" ? "today" : minimumLevel === "professional_contact" ? "within_days" : "within_weeks",
+        specialist_types: [],
+        reasons: [],
+        interim_support: [],
+        urgent_triggers: minimumLevel === "urgent_help" ? ["see_recommendations"] : [],
+      };
+      // Populate based on detected signals
+      if (hasSuicidalIntent || hasSuicidalPlan) { careRec.reasons.push("suicidal_thoughts"); careRec.specialist_types.push("emergency_service"); }
+      if (hasPsychosis) { careRec.reasons.push("psychosis_red_flags"); careRec.specialist_types.push("psychiatrist"); }
+      if (hasMania) { careRec.reasons.push("mania_red_flags"); careRec.specialist_types.push("psychiatrist"); }
+      if (hasSevereDistress) careRec.reasons.push("severe_distress");
+      if (hasFunctionalImpairment) careRec.reasons.push("functional_impairment");
+      if (hasSomaticSymptoms) { careRec.reasons.push("somatic_symptoms"); if (!careRec.specialist_types.includes("general_physician")) careRec.specialist_types.push("general_physician"); }
+      if (hasTraumaticUncertainty) careRec.reasons.push("traumatic_uncertainty");
+      if (hasSleepDisruption) careRec.reasons.push("sleep_disruption");
+      if (hasSubstanceUse) { careRec.reasons.push("substance_use"); if (!careRec.specialist_types.includes("clinical_psychologist")) careRec.specialist_types.push("clinical_psychologist"); }
+      if (hasSelfHarm) { careRec.reasons.push("self_harm_risk"); careRec.level = "urgent_help"; careRec.timeframe = "today"; }
+      if (hasRiskToOthers) { careRec.reasons.push("risk_to_others"); careRec.level = "urgent_help"; careRec.timeframe = "today"; }
+      // Deduplicate
+      careRec.specialist_types = [...new Set(careRec.specialist_types)];
+      careRec.reasons = [...new Set(careRec.reasons)];
+      if (careRec.level === "self_support" && !careRec.reasons.length) {
+        careRec.reasons = [];
+        careRec.interim_support = ["вернуться к разговору, если состояние изменится"];
+      }
+    }
+
+    // Final fallback for user_report if quality check still fails
+    if (!userPart) {
+      userPart = "Нам не удалось сформулировать итог разговора достаточно точно. Ваш диалог сохранён, и к нему можно вернуться позже по коду доступа.";
+    }
 
     const report = userPart.includes("===USER_REPORT===")
       ? userPart
       : `===USER_REPORT===\n\n${userPart}\n\n===DOCTOR_REPORT===\n\n${doctorPart}`;
 
-    return res.status(200).json({ type: "final", report, model_used: modelUsed, fallback_used: fallbackUsed });
+    const debugInfo = {
+      raw_model_response: raw,
+      parsed_user_report: userPart,
+      parsed_doctor_report: doctorPart,
+      care_recommendation: careRec,
+      prompt_version: PROMPT_VERSION,
+      quality_check: {
+        pass: qualityCheck.pass,
+        violations: qualityCheck.violations,
+      },
+      repair: repairInfo,
+      care_repair: careRepairInfo,
+      minimum_level: minimumLevel,
+    };
+
+    return res.status(200).json({
+      type: "final",
+      report,
+      model_used: modelUsed,
+      fallback_used: fallbackUsed,
+      care_recommendation: careRec,
+      _debug: debugInfo,
+    });
   } catch (error) {
     console.error("Analyze error:", error.message);
+    const fallbackCareRec = {
+      level: "self_support",
+      timeframe: "within_weeks",
+      specialist_types: [],
+      reasons: ["persistent_symptoms"],
+      interim_support: ["вернуться к разговору позже по коду доступа"],
+      urgent_triggers: [],
+    };
     if (depth === 0) {
-      return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: MODEL_TRIAGE, fallback_used: true });
+      return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: MODEL_TRIAGE, fallback_used: true, care_recommendation: fallbackCareRec });
     }
-    return res.status(200).json({ type: "final", report: fallbackFinal, model_used: MODEL_TRIAGE, fallback_used: true });
+    return res.status(200).json({ type: "final", report: fallbackFinal, model_used: MODEL_TRIAGE, fallback_used: true, care_recommendation: fallbackCareRec });
   }
 }
