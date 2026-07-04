@@ -2660,7 +2660,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     };
 
     const renderReviewSections = (review, json, t, data) => {
-      const { patientText, userReport, doctorReport, doctorFeedbackComment, conversationHistory } = data;
+      const { patientText, userReport, doctorReport, doctorFeedbackComment, conversationHistory: rounds } = data;
         const sections = [
         {
           key: "patient",
@@ -2673,9 +2673,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         {
           key: "dialogue",
           label: "Диалог с системой",
-          hasData: conversationHistory.length > 0 || (Array.isArray(json.questions) && json.questions.length > 0),
-          summary: conversationHistory.length > 0
-            ? `Сообщений: ${conversationHistory.length}`
+          hasData: rounds.length > 0 || (Array.isArray(json.questions) && json.questions.length > 0),
+          summary: rounds.length > 0
+            ? `Раундов: ${rounds.length}`
             : Array.isArray(json.questions) ? `Вопросов: ${json.questions.length}` : "",
           fullContent: null,
           isDialogue: true,
@@ -2745,7 +2745,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
                 {open && canOpen && (
                   <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
-                    {sec.isDialogue ? renderDialogueContent(review, json, t, conversationHistory)
+                    {sec.isDialogue ? renderDialogueContent(review, json, t, rounds)
                       : sec.isFeedback ? renderFeedbackContent(review, json, t, data.doctorFeedback, doctorFeedbackComment)
                       : renderTextContent(review, sec, t)}
                   </div>
@@ -2780,62 +2780,65 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       );
     };
 
-    const renderDialogueContent = (review, json, t, conversationHistory) => {
-      const messages = conversationHistory.length > 0 ? conversationHistory : normalizeConversationHistory([], json);
+    const renderDialogueContent = (review, json, t, rounds) => {
+      const items = rounds.length > 0 ? rounds : normalizeConversationHistory([], json).rounds;
 
-      const fullText = messages.map((m) => {
-        const role = m.role === "user" ? "Пациент" : "Точка опоры";
-        return `[${role}]${m.round ? ` (раунд ${m.round})` : ""}\n${m.text || ""}`;
-      }).join("\n\n---\n\n");
+      const fullText = renderRoundsToText(items);
 
       return (
         <div>
-          {messages.length === 0 ? (
+          {items.length === 0 ? (
             <div style={{ color: t.muted, fontSize: 13 }}>Нет сохранённых данных диалога</div>
           ) : (
             <div style={{ maxHeight: 400, overflowY: "auto" }}>
-              {messages.map((msg, i) => {
-                const isUser = msg.role === "user";
-                return (
-                  <div key={i} style={{
-                    marginBottom: 10, padding: "10px 12px",
-                    background: isUser ? t.highlight : "transparent",
-                    borderLeft: `3px solid ${isUser ? t.accent : t.muted}`,
+              {items.map((rnd) => (
+                <div key={rnd.round} style={{ marginBottom: 14 }}>
+                  <div style={{
+                    background: t.cardLabel, color: "white", fontSize: 11, fontWeight: 700,
+                    padding: "4px 12px", marginBottom: 8, borderRadius: 4,
+                  }}>
+                    Раунд {rnd.round}
+                  </div>
+                  <div style={{
+                    marginBottom: 6, padding: "10px 12px",
+                    background: "transparent",
+                    borderLeft: `3px solid ${t.muted}`,
                     borderRadius: "0 8px 8px 0",
                   }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                      <span style={{ fontWeight: 700, fontSize: 12, color: isUser ? t.accent : t.muted }}>
-                        {isUser ? "Пациент" : "Точка опоры"}
-                      </span>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        {msg.round && <span style={{ color: t.cardLabel, fontSize: 10 }}>раунд {msg.round}</span>}
-                        {msg.created_at && <span style={{ color: t.cardLabel, fontSize: 10 }}>{new Date(msg.created_at).toLocaleString("ru-RU")}</span>}
-                      </div>
-                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: t.muted, marginBottom: 4 }}>Точка опоры</div>
                     <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                      {msg.text || msg.content || ""}
+                      {rnd.question}
                     </div>
-                    {msg.type && <div style={{ color: t.cardLabel, fontSize: 10, marginTop: 4 }}>{msg.type}</div>}
                   </div>
-                );
-              })}
+                  <div style={{
+                    padding: "10px 12px",
+                    background: t.highlight,
+                    borderLeft: `3px solid ${t.accent}`,
+                    borderRadius: "0 8px 8px 0",
+                  }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: t.accent, marginBottom: 4 }}>Пациент</div>
+                    <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                      {rnd.answer}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            {messages.length > 0 && (
-              <button onClick={() => openModal("Диалог", fullText)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
-                Открыть в большом окне
-              </button>
-            )}
-            {fullText && (
-              <button onClick={() => { navigator.clipboard.writeText(fullText); showToast("Скопировано"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
-                Скопировать диалог
-              </button>
-            )}
-          </div>
         </div>
       );
     };
+
+    function renderRoundsToText(rounds) {
+      return rounds.map((r) => {
+        const lines = [];
+        lines.push(`[Точка опоры] (раунд ${r.round})`);
+        lines.push(r.question);
+        lines.push(`[Пациент] (раунд ${r.round})`);
+        lines.push(r.answer);
+        return lines.join("\n");
+      }).join("\n\n---\n\n");
+    }
 
     const renderFeedbackContent = (review, json, t, feedback, feedbackComment) => {
       const df = feedback || {};
@@ -2887,41 +2890,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       );
     };
 
-    function getConversationMessageText(msg) {
-      if (!msg) return "";
-      if (typeof msg === "string") return msg;
-      if (typeof msg.text === "string" && msg.text.trim()) return msg.text;
-      if (typeof msg.content === "string" && msg.content.trim()) return msg.content;
-      if (Array.isArray(msg.content)) {
-        return msg.content.map((part) => {
-          if (typeof part === "string") return part;
-          return part?.text || part?.content || part?.value || "";
-        }).filter(Boolean).join("\n");
-      }
-      return msg.message || msg.value || msg.answer || msg.question || msg.transcript || "";
-    }
-
-    function formatConversationForCopy(conversation) {
-      return (conversation || [])
-        .filter((m) => {
-          if (!m) return false;
-          const role = (m.role || "").toLowerCase();
-          return !["system", "developer", "tool", "reasoning"].includes(role);
-        })
-        .map((m) => {
-          const role = m.role === "user" || m.role === "patient" ? "Пациент" : "Точка опоры";
-          return `[${role}]${m.round ? ` (раунд ${m.round})` : ""}\n${getConversationMessageText(m)}`;
-        })
-        .filter(Boolean)
-        .join("\n\n---\n\n");
+    function formatConversationForCopy(rounds) {
+      return renderRoundsToText(rounds || []);
     }
 
     function formatAnonymizedSession(sd) {
       if (!sd) return "";
       const parts = [];
-      parts.push(`Текст пациента:\n${sd.patient_text || "—"}`);
-      const ch = normalizeConversationHistory(sd.conversation_history || []);
-      parts.push(`Диалог:\n${ch.length > 0 ? formatConversationForCopy(ch) : "Текст диалога не был сохранён"}`);
+      const { rounds } = normalizeConversationHistory(sd.conversation_history || []);
+      parts.push(`Первичное обращение:\n${sd.patient_text || "—"}`);
+      parts.push(`Диалог:\n${rounds.length > 0 ? formatConversationForCopy(rounds) : "Текст диалога не был сохранён"}`);
       parts.push(`Отчёт для пациента:\n${sd.user_report || "Отчёт для пациента не был сохранён"}`);
       parts.push(`Отчёт для специалиста:\n${sd.doctor_report || "Отчёт для специалиста не был сохранён"}`);
       if (sd.correction_comment) parts.push(`Экспертная правка:\n${sd.correction_comment}`);
@@ -2957,15 +2935,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     const renderSessionTimelineDetail = (sd, t) => {
       if (!sd) return null;
 
-      const conversationHistory = normalizeConversationHistory(sd.conversation_history || []);
-      const normalizedMessages = conversationHistory
-        .filter((m) => {
-          const role = (m.role || "").toLowerCase();
-          return !["system", "developer", "tool", "reasoning"].includes(role);
-        })
-        .filter((m) => getConversationMessageText(m).trim());
+      const { rounds } = normalizeConversationHistory(sd.conversation_history || []);
 
-      const dialogueText = formatConversationForCopy(normalizedMessages);
+      const dialogueText = formatConversationForCopy(rounds);
 
       const sections = [];
 
@@ -3022,66 +2994,71 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       };
 
       // 1. Patient text
-      addSection("patient", "Текст пациента", sd.patient_text, true);
+      addSection("patient", "Первичное обращение", sd.patient_text, true);
 
       // 2. Dialogue
       sections.push(
         <div key="dialogue" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
           <div
             onClick={() => {
-              if (normalizedMessages.length === 0) return;
+              if (rounds.length === 0) return;
               const k = "tl-dialogue";
               setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
             }}
             style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "10px 14px", cursor: normalizedMessages.length > 0 ? "pointer" : "default",
+              padding: "10px 14px", cursor: rounds.length > 0 ? "pointer" : "default",
               background: t.highlight,
               userSelect: "none",
             }}
           >
-            <span style={{ fontWeight: 700, fontSize: 13, color: normalizedMessages.length > 0 ? t.crisisText : t.muted }}>
+            <span style={{ fontWeight: 700, fontSize: 13, color: rounds.length > 0 ? t.crisisText : t.muted }}>
               Диалог с системой
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {normalizedMessages.length === 0 && conversationHistory.length > 0 && (
-                <span style={{ color: t.muted, fontSize: 11 }}>В этой записи сохранились роли сообщений, но текст диалога отсутствует.</span>
-              )}
-              {normalizedMessages.length === 0 && conversationHistory.length === 0 && (
+              {rounds.length === 0 && (
                 <span style={{ color: t.muted, fontSize: 11 }}>Нет сохранённых данных</span>
               )}
-              {normalizedMessages.length > 0 && (
+              {rounds.length > 0 && (
                 <span style={{ color: t.cardLabel, fontSize: 11, transform: "rotate(180deg)", transition: "transform .2s" }}>▾</span>
               )}
             </div>
           </div>
-          {normalizedMessages.length > 0 && (
+          {rounds.length > 0 && (
             <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
               <div style={{ maxHeight: 400, overflowY: "auto" }}>
-                {normalizedMessages.map((msg, i) => {
-                  const isUser = msg.role === "user" || msg.role === "patient";
-                  return (
-                    <div key={i} style={{
-                      marginBottom: 10, padding: "10px 12px",
-                      background: isUser ? t.highlight : "transparent",
-                      borderLeft: `3px solid ${isUser ? t.accent : t.muted}`,
+                {rounds.map((rnd) => (
+                  <div key={rnd.round} style={{ marginBottom: 14 }}>
+                    <div style={{
+                      background: t.cardLabel, color: "white", fontSize: 11, fontWeight: 700,
+                      padding: "4px 12px", marginBottom: 8, borderRadius: 4,
+                    }}>
+                      Раунд {rnd.round}
+                    </div>
+                    <div style={{
+                      marginBottom: 6, padding: "10px 12px",
+                      background: "transparent",
+                      borderLeft: `3px solid ${t.muted}`,
                       borderRadius: "0 8px 8px 0",
                     }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                        <span style={{ fontWeight: 700, fontSize: 12, color: isUser ? t.accent : t.muted }}>
-                          {isUser ? "Пациент" : "Точка опоры"}
-                        </span>
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          {msg.round && <span style={{ color: t.cardLabel, fontSize: 10 }}>раунд {msg.round}</span>}
-                          {msg.created_at && <span style={{ color: t.cardLabel, fontSize: 10 }}>{new Date(msg.created_at).toLocaleString("ru-RU")}</span>}
-                        </div>
-                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: t.muted, marginBottom: 4 }}>Точка опоры</div>
                       <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                        {getConversationMessageText(msg)}
+                        {rnd.question}
                       </div>
                     </div>
-                  );
-                })}
+                    <div style={{
+                      padding: "10px 12px",
+                      background: t.highlight,
+                      borderLeft: `3px solid ${t.accent}`,
+                      borderRadius: "0 8px 8px 0",
+                    }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: t.accent, marginBottom: 4 }}>Пациент</div>
+                      <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                        {rnd.answer}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 {dialogueText && (
@@ -4354,7 +4331,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     const userReport = safeText(norm.userReport);
                     const doctorReport = safeText(norm.doctorReport);
                     const doctorFeedbackComment = safeText(norm.doctorFeedback?.generalComment || "");
-                    const conversationHistory = norm.conversationHistory;
+                    const rounds = norm.rounds;
                     const status = safeText(json.status, "legacy");
                     const source = safeText(json.source, "—");
                     const environment = safeText(json.environment, "—");
@@ -4421,7 +4398,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           </div>
                         )}
 
-                        {renderReviewSections(review, json, t, { patientText, userReport, doctorReport, doctorFeedbackComment, conversationHistory, doctorFeedback: norm.doctorFeedback })}
+                        {renderReviewSections(review, json, t, { patientText, userReport, doctorReport, doctorFeedbackComment, conversationHistory: rounds, doctorFeedback: norm.doctorFeedback })}
 
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           <button

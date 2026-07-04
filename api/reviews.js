@@ -1968,7 +1968,8 @@ async function handleGetSessionTimelineDetails(req, res) {
       }
 
       // Normalize conversation history (handles all formats + fallbacks)
-      session.conversation_history = normalizeConversationHistory(session.conversation_history, j);
+      const { rounds: chRounds } = normalizeConversationHistory(session.conversation_history, j);
+      session.conversation_history = chRounds;
 
       // Also try to link to a training_session via case_review_id
       const { data: linkedTraining } = await supabase
@@ -2052,7 +2053,8 @@ async function handleGetSessionTimelineDetails(req, res) {
       }
 
       // Normalize conversation history
-      session.conversation_history = normalizeConversationHistory(session.conversation_history, sj);
+      const { rounds: chRounds2 } = normalizeConversationHistory(session.conversation_history, sj);
+      session.conversation_history = chRounds2;
 
       // Try to link case_review by session_id
       const { data: linkedReview } = await supabase
@@ -2180,12 +2182,16 @@ async function handleGetSessionTimelineDetails(req, res) {
             session.corrected_doctor_report = dfb.correctedDoctorReport || "";
           }
 
-          session.conversation_history = normalizeConversationHistory(session.conversation_history, lj);
+          const { rounds: ljRounds } = normalizeConversationHistory(session.conversation_history, lj);
+          session.conversation_history = ljRounds;
         }
       }
 
       // Normalize standalone training session history too
-      session.conversation_history = normalizeConversationHistory(session.conversation_history);
+      if (!Array.isArray(session.conversation_history) || session.conversation_history.length === 0 || !session.conversation_history[0]?.round) {
+        const { rounds: stRounds } = normalizeConversationHistory(session.conversation_history);
+        session.conversation_history = stRounds;
+      }
     }
 
     // Apply privacy-safe masking
@@ -2193,9 +2199,10 @@ async function handleGetSessionTimelineDetails(req, res) {
       session.patient_text = maskText(session.patient_text || "");
       session.user_report = maskText(session.user_report || "");
       session.doctor_report = maskText(session.doctor_report || "");
-      session.conversation_history = (session.conversation_history || []).map((msg) => ({
-        ...msg,
-        text: maskText(msg.text || ""),
+      session.conversation_history = (session.conversation_history || []).map((rnd) => ({
+        ...rnd,
+        question: maskText(rnd.question || ""),
+        answer: maskText(rnd.answer || ""),
       }));
       if (session.diary) {
         if (typeof session.diary === "string") {
