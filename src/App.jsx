@@ -211,6 +211,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [adminCrisisLoading, setAdminCrisisLoading] = useState(false);
   const [adminCrisisActionLoading, setAdminCrisisActionLoading] = useState(null);
   const [adminDarkMode, setAdminDarkMode] = useState(true);
+  const [adminReviewShowTrash, setAdminReviewShowTrash] = useState(false);
+  const [deleteConfirmReviewId, setDeleteConfirmReviewId] = useState(null);
+  const [deleteConfirmCode, setDeleteConfirmCode] = useState("");
+  const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
+  const [deleteConfirmType, setDeleteConfirmType] = useState("soft");
 
   // Training table state
   const [trainingSessions, setTrainingSessions] = useState([]);
@@ -1263,7 +1268,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const data = await res.json();
       if (data.ok) {
         setAdminAuthed(true);
-        adminLoadReviews(adminFilter, adminEnv, adminExpertFilter);
+        adminLoadReviews(adminFilter, adminEnv, adminExpertFilter, adminReviewShowTrash);
       } else {
         showToast("Неверный пароль", "error");
       }
@@ -1751,16 +1756,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setTrainingFormPublicCodeAuto(!!code);
   }
 
-  async function adminLoadReviews(filterStatus, filterEnv, expertFilter) {
+  async function adminLoadReviews(filterStatus, filterEnv, expertFilter, showTrash) {
     const st = filterStatus !== undefined ? filterStatus : adminFilter;
     const env = filterEnv !== undefined ? filterEnv : adminEnv;
     const exp = expertFilter !== undefined ? expertFilter : adminExpertFilter;
+    const trash = showTrash !== undefined ? showTrash : adminReviewShowTrash;
     setAdminLoading(true);
     try {
       const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "list", status: st, environment: env, expert_filter: exp, limit: 100 }),
+        body: JSON.stringify({ action: "list", status: st, environment: env, expert_filter: exp, limit: 100, showTrash: trash }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -4337,6 +4343,22 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 >
                   {adminLoading ? "Загрузка..." : `Обновить (${adminTotal})`}
                 </button>
+                <button
+                  style={{
+                    border: `1px solid ${adminReviewShowTrash ? t.crisisAccent : t.border}`,
+                    borderRadius: 12,
+                    background: adminReviewShowTrash ? t.crisisAccent : t.tabBg,
+                    color: adminReviewShowTrash ? "#fff" : t.text,
+                    padding: "10px 16px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                  }}
+                  onClick={() => {
+                    const next = !adminReviewShowTrash;
+                    setAdminReviewShowTrash(next);
+                    adminLoadReviews(adminFilter, adminEnv, adminExpertFilter, next);
+                  }}
+                >
+                  {adminReviewShowTrash ? "🗑 Активные" : "🗑 Корзина"}
+                </button>
               </div>
 
               {/* Reviews list */}
@@ -4493,7 +4515,279 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           >
                             Редактировать
                           </button>
+                          {!adminReviewShowTrash ? (
+                            <button
+                              disabled={!review?.id}
+                              title="Удалить из отзывов"
+                              style={{
+                                border: `1px solid ${t.crisisBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                                color: "#e74c3c", padding: "8px 14px", fontWeight: 600, fontSize: 16, cursor: "pointer",
+                                lineHeight: 1,
+                              }}
+                              onClick={() => {
+                                const j = getReviewJson(review);
+                                const code = j.public_code || j.publicCode || review.public_code || "—";
+                                setDeleteConfirmReviewId(review.id);
+                                setDeleteConfirmCode(code);
+                                setDeleteConfirmType("soft");
+                                setDeleteConfirmStep(1);
+                              }}
+                            >
+                              🗑
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                disabled={!review?.id}
+                                title="Восстановить"
+                                style={{
+                                  border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                                  color: t.badgeClosedText, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                                }}
+                                onClick={async () => {
+                                  setAdminActionLoading(review.id);
+                                  try {
+                                    const res = await fetch("/api/reviews", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ action: "restoreReview", review_id: review.id, admin_secret: adminPassword }),
+                                    });
+                                    const d = await res.json();
+                                    showToast(d.message || (d.ok ? "Восстановлено" : d.error), d.ok ? "success" : "error");
+                                    if (d.ok) adminLoadReviews();
+                                  } catch {
+                                    showToast("Ошибка восстановления", "error");
+                                  } finally {
+                                    setAdminActionLoading(null);
+                                  }
+                                }}
+                              >
+                                ↩️ Восстановить
+                              </button>
+                              <button
+                                disabled={!review?.id}
+                                title="Удалить безвозвратно"
+                                style={{
+                                  border: `1px solid ${t.crisisBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                                  color: "#e74c3c", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                                }}
+                                onClick={() => {
+                                  const j = getReviewJson(review);
+                                  const code = j.public_code || j.publicCode || review.public_code || "—";
+                                  setDeleteConfirmReviewId(review.id);
+                                  setDeleteConfirmCode(code);
+                                  setDeleteConfirmType("permanent");
+                                  setDeleteConfirmStep(1);
+                                }}
+                              >
+                                🗑 Удалить запись
+                              </button>
+                              <button
+                                disabled={!review?.id}
+                                title="Удалить всю тестовую сессию"
+                                style={{
+                                  border: `1px solid #e74c3c`, borderRadius: 12,
+                                  background: "#e74c3c", color: "#fff",
+                                  padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                                }}
+                                onClick={() => {
+                                  const j = getReviewJson(review);
+                                  const code = j.public_code || j.publicCode || review.public_code || "—";
+                                  setDeleteConfirmReviewId(review.id);
+                                  setDeleteConfirmCode(code);
+                                  setDeleteConfirmType("full");
+                                  setDeleteConfirmStep(1);
+                                }}
+                              >
+                                ☠ Полностью
+                              </button>
+                            </>
+                          )}
                         </div>
+
+                        {/* Delete confirmation dialog */}
+                        {deleteConfirmReviewId === review.id && deleteConfirmStep >= 1 && (
+                          <div style={{
+                            marginTop: 16, border: `2px solid #e74c3c`, borderRadius: 16,
+                            background: t.cardBorder, padding: 20, position: "relative",
+                          }}>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: "#e74c3c", marginBottom: 12 }}>
+                              {deleteConfirmType === "soft" ? "🗑 Удаление карточки" :
+                               deleteConfirmType === "permanent" ? "🔥 Безвозвратное удаление" :
+                               "☠ Удаление всей тестовой сессии"}
+                            </div>
+
+                            {deleteConfirmType === "soft" && deleteConfirmStep === 1 && (
+                              <>
+                                <p style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, margin: "0 0 12px" }}>
+                                  Карточка отзыва <strong>{deleteConfirmCode}</strong> будет перемещена в корзину.<br />
+                                  Исходная сессия и диалог останутся в базе.
+                                </p>
+                                <div style={{ display: "flex", gap: 8 }}>
+                                  <button
+                                    style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                    onClick={async () => {
+                                      setAdminActionLoading(review.id);
+                                      try {
+                                        const res = await fetch("/api/reviews", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ action: "softDeleteReview", review_id: review.id, admin_secret: adminPassword }),
+                                        });
+                                        const d = await res.json();
+                                        showToast(d.message || (d.ok ? "Удалено" : d.error), d.ok ? "success" : "error");
+                                        if (d.ok) { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); adminLoadReviews(); }
+                                      } catch { showToast("Ошибка удаления", "error"); }
+                                      finally { setAdminActionLoading(null); }
+                                    }}
+                                  >
+                                    Переместить в корзину
+                                  </button>
+                                  <button
+                                    style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                                    onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
+                                  >
+                                    Отмена
+                                  </button>
+                                </div>
+                              </>
+                            )}
+
+                            {deleteConfirmType === "permanent" && (
+                              <>
+                                {deleteConfirmStep === 1 ? (
+                                  <>
+                                    <p style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, margin: "0 0 4px" }}>
+                                      Вы уверены, что хотите <strong style={{ color: "#e74c3c" }}>безвозвратно удалить</strong> запись <strong>{deleteConfirmCode}</strong>?
+                                    </p>
+                                    <p style={{ color: t.muted, fontSize: 12, margin: "0 0 12px" }}>
+                                      Будет удалена только эта запись <code>case_review</code>.<br />
+                                      Действие нельзя отменить.
+                                    </p>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                      <button
+                                        style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => setDeleteConfirmStep(2)}
+                                      >
+                                        Да, удалить навсегда
+                                      </button>
+                                      <button
+                                        style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
+                                      >
+                                        Отмена
+                                      </button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, margin: "0 0 12px" }}>
+                                      ⚠️ Последнее подтверждение. Запись <strong>{deleteConfirmCode}</strong> будет удалена безвозвратно. Восстановление невозможно.
+                                    </p>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                      <button
+                                        style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                        onClick={async () => {
+                                          setAdminActionLoading(review.id);
+                                          try {
+                                            const res = await fetch("/api/reviews", {
+                                              method: "POST",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ action: "permanentDeleteReview", review_id: review.id, admin_secret: adminPassword }),
+                                            });
+                                            const d = await res.json();
+                                            showToast(d.message || (d.ok ? "Удалено" : d.error), d.ok ? "success" : "error");
+                                            if (d.ok) { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); adminLoadReviews(); }
+                                          } catch { showToast("Ошибка удаления", "error"); }
+                                          finally { setAdminActionLoading(null); }
+                                        }}
+                                      >
+                                        🔥 Подтверждаю безвозвратное удаление
+                                      </button>
+                                      <button
+                                        style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
+                                      >
+                                        Отмена
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </>
+                            )}
+
+                            {deleteConfirmType === "full" && (
+                              <>
+                                {deleteConfirmStep === 1 ? (
+                                  <>
+                                    <p style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, margin: "0 0 4px" }}>
+                                      ⚠️ Вы собираетесь <strong style={{ color: "#e74c3c" }}>полностью удалить тестовую сессию</strong> <strong>{deleteConfirmCode}</strong>.
+                                    </p>
+                                    <p style={{ color: t.muted, fontSize: 12, margin: "0 0 12px" }}>
+                                      Будут удалены: <code>case_review</code>, <code>training_session</code>, <code>session</code>.<br />
+                                      Диалог и отчёты восстановить будет невозможно.
+                                    </p>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                      <button
+                                        style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => setDeleteConfirmStep(2)}
+                                      >
+                                        Да, я понимаю. Удалить всё.
+                                      </button>
+                                      <button
+                                        style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
+                                      >
+                                        Отмена
+                                      </button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p style={{ color: "#e74c3c", fontSize: 13, lineHeight: 1.5, margin: "0 0 12px", fontWeight: 700 }}>
+                                      ☠️ Последнее предупреждение!<br />
+                                      Сессия <strong>{deleteConfirmCode}</strong> будет удалена из всех таблиц.<br />
+                                      Восстановление невозможно. Это действие только для администратора.
+                                    </p>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                      <button
+                                        style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                        onClick={async () => {
+                                          setAdminActionLoading(review.id);
+                                          try {
+                                            const res = await fetch("/api/reviews", {
+                                              method: "POST",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ action: "deleteFullTestSession", review_id: review.id, admin_secret: adminPassword }),
+                                            });
+                                            const d = await res.json();
+                                            if (d.ok) {
+                                              showToast(d.message + ` (case_review: ${d.deleted.case_review}, session: ${d.deleted.session}, training: ${d.deleted.training_sessions})`, "success");
+                                              setDeleteConfirmReviewId(null);
+                                              setDeleteConfirmStep(0);
+                                              adminLoadReviews();
+                                            } else {
+                                              showToast(d.error || "Ошибка", "error");
+                                            }
+                                          } catch { showToast("Ошибка удаления сессии", "error"); }
+                                          finally { setAdminActionLoading(null); }
+                                        }}
+                                      >
+                                        ☠️ Подтверждаю полное удаление
+                                      </button>
+                                      <button
+                                        style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
+                                      >
+                                        Отмена
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
 
                         {trainingFormReviewId === review.id && (
                           <div style={{ marginTop: 16, borderTop: `1px solid ${t.cardBorder}`, paddingTop: 16 }}>

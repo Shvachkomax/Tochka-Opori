@@ -81,6 +81,14 @@ export default async function handler(req, res) {
         return await handleGetSessionTimeline(req, res);
       case "getSessionTimelineDetails":
         return await handleGetSessionTimelineDetails(req, res);
+      case "softDeleteReview":
+        return await handleSoftDeleteReview(req, res);
+      case "restoreReview":
+        return await handleRestoreReview(req, res);
+      case "permanentDeleteReview":
+        return await handlePermanentDeleteReview(req, res);
+      case "deleteFullTestSession":
+        return await handleDeleteFullTestSession(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -179,6 +187,7 @@ async function handleList(req, res) {
     const status = String(params.status || "pending").toLowerCase();
     const environment = String(params.environment || "all").toLowerCase();
     const expertFilter = String(params.expert_filter || "all").toLowerCase();
+    const showTrash = params.showTrash === true;
 
     let limit = parseInt(String(params.limit || "50"), 10);
     if (Number.isNaN(limit) || limit <= 0) limit = 50;
@@ -189,6 +198,13 @@ async function handleList(req, res) {
       .select("*")
       .order("created_at", { ascending: false })
       .limit(limit);
+
+    // Active vs trash filter
+    if (showTrash) {
+      query = query.not("json_data->_deleted", "is", null);
+    } else {
+      query = query.filter("json_data->_deleted", "is", null);
+    }
 
     if (status && status !== "all") {
       query = query.filter("json_data->>status", "eq", status);
@@ -993,6 +1009,244 @@ async function handlePermanentlyDeleteTrainingSessions(req, res) {
     });
   } catch (error) {
     return res.status(500).json({ ok: false, error: "Fatal permanentlyDeleteTrainingSessions error", details: error?.message || String(error) });
+  }
+}
+
+// ─── Review soft-delete (trash) ─────────────────────────────────
+
+async function handleSoftDeleteReview(req, res) {
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { isAdmin, expertId } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const { review_id, deletion_reason } = req.body || {};
+    if (!review_id) {
+      return res.status(400).json({ ok: false, error: "Missing review_id" });
+    }
+
+    const { data: current, error: fetchError } = await supabase
+      .from("case_reviews")
+      .select("id, json_data")
+      .eq("id", review_id)
+      .maybeSingle();
+
+    if (fetchError || !current) {
+      return res.status(404).json({ ok: false, error: "Review not found", details: fetchError?.message });
+    }
+
+    const jd = current.json_data || {};
+    jd._deleted = {
+      at: new Date().toISOString(),
+      by_expert_id: expertId || null,
+      by_expert_name: "admin",
+      reason: deletion_reason || null,
+    };
+
+    const { error: updateError } = await supabase
+      .from("case_reviews")
+      .update({ json_data: jd })
+      .eq("id", review_id);
+
+    if (updateError) {
+      return res.status(500).json({ ok: false, error: "Failed to delete review", details: updateError.message });
+    }
+
+    return res.status(200).json({ ok: true, message: "Карточка перемещена в корзину" });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal softDeleteReview error", details: error?.message || String(error) });
+  }
+}
+
+async function handleRestoreReview(req, res) {
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const { review_id } = req.body || {};
+    if (!review_id) {
+      return res.status(400).json({ ok: false, error: "Missing review_id" });
+    }
+
+    const { data: current, error: fetchError } = await supabase
+      .from("case_reviews")
+      .select("id, json_data")
+      .eq("id", review_id)
+      .maybeSingle();
+
+    if (fetchError || !current) {
+      return res.status(404).json({ ok: false, error: "Review not found", details: fetchError?.message });
+    }
+
+    const jd = current.json_data || {};
+    if (!jd._deleted) {
+      return res.status(400).json({ ok: false, error: "Review is not in trash" });
+    }
+
+    delete jd._deleted;
+
+    const { error: updateError } = await supabase
+      .from("case_reviews")
+      .update({ json_data: jd })
+      .eq("id", review_id);
+
+    if (updateError) {
+      return res.status(500).json({ ok: false, error: "Failed to restore review", details: updateError.message });
+    }
+
+    return res.status(200).json({ ok: true, message: "Карточка восстановлена из корзины" });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal restoreReview error", details: error?.message || String(error) });
+  }
+}
+
+async function handlePermanentDeleteReview(req, res) {
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const { review_id } = req.body || {};
+    if (!review_id) {
+      return res.status(400).json({ ok: false, error: "Missing review_id" });
+    }
+
+    // Verify it's in trash
+    const { data: current, error: fetchError } = await supabase
+      .from("case_reviews")
+      .select("id, json_data")
+      .eq("id", review_id)
+      .maybeSingle();
+
+    if (fetchError || !current) {
+      return res.status(404).json({ ok: false, error: "Review not found", details: fetchError?.message });
+    }
+
+    const jd = current.json_data || {};
+    if (!jd._deleted) {
+      return res.status(400).json({ ok: false, error: "Cannot permanently delete active review. Move to trash first." });
+    }
+
+    const { error: deleteError } = await supabase
+      .from("case_reviews")
+      .delete()
+      .eq("id", review_id);
+
+    if (deleteError) {
+      return res.status(500).json({ ok: false, error: "Failed to permanently delete review", details: deleteError.message });
+    }
+
+    return res.status(200).json({ ok: true, message: "Запись case_review удалена безвозвратно" });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal permanentDeleteReview error", details: error?.message || String(error) });
+  }
+}
+
+async function handleDeleteFullTestSession(req, res) {
+  try {
+    const supabase = await getSupabaseClient();
+    if (!supabase) {
+      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
+    }
+
+    const { isAdmin } = authorizeExpert(req);
+    if (!isAdmin) {
+      return res.status(401).json({ ok: false, error: "Admin access required" });
+    }
+
+    const { review_id } = req.body || {};
+    if (!review_id) {
+      return res.status(400).json({ ok: false, error: "Missing review_id" });
+    }
+
+    // Fetch the review
+    const { data: review, error: fetchError } = await supabase
+      .from("case_reviews")
+      .select("id, session_id, public_code, json_data")
+      .eq("id", review_id)
+      .maybeSingle();
+
+    if (fetchError || !review) {
+      return res.status(404).json({ ok: false, error: "Review not found", details: fetchError?.message });
+    }
+
+    const sessionId = review.session_id;
+    const publicCode = review.public_code;
+    const results = { case_review: false, session: false, training_sessions: false };
+
+    // 1. Delete case_review
+    const { error: delReviewError } = await supabase
+      .from("case_reviews")
+      .delete()
+      .eq("id", review_id);
+    if (delReviewError) {
+      return res.status(500).json({ ok: false, error: "Failed to delete case_review", details: delReviewError.message });
+    }
+    results.case_review = true;
+
+    // 2. Delete sessions by session_id or public_code
+    if (sessionId) {
+      const { error: delSessionError } = await supabase
+        .from("sessions")
+        .delete()
+        .eq("session_id", sessionId);
+      results.session = !delSessionError;
+    }
+    if (!results.session && publicCode) {
+      const { error: delSessionError } = await supabase
+        .from("sessions")
+        .delete()
+        .eq("public_code", publicCode);
+      results.session = !delSessionError;
+    }
+
+    // 3. Delete training_sessions by case_review_id or public_code
+    if (publicCode) {
+      const { error: delTsError } = await supabase
+        .from("training_sessions")
+        .delete()
+        .eq("public_code", publicCode);
+      results.training_sessions = !delTsError;
+    }
+    // Also delete training_sessions linked by case_review_id
+    const { error: delTsByIdError } = await supabase
+      .from("training_sessions")
+      .delete()
+      .eq("case_review_id", review_id);
+    if (delTsByIdError && results.training_sessions === false) {
+      // leave as false if both failed
+    } else if (!delTsByIdError) {
+      results.training_sessions = true;
+    }
+
+    return res.status(200).json({
+      ok: true,
+      message: "Тестовая сессия удалена полностью",
+      deleted: results,
+      sessionId,
+      publicCode,
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: "Fatal deleteFullTestSession error", details: error?.message || String(error) });
   }
 }
 
