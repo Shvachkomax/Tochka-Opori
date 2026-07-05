@@ -3959,9 +3959,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                               </td>
                               {trainingShowTrash ? (
                                 <>
-                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.deleted_at ? new Date(s.deleted_at).toLocaleDateString("ru-RU") : ""}</td>
-                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.deleted_by_expert_name || "—"}</td>
-                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, maxWidth: 120 }}>{s.deletion_reason || "—"}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.json_data?._deleted?.at ? new Date(s.json_data._deleted.at).toLocaleDateString("ru-RU") : ""}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.json_data?._deleted?.by_expert_name || "—"}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, maxWidth: 120 }}>{s.json_data?._deleted?.reason || "—"}</td>
                                   <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.created_at ? new Date(s.created_at).toLocaleDateString("ru-RU") : ""}</td>
                                   <td style={{ padding: "6px", fontWeight: 700, color: t.accent, fontSize: 12, whiteSpace: "nowrap" }}>{s.public_code || "—"}</td>
                                   <td style={{ padding: "6px", color: t.text }}>{s.session_sequence ?? ""}</td>

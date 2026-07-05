@@ -500,9 +500,9 @@ async function handleListTrainingSessions(req, res) {
 
     // Active vs trash filter
     if (showTrash) {
-      query = query.is("deleted_at", "not null");
+      query = query.not("json_data->_deleted", "is", null);
     } else {
-      query = query.is("deleted_at", null);
+      query = query.filter("json_data->_deleted", "is", null);
     }
 
     if (!isAdmin && expertId) {
@@ -531,12 +531,23 @@ async function handleListTrainingSessions(req, res) {
     const { data, error } = await query.limit(500);
 
     if (error) {
-      return res.status(500).json({ ok: false, error: "Failed to load training sessions", details: error.message });
+      return res.status(500).json({
+        ok: false,
+        error: "Не удалось загрузить таблицу тренировок.",
+        error_code: "DB_QUERY_FAILED",
+        details: error.message,
+        hint: "Проверьте соединение с БД и наличие колонок.",
+      });
     }
 
     return res.status(200).json({ ok: true, sessions: data || [], count: Array.isArray(data) ? data.length : 0 });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: "Fatal listTrainingSessions error", details: error?.message || String(error) });
+    return res.status(500).json({
+      ok: false,
+      error: "Fatal listTrainingSessions error",
+      error_code: "FATAL",
+      details: error?.message || String(error),
+    });
   }
 }
 
@@ -569,7 +580,7 @@ async function handleSaveTrainingSession(req, res) {
         .from("training_sessions")
         .select("session_sequence")
         .eq("public_code", sessionData.public_code)
-        .is("deleted_at", null)
+        .filter("json_data->_deleted", "is", null)
         .order("session_sequence", { ascending: false })
         .limit(1);
 
@@ -720,16 +731,24 @@ async function handleDeleteTrainingSession(req, res) {
       return res.status(400).json({ ok: false, error: "Missing id" });
     }
 
-    // Soft delete: move to trash
-    const now = new Date().toISOString();
+    // Fetch existing json_data
+    const { data: existing } = await supabase
+      .from("training_sessions")
+      .select("json_data")
+      .eq("id", id)
+      .maybeSingle();
+
+    const jd = existing?.json_data || {};
+    jd._deleted = {
+      at: new Date().toISOString(),
+      by_expert_id: null,
+      by_expert_name: "admin",
+      reason: deletion_reason || null,
+    };
+
     const { error } = await supabase
       .from("training_sessions")
-      .update({
-        deleted_at: now,
-        deleted_by_expert_id: null,
-        deleted_by_expert_name: "admin",
-        deletion_reason: deletion_reason || null,
-      })
+      .update({ json_data: jd })
       .eq("id", id);
 
     if (error) {
@@ -759,15 +778,23 @@ async function handleTrashTrainingSession(req, res) {
       return res.status(400).json({ ok: false, error: "Missing id" });
     }
 
-    const now = new Date().toISOString();
+    const { data: existing } = await supabase
+      .from("training_sessions")
+      .select("json_data")
+      .eq("id", id)
+      .maybeSingle();
+
+    const jd = existing?.json_data || {};
+    jd._deleted = {
+      at: new Date().toISOString(),
+      by_expert_id: req.body.expert_id || null,
+      by_expert_name: req.body.expert_name || "admin",
+      reason: deletion_reason || null,
+    };
+
     const { data, error } = await supabase
       .from("training_sessions")
-      .update({
-        deleted_at: now,
-        deleted_by_expert_id: req.body.expert_id || null,
-        deleted_by_expert_name: req.body.expert_name || "admin",
-        deletion_reason: deletion_reason || null,
-      })
+      .update({ json_data: jd })
       .eq("id", id)
       .select()
       .single();
@@ -803,27 +830,34 @@ async function handleTrashTrainingSessions(req, res) {
       return res.status(400).json({ ok: false, error: "Maximum 100 sessions per request" });
     }
 
-    const now = new Date().toISOString();
-    const { data, error } = await supabase
+    // Fetch all to get existing json_data
+    const { data: existingAll } = await supabase
       .from("training_sessions")
-      .update({
-        deleted_at: now,
-        deleted_by_expert_id: req.body.expert_id || null,
-        deleted_by_expert_name: req.body.expert_name || "admin",
-        deletion_reason: deletion_reason || null,
-      })
-      .in("id", ids)
-      .select();
+      .select("id, json_data")
+      .in("id", ids);
 
-    if (error) {
-      return res.status(500).json({ ok: false, error: "Failed to trash training sessions", details: error.message });
+    const now = new Date().toISOString();
+    const promises = (existingAll || []).map((row) => {
+      const jd = row.json_data || {};
+      jd._deleted = {
+        at: now,
+        by_expert_id: req.body.expert_id || null,
+        by_expert_name: req.body.expert_name || "admin",
+        reason: deletion_reason || null,
+      };
+      return supabase.from("training_sessions").update({ json_data: jd }).eq("id", row.id);
+    });
+
+    const results = await Promise.allSettled(promises);
+    const errors = results.filter((r) => r.status === "rejected");
+    if (errors.length > 0) {
+      return res.status(500).json({ ok: false, error: "Failed to trash some sessions", details: errors[0].reason?.message });
     }
 
     return res.status(200).json({
       ok: true,
-      message: `Перемещено в корзину: ${data?.length || 0}`,
-      count: data?.length || 0,
-      sessions: data || [],
+      message: `Перемещено в корзину: ${existingAll?.length || 0}`,
+      count: existingAll?.length || 0,
     });
   } catch (error) {
     return res.status(500).json({ ok: false, error: "Fatal trashTrainingSessions error", details: error?.message || String(error) });
@@ -847,25 +881,32 @@ async function handleRestoreTrainingSession(req, res) {
       return res.status(400).json({ ok: false, error: "Missing id" });
     }
 
+    const { data: existing } = await supabase
+      .from("training_sessions")
+      .select("id, json_data")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (!existing) {
+      return res.status(404).json({ ok: false, error: "Training session not found" });
+    }
+
+    const jd = existing.json_data || {};
+    if (!jd._deleted) {
+      return res.status(400).json({ ok: false, error: "Training session is not in trash" });
+    }
+
+    delete jd._deleted;
+
     const { data, error } = await supabase
       .from("training_sessions")
-      .update({
-        deleted_at: null,
-        deleted_by_expert_id: null,
-        deleted_by_expert_name: null,
-        deletion_reason: null,
-      })
+      .update({ json_data: jd })
       .eq("id", id)
-      .is("deleted_at", "not null")
       .select()
       .single();
 
     if (error) {
       return res.status(500).json({ ok: false, error: "Failed to restore training session", details: error.message });
-    }
-
-    if (!data) {
-      return res.status(404).json({ ok: false, error: "Training session not found or not in trash" });
     }
 
     return res.status(200).json({ ok: true, message: "Восстановлено", session: data });
@@ -895,27 +936,29 @@ async function handleRestoreTrainingSessions(req, res) {
       return res.status(400).json({ ok: false, error: "Maximum 100 sessions per request" });
     }
 
-    const { data, error } = await supabase
+    // Fetch all to get json_data
+    const { data: existingAll } = await supabase
       .from("training_sessions")
-      .update({
-        deleted_at: null,
-        deleted_by_expert_id: null,
-        deleted_by_expert_name: null,
-        deletion_reason: null,
-      })
-      .in("id", ids)
-      .is("deleted_at", "not null")
-      .select();
+      .select("id, json_data")
+      .in("id", ids);
 
-    if (error) {
-      return res.status(500).json({ ok: false, error: "Failed to restore training sessions", details: error.message });
+    const promises = (existingAll || []).map((row) => {
+      const jd = row.json_data || {};
+      if (!jd._deleted) return null; // skip active records
+      delete jd._deleted;
+      return supabase.from("training_sessions").update({ json_data: jd }).eq("id", row.id);
+    }).filter(Boolean);
+
+    const results = await Promise.allSettled(promises);
+    const errors = results.filter((r) => r.status === "rejected");
+    if (errors.length > 0) {
+      return res.status(500).json({ ok: false, error: "Failed to restore some sessions", details: errors[0].reason?.message });
     }
 
     return res.status(200).json({
       ok: true,
-      message: `Восстановлено: ${data?.length || 0}`,
-      count: data?.length || 0,
-      sessions: data || [],
+      message: `Восстановлено: ${promises.length}`,
+      count: promises.length,
     });
   } catch (error) {
     return res.status(500).json({ ok: false, error: "Fatal restoreTrainingSessions error", details: error?.message || String(error) });
@@ -942,15 +985,16 @@ async function handlePermanentDeleteTrainingSession(req, res) {
     // Verify the record is in trash before deleting
     const { data: existing } = await supabase
       .from("training_sessions")
-      .select("id, deleted_at")
+      .select("id, json_data")
       .eq("id", id)
-      .single();
+      .maybeSingle();
 
     if (!existing) {
       return res.status(404).json({ ok: false, error: "Training session not found" });
     }
 
-    if (!existing.deleted_at) {
+    const jd = existing.json_data || {};
+    if (!jd._deleted) {
       return res.status(400).json({ ok: false, error: "Cannot permanently delete active session. Move to trash first." });
     }
 
@@ -991,12 +1035,23 @@ async function handlePermanentlyDeleteTrainingSessions(req, res) {
     }
 
     // Only delete records that are in trash
+    const { data: trashCheck } = await supabase
+      .from("training_sessions")
+      .select("id, json_data")
+      .in("id", ids);
+
+    const trashIds = (trashCheck || [])
+      .filter((row) => row.json_data?._deleted)
+      .map((row) => row.id);
+
+    if (trashIds.length === 0) {
+      return res.status(400).json({ ok: false, error: "No matching records found in trash" });
+    }
+
     const { data, error } = await supabase
       .from("training_sessions")
       .delete()
-      .in("id", ids)
-      .is("deleted_at", "not null")
-      .select();
+      .in("id", trashIds);
 
     if (error) {
       return res.status(500).json({ ok: false, error: "Failed to permanently delete sessions", details: error.message });
@@ -1304,7 +1359,7 @@ async function handleCreateTrainingFromReview(req, res) {
       .from("training_sessions")
       .select("session_sequence")
       .eq("public_code", foundCode)
-      .is("deleted_at", null)
+      .filter("json_data->_deleted", "is", null)
       .order("session_sequence", { ascending: false })
       .limit(1);
 
@@ -1378,9 +1433,9 @@ async function handleExportTrainingCsv(req, res) {
       .order("created_at", { ascending: false });
 
     if (showTrash) {
-      query = query.is("deleted_at", "not null");
+      query = query.not("json_data->_deleted", "is", null);
     } else {
-      query = query.is("deleted_at", null);
+      query = query.filter("json_data->_deleted", "is", null);
     }
 
     if (!isAdmin && expertId) {
@@ -1452,10 +1507,10 @@ async function handleExportTrainingCsv(req, res) {
       { key: "classification_comment", label: "Комментарий по классификации" },
       { key: "continuation_comment", label: "Комментарий по продолжению" },
       { key: "approved_for_learning", label: "Одобрен для обучения" },
-      // Trash columns (only populated in trash view)
-      { key: "deleted_at", label: "Дата удаления" },
-      { key: "deleted_by_expert_name", label: "Удалил" },
-      { key: "deletion_reason", label: "Причина удаления" },
+      // Trash columns (read from json_data._deleted)
+      { key: "json_data", label: "Дата удаления", getter: (r) => r.json_data?._deleted?.at || "" },
+      { key: "json_data", label: "Удалил", getter: (r) => r.json_data?._deleted?.by_expert_name || "" },
+      { key: "json_data", label: "Причина удаления", getter: (r) => r.json_data?._deleted?.reason || "" },
     ];
 
     const csvEscape = (v) => {
@@ -1471,6 +1526,8 @@ async function handleExportTrainingCsv(req, res) {
     const lines = [headerLine];
     for (const row of data || []) {
       const vals = csvColumns.map((c) => {
+        // Use getter if provided (for derived fields like json_data._deleted)
+        if (c.getter) return csvEscape(c.getter(row));
         let v = row[c.key];
         if (c.key === "session_kind") v = SESSION_KIND_LABELS[v] || v;
         if (c.key === "expected_case_type" || c.key === "ai_detected_case_type") v = CASE_TYPE_LABELS[v] || v;
@@ -1952,7 +2009,7 @@ async function handleGetSessionTimeline(req, res) {
       .from("training_sessions")
       .select("*")
       .eq("public_code", code)
-      .is("deleted_at", null)
+      .filter("json_data->_deleted", "is", null)
       .order("created_at", { ascending: true });
 
     // Build a unified items list from sessions + case_reviews + training_sessions
