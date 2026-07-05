@@ -224,6 +224,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [trainingEditId, setTrainingEditId] = useState(null);
   const [trainingEditData, setTrainingEditData] = useState({});
   const [trainingNewRow, setTrainingNewRow] = useState(null);
+  const [trainingSessionsError, setTrainingSessionsError] = useState(null);
 
   // Create training from review state
   const [trainingFormReviewId, setTrainingFormReviewId] = useState(null);
@@ -1279,6 +1280,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   async function loadTrainingSessions() {
     setTrainingLoading(true);
+    setTrainingSessionsError(null);
     setTrainingSelection(new Set());
     try {
       const body = { action: "listTrainingSessions", ...trainingFilter, showTrash: trainingShowTrash };
@@ -1295,11 +1297,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const data = await res.json();
       if (data.ok) {
         setTrainingSessions(data.sessions || []);
+        setTrainingSessionsError(null);
       } else {
-        showToast(data.error || "Ошибка загрузки", "error");
+        const err = data.error || "Ошибка загрузки";
+        setTrainingSessionsError(err);
+        showToast(err, "error");
       }
     } catch {
-      showToast("Ошибка загрузки таблицы тренировок", "error");
+      const err = "Ошибка загрузки таблицы тренировок";
+      setTrainingSessionsError(err);
+      showToast(err, "error");
     } finally {
       setTrainingLoading(false);
     }
@@ -3922,6 +3929,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   <button onClick={() => setTrainingNewRow({ session_kind: "initial", status: "new" })} style={{ border: `1px dashed ${t.accent}`, borderRadius: 12, background: "transparent", color: t.accent, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer", marginBottom: 16 }}>
                     + Добавить строку
                   </button>
+                )}
+
+                {trainingSessionsError && (
+                  <div style={{ color: t.error || "#e74c3c", textAlign: "center", padding: "12px 16px", marginBottom: 12, background: t.dangerBg || "rgba(231,76,60,0.08)", borderRadius: 12, border: `1px solid ${t.badgeNewText || "#e74c3c"}`, fontWeight: 600, fontSize: 14, lineHeight: 1.4 }}>
+                    {trainingSessionsError}
+                  </div>
                 )}
 
                 {trainingLoading ? (
