@@ -365,15 +365,13 @@ async function handleCreateOrganization(req, res) {
   const supabase = getSupabase();
   let finalSlug = slug?.trim() || null;
 
+  function transliterate(c) {
+    const map = { а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "yo", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "kh", ц: "ts", ч: "ch", ш: "sh", щ: "shch", ы: "y", э: "e", ю: "yu", я: "ya" };
+    return map[c] || c;
+  }
+
   if (!finalSlug) {
-    finalSlug = name.trim()
-      .toLowerCase()
-      .replace(/[^a-zа-яё0-9\s-]/g, "")
-      .replace(/[а-яё]/g, (c) => ({ а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "yo", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "kh", ц: "ts", ч: "ch", ш: "sh", щ: "shch", ы: "y", э: "e", ю: "yu", я: "ya" }[c] || c)
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 100) || "org";
+    finalSlug = name.trim().toLowerCase().replace(/[^a-zа-яё0-9\s-]/g, "").replace(/[а-яё]/g, transliterate).replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100) || "org";
 
     // ensure uniqueness — append -2, -3, etc.
     const existing = await supabase
