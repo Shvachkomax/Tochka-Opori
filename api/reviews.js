@@ -120,6 +120,35 @@ async function handleSave(req, res) {
     const privacy = getPrivacySafeMode();
     const cleanedReview = privacy ? maskSensitiveData(localReview) : localReview;
 
+    // Try to enrich with organization_id / primary_expert_id from session or assignment
+    let orgId = null;
+    let primExpertId = null;
+    if (cleanedReview.publicCode) {
+      const { data: sessionData } = await supabase
+        .from("sessions")
+        .select("organization_id, primary_expert_id")
+        .eq("public_code", cleanedReview.publicCode)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (sessionData) {
+        orgId = sessionData.organization_id;
+        primExpertId = sessionData.primary_expert_id;
+      }
+      if (!orgId && !primExpertId) {
+        const { data: assignData } = await supabase
+          .from("patient_assignments")
+          .select("organization_id, primary_expert_id")
+          .eq("public_code", cleanedReview.publicCode)
+          .eq("status", "active")
+          .maybeSingle();
+        if (assignData) {
+          orgId = assignData.organization_id;
+          primExpertId = assignData.primary_expert_id;
+        }
+      }
+    }
+
     const payload = {
       case_id: cleanedReview.case_id || cleanedReview.sessionId || `review-${Date.now()}`,
       session_id: cleanedReview.sessionId || null,
@@ -129,6 +158,9 @@ async function handleSave(req, res) {
       expert_name: cleanedReview.expert_name || null,
       expert_role: cleanedReview.expert_role || null,
       expert_specialty: cleanedReview.expert_specialty || null,
+      organization_id: orgId,
+      primary_expert_id: primExpertId,
+      assigned_expert_id: cleanedReview.expert_id || null,
     };
 
     const { error } = await supabase.from("case_reviews").insert(payload);
@@ -188,6 +220,8 @@ async function handleList(req, res) {
     const environment = String(params.environment || "all").toLowerCase();
     const expertFilter = String(params.expert_filter || "all").toLowerCase();
     const showTrash = params.showTrash === true;
+    const organizationId = params.organization_id || null;
+    const primaryExpertId = params.primary_expert_id || null;
 
     let limit = parseInt(String(params.limit || "50"), 10);
     if (Number.isNaN(limit) || limit <= 0) limit = 50;
@@ -212,6 +246,13 @@ async function handleList(req, res) {
 
     if (environment && environment !== "all") {
       query = query.filter("json_data->>environment", "eq", environment);
+    }
+
+    if (organizationId) {
+      query = query.eq("organization_id", organizationId);
+    }
+    if (primaryExpertId) {
+      query = query.eq("primary_expert_id", primaryExpertId);
     }
 
     if (expertFilter === "with_expert") {
@@ -492,6 +533,8 @@ async function handleListTrainingSessions(req, res) {
     const { isAdmin, expertId } = authorizeExpert(req);
     const params = req.body || {};
     const showTrash = params.showTrash === true;
+    const filterOrgId = params.organization_id || null;
+    const filterPrimaryExpertId = params.primary_expert_id || null;
 
     let query = supabase
       .from("training_sessions")
@@ -506,7 +549,29 @@ async function handleListTrainingSessions(req, res) {
     }
 
     if (!isAdmin && expertId) {
-      query = query.eq("expert_id", expertId);
+      // Non-admin expert: show records where they are primary_expert, expert_id, or have access
+      const { data: accessCodes } = await supabase
+        .from("patient_access")
+        .select("public_code")
+        .eq("expert_id", expertId)
+        .eq("status", "active");
+      const accessCodesList = (accessCodes || []).map((a) => a.public_code);
+
+      query = query.or(
+        `primary_expert_id.eq.${expertId},expert_id.eq.${expertId}${
+          accessCodesList.length > 0
+            ? "," + accessCodesList.map((c) => `public_code.eq.${c}`).join(",")
+            : ""
+        }`
+      );
+    }
+
+    // Admin filters from UI
+    if (filterOrgId) {
+      query = query.eq("organization_id", filterOrgId);
+    }
+    if (filterPrimaryExpertId) {
+      query = query.eq("primary_expert_id", filterPrimaryExpertId);
     }
 
     if (params.status && params.status !== "all") {
@@ -632,8 +697,25 @@ async function handleSaveTrainingSession(req, res) {
       action_needed: sessionData.action_needed || null,
       continuation_comment: sessionData.continuation_comment || null,
       approved_for_learning: Boolean(sessionData.approved_for_learning),
+      organization_id: sessionData.organization_id || null,
+      primary_expert_id: sessionData.primary_expert_id || null,
       json_data: sessionData.json_data || null,
     };
+
+    // Auto-fill org/expert from session if not provided
+    if (!payload.organization_id && !payload.primary_expert_id && payload.public_code) {
+      const { data: sessionInfo } = await supabase
+        .from("sessions")
+        .select("organization_id, primary_expert_id")
+        .eq("public_code", payload.public_code)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (sessionInfo) {
+        payload.organization_id = sessionInfo.organization_id;
+        payload.primary_expert_id = sessionInfo.primary_expert_id;
+      }
+    }
 
     const { data, error } = await supabase
       .from("training_sessions")
@@ -2016,15 +2098,43 @@ async function handleGetSessionTimeline(req, res) {
     const items = [];
 
     // Check if expert has access to this code
-    const hasAccessToCode = (itemExpertId) => {
+    // For non-admin: check primary_expert_id, patient_access, or org membership
+    let accessCodesSet = null;
+    let expertOrgId = null;
+    let expertOrgRole = null;
+    if (!isAdmin && expertId) {
+      const { data: membership } = await supabase
+        .from("expert_organization_memberships")
+        .select("organization_id, role")
+        .eq("expert_id", expertId)
+        .eq("status", "active")
+        .maybeSingle();
+      if (membership) {
+        expertOrgId = membership.organization_id;
+        expertOrgRole = membership.role;
+      }
+      const { data: accessRecords } = await supabase
+        .from("patient_access")
+        .select("public_code")
+        .eq("expert_id", expertId)
+        .eq("status", "active");
+      accessCodesSet = new Set((accessRecords || []).map((a) => a.public_code));
+    }
+    const hasAccessToCode = (publicCode, itemExpertId, itemOrgId) => {
       if (isAdmin) return true;
-      return itemExpertId === expertId;
+      // Direct expert match
+      if (itemExpertId === expertId) return true;
+      // Code-level access via patient_access
+      if (publicCode && accessCodesSet && accessCodesSet.has(publicCode)) return true;
+      // Org-level access (owner/admin/supervisor can see all in their org)
+      if (expertOrgId && itemOrgId === expertOrgId && ["owner", "admin", "supervisor"].includes(expertOrgRole)) return true;
+      return false;
     };
 
     // Process sessions
     if (sessions) {
       for (const s of sessions) {
-        if (!hasAccessToCode(s.expert_id)) continue;
+        if (!hasAccessToCode(s.public_code || code, s.primary_expert_id || s.expert_id, s.organization_id)) continue;
         items.push({
           source: "session",
           session_id: s.session_id || s.id,
@@ -2044,6 +2154,8 @@ async function handleGetSessionTimeline(req, res) {
           diary_available: !!(s.diary || s.json_data?.diary),
           expert_id: s.expert_id,
           expert_name: s.expert_name || null,
+          organization_id: s.organization_id,
+          primary_expert_id: s.primary_expert_id,
           json_data: s.json_data || null,
         });
       }
@@ -2052,7 +2164,7 @@ async function handleGetSessionTimeline(req, res) {
     // Process case_reviews
     if (caseReviews) {
       for (const r of caseReviews) {
-        if (!hasAccessToCode(r.expert_id)) continue;
+        if (!hasAccessToCode(r.public_code || code, r.primary_expert_id || r.expert_id, r.organization_id)) continue;
         const j = r.json_data || {};
         items.push({
           source: "case_review",
@@ -2073,6 +2185,8 @@ async function handleGetSessionTimeline(req, res) {
           diary_available: !!(j.diary),
           expert_id: r.expert_id,
           expert_name: r.expert_name || null,
+          organization_id: r.organization_id,
+          primary_expert_id: r.primary_expert_id,
           json_data: j,
         });
       }
@@ -2081,7 +2195,7 @@ async function handleGetSessionTimeline(req, res) {
     // Process training_sessions
     if (trainingSessions) {
       for (const t of trainingSessions) {
-        if (!hasAccessToCode(t.expert_id)) continue;
+        if (!hasAccessToCode(t.public_code || code, t.primary_expert_id || t.expert_id, t.organization_id)) continue;
         items.push({
           source: "training_session",
           session_id: t.session_id || null,
@@ -2101,6 +2215,8 @@ async function handleGetSessionTimeline(req, res) {
           diary_available: false,
           expert_id: t.expert_id,
           expert_name: t.expert_name || null,
+          organization_id: t.organization_id,
+          primary_expert_id: t.primary_expert_id,
           json_data: t.json_data || null,
           // Training-specific fields
           scenario_played: t.scenario_played || null,

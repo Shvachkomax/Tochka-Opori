@@ -18,6 +18,8 @@ export default async function handler(req, res) {
         return await handleUpdateSupportPlan(req, res);
       case "save_conversation_pairs":
         return await handleSaveConversationPairs(req, res);
+      case "validateInviteToken":
+        return await handleValidateInviteToken(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -34,6 +36,7 @@ async function handleSave(req, res) {
       dialogDepth, previousPatientReport, previousDoctorReport,
       homeTasks, resourceFactors, questions, answers,
       voiceObservations, _debug, care_recommendation,
+      invite_token,
     } = req.body || {};
 
     if (!sessionId) {
@@ -49,16 +52,85 @@ async function handleSave(req, res) {
     const maskedConversation = privacy ? maskSensitiveData(conversationHistory || []) : conversationHistory;
 
     const { generatePublicCode } = await import("../lib/publicCode.js");
+    const { validateInviteToken, useInviteToken } = await import("./experts.js");
 
     const existing = await supabase
       .from("sessions")
-      .select("public_code")
+      .select("public_code, organization_id, primary_expert_id")
       .eq("session_id", sessionId)
       .maybeSingle();
 
     let publicCode = existing?.data?.public_code;
+    let organizationId = existing?.data?.organization_id || null;
+    let primaryExpertId = existing?.data?.primary_expert_id || null;
+    let inviteToken = existing?.data?.invite_token || null;
+
+    if (publicCode && (organizationId || primaryExpertId)) {
+      // Existing session with links — keep them
+    } else if (publicCode && !organizationId && !primaryExpertId) {
+      // Existing session but no links — try to find from patient_assignment
+      const { data: assignment } = await supabase
+        .from("patient_assignments")
+        .select("organization_id, primary_expert_id")
+        .eq("public_code", publicCode)
+        .eq("status", "active")
+        .maybeSingle();
+      if (assignment) {
+        organizationId = assignment.organization_id;
+        primaryExpertId = assignment.primary_expert_id;
+      }
+    }
+
     if (!publicCode) {
       publicCode = generatePublicCode();
+
+      // Handle invite_token for new sessions
+      if (invite_token) {
+        const invite = await validateInviteToken(invite_token);
+        if (invite) {
+          organizationId = invite.organization_id;
+          primaryExpertId = invite.expert_id;
+          inviteToken = invite_token;
+
+          // Create patient_assignment if not exists
+          const { data: existingAssignment } = await supabase
+            .from("patient_assignments")
+            .select("id")
+            .eq("public_code", publicCode)
+            .maybeSingle();
+
+          if (!existingAssignment) {
+            await supabase
+              .from("patient_assignments")
+              .insert({
+                public_code: publicCode,
+                organization_id: organizationId,
+                primary_expert_id: primaryExpertId,
+                assigned_by_expert_id: primaryExpertId,
+                assigned_by_expert_name: "auto",
+                source: "invite_link",
+                status: "active",
+              })
+              .then(() => {});
+
+            // Create patient_access for the expert
+            await supabase
+              .from("patient_access")
+              .insert({
+                public_code: publicCode,
+                organization_id: organizationId,
+                expert_id: primaryExpertId,
+                access_role: "owner",
+                granted_by_expert_id: primaryExpertId,
+                granted_by_expert_name: "auto",
+              })
+              .then(() => {});
+          }
+
+          // Increment invite link usage
+          await useInviteToken(invite_token);
+        }
+      }
     }
 
     const { data: existingRow } = await supabase
@@ -79,6 +151,9 @@ async function handleSave(req, res) {
       risk_level: riskLevel || null,
       support_plan: supportPlan || null,
       public_code: publicCode,
+      organization_id: organizationId,
+      primary_expert_id: primaryExpertId,
+      invite_token: inviteToken,
       json_data: {
         dialogDepth: dialogDepth ?? 0,
         previousPatientReport: previousPatientReport || "",
@@ -115,6 +190,8 @@ async function handleSave(req, res) {
       message: "Сессия сохранена. Вы можете продолжить позже.",
       sessionId,
       publicCode,
+      organization_id: organizationId,
+      primary_expert_id: primaryExpertId,
     });
   } catch (error) {
     return res.status(500).json({
@@ -166,6 +243,9 @@ async function handleLoad(req, res) {
       doctor_report: data.doctor_report,
       supportPlan: data.support_plan,
       riskLevel: data.risk_level,
+      organization_id: data.organization_id,
+      primary_expert_id: data.primary_expert_id,
+      invite_token: data.invite_token,
       dialogDepth: jsonData.dialogDepth ?? 0,
       previousPatientReport: jsonData.previousPatientReport || "",
       previousDoctorReport: jsonData.previousDoctorReport || "",
@@ -282,4 +362,36 @@ function mergePairs(existing, incoming) {
   }
   merged.sort((a, b) => (a.round || 0) - (b.round || 0));
   return merged;
+}
+
+async function handleValidateInviteToken(req, res) {
+  try {
+    const { token } = req.body || {};
+    if (!token) {
+      return res.status(400).json({ ok: false, error: "Укажите token" });
+    }
+
+    const { validateInviteToken } = await import("./experts.js");
+    const invite = await validateInviteToken(token);
+
+    if (!invite) {
+      return res.status(200).json({
+        ok: false,
+        valid: false,
+        error: "Ссылка недействительна или устарела",
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      valid: true,
+      invite: {
+        id: invite.id,
+        organization_id: invite.organization_id,
+        expert_id: invite.expert_id,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message || "Ошибка проверки токена" });
+  }
 }

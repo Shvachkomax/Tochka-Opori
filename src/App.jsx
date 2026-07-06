@@ -200,7 +200,62 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [registerSending, setRegisterSending] = useState(false);
   const [registrationResult, setRegistrationResult] = useState(null); // { access_code, expert }
 
-  // Admin expert requests state
+  // Organization state
+  const [organizations, setOrganizations] = useState([]);
+  const [orgFormOpen, setOrgFormOpen] = useState(false);
+  const [orgForm, setOrgForm] = useState({ name: "", slug: "", type: "clinic", city: "", comment: "" });
+  const [orgFormEditId, setOrgFormEditId] = useState(null);
+  const [orgDetail, setOrgDetail] = useState(null);
+  const [orgExperts, setOrgExperts] = useState([]);
+  const [orgAddExpertOpen, setOrgAddExpertOpen] = useState(false);
+  const [orgAddExpertId, setOrgAddExpertId] = useState("");
+  const [orgAddExpertRole, setOrgAddExpertRole] = useState("doctor");
+
+  // My patients state (expert panel)
+  const [myPatients, setMyPatients] = useState([]);
+  const [myPatientsLoading, setMyPatientsLoading] = useState(false);
+  const [patientModalOpen, setPatientModalOpen] = useState(false);
+  const [patientModalCode, setPatientModalCode] = useState("");
+
+  // Invite link state
+  const [inviteLinks, setInviteLinks] = useState([]);
+  const [inviteLinkModalOpen, setInviteLinkModalOpen] = useState(false);
+  const [inviteLinkLabel, setInviteLinkLabel] = useState("");
+  const [inviteLinkCreated, setInviteLinkCreated] = useState(null);
+
+  // Invite token from URL
+  const [inviteToken, setInviteToken] = useState(() => {
+    try {
+      const m = window.location.pathname.match(/^\/(?:start|invite)\/([a-z0-9]+)/i);
+      return m ? m[1] : (localStorage.getItem("tochka_invite_token") || null);
+    } catch { return null; }
+  });
+  const [inviteInfo, setInviteInfo] = useState(null);
+  const [inviteChecking, setInviteChecking] = useState(false);
+
+  // Validate invite token on mount
+  React.useEffect(() => {
+    if (inviteToken) {
+      localStorage.setItem("tochka_invite_token", inviteToken);
+      setInviteChecking(true);
+      fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "validateInviteToken", token: inviteToken }),
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.valid && d.invite) {
+            setInviteInfo({ valid: true, expert_name: d.invite.expert_name, organization_name: d.invite.organization_name });
+          } else {
+            setInviteInfo({ valid: false, error: d.error || "Ссылка недействительна" });
+          }
+        })
+        .catch(() => setInviteInfo({ valid: false, error: "Ошибка проверки ссылки" }))
+        .finally(() => setInviteChecking(false));
+    }
+  }, []);
+
   const [adminReqTab, setAdminReqTab] = useState("reviews");
   const [adminRequests, setAdminRequests] = useState([]);
   const [adminReqFilter, setAdminReqFilter] = useState("pending");
@@ -359,6 +414,256 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setExpertData(null);
     localStorage.removeItem("tochka_expert");
     showToast("Режим специалиста выключен");
+  }
+
+  // ── My Patients (expert panel) ──────────────────────────
+
+  async function loadMyPatients() {
+    setPatientModalOpen(true);
+    setMyPatientsLoading(true);
+    try {
+      const body = { action: "listMyPatients" };
+      if (expertData) {
+        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
+      }
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setMyPatients(data.patients || []);
+      } else {
+        showToast(data.error || "Ошибка загрузки", "error");
+      }
+    } catch {
+      showToast("Ошибка загрузки пациентов", "error");
+    } finally {
+      setMyPatientsLoading(false);
+    }
+  }
+
+  function getStoredExpertCode() {
+    try {
+      const expert = localStorage.getItem("tochka_expert");
+      return expert ? JSON.parse(expert)?.access_code || "" : "";
+    } catch { return ""; }
+  }
+
+  async function handleAssignPatient() {
+    const code = patientModalCode.trim().toUpperCase();
+    if (!code) return;
+    try {
+      const body = { action: "assignPatientToExpert", public_code: code };
+      if (expertData) {
+        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
+      }
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Пациент назначен");
+        setPatientModalCode("");
+        loadMyPatients();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка назначения", "error");
+    }
+  }
+
+  async function handleCreateInviteLink() {
+    try {
+      const body = { action: "createDoctorInviteLink", label: inviteLinkLabel };
+      if (expertData) {
+        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
+      }
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setInviteLinkCreated(data.invite_link);
+        showToast("Ссылка создана");
+        setInviteLinkLabel("");
+        loadInviteLinks();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка создания ссылки", "error");
+    }
+  }
+
+  async function loadInviteLinks() {
+    try {
+      const body = { action: "listDoctorInviteLinks" };
+      if (expertData) {
+        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
+      }
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setInviteLinks(data.invite_links || []);
+      }
+    } catch {}
+  }
+
+  async function handleDisableInviteLink(linkId) {
+    try {
+      const body = { action: "disableDoctorInviteLink", link_id: linkId };
+      if (expertData) {
+        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
+      }
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Ссылка отключена");
+        loadInviteLinks();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка", "error");
+    }
+  }
+
+  // ── Admin Organizations ─────────────────────────────────
+
+  async function adminLoadOrganizations() {
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listOrganizations", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setOrganizations(data.organizations || []);
+      }
+    } catch {}
+  }
+
+  async function handleCreateOrganization() {
+    if (!orgForm.name.trim()) { showToast("Укажите название", "error"); return; }
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: orgFormEditId ? "updateOrganization" : "createOrganization",
+          admin_secret: adminPassword,
+          id: orgFormEditId,
+          ...orgForm,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(orgFormEditId ? "Организация обновлена" : "Организация создана");
+        setOrgFormOpen(false);
+        setOrgFormEditId(null);
+        setOrgForm({ name: "", slug: "", type: "clinic", city: "", comment: "" });
+        adminLoadOrganizations();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка", "error");
+    }
+  }
+
+  async function adminLoadOrganizationExperts(orgId) {
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listOrganizationExperts", organization_id: orgId, admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setOrgExperts(data.members || []);
+      }
+    } catch {}
+  }
+
+  async function handleAddExpertToOrg() {
+    if (!orgDetail?.id || !orgAddExpertId) return;
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "addExpertToOrganization",
+          admin_secret: adminPassword,
+          organization_id: orgDetail.id,
+          expert_id: orgAddExpertId,
+          role: orgAddExpertRole,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Специалист добавлен");
+        setOrgAddExpertOpen(false);
+        setOrgAddExpertId("");
+        adminLoadOrganizationExperts(orgDetail.id);
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка", "error");
+    }
+  }
+
+  async function handleRemoveExpertFromOrg(expertId) {
+    if (!orgDetail?.id) return;
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "removeExpertFromOrganization",
+          admin_secret: adminPassword,
+          organization_id: orgDetail.id,
+          expert_id: expertId,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Специалист удалён");
+        adminLoadOrganizationExperts(orgDetail.id);
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка", "error");
+    }
+  }
+
+  async function adminListAllExperts() {
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listAllExperts", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      return data.experts || [];
+    } catch { return []; }
   }
 
   function resetRegisterForm() {
@@ -983,6 +1288,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             voiceObservations: voiceObservations || null,
             _debug: data._debug || null,
             care_recommendation: data.care_recommendation || null,
+            invite_token: inviteToken, // pass invite token from URL/localStorage
           }),
         })
           .then((r) => r.json())
@@ -3503,6 +3809,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 >
                   Обзоры качества
                 </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "organizations" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "organizations" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setAdminReqTab("organizations"); adminLoadOrganizations(); }}
+                >
+                  Организации
+                </button>
               </div>
 
               {adminReqTab === "crisis" ? (
@@ -4304,6 +4620,129 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 )}
 
                 </>
+              ) : adminReqTab === "organizations" ? (
+                <>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 20px 0" }}>Организации</h2>
+
+                  <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+                    <button onClick={() => { setOrgFormEditId(null); setOrgForm({ name: "", slug: "", type: "clinic", city: "", comment: "" }); setOrgFormOpen(true); }} style={{ border: 0, borderRadius: 14, padding: "12px 24px", fontWeight: 700, fontSize: 14, cursor: "pointer", background: t.accent, color: "#fff" }}>
+                      + Создать организацию
+                    </button>
+                  </div>
+
+                  {/* Organization cards */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {organizations.map((org) => (
+                      <div key={org.id} style={{ border: `1px solid ${t.cardBorder}`, borderRadius: 20, background: t.cardBg, padding: 20 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 16 }}>{org.name}</div>
+                            <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>
+                              {org.type} · {org.status}
+                              {org.city ? ` · ${org.city}` : ""}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={() => { setOrgForm({ name: org.name, slug: org.slug || "", type: org.type, city: org.city || "", comment: org.comment || "" }); setOrgFormEditId(org.id); setOrgFormOpen(true); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+                              Редактировать
+                            </button>
+                            <button onClick={async () => { setOrgDetail(org); adminLoadOrganizationExperts(org.id); }} style={{ border: `1px solid ${t.accent}`, borderRadius: 10, background: t.highlight, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+                              Открыть ({org.expert_count} спец., {org.patient_count} пациентов)
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {organizations.length === 0 && (
+                      <div style={{ color: t.muted, textAlign: "center", padding: 60, fontSize: 14 }}>
+                        Нет организаций
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Organization detail */}
+                  {orgDetail && (
+                    <div style={{ marginTop: 32, border: `1px solid ${t.accent}`, borderRadius: 20, background: t.highlight, padding: 24 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>{orgDetail.name}</h3>
+                          <div style={{ color: t.muted, fontSize: 13 }}>{orgDetail.type} · {orgDetail.status} · {orgDetail.city || "город не указан"}</div>
+                        </div>
+                        <button onClick={() => setOrgDetail(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+                          Закрыть
+                        </button>
+                      </div>
+
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>Специалисты организации</div>
+                        {orgExperts.length === 0 ? (
+                          <div style={{ color: t.muted, fontSize: 13 }}>Нет специалистов</div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {orgExperts.map((m) => (
+                              <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", border: `1px solid ${t.cardBorder}`, borderRadius: 12, background: t.cardBg, flexWrap: "wrap", gap: 8 }}>
+                                <div>
+                                  <span style={{ fontWeight: 600, fontSize: 14 }}>{m.experts?.name || "—"}</span>
+                                  <span style={{ color: t.muted, fontSize: 12, marginLeft: 8 }}>{m.role} · {m.experts?.specialty || ""}</span>
+                                </div>
+                                <div style={{ display: "flex", gap: 6 }}>
+                                  <span style={{ fontSize: 11, color: t.muted }}>{m.experts?.access_code || ""}</span>
+                                  <button onClick={() => handleRemoveExpertFromOrg(m.expert_id)} style={{ border: `1px solid ${t.badgeNewText}`, borderRadius: 8, background: t.dangerBg, color: t.badgeNewText, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                                    Удалить
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <button onClick={async () => { const experts = await adminListAllExperts(); setOrgAddExpertOpen(true); }} style={{ border: `1px dashed ${t.accent}`, borderRadius: 10, background: "transparent", color: t.accent, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer", marginTop: 12 }}>
+                          + Добавить специалиста
+                        </button>
+                      </div>
+
+                      {/* Add expert modal */}
+                      {orgAddExpertOpen && (
+                        <div style={{ marginTop: 12, padding: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.cardBg }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Добавить специалиста</div>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                            <input placeholder="ID специалиста" value={orgAddExpertId} onChange={(e) => setOrgAddExpertId(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", width: 200 }} />
+                            <select value={orgAddExpertRole} onChange={(e) => setOrgAddExpertRole(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
+                              {["owner","admin","supervisor","doctor","assistant","observer"].map((r) => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                            <button onClick={handleAddExpertToOrg} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Добавить</button>
+                            <button onClick={() => setOrgAddExpertOpen(false)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Отмена</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Create/Edit organization form */}
+                  {orgFormOpen && (
+                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+                      <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20, padding: 24, maxWidth: 500, width: "90%" }}>
+                        <h3 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 800 }}>{orgFormEditId ? "Редактировать организацию" : "Создать организацию"}</h3>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                          <input placeholder="Название *" value={orgForm.name} onChange={(e) => setOrgForm((f) => ({ ...f, name: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
+                          <input placeholder="Slug (уникальный идентификатор)" value={orgForm.slug} onChange={(e) => setOrgForm((f) => ({ ...f, slug: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
+                          <select value={orgForm.type} onChange={(e) => setOrgForm((f) => ({ ...f, type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, cursor: "pointer" }}>
+                            {["clinic","private_practice","support_center","research_group","demo"].map((t) => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                          <input placeholder="Город" value={orgForm.city} onChange={(e) => setOrgForm((f) => ({ ...f, city: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
+                          <textarea placeholder="Комментарий" value={orgForm.comment} onChange={(e) => setOrgForm((f) => ({ ...f, comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none", minHeight: 60, resize: "vertical" }} />
+                        </div>
+                        <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
+                          <button onClick={handleCreateOrganization} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                            {orgFormEditId ? "Сохранить" : "Создать"}
+                          </button>
+                          <button onClick={() => { setOrgFormOpen(false); setOrgFormEditId(null); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                            Отмена
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
               <>
               {/* Reviews filters */}
@@ -5000,6 +5439,110 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           </div>
         )}
 
+        {/* Patient modal (expert — My Patients) */}
+        {patientModalOpen && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center",
+            justifyContent: "center", zIndex: 3001, padding: 20,
+          }} onClick={() => { setPatientModalOpen(false); }}>
+            <div style={{
+              background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
+              padding: 24, maxWidth: 700, width: "100%", maxHeight: "90vh",
+              display: "flex", flexDirection: "column",
+            }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Мои пациенты</h3>
+                  {expertData?.membership?.organization_name && (
+                    <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>{expertData.membership.organization_name}</div>
+                  )}
+                </div>
+                <button onClick={() => setPatientModalOpen(false)} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>✕</button>
+              </div>
+
+              {/* Assign patient by code */}
+              <div style={{ marginBottom: 16, padding: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.highlight }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Добавить пациента по коду</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input placeholder="ТОЧКА-XXXX-XXXX" value={patientModalCode} onChange={(e) => setPatientModalCode(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", flex: 1 }} />
+                  <button onClick={handleAssignPatient} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                    Назначить
+                  </button>
+                </div>
+              </div>
+
+              {/* Create invite link */}
+              <div style={{ marginBottom: 16, padding: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.highlight }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Создать ссылку для пациента</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input placeholder="Метка (например, Пациент 1)" value={inviteLinkLabel} onChange={(e) => setInviteLinkLabel(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", flex: 1 }} />
+                  <button onClick={handleCreateInviteLink} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                    Создать ссылку
+                  </button>
+                </div>
+                {inviteLinkCreated && (
+                  <div style={{ marginTop: 12, padding: 12, border: `1px solid ${t.badgeClosed}`, borderRadius: 10, background: t.cardBg }}>
+                    <div style={{ fontSize: 12, color: t.muted, marginBottom: 4 }}>Ссылка создана:</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, wordBreak: "break-all", marginBottom: 8 }}>{inviteLinkCreated.url}</div>
+                    <button onClick={() => { navigator.clipboard.writeText(inviteLinkCreated.url); showToast("Ссылка скопирована"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>
+                      Копировать
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Patient list */}
+              <div style={{ flex: 1, overflowY: "auto", marginBottom: 16 }}>
+                {myPatientsLoading ? (
+                  <div style={{ color: t.muted, textAlign: "center", padding: 40, fontSize: 14 }}>Загрузка...</div>
+                ) : myPatients.length === 0 ? (
+                  <div style={{ color: t.muted, textAlign: "center", padding: 40, fontSize: 14 }}>Нет назначенных пациентов</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {myPatients.map((p) => (
+                      <div key={p.id} style={{ padding: "12px 16px", border: `1px solid ${t.cardBorder}`, borderRadius: 14, background: t.cardBg, cursor: "pointer" }}
+                        onClick={() => loadSessionTimeline(p.public_code)}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 4 }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: t.accent, letterSpacing: 0.5 }}>
+                              {p.public_code}
+                            </div>
+                            {p.patient_label && (
+                              <div style={{ color: t.muted, fontSize: 12, marginTop: 2 }}>{p.patient_label}</div>
+                            )}
+                          </div>
+                          <div style={{ textAlign: "right", fontSize: 12, color: t.muted }}>
+                            <div>Сессий: {p.session_count || 0}</div>
+                            {p.last_session_at && (
+                              <div>{new Date(p.last_session_at).toLocaleDateString("ru-RU")}</div>
+                            )}
+                          </div>
+                        </div>
+                        {(p.last_risk_level || p.last_care_recommendation) && (
+                          <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                            {p.last_risk_level && (
+                              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: p.last_risk_level === "high" ? t.dangerBg : p.last_risk_level === "medium" ? t.badgePending : t.badgeClosed, color: p.last_risk_level === "high" ? t.badgeNewText : p.last_risk_level === "medium" ? t.badgePendingText : t.badgeClosedText }}>
+                                Риск: {p.last_risk_level}
+                              </span>
+                            )}
+                            {p.last_care_recommendation?.level && (
+                              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: t.badgeInProgress, color: t.badgeInProgressText }}>
+                                {p.last_care_recommendation.level}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {(timelineLoading || timelineData) && (
           <div style={{
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
@@ -5341,7 +5884,23 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 borderRadius: 22, padding: "8px 16px", fontSize: 13, color: "#5F7D6C",
                 display: "flex", alignItems: "center", gap: 8,
               }}>
-                <span>{expertData.name}, {roleMap[expertData.role] || expertData.role}</span>
+                <span>
+                  {expertData.name}, {roleMap[expertData.role] || expertData.role}
+                  {expertData.membership?.organization_name && (
+                    <span style={{ marginLeft: 6, opacity: 0.7 }}>· {expertData.membership.organization_name}</span>
+                  )}
+                </span>
+                {expertData && (
+                  <button
+                    onClick={() => loadMyPatients()}
+                    style={{
+                      background: "none", border: "1px solid rgba(46,42,37,.15)", borderRadius: 10,
+                      color: "#5F7D6C", padding: "4px 10px", fontSize: 11, cursor: "pointer",
+                    }}
+                  >
+                    Мои пациенты
+                  </button>
+                )}
                 <button
                   onClick={handleExpertLogout}
                   style={{
@@ -5367,6 +5926,28 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </button>
           </div>
         </header>
+
+        {inviteChecking && (
+          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: t.cardBg, border: `1px solid ${t.cardBorder}`, textAlign: "center", color: t.muted, fontSize: 14 }}>
+            Проверка ссылки...
+          </div>
+        )}
+        {inviteInfo && inviteInfo.valid && (
+          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: "rgba(46,125,50,0.08)", border: "1px solid rgba(46,125,50,0.2)", textAlign: "center" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#2e7d32", marginBottom: 4 }}>🔗 Вы открыли ссылку специалиста</div>
+            <div style={{ fontSize: 13, color: "#4a7c4c", lineHeight: 1.5 }}>
+              Разговор останется анонимным, но результат будет доступен специалисту, который дал вам ссылку.
+            </div>
+          </div>
+        )}
+        {inviteInfo && !inviteInfo.valid && !inviteChecking && (
+          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: "rgba(255,152,0,0.08)", border: "1px solid rgba(255,152,0,0.2)", textAlign: "center" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#e65100", marginBottom: 4 }}>⚠️ {inviteInfo.error || "Ссылка недействительна"}</div>
+            <div style={{ fontSize: 13, color: "#bf5f00", lineHeight: 1.5 }}>
+              Вы можете начать обычный анонимный разговор.
+            </div>
+          </div>
+        )}
 
         <main style={s.grid} className="app-grid">
           <section>
