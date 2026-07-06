@@ -3715,7 +3715,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 40 }}>
-            <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>{isTrainingPage ? "🧠 Таблица тренировок" : "🧠 Админ-панель / Отзывы о сессиях"}</h1>
+            <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 12 }}>
+              <img src="/logo-tochka-opory-header.png" alt="" style={{ height: 44, width: "auto", display: "block" }} />
+              {isTrainingPage ? "Таблица тренировок" : "Админ-панель / Отзывы о сессиях"}
+            </h1>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <button
                 onClick={() => setAdminDarkMode(!adminDarkMode)}
