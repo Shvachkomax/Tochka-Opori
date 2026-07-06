@@ -170,7 +170,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [adminReviews, setAdminReviews] = useState([]);
   const [adminTotal, setAdminTotal] = useState(0);
   const [adminFilter, setAdminFilter] = useState("all");
-  const [adminEnv, setAdminEnv] = useState("production");
+  const [adminEnv, setAdminEnv] = useState("all");
   const [adminExpertFilter, setAdminExpertFilter] = useState("all");
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminActionLoading, setAdminActionLoading] = useState(null);
@@ -3715,10 +3715,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 40 }}>
-            <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 12 }}>
-              <img src="/logo-tochka-opory-header.png" alt="" style={{ height: 44, width: "auto", display: "block" }} />
-              {isTrainingPage ? "Таблица тренировок" : "Админ-панель / Отзывы о сессиях"}
-            </h1>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <img src="/logo-tochka-opory-header.png" alt="Точка опоры" style={{ height: 44, width: "auto", display: "block" }} />
+              <div>
+                <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2 }}>Точка опоры</div>
+                <div style={{ fontSize: 14, color: t.muted }}>{isTrainingPage ? "Таблица тренировок" : "Админ-панель / Отзывы о сессиях"}</div>
+              </div>
+            </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <button
                 onClick={() => setAdminDarkMode(!adminDarkMode)}
@@ -4773,9 +4776,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
                   }}
                 >
-                  <option value="production">Production</option>
-                  <option value="local">Local</option>
-                  <option value="all">Все окружения</option>
+                  <option value="all">Все</option>
+                  <option value="production">Рабочий сайт (Production)</option>
+                  <option value="preview">Предпросмотр (Preview)</option>
+                  <option value="development">Разработка (Development)</option>
+                  <option value="local">Локально (Local)</option>
                 </select>
                 <select
                   value={adminExpertFilter}
