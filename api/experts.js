@@ -363,10 +363,35 @@ async function handleCreateOrganization(req, res) {
   }
 
   const supabase = getSupabase();
+  let finalSlug = slug?.trim() || null;
+
+  if (!finalSlug) {
+    finalSlug = name.trim()
+      .toLowerCase()
+      .replace(/[^a-zа-яё0-9\s-]/g, "")
+      .replace(/[а-яё]/g, (c) => ({ а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "yo", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "kh", ц: "ts", ч: "ch", ш: "sh", щ: "shch", ы: "y", э: "e", ю: "yu", я: "ya" }[c] || c)
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 100) || "org";
+
+    // ensure uniqueness — append -2, -3, etc.
+    const existing = await supabase
+      .from("organizations")
+      .select("slug")
+      .like("slug", `${finalSlug}%`);
+    if (!existing.error && existing.data?.length > 0) {
+      const slugs = new Set(existing.data.map((r) => r.slug));
+      let counter = 2;
+      while (slugs.has(`${finalSlug}-${counter}`)) counter++;
+      finalSlug = `${finalSlug}-${counter}`;
+    }
+  }
+
   const payload = {
     name: name.trim(),
-    slug: slug?.trim() || null,
-    type: type || "clinic",
+    slug: finalSlug,
+    type: type || "private_clinic",
     city: city?.trim() || null,
     comment: comment?.trim() || null,
     settings: settings || {},

@@ -203,7 +203,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   // Organization state
   const [organizations, setOrganizations] = useState([]);
   const [orgFormOpen, setOrgFormOpen] = useState(false);
-  const [orgForm, setOrgForm] = useState({ name: "", slug: "", type: "clinic", city: "", comment: "" });
+  const [orgForm, setOrgForm] = useState({ name: "", slug: "", type: "private_clinic", city: "", comment: "" });
+
+  const orgTypeLabels = {
+    private_clinic: "Частная клиника",
+    state_clinic: "Государственная клиника",
+    research_institution: "Научное учреждение",
+    test: "Тест",
+  };
   const [orgFormEditId, setOrgFormEditId] = useState(null);
   const [orgDetail, setOrgDetail] = useState(null);
   const [orgExperts, setOrgExperts] = useState([]);
@@ -577,7 +584,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         showToast(orgFormEditId ? "Организация обновлена" : "Организация создана");
         setOrgFormOpen(false);
         setOrgFormEditId(null);
-        setOrgForm({ name: "", slug: "", type: "clinic", city: "", comment: "" });
+        setOrgForm({ name: "", slug: "", type: "private_clinic", city: "", comment: "" });
         adminLoadOrganizations();
       } else {
         showToast(data.error || "Ошибка", "error");
@@ -4644,7 +4651,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           <div>
                             <div style={{ fontWeight: 700, fontSize: 16 }}>{org.name}</div>
                             <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>
-                              {org.type} · {org.status}
+                              {(orgTypeLabels[org.type] || org.type)} · {org.status}
                               {org.city ? ` · ${org.city}` : ""}
                             </div>
                           </div>
@@ -4730,9 +4737,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         <h3 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 800 }}>{orgFormEditId ? "Редактировать организацию" : "Создать организацию"}</h3>
                         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                           <input placeholder="Название *" value={orgForm.name} onChange={(e) => setOrgForm((f) => ({ ...f, name: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
-                          <input placeholder="Slug (уникальный идентификатор)" value={orgForm.slug} onChange={(e) => setOrgForm((f) => ({ ...f, slug: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <label style={{ fontSize: 13, fontWeight: 600, color: t.text }}>Slug / технический адрес</label>
+                            <input placeholder="slug-organization" value={orgForm.slug} onChange={(e) => setOrgForm((f) => ({ ...f, slug: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
+                            <div style={{ fontSize: 12, color: t.muted, lineHeight: 1.4 }}>
+                              Короткий уникальный идентификатор латиницей, например kazan-clinic или demo-test. Можно оставить пустым — система создаст автоматически.
+                            </div>
+                          </div>
                           <select value={orgForm.type} onChange={(e) => setOrgForm((f) => ({ ...f, type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, cursor: "pointer" }}>
-                            {["clinic","private_practice","support_center","research_group","demo"].map((t) => <option key={t} value={t}>{t}</option>)}
+                            {Object.entries(orgTypeLabels).map(([val, label]) => <option key={val} value={val}>{label}</option>)}
                           </select>
                           <input placeholder="Город" value={orgForm.city} onChange={(e) => setOrgForm((f) => ({ ...f, city: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
                           <textarea placeholder="Комментарий" value={orgForm.comment} onChange={(e) => setOrgForm((f) => ({ ...f, comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none", minHeight: 60, resize: "vertical" }} />
