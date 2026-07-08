@@ -6271,7 +6271,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         <main style={s.grid} className="app-grid">
           <section>
             <h1 style={s.h1} className="app-hero-title">
-              {activeModule === "body" ? "Опора. Здоровье & Стройность" : "Найдём точку опоры"}
+              {activeModule === "body" ? "Разберёмся с питанием, движением и режимом" : "Найдём точку опоры"}
             </h1>
             <p style={s.p} className="app-hero-text">
               {activeModule === "body"
@@ -6331,7 +6331,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 : "Сервис работает в тестовом режиме, не ставит диагноз и не является экстренной службой. Не указывайте персональные данные в тексте обращения."}
             </p>
             <p style={{ color: "#B85C4A", fontSize: 12, marginTop: 8, lineHeight: 1.4 }}>
-              {activeModule === "body" && "Если у вас острая боль, высокая температура, кровотечение или другие неотложные состояния — звоните 103 или 112."}
+              {activeModule !== "body" && "Если у вас острая боль, высокая температура, кровотечение или другие неотложные состояния — звоните 103 или 112."}
             </p>
           </section>
 
