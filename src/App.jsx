@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback, buildConversationPairs } from "../lib/conversation.js";
 import BodyIntake from "./BodyIntake.jsx";
 
@@ -2631,6 +2631,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || import.meta.env?.DEV
   );
   const showModuleSwitcher = isDev || adminRole === "super";
+
+  // Update document title based on subdomain
+  useEffect(() => {
+    document.title = isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : "Точка опоры";
+  }, [isDedicatedSubdomain]);
 
   const s = {
     page: {
