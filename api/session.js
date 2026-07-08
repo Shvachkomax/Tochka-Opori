@@ -36,7 +36,7 @@ async function handleSave(req, res) {
       dialogDepth, previousPatientReport, previousDoctorReport,
       homeTasks, resourceFactors, questions, answers,
       voiceObservations, _debug, care_recommendation,
-      invite_token,
+      invite_token, module: sessionModule,
     } = req.body || {};
 
     if (!sessionId) {
@@ -144,6 +144,7 @@ async function handleSave(req, res) {
 
     const payload = {
       session_id: sessionId,
+      module: sessionModule || 'support',
       patient_text: maskedPatientText,
       conversation_history: maskedConversation,
       user_report: maskedUserReport,
@@ -235,6 +236,7 @@ async function handleLoad(req, res) {
     const pairs = jsonData.conversation_pairs || data.conversation_pairs || [];
     const session = {
       sessionId: data.session_id,
+      module: data.module || 'support',
       publicCode: data.public_code,
       patient_input: data.patient_text,
       conversationHistory: data.conversation_history,

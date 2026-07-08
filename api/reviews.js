@@ -153,6 +153,7 @@ async function handleSave(req, res) {
       case_id: cleanedReview.case_id || cleanedReview.sessionId || `review-${Date.now()}`,
       session_id: cleanedReview.sessionId || null,
       public_code: cleanedReview.publicCode || null,
+      module: cleanedReview.module || 'support',
       json_data: cleanedReview,
       expert_id: cleanedReview.expert_id || null,
       expert_name: cleanedReview.expert_name || null,
@@ -1879,8 +1880,11 @@ async function handleGenerateQualityInsight(req, res) {
 
 function readSystemPrompt() {
   const candidates = [
+    new URL("../prompts/support/quality-review-analyst.md", import.meta.url),
     new URL("../prompts/quality-review-analyst.md", import.meta.url),
+    "./prompts/support/quality-review-analyst.md",
     "./prompts/quality-review-analyst.md",
+    "/var/task/prompts/support/quality-review-analyst.md",
     "/var/task/prompts/quality-review-analyst.md",
   ];
   for (const candidate of candidates) {

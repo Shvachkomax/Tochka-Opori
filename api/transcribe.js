@@ -101,12 +101,18 @@ export default async function handler(req, res) {
 
         const audioBase64 = audioForAnalysis.toString("base64");
 
-        const promptPath = new URL("../prompts/voice-analysis.md", import.meta.url);
+        const promptPaths = [
+          new URL("../prompts/support/voice-analysis.md", import.meta.url),
+          new URL("../prompts/voice-analysis.md", import.meta.url),
+        ];
         let voiceSystemPrompt = "Ты анализируешь голосовое сообщение и возвращаешь JSON.";
         try {
           const { readFileSync, existsSync } = await import("node:fs");
-          if (existsSync(promptPath)) {
-            voiceSystemPrompt = readFileSync(promptPath, "utf-8");
+          for (const pp of promptPaths) {
+            if (existsSync(pp)) {
+              voiceSystemPrompt = readFileSync(pp, "utf-8");
+              break;
+            }
           }
         } catch {}
 

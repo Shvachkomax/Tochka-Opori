@@ -60,6 +60,7 @@ export default function App() {
   const [showConsultPrep, setShowConsultPrep] = useState(false);
   const [showMessageToClose, setShowMessageToClose] = useState(false);
   const [messageText, setMessageText] = useState("");
+  const [activeModule, setActiveModule] = useState("support");
 
   // Support Toolkit state
   const [supportPlan, setSupportPlan] = useState(null);
@@ -1219,6 +1220,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           resourceFactors,
           supportPlan,
           voiceObservations,
+          module: activeModule,
         }),
       });
 
@@ -1279,6 +1281,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "save",
             sessionId: sid,
+            module: activeModule,
             patient_text: text,
             conversationHistory: finalHistory,
             user_report: data.report?.split("===DOCTOR_REPORT===")[0]?.replace("===USER_REPORT===", "").trim() || "",
@@ -1318,6 +1321,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               // Save case review (local + Supabase)
               const review = {
                 case_id: sid, sessionId: sid, publicCode: code,
+                module: activeModule,
                 createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
                 environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
                 patient_input: text, questions, answers,
@@ -5973,19 +5977,39 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         <main style={s.grid} className="app-grid">
           <section>
             <h1 style={s.h1} className="app-hero-title">
-              Найдём точку опоры
+              {activeModule === "body" ? "Опора. Здоровье & Стройность" : "Найдём точку опоры"}
             </h1>
             <p style={s.p} className="app-hero-text">
-              Расскажите, что с вами происходит — голосом или текстом. Сервис поможет мягко разобрать состояние, заметить важные признаки и предложить понятный следующий шаг.
+              {activeModule === "body"
+                ? "Поддержим на пути к здоровому и стройному телу"
+                : "Расскажите, что с вами происходит — голосом или текстом. Сервис поможет мягко разобрать состояние, заметить важные признаки и предложить понятный следующий шаг."}
             </p>
 
             <div style={s.row} className="app-actions">
               <button style={s.primary} onClick={() => setMode("text")}>
-                Начать разговор
+                {activeModule === "body" ? "Начать диалог" : "Начать разговор"}
               </button>
               <button style={s.secondary} onClick={() => setMode("voice")}>
-                Рассказать голосом
+                {activeModule === "body" ? "Говорить голосом" : "Рассказать голосом"}
               </button>
+            </div>
+
+            <div style={{ ...s.row, marginTop: 8, gap: 6 }} className="app-actions">
+              <button
+                style={activeModule === "support" ? s.primary : s.secondary}
+                onClick={() => setActiveModule("support")}
+              >
+                Точка опоры
+              </button>
+              <button
+                style={activeModule === "body" ? s.primary : s.secondary}
+                onClick={() => setActiveModule("body")}
+              >
+                Здоровье & Стройность
+              </button>
+            </div>
+
+            <div style={s.row} className="app-actions">
               <button
                 style={{ ...s.secondary, marginTop: 8 }}
                 onClick={() => setSessionModalOpen(true)}
@@ -5994,8 +6018,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </button>
             </div>
 
-            <p style={{ color: "#7A7268", fontSize: 13, marginTop: 24, lineHeight: 1.5 }}>
-              Сервис работает в тестовом режиме, не ставит диагноз и не является экстренной службой. Не указывайте персональные данные в тексте обращения.
+              <p style={{ color: "#7A7268", fontSize: 13, marginTop: 24, lineHeight: 1.5 }}>
+              {activeModule === "body"
+                ? "AI-компаньон помогает разобраться с режимом, питанием, активностью и самоконтролем. Не заменяет врача и не назначает лечение."
+                : "Сервис работает в тестовом режиме, не ставит диагноз и не является экстренной службой. Не указывайте персональные данные в тексте обращения."}
+            </p>
+            <p style={{ color: "#B85C4A", fontSize: 12, marginTop: 8, lineHeight: 1.4 }}>
+              {activeModule === "body" && "Если у вас острая боль, высокая температура, кровотечение или другие неотложные состояния — звоните 103 или 112."}
             </p>
           </section>
 
@@ -6320,6 +6349,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                               psychotherapist: "психотерапевт", psychiatrist: "психиатр",
                               general_physician: "терапевт", neurologist: "невролог",
                               emergency_service: "экстренная служба", crisis_service: "кризисная служба",
+                              orthopedist: "ортопед", cardiologist: "кардиолог", gastroenterologist: "гастроэнтеролог",
                             }[st] || st)).join(", ")}
                           </div>
                         )}
@@ -6365,8 +6395,65 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       </div>
                     )}
 
-                    {/* SELF_SUPPORT block */}
-                    {careRecommendation.level === "self_support" && (
+                    {/* MEDICAL_CONSULTATION block (body module) */}
+                    {careRecommendation.level === "medical_consultation" && (
+                      <div style={{
+                        background: "#F5F0E8", border: "1px solid rgba(46,42,37,.15)",
+                        borderRadius: 18, padding: 20, marginBottom: 16,
+                      }}>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: "#2E2A25", marginBottom: 8 }}>
+                          Рекомендуем обратиться к врачу
+                        </div>
+                        {careRecommendation.timeframe && (
+                          <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
+                            {careRecommendation.timeframe === "today" ? "Обратиться сегодня" :
+                             careRecommendation.timeframe === "within_days" ? "Обратиться в ближайшие дни" :
+                             "Обратиться в ближайшее время"}
+                          </div>
+                        )}
+                        {careRecommendation.specialist_types?.length > 0 && (
+                          <div style={{ fontSize: 13, color: "#5F7D6C", marginBottom: 14, lineHeight: 1.5 }}>
+                            {careRecommendation.specialist_types.map(st => ({
+                              psychologist: "психолог", clinical_psychologist: "клинический психолог",
+                              psychotherapist: "психотерапевт", psychiatrist: "психиатр",
+                              general_physician: "терапевт", neurologist: "невролог",
+                              emergency_service: "экстренная служба", crisis_service: "кризисная служба",
+                              orthopedist: "ортопед", cardiologist: "кардиолог", gastroenterologist: "гастроэнтеролог",
+                            }[st] || st)).join(", ")}
+                          </div>
+                        )}
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
+                            showToast("Симптомы, требующие срочного внимания: боль в груди, одышка, сильная головная боль, слабость в конечности — звоните 112");
+                          }}>
+                            Когда нужна срочная помощь
+                          </button>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
+                            const msg = "Я сейчас прохожу разбор телесных симптомов. Мне может понадобиться помощь с визитом к врачу в ближайшие дни.";
+                            setMessageText(msg);
+                            setShowMessageToClose(true);
+                          }}>
+                            Сообщить близкому
+                          </button>
+                        </div>
+                        {careRecommendation.interim_support?.length > 0 && (
+                          <div style={{ marginTop: 14, fontSize: 13, color: "#7A7268", lineHeight: 1.6 }}>
+                            <div style={{ fontWeight: 600, marginBottom: 4 }}>До визита к врачу:</div>
+                            <ul style={{ margin: 0, paddingLeft: 18 }}>
+                              {careRecommendation.interim_support.map((s, i) => (
+                                <li key={i}>{s}</li>
+                              ))}
+                            </ul>
+                            <div style={{ marginTop: 6, fontStyle: "italic" }}>
+                              Это временные меры, не заменяющие медицинскую консультацию.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* SELF_SUPPORT / SELF_CARE block */}
+                    {(careRecommendation.level === "self_support" || careRecommendation.level === "self_care") && (
                       <div style={{
                         background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
                         borderRadius: 18, padding: 20, marginBottom: 16,
@@ -6473,7 +6560,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 )}
 
-                {!showSelfAssessment && !showSupportToolkit && !showSpecialistIntent && (
+                {activeModule === "support" && !showSelfAssessment && !showSupportToolkit && !showSpecialistIntent && (
                   <div style={{ marginTop: 24, borderTop: "1px solid rgba(46,42,37,.1)", paddingTop: 20 }}>
                     <div style={{ fontSize: 14, color: "#2E2A25", lineHeight: 1.6, marginBottom: 16, fontFamily: "Georgia, \"PT Serif\", serif" }}>
                       Как вам кажется, на этом этапе вы сможете справляться с состоянием без подключения специалиста?
@@ -6492,7 +6579,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 )}
 
-                {showSpecialistIntent && !specialistIntentDone && (
+                {activeModule === "support" && showSpecialistIntent && !specialistIntentDone && (
                   <div style={{ marginTop: 24, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", borderRadius: 14, padding: 20 }}>
                     <div style={{ fontSize: 16, fontWeight: 600, color: "#2E2A25", marginBottom: 12 }}>Запрос на подключение специалиста</div>
                     <p style={{ color: "#7A7268", lineHeight: 1.7, fontSize: 14, margin: "0 0 16px" }}>
@@ -6517,7 +6604,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 )}
 
-                {showSupportToolkit && (
+                {showSupportToolkit && activeModule === "support" && (
                   <div style={{ marginTop: 24 }}>
                     <div style={{ fontSize: 16, fontWeight: 600, color: "#2E2A25", marginBottom: 12, fontFamily: "Georgia, \"PT Serif\", serif" }}>
                       Что можно попробовать до следующего разговора
@@ -6851,6 +6938,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       setPreviousDoctorReport(s.doctor_report || s.previousDoctorReport || "");
                       setHomeTasks(s.homeTasks || "");
                       setResourceFactors(s.resourceFactors || "");
+                      if (s.module) {
+                        setActiveModule(s.module);
+                      }
                       if (s.supportPlan) {
                         setSupportPlan(s.supportPlan);
                         const sa = s.supportPlan.patient_self_assessment;

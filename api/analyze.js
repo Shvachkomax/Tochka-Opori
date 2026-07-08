@@ -1,6 +1,8 @@
 import { runTextAnalysis } from "../lib/aiClient.js";
+import { getModule, isValidModule, DEFAULT_MODULE } from "../lib/modules.js";
+import { readModulePrompt } from "../lib/prompts.js";
 
-function buildAntiRepeatBlock(convHistory) {
+function buildAntiRepeatBlock(convHistory, module = "support") {
   if (!Array.isArray(convHistory) || convHistory.length === 0) return "";
 
   const previousQuestions = [];
@@ -45,7 +47,7 @@ ${previousAnswers.map((a, i) => `${i + 1}. ${a}`).join("\n")}
 - Не повторяй вопрос другими словами.
 - Каждый новый раунд уточняет только незакрытые зоны:
   safety/risk, timeline, trigger/context, sleep, substances/medications,
-  body tension, functioning, resources/support, selected support practices.
+  body tension, functioning, resources/support${module === "support" ? ", selected support practices" : "."}
 - Если вопрос уже был задан или пациент уже ответил, не возвращайся к нему без явной причины.
 `;
 }
@@ -172,6 +174,7 @@ const VALID_SPECIALIST_TYPES = [
   "psychologist", "clinical_psychologist", "psychotherapist",
   "psychiatrist", "general_physician", "neurologist",
   "emergency_service", "crisis_service",
+  "orthopedist", "cardiologist", "gastroenterologist",
 ];
 
 const VALID_REASONS = [
@@ -180,6 +183,9 @@ const VALID_REASONS = [
   "grief", "substance_use", "hopelessness", "social_isolation",
   "suicidal_thoughts", "self_harm_risk", "psychosis_red_flags",
   "mania_red_flags", "risk_to_others",
+  "chest_pain", "headache", "back_pain", "joint_pain", "muscle_tension",
+  "shortness_of_breath", "dizziness", "fatigue", "numbness",
+  "red_flag_symptom",
 ];
 
 function deriveMinimumCareLevel({
@@ -187,7 +193,27 @@ function deriveMinimumCareLevel({
   psychosisRedFlags, maniaRedFlags, riskToOthers,
   functionalImpairment, severeDistress, somaticSymptoms,
   traumaticUncertainty, sleepDisruption, substanceUse,
-}) {
+}, module) {
+  if (module === "body") {
+    // Body module: focus on medical red flags
+    if (riskToOthers) return "urgent_help";
+    if (suicidalIntent || suicidalPlan) return "urgent_help";
+    // Chest pain, severe shortness of breath, worst headache, stroke-like symptoms
+    // These are detected via the text patterns below
+    if (psychosisRedFlags || maniaRedFlags) return "urgent_help";
+    if (somaticSymptoms && (riskLevel === "high" || functionalImpairment)) {
+      return "urgent_help";
+    }
+    // Any concerning physical symptom that limits function
+    if (somaticSymptoms || severeDistress || functionalImpairment || selfHarmRisk) {
+      return "medical_consultation";
+    }
+    if (sleepDisruption || substanceUse) {
+      return "medical_consultation";
+    }
+    return "self_care";
+  }
+  // Support module: mental health triage
   if (suicidalIntent || suicidalPlan || psychosisRedFlags || maniaRedFlags || riskToOthers || riskLevel === "high") {
     return "urgent_help";
   }
@@ -212,8 +238,8 @@ function checkCareRecommendation(cr, conversationText) {
   if (level === "urgent_help" && timeframe !== "today") {
     violations.push("urgent_help must have timeframe 'today'");
   }
-  if (level === "professional_contact" && timeframe !== "within_days" && timeframe !== "today") {
-    violations.push("professional_contact must have timeframe 'within_days' or 'today'");
+  if ((level === "professional_contact" || level === "medical_consultation") && timeframe !== "within_days" && timeframe !== "today") {
+    violations.push(`${level} must have timeframe 'within_days' or 'today'`);
   }
 
   // specialist_types must be valid
@@ -274,7 +300,7 @@ ${violations.join("\n")}
 Задача: исправь ТОЛЬКО care_recommendation.
 
 Правила:
-- level: self_support | professional_contact | urgent_help
+- level: self_support | professional_contact | urgent_help | self_care | medical_consultation
 - timeframe: today | within_days | within_weeks | routine
 - specialist_types: ${VALID_SPECIALIST_TYPES.join(", ")}
 - reasons: ${VALID_REASONS.join(", ")}
@@ -306,16 +332,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations } = req.body || {};
+  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations, module: reqModule } = req.body || {};
 
   if (!text || text.trim().length < 10) {
     return res.status(400).json({ error: "Опишите состояние подробнее" });
   }
 
+  const activeModule = isValidModule(reqModule) ? reqModule : DEFAULT_MODULE;
+  const moduleConfig = getModule(activeModule);
   const MIN_DEPTH = 3;
   const MAX_DEPTH = 8;
 
-  const fallbackQuestions = [
+  const fallbackQuestions_support = [
     "Было ли в последние месяцы важное событие, потеря, конфликт, болезнь, переезд, военные события, исчезновение или смерть близкого человека, которое могло повлиять на ваше состояние?",
     "Началось ли состояние после конкретного события или постепенно, без понятной причины?",
     "Были ли алкоголь, вещества, новые лекарства, отмена препаратов, гормональные или соматические проблемы, которые совпали с ухудшением?",
@@ -325,6 +353,19 @@ export default async function handler(req, res) {
     "Бывали ли ощущения, что вы слышите или замечаете то, чего не замечают другие?",
     "Бывали ли периоды, когда вы почти не спали, но чувствовали необычный прилив энергии?",
   ];
+
+  const fallbackQuestions_body = [
+    "Где именно вы чувствуете боль или дискомфорт? Опишите словами.",
+    "Когда это началось и как менялось со временем?",
+    "Что делает эти ощущения сильнее или слабее?",
+    "Были ли у вас похожие симптомы раньше?",
+    "Как это влияет на ваш обычный день — работу, сон, движение?",
+    "Пробовали ли вы что-то, чтобы облегчить состояние?",
+    "Были ли недавно травмы, падения, перегрузки или болезни?",
+    "Принимаете ли вы какие-то лекарства или средства от боли?",
+  ];
+
+  const fallbackQuestions = activeModule === "body" ? fallbackQuestions_body : fallbackQuestions_support;
 
   const fallbackFinal = `===USER_REPORT===
 
@@ -346,6 +387,7 @@ AI-assisted summary не сформирован из-за технической
       questions: fallbackQuestions,
       model_used: "none",
       fallback_used: true,
+      module: activeModule,
     });
   }
 
@@ -373,260 +415,122 @@ AI-assisted summary не сформирован из-за технической
           .join("\n")
       : "";
 
-  const antiRepeatBlock = buildAntiRepeatBlock(convHistory);
+  const antiRepeatBlock = buildAntiRepeatBlock(convHistory, activeModule);
 
-  const systemPrompt = `Ты — AI-ассистент первичного mental health triage (выявление сигналов). Твоя задача — выявление сигналов, а не постановка диагноза.
+  // Build system prompt based on active module
+  const systemPrompt = (() => {
+    const modulePrompt = readModulePrompt(activeModule, "triage-system.md");
+    const basePrompt = modulePrompt || `Ты — AI-ассистент сервиса "Точка Опоры". Твоя задача — помогать пользователю описать своё состояние, задавать уточняющие вопросы и формировать предварительное заключение. Ты НЕ ставишь диагноз. Ты НЕ назначаешь лечение.`;
+
+    // Common rules shared by all modules
+    const commonRules = `
+ПРАВИЛА (общие для всех модулей):
+- Не ставь диагноз
+- Не назначай лекарства, дозировки, схемы лечения, БАДы, растительные средства
+- Не используй "у вас..." в отношении болезни или расстройства
+- Используй язык сигналов: "признаки", "маркеры", "важно уточнить", "стоит обсудить со специалистом"
+- Если есть риск самоповреждения — срочная помощь 112/103, не оставаться одному
+- Не обещай излечение, не заменяй врача, не давай категоричных советов
+- Отвечай только на русском языке, без смешивания с английским
+- Отчёт для пользователя пиши живым, ясным языком без канцелярита и медицинского жаргона
+- Отчёт для специалиста — профессиональным языком, но без окончательных диагнозов и назначений
+
+Голосовые признаки (войс-обсервации):
+Не ставь диагноз по голосовым признакам.
+Не усиливай уровень риска только на основании голоса.
+
+MIN_DEPTH = 3. Не завершай диалог до минимальной глубины.
+MAX_DEPTH = 8. После максимальной глубины заверши, указав ограничения.
+
+Модель уверенности:
+- Высокая: множество сигналов, согласованы между раундами
+- Средняя: некоторые сигналы присутствуют, частичные данные
+- Низкая: мало сигналов, противоречивые данные
+
+Продолжение сессии (isContinuation=true):
+Если это продолжение, AI НЕ начинает новый опрос.
+Кратко напоминает прошлый разговор и задает вопросы о динамике.
+Не повторяй вопросы, которые уже были заданы.
+Фокус — на changes, progress, new signals.
+`;
+
+    if (activeModule === "support") {
+      return `
+Ты — AI-ассистент первичного mental health triage (выявление сигналов).
 
 Ты НЕ ставишь диагноз.
 Ты определяешь:
 - сигналы (эмоциональные, когнитивные, поведенческие)
 - маркеры риска
-- уровень сроности
+- уровень срочности
 - необходимость передачи специалисту
 
 Добавлен Patient Support Layer.
-Система должна не только выявлять сигналы, но и помогать пациенту пережить ближайшие часы/дни безопасным способом.
 Всегда ищи:
 - ресурсы пациента
 - социальную поддержку
-- действия, которые могут немного стабилизировать состояние
-- возможность обратиться к близкому
+- действия, которые могут стабилизировать состояние
 - план до следующего контакта
 
-Нельзя:
-- обещать излечение
-- заменять врача
-- давать категоричные советы
-- назначать лекарства
-- давать опасные рекомендации
-
-Можно:
-- предложить дневник состояния
-- дневник сна
-- наблюдение за триггерами
-- ограничить алкоголь/стимуляторы
-- обратиться к близкому человеку
-- снизить нагрузку
-- сделать короткую прогулку или план физической активности
-- подготовить список жалоб для специалиста
-- назначить следующий анонимный разговор
-
-При достаточной глубине диалога необходимо выяснять:
-1. Что человек уже делает для улучшения состояния.
-2. Какие немедикаментозные способы поддержки использует.
-3. Какие лекарства принимает.
-4. Были ли изменения препаратов.
-5. Использует ли алкоголь, никотин, стимуляторы, БАДы, средства для сна.
-
-Система не назначает лечение и не рекомендует препараты.
-Система не должна рекомендовать: препараты, дозировки, схемы лечения, БАДы, растительные седативные средства.
-Система может только фиксировать факт их использования и предлагать обсудить вопросы лечения со специалистом.
-
-Система может обсуждать только:
-- режим сна
-- физическую активность
-- снижение алкоголя
-- снижение стимуляторов
-- дневник состояния
-- дневник сна
-- социальную поддержку
-- обращение к близким
-- снижение перегрузки
-- наблюдение за триггерами
-- подготовку к консультации специалиста
-
-Используй русские формулировки:
-- признаки тревоги
-- признаки, связанные с травмой
-- маркеры, напоминающие СДВГ
-- маниакальные красные флаги
-- психотические красные флаги
-- маркеры исполнительной дисфункции
-- сигналы эмоциональной нестабильности
-- модифицирующие факторы
-- временная динамика
-- ресурсы и поддержка
-
-Запрещено (даже во внутренних рассуждениях):
-- "у вас ПТСР"
-- "у вас биполярное расстройство"
-- "у вас шизофрения"
-- "это подтверждает СДВГ"
-- "диагноз"
-- "пациент страдает"
-
-Сферы выявления сигналов (внутреннее отслеживание):
-- Эмоциональная сфера (Affective / emotional)
-- Травматический контекст (Trauma)
-- Нейрокогнитивная сфера (Neurocognitive)
-- Сфера мышления и восприятия (Thought / perception)
-- Сфера нестабильности настроения (Mood instability)
-- Сфера риска (Risk)
-- Модифицирующие факторы (Contextual modifiers)
-- Временная динамика (Temporal analysis)
-- Функциональные нарушения (Functional impairment)
-- Ресурсы и поддержка (Resource & Support)
+Сферы выявления сигналов:
+- Эмоциональная сфера
+- Травматический контекст
+- Нейрокогнитивная сфера
+- Сфера риска
+- Функциональные нарушения
+- Ресурсы и поддержка
 
 Правила:
 - не ставь диагноз
 - не назначай лекарства
-- не используй "у вас психоз/шизофрения/БАР"
-- используй "обнаружены сигналы", "важно уточнить", "рекомендуется обсудить со специалистом"
 - если риск самоповреждения — срочная помощь 112/103
-- не усиливай тревогу
-- отвечай только на русском языке, без смешивания с английским
-- если пользователь явно обозначил психологический триггер (расставание, утрата, конфликт) — не спрашивай про наследственные психические заболевания, фокусируйся на причинах и контексте триггера
-- всегда проверяй соматические факторы: перенесённый ковид, интоксикации, хирургические операции, отмена/смена препаратов
-- если обозначена главная проблема — выясни её психологические причины и обстоятельства
-- выясни события ближайшего прошлого: болезни, интоксикации, травмы, перегрузки
-- отчет для специалиста пиши на профессиональном медицинском русском языке
-- не превращать это в терапию, не обещать улучшение, не заменять врача
-- если есть суицидальные мысли, план или потеря контроля — основная рекомендация: срочная помощь и не оставаться одному
+- используй "обнаружены сигналы", "важно уточнить"
 
-Речевой стиль "Точки опоры": живой язык без канцелярита.
-
-1. Всегда соблюдай речевой стиль: живой язык без канцелярита. Пациенту отвечай просто, тепло, короткими фразами. Не используй тяжёлые служебные обороты, пассивные конструкции и медицинский жаргон там, где можно сказать человечески.
-
-2. Уточняющие вопросы должны звучать как живой разговор, а не анкета.
-   Плохо: "Укажите длительность состояния."
-   Лучше: "Как давно это началось?"
-   Плохо: "Опишите провоцирующий фактор."
-   Лучше: "Было ли событие, после которого вам стало хуже?"
-
-3. Вкладка "Для вас" должна быть написана живым человеческим языком.
-   Запрещено: "на основании предоставленной информации", "имеются признаки", "наблюдается", "данное состояние", "осуществить обращение", "проведение анализа", "симптоматика", "выявлены признаки" без мягкой переформулировки.
-   Предпочтительно: "по вашим словам видно", "похоже, сейчас...", "вам стало...", "лучше поговорить со специалистом", "с этим не стоит оставаться одному", "давайте разберём по шагам".
-
-4. Тексты практик Support Toolkit должны быть простыми, спокойными и не обещать результата.
-   Не писать: "эта практика поможет", "это снизит тревогу", "это восстановит сон".
-   Писать: "можно попробовать", "если вам подходит", "остановитесь, если становится хуже", "это не лечение и не замена специалиста".
-
-5. В кризисном окне и high risk ответе говорить ясно и прямо, но без паники.
-   Пример: "Если есть риск причинить вред себе или другому человеку — звоните 112 или 103 и не оставайтесь одни."
-   Не писать: "Осуществите обращение за экстренной медицинской помощью."
-
-6. Перед тем как ответить пациенту, перепиши фразы, которые звучат как справка или медицинский протокол, на живой язык.
-
-Полный речевой справочник: prompts/language-style.md.
+${commonRules}
 
 --- ПРАВИЛА ФОРМИРОВАНИЯ ОТЧЁТА ДЛЯ КЛИЕНТА (user_report) ---
 
-Отчёт для клиента — это не медицинская справка и не перечень доменов.
-Это короткое, узнаваемое продолжение состоявшегося разговора.
-Человек должен увидеть в тексте свою ситуацию и понять, что его услышали.
-Не повторяй внутреннюю классификацию системы в user_report.
-Не перечисляй все возможные причины и факторы — выбирай только то, что связано с данным разговором.
-
-Запрещено использовать в user_report (допустимо только в doctor_report):
-- эмоциональная сфера / нейрокогнитивная сфера
-- модифицирующие факторы / травматический контекст
-- домены / маркеры / гипотезы
-- психопатологическая симптоматика
-- "требуется уточнение" / "важно оценить" / "выявлены сигналы"
-- ресурсный потенциал
-- "триггеры" как универсальное слово без конкретики
-
-Структура user_report при финальном ответе:
-
+Структура user_report:
 1. Что с вами сейчас происходит — 2-4 предложения. Назвать главное событие и его влияние.
-
-2. Что мы услышали в разговоре — только конкретные проявления из диалога. Никаких универсальных списков.
-
-3. Что важно не пропустить — коротко: непосредственные риски, телесные симптомы (требующие врача), сон, алкоголь или препараты — только если обсуждалось. Не писать список всех возможных факторов одновременно.
-
-4. На что можно опереться — реальные ресурсы из разговора. Если ресурс не выявлен: "В разговоре пока не удалось найти человека или место, на которое вы можете опереться". Не писать "важно оценить социальную поддержку".
-
-5. Что может немного помочь сегодня — максимум 3 конкретных выполнимых действия. Без общих фраз: "снизить нагрузку", "стабилизировать сон", "избегать стресса". Конкретно: "выбрать одного человека и написать ему", "сделать паузу в проверке новостей", "поесть или выпить воды", "записать симптомы", "договориться о медосмотре".
-
-6. Следующий шаг — один понятный шаг. Например: "В следующем разговоре стоит подробнее обсудить сон, телесные симптомы и то, кто может быть рядом в ближайшие дни."
+2. Что мы услышали в разговоре — только конкретные проявления из диалога.
+3. Что важно не пропустить — риски, телесные симптомы, сон, алкоголь.
+4. На что можно опереться — реальные ресурсы из разговора.
+5. Что может немного помочь сегодня — максимум 3 конкретных действия.
+6. Следующий шаг — один понятный шаг с маршрутизацией.
 
 Обязательное заземление в фактах:
-Перед формированием user_report выдели внутренне:
-1) главное событие; 2) главную трудность сейчас; 3) наиболее значимые проявления; 4) имеющиеся ресурсы; 5) ближайший реалистичный шаг.
-Не выводи этот служебный анализ отдельно, но обязательно используй его в тексте.
-Каждый user_report должен опираться минимум на 2-3 конкретных факта из разговора.
+Каждый user_report должен опираться на 2-3 конкретных факта из разговора.
 
-Неопределённая утрата (ambiguous loss):
-Различай: подтверждённая смерть vs расставание vs человек пропал без вести vs потеряна связь, судьба неизвестна.
-Если судьба близкого неизвестна:
-- не пиши так, как будто смерть подтверждена;
-- не называй состояние завершённым горем;
-- используй: "мучительная неопределённость", "неопределённая утрата" — с пояснением;
-- признавай, что человеку трудно одновременно надеяться и готовиться к плохим новостям;
-- не предлагай "принять утрату", если факт утраты не подтверждён.
+Когда завершаешь диалог, верни JSON с user_report, doctor_report и care_recommendation.
 
-Связь переживаний и тела:
-Если в разговоре есть соматические жалобы:
-- назови их конкретно (только если клиент сообщал);
-- объясни, что длительное напряжение может усиливать телесные ощущения;
-- не утверждай, что симптомы вызваны только тревогой;
-- укажи, что медицинские причины должны быть исключены;
-- при опасных симптомах — ясная рекомендация обратиться за неотложной помощью.
-Не используй "нейрокогнитивная сфера" для телесных жалоб.
+${antiRepeatBlock}
+`;
+    }
 
-Запрет на отчёт-анкету:
-user_report не должен выглядеть как перечень вопросов, которые врач ещё не задал.
-Вместо "важно оценить социальную поддержку" → "Вы рассказали, что можете обратиться к сестре" или "Пока неясно, есть ли рядом человек, которому вы можете позвонить".
-Вместо "требуется уточнение по препаратам" → "Мы пока не обсудили лекарства и средства, которые вы принимаете. Это стоит уточнить в следующем разговоре".
+    // Body module and other modules
+    return `
+${basePrompt}
 
-Стиль user_report (Нора Галь):
-- конкретный глагол вместо отглагольного существительного;
-- короткие предложения;
-- меньше пассивных конструкций;
-- не использовать канцелярские связки;
-- обращаться к человеку, а не описывать его как объект анализа;
-- один абзац — одна мысль.
+${commonRules}
+
+--- ПРАВИЛА ФОРМИРОВАНИЯ ОТЧЁТА ДЛЯ КЛИЕНТА (user_report) ---
+
+Структура user_report:
+1. Что происходит с вашим телом — 2-4 предложения о главных ощущениях/симптомах.
+2. Что мы услышали — конкретные детали из разговора.
+3. Что важно не пропустить — красные флаги, требующие врача.
+4. На что можно опереться — что помогает или пробовали раньше.
+5. Что может немного помочь сегодня — максимум 3 конкретных действия.
+6. Следующий шаг — один понятный шаг.
+
+Каждый user_report должен опираться на 2-3 конкретных факта из разговора.
+Пиши живым человеческим языком.
 
 --- КОНЕЦ ПРАВИЛ ОТЧЁТА ДЛЯ КЛИЕНТА ---
 
-Голосовые признаки (voice_observations):
-Если переданы voice_observations, используй их только как дополнительный
-неспецифический источник информации.
-
-Не ставь диагноз по голосовым признакам.
-
-Разделяй:
-1. наблюдаемую особенность речи;
-2. возможные альтернативные объяснения;
-3. вопрос, который специалисту следует уточнить.
-
-Не усиливай уровень риска только на основании голоса.
-
-Голосовые признаки могут повысить приоритет уточняющего вопроса,
-но не могут самостоятельно служить основанием для вывода о депрессии,
-мании, психозе, интоксикации, суицидальном риске или неискренности.
-
-MIN_DEPTH = ${MIN_DEPTH}. Не завершай диалог до минимальной глубины ${MIN_DEPTH}, если нет низкой сложности, низкого риска и ясного объяснения.
-MAX_DEPTH = ${MAX_DEPTH}. После максимальной глубины ${MAX_DEPTH} заверши, указав ограничения.
-
-Модель уверенности:
-- Высокая: множество сигналов в сфере, согласованы между раундами
-- Средняя: некоторые сигналы присутствуют, частичные данные
-- Низкая: мало сигналов, противоречивые данные — рекомендуется дальнейшая оценка
-
-Продолжение сессии (isContinuation=true):
-Если это продолжение предыдущей сессии, AI НЕ начинает новый опрос.
-AI кратко напоминает прошлый разговор и задает вопросы о динамике состояния:
-- что изменилось с прошлого раза?
-- что помогло?
-- что ухудшилось?
-- удалось ли выполнить рекомендации?
-- какие появились новые жалобы или сигналы?
-Не повторяй вопросы, которые уже были заданы в предыдущей сессии.
-Не запрашивай заново то, что уже выяснено.
-Фокус — на changes, progress, new signals.
-
-Если в support_plan есть selected_practices, спросить:
-- Удалось ли попробовать выбранную практику?
-- Что изменилось после неё?
-- Стало легче, тяжелее или без изменений?
-- Что оказалось неудобным или не подошло?
-- Заполняли ли дневник состояния?
-
-Если выбран дневник:
-- спросить, удалось ли вести дневник 1–3 дня;
-- какие симптомы усиливались;
-- что немного помогало.`;
+${antiRepeatBlock}
+`;
+  })();
 
   let userPrompt = "";
 
@@ -813,16 +717,16 @@ ${antiRepeatBlock}
 
     if (!raw) {
       if (depth === 0) {
-        return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: modelUsed, fallback_used: fallbackUsed });
+        return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: modelUsed, fallback_used: fallbackUsed, module: activeModule });
       }
-      return res.status(200).json({ type: "final", user_report: fallbackFinal, doctor_report: "", model_used: modelUsed, fallback_used: fallbackUsed });
+      return res.status(200).json({ type: "final", user_report: fallbackFinal, doctor_report: "", model_used: modelUsed, fallback_used: fallbackUsed, module: activeModule });
     }
 
     if (!parsed) {
       if (depth === 0) {
-        return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: modelUsed, fallback_used: fallbackUsed });
+        return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: modelUsed, fallback_used: fallbackUsed, module: activeModule });
       }
-      return res.status(200).json({ type: "final", user_report: raw, doctor_report: "", model_used: modelUsed, fallback_used: fallbackUsed });
+      return res.status(200).json({ type: "final", user_report: raw, doctor_report: "", model_used: modelUsed, fallback_used: fallbackUsed, module: activeModule });
     }
 
     if (parsed.type === "questions" && Array.isArray(parsed.questions)) {
@@ -831,6 +735,7 @@ ${antiRepeatBlock}
         questions: parsed.questions.filter(Boolean).slice(0, 7),
         model_used: modelUsed,
         fallback_used: fallbackUsed,
+        module: activeModule,
       });
     }
 
@@ -886,7 +791,7 @@ ${antiRepeatBlock}
       traumaticUncertainty: hasTraumaticUncertainty,
       sleepDisruption: hasSleepDisruption,
       substanceUse: hasSubstanceUse,
-    });
+    }, activeModule);
 
     // Validate and enforce care_recommendation
     let careRepairInfo = { repairAttempted: false };
@@ -895,7 +800,7 @@ ${antiRepeatBlock}
     if (careRec) {
       careCheck = checkCareRecommendation(careRec, fullConversation);
       // Backend override: model cannot set below minimum
-      const levelOrder = { "self_support": 0, "professional_contact": 1, "urgent_help": 2 };
+      const levelOrder = { "self_support": 0, "professional_contact": 1, "self_care": 0, "medical_consultation": 1, "urgent_help": 2 };
       if (levelOrder[careRec.level] < levelOrder[minimumLevel]) {
         careRec.level = minimumLevel;
         careCheck.violations.push(`overridden to ${minimumLevel} (model set lower)`);
@@ -926,7 +831,7 @@ ${antiRepeatBlock}
     if (!careRec) {
       careRec = {
         level: minimumLevel,
-        timeframe: minimumLevel === "urgent_help" ? "today" : minimumLevel === "professional_contact" ? "within_days" : "within_weeks",
+        timeframe: minimumLevel === "urgent_help" ? "today" : (minimumLevel === "professional_contact" || minimumLevel === "medical_consultation") ? "within_days" : "within_weeks",
         specialist_types: [],
         reasons: [],
         interim_support: [],
@@ -947,7 +852,7 @@ ${antiRepeatBlock}
       // Deduplicate
       careRec.specialist_types = [...new Set(careRec.specialist_types)];
       careRec.reasons = [...new Set(careRec.reasons)];
-      if (careRec.level === "self_support" && !careRec.reasons.length) {
+      if ((careRec.level === "self_support" || careRec.level === "self_care") && !careRec.reasons.length) {
         careRec.reasons = [];
         careRec.interim_support = ["вернуться к разговору, если состояние изменится"];
       }
@@ -982,13 +887,15 @@ ${antiRepeatBlock}
       report,
       model_used: modelUsed,
       fallback_used: fallbackUsed,
+      module: activeModule,
       care_recommendation: careRec,
       _debug: debugInfo,
     });
   } catch (error) {
     console.error("Analyze error:", error.message);
+    const fallbackLevel = activeModule === "body" ? "self_care" : "self_support";
     const fallbackCareRec = {
-      level: "self_support",
+      level: fallbackLevel,
       timeframe: "within_weeks",
       specialist_types: [],
       reasons: ["persistent_symptoms"],
@@ -996,8 +903,8 @@ ${antiRepeatBlock}
       urgent_triggers: [],
     };
     if (depth === 0) {
-      return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: MODEL_TRIAGE, fallback_used: true, care_recommendation: fallbackCareRec });
+      return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: MODEL_TRIAGE, fallback_used: true, care_recommendation: fallbackCareRec, module: activeModule });
     }
-    return res.status(200).json({ type: "final", report: fallbackFinal, model_used: MODEL_TRIAGE, fallback_used: true, care_recommendation: fallbackCareRec });
+    return res.status(200).json({ type: "final", report: fallbackFinal, model_used: MODEL_TRIAGE, fallback_used: true, care_recommendation: fallbackCareRec, module: activeModule });
   }
 }
