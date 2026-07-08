@@ -1,6 +1,24 @@
+import { getSupabase } from "../lib/supabase.js";
+
+function resolveRole(token) {
+  if (!token) return null;
+  if (process.env.SUPER_ADMIN_TOKEN && token === process.env.SUPER_ADMIN_TOKEN) return "super";
+  if (process.env.SUPPORT_ADMIN_TOKEN && token === process.env.SUPPORT_ADMIN_TOKEN) return "support";
+  if (process.env.BODY_ADMIN_TOKEN && token === process.env.BODY_ADMIN_TOKEN) return "body";
+  return null;
+}
+
+function checkAccess(role, requiredModule) {
+  if (!role) return false;
+  if (role === "super") return true;
+  if (requiredModule === "support" && role === "support") return true;
+  if (requiredModule === "body" && role === "body") return true;
+  return false;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
   const { action } = req.body || {};
@@ -9,6 +27,10 @@ export default async function handler(req, res) {
     switch (action) {
       case "verify":
         return await handleVerify(req, res);
+      case "listBodyIntake":
+        return await handleListBodyIntake(req, res);
+      case "getBodyIntakeDetail":
+        return await handleGetBodyIntakeDetail(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -20,17 +42,58 @@ export default async function handler(req, res) {
 async function handleVerify(req, res) {
   try {
     const { password } = req.body || {};
-
-    if (!password || !process.env.ADMIN_SECRET) {
-      return res.status(401).json({ ok: false, error: "Нет доступа" });
-    }
-
-    if (password !== process.env.ADMIN_SECRET) {
+    const role = resolveRole(password);
+    if (!role) {
       return res.status(403).json({ ok: false, error: "Неверный пароль" });
     }
-
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: true, role });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error.message || "Ошибка проверки" });
   }
+}
+
+async function handleListBodyIntake(req, res) {
+  const { password, limit = 50, offset = 0 } = req.body || {};
+  const role = resolveRole(password);
+  if (!checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const supabase = getSupabase();
+  const { data, error, count } = await supabase
+    .from("body_intake_forms")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.status(200).json({ ok: true, records: data || [], count: count || 0 });
+}
+
+async function handleGetBodyIntakeDetail(req, res) {
+  const { password, id } = req.body || {};
+  const role = resolveRole(password);
+  if (!checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("body_intake_forms")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.status(200).json({ ok: true, record: data });
 }

@@ -1,6 +1,6 @@
 import { runTextAnalysis } from "../lib/aiClient.js";
 import { getModule, isValidModule, DEFAULT_MODULE } from "../lib/modules.js";
-import { readModulePrompt } from "../lib/prompts.js";
+import { readModulePrompt, readCorePrompt } from "../lib/prompts.js";
 
 function buildAntiRepeatBlock(convHistory, module = "support") {
   if (!Array.isArray(convHistory) || convHistory.length === 0) return "";
@@ -327,18 +327,233 @@ ${violations.join("\n")}
   }
 }
 
+const BODY_FALLBACK_RESPONSE = {
+  type: "intake_analysis",
+  user_report: "Спасибо, я собрал первичные данные. Начнем мягко: пару дней понаблюдаем за питанием, сном и активностью, а затем соберем простой план без рывков и крайностей.\n\nЭто не диагноз и не медицинское назначение.",
+  body_plan: {
+    focus: "Первичное наблюдение и мягкий старт",
+    days: [
+      { day: 1, title: "Просто начните замечать", actions: ["Запишите, что и когда вы едите", "Отметьте время сна и самочувствие утром", "Посильная прогулка 15–20 минут"], note: "Ничего не меняйте — просто наблюдайте" },
+      { day: 2, title: "Продолжаем наблюдение", actions: ["Запишите вес и объём талии", "Те же три точки: еда, сон, движение"], note: "Два дня — уже хорошая база" },
+      { day: 3, title: "Первый микрошаг", actions: ["Добавьте стакан воды утром", "Замените один перекус на фрукт или овощ"], note: "Маленький шаг — это уже движение" },
+      { day: 4, title: "Закрепляем", actions: ["Повторите шаг дня 3", "10 минут лёгкой растяжки или ходьбы"], note: "Не стремитесь к идеалу — стремитесь к регулярности" },
+      { day: 5, title: "Добавляем осознанность", actions: ["Обратите внимание на сигналы голода и сытости", "Сделайте один приём пищи без телефона"], note: "Еда — не только топливо, но и контакт с собой" },
+      { day: 6, title: "Проверяем прогресс", actions: ["Запишите самочувствие и вес", "Что получилось? Что было сложным?"], note: "Срыв — не провал, а информация" },
+      { day: 7, title: "Оцениваем неделю", actions: ["Посмотрите, что изменилось за неделю", "Отметьте, что хотите продолжить"], note: "Любой опыт полезен. На следующей неделе скорректируем план" },
+    ],
+  },
+  care_recommendation: {
+    level: "self_care",
+    timeframe: "within_weeks",
+    specialist_types: [],
+    reasons: [],
+    interim_support: ["наблюдать за питанием, сном и активностью"],
+  },
+  module: "body",
+};
+
+function calcBMI(heightCm, weightKg) {
+  const h = parseFloat(heightCm);
+  const w = parseFloat(weightKg);
+  if (!h || !w || h <= 0 || w <= 0) return null;
+  return Math.round((w / ((h / 100) * (h / 100))) * 10) / 10;
+}
+
+async function trySaveIntake(intake, bmi, careLevel) {
+  try {
+    const { getSupabase } = await import("../lib/supabase.js");
+    const supabase = getSupabase();
+    const answers = { ...intake };
+    delete answers.session_id;
+    const payload = {
+      module: "body",
+      version: "body-intake-v0.1",
+      session_id: intake.session_id || null,
+      answers,
+      bmi: bmi ?? null,
+      care_recommendation: careLevel || null,
+    };
+    await supabase.from("body_intake_forms").insert(payload);
+  } catch (err) {
+    console.log("Body intake DB save skipped (table may not exist):", err.message);
+  }
+}
+
+async function handleBodyIntakeAnalysis(req, res, intake) {
+  const bmi = calcBMI(intake.height_cm, intake.weight_kg);
+
+  // Backend care level override based on red flags (safety backstop)
+  const redFlags = Array.isArray(intake.red_flags_check) ? intake.red_flags_check : [];
+  const hasUrgentFlag = redFlags.some(f => ["chest_pain", "fainting"].includes(f));
+  const hasMedicalFlag = redFlags.some(f => ["severe_dizziness", "unexplained_weight_loss", "blood_in_stool"].includes(f));
+  let redFlagCareLevel = null;
+  if (hasUrgentFlag) redFlagCareLevel = "urgent_help";
+  else if (hasMedicalFlag) redFlagCareLevel = "medical_consultation";
+
+  // Try to save intake data (non-blocking)
+  trySaveIntake(intake, bmi, null);
+
+  const DISCLAIMER = "\n\nЭто не диагноз и не медицинское назначение.";
+
+  try {
+    const conversationStyle = readCorePrompt("conversation-style.md") || "";
+    const modulePrompt = readModulePrompt("body", "intake-analysis.md") || "Ты — AI-ассистент модуля здоровья. Проанализируй данные анкеты и верни план.";
+
+    const systemPrompt = `
+${modulePrompt}
+
+${conversationStyle}
+
+ПРАВИЛА:
+- Не ставь диагноз
+- Не назначай лекарства, БАДы, ГПП-1, витамины в лечебных дозах
+- Не давай жёсткие нормы калорий
+- Не стыди, не дави
+- При красных флагах — чётко рекомендовать врача
+- Отвечай только на русском языке
+- Каждый ответ обязан заканчиваться фразой: "${DISCLAIMER.trim()}"
+- Верни JSON с полями: user_report (текст для пользователя), body_plan (объект с полями focus и days), care_recommendation (объект)
+`;
+
+    const flags = Array.isArray(intake.red_flags_check) ? intake.red_flags_check.join(", ") : "нет";
+
+    const userPrompt = `Пользователь заполнил первичную анкету модуля "Здоровье & Стройность".
+
+Данные анкеты:
+- Имя: ${intake.display_name || "не указано"}
+- Пол: ${intake.sex || "не указан"}
+- Возраст: ${intake.age || "не указан"}
+- Цель: ${intake.goal === "custom" ? intake.goal_custom : intake.goal || "не указана"}
+- Рост: ${intake.height_cm || "не указан"} см
+- Вес: ${intake.weight_kg || "не указан"} кг
+- ИМТ: ${bmi ?? "не рассчитан"}
+- Объём талии: ${intake.waist_cm || "не указан"} см
+- Уровень активности на работе: ${intake.work_activity_level || "не указан"}
+- Шагов в день: ${intake.daily_steps_estimate || "не указано"}
+- Сон: ${intake.sleep_hours_estimate || "не указан"}
+- Питание (главная проблема): ${intake.nutrition_main_problem || "не указана"}
+- Ограничения по здоровью: ${intake.health_limitations || "нет"}
+- Красные флаги: ${flags}
+
+Проанализируй анкету и верни JSON:
+{
+  "user_report": "3-5 предложений на русском, бережно, без диагнозов",
+  "body_plan": {
+    "focus": "главная тема недели",
+    "days": [
+      { "day": 1, "title": "...", "actions": ["..."], "note": "..." }
+    ]
+  },
+  "care_recommendation": {
+    "level": "self_care|medical_consultation|urgent_help",
+    "timeframe": "...",
+    "specialist_types": [],
+    "reasons": [],
+    "interim_support": []
+  }
+}`;
+
+    const MODEL_TRIAGE = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
+    const MODEL_FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
+    const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
+
+    const result = await runTextAnalysis({
+      systemPrompt,
+      userPrompt,
+      model: MODEL_TRIAGE,
+      fallbackModel: MODEL_FALLBACK,
+      reasoningEffort: REASONING_EFFORT,
+    });
+
+    const parsed = result.parsed;
+
+    if (!parsed || !parsed.user_report) {
+      return res.status(200).json({
+        ...BODY_FALLBACK_RESPONSE,
+        bmi,
+        care_recommendation: redFlagCareLevel
+          ? { ...BODY_FALLBACK_RESPONSE.care_recommendation, level: redFlagCareLevel }
+          : BODY_FALLBACK_RESPONSE.care_recommendation,
+        triggered_red_flags: redFlags,
+        red_flag_care_level: redFlagCareLevel,
+        used_fallback: true,
+        intake_answers: intake,
+      });
+    }
+
+    const careLevel = redFlagCareLevel || parsed.care_recommendation?.level || "self_care";
+
+    // Override care_recommendation if red flags dictate higher level
+    let safeCareRecommendation = parsed.care_recommendation || BODY_FALLBACK_RESPONSE.care_recommendation;
+    if (redFlagCareLevel) {
+      safeCareRecommendation = {
+        ...safeCareRecommendation,
+        level: redFlagCareLevel,
+        ...(hasUrgentFlag ? {
+          timeframe: "немедленно",
+          specialist_types: ["emergency_service"],
+          reasons: redFlags,
+          interim_support: ["Позвоните 112 или 103", "Не оставайтесь в одиночестве"],
+        } : {
+          timeframe: "в ближайшее время",
+          specialist_types: ["general_physician"],
+          reasons: redFlags,
+          interim_support: ["Обратитесь к терапевту для первичной консультации"],
+        }),
+      };
+    }
+
+    // Save intake with care recommendation (non-blocking)
+    trySaveIntake(intake, bmi, careLevel);
+
+    return res.status(200).json({
+      type: "intake_analysis",
+      user_report: parsed.user_report,
+      body_plan: parsed.body_plan || BODY_FALLBACK_RESPONSE.body_plan,
+      care_recommendation: safeCareRecommendation,
+      bmi,
+      triggered_red_flags: redFlags,
+      red_flag_care_level: redFlagCareLevel,
+      used_fallback: !!result.fallback_used,
+      model_used: result.model_used,
+      fallback_used: result.fallback_used,
+      module: "body",
+      intake_answers: intake,
+    });
+  } catch (error) {
+    console.error("Body intake analysis error:", error.message);
+    return res.status(200).json({
+      ...BODY_FALLBACK_RESPONSE,
+      bmi,
+      care_recommendation: redFlagCareLevel
+        ? { ...BODY_FALLBACK_RESPONSE.care_recommendation, level: redFlagCareLevel }
+        : BODY_FALLBACK_RESPONSE.care_recommendation,
+      triggered_red_flags: redFlags,
+      red_flag_care_level: redFlagCareLevel,
+      used_fallback: true,
+      intake_answers: intake,
+    });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations, module: reqModule } = req.body || {};
+  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations, module: reqModule, stage, intake: intakeData } = req.body || {};
+
+  const activeModule = isValidModule(reqModule) ? reqModule : DEFAULT_MODULE;
+
+  // Body intake stage: one-shot analysis from completed intake form
+  const bodyIntake = intakeData || answers;
+  if (stage === "intake_completed" && activeModule === "body" && bodyIntake) {
+    return await handleBodyIntakeAnalysis(req, res, bodyIntake);
+  }
 
   if (!text || text.trim().length < 10) {
     return res.status(400).json({ error: "Опишите состояние подробнее" });
   }
-
-  const activeModule = isValidModule(reqModule) ? reqModule : DEFAULT_MODULE;
   const moduleConfig = getModule(activeModule);
   const MIN_DEPTH = 3;
   const MAX_DEPTH = 8;
@@ -418,6 +633,8 @@ AI-assisted summary не сформирован из-за технической
   const antiRepeatBlock = buildAntiRepeatBlock(convHistory, activeModule);
 
   // Build system prompt based on active module
+  const conversationStyle = readCorePrompt("conversation-style.md") || "";
+
   const systemPrompt = (() => {
     const modulePrompt = readModulePrompt(activeModule, "triage-system.md");
     const basePrompt = modulePrompt || `Ты — AI-ассистент сервиса "Точка Опоры". Твоя задача — помогать пользователю описать своё состояние, задавать уточняющие вопросы и формировать предварительное заключение. Ты НЕ ставишь диагноз. Ты НЕ назначаешь лечение.`;
@@ -431,9 +648,9 @@ AI-assisted summary не сформирован из-за технической
 - Используй язык сигналов: "признаки", "маркеры", "важно уточнить", "стоит обсудить со специалистом"
 - Если есть риск самоповреждения — срочная помощь 112/103, не оставаться одному
 - Не обещай излечение, не заменяй врача, не давай категоричных советов
-- Отвечай только на русском языке, без смешивания с английским
-- Отчёт для пользователя пиши живым, ясным языком без канцелярита и медицинского жаргона
 - Отчёт для специалиста — профессиональным языком, но без окончательных диагнозов и назначений
+
+${conversationStyle}
 
 Голосовые признаки (войс-обсервации):
 Не ставь диагноз по голосовым признакам.
