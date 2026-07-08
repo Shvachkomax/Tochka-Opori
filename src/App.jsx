@@ -6191,7 +6191,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             />
             <div>
               <div style={s.logo}>{isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : "Точка опоры"}</div>
-              <div style={s.sub}>{isDedicatedSubdomain ? "Забота о теле без давления и крайностей." : "Анонимно. Безопасно. Можно просто поговорить."}</div>
+              {!isDedicatedSubdomain && <div style={s.sub}>Анонимно. Безопасно. Можно просто поговорить.</div>}
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -6289,16 +6289,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               }}>
                 {activeModule === "body" ? "Начать диалог" : "Начать разговор"}
               </button>
-              <button style={s.secondary} onClick={() => {
-                if (activeModule === "body") {
-                  setBodyIntakeStage("filling");
-                } else {
-                  setMode("voice");
-                }
-              }}>
-                {activeModule === "body" ? "Говорить голосом" : "Рассказать голосом"}
-              </button>
+              {activeModule !== "body" && (
+                <button style={s.secondary} onClick={() => { setMode("voice"); }}>
+                  Рассказать голосом
+                </button>
+              )}
             </div>
+            {/* voice input for body diary stage, not intake stage */}
 
             {showModuleSwitcher && (
             <div style={{ ...s.row, marginTop: 8, gap: 6 }} className="app-actions">
@@ -6347,7 +6344,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           {activeModule === "body" && bodyIntakeStage === "analyzing" && (
             <section style={s.card} className="app-card">
               <div style={{ textAlign: "center", padding: "60px 20px" }}>
-                <div style={{ fontSize: 18, color: "#94a3b8" }}>Анализируем ваши данные...</div>
+                <div style={{ fontSize: 18, color: "#665c52" }}>Анализируем ваши данные...</div>
               </div>
             </section>
           )}
@@ -6355,20 +6352,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           {/* Body intake result */}
           {activeModule === "body" && bodyIntakeStage === "result" && (
             <section style={s.card} className="app-card">
-              <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16, color: "#2f2925" }}>
                 Ваш первый разбор
               </div>
 
-              <div style={{ fontSize: 16, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#e2e8f0" }}>
+              <div style={{ fontSize: 16, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#2f2925" }}>
                 {bodyIntakeResult?.user_report || "Анализ завершён."}
               </div>
 
               {bodyIntakeResult?.care_recommendation && (
-                <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }}>
-                  <div style={{ color: "#94a3b8", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+                <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
+                  <div style={{ color: "#665c52", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
                     Почему такой уровень рекомендации
                   </div>
-                  <div style={{ color: "#e2e8f0", fontSize: 14, lineHeight: 1.6 }}>
+                  <div style={{ color: "#2f2925", fontSize: 14, lineHeight: 1.6 }}>
                     {bodyIntakeResult.care_recommendation.level === "self_care" && "В анкете нет признаков, требующих срочной помощи; можно начать с мягкого самонаблюдения."}
                     {bodyIntakeResult.care_recommendation.level === "medical_consultation" && "Есть признаки или ограничения, которые лучше обсудить со специалистом перед нагрузками."}
                     {bodyIntakeResult.care_recommendation.level === "urgent_help" && "Вы отметили симптом, при котором лучше не продолжать программу и обратиться за срочной помощью."}
@@ -6377,8 +6374,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               )}
 
               {bodyIntakeResult?.bmi && (
-                <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }}>
-                  <div style={{ color: "#e2e8f0", fontSize: 14, lineHeight: 1.6 }}>
+                <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
+                  <div style={{ color: "#2f2925", fontSize: 14, lineHeight: 1.6 }}>
                     По введенным данным ИМТ примерно {bodyIntakeResult.bmi}. Это ориентировочный показатель: он помогает увидеть общую картину, но не заменяет оценку состава тела, объема талии, самочувствия и консультацию специалиста.
                   </div>
                 </div>
@@ -6386,27 +6383,27 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
               {bodyIntakeResult?.body_plan && (
                 <div style={{ marginTop: 28 }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>План на 7 дней</div>
-                  <div style={{ color: "#94a3b8", fontSize: 14, marginBottom: 16, fontStyle: "italic" }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, color: "#2f2925" }}>План на 7 дней</div>
+                  <div style={{ color: "#665c52", fontSize: 14, marginBottom: 16, fontStyle: "italic" }}>
                     {bodyIntakeResult.body_plan.focus}
                   </div>
 
                   {bodyIntakeResult.body_plan.days?.map(d => (
                     <div key={d.day} style={{
-                      border: "1px solid rgba(255,255,255,.12)",
+                      border: "1px solid #d8cec1",
                       borderRadius: 16, padding: "14px 18px", marginBottom: 10,
-                      background: "rgba(255,255,255,.05)",
+                      background: "#faf6ef",
                     }}>
-                      <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 6 }}>
+                      <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 6, color: "#2f2925" }}>
                         День {d.day}: {d.title}
                       </div>
                       {d.actions?.map((a, i) => (
-                        <div key={i} style={{ color: "#cbd5e1", fontSize: 14, paddingLeft: 14, marginBottom: 3 }}>
+                        <div key={i} style={{ color: "#5f574f", fontSize: 14, paddingLeft: 14, marginBottom: 3 }}>
                           • {a}
                         </div>
                       ))}
                       {d.note && (
-                        <div style={{ color: "#94a3b8", fontSize: 13, fontStyle: "italic", marginTop: 6 }}>
+                        <div style={{ color: "#665c52", fontSize: 13, fontStyle: "italic", marginTop: 6 }}>
                           {d.note}
                         </div>
                       )}
@@ -6417,8 +6414,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
               {bodyIntakeResult?.care_recommendation?.level === "medical_consultation" && (
                 <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: "rgba(251,191,36,.10)", border: "1px solid rgba(251,191,36,.25)" }}>
-                  <div style={{ fontWeight: 700, color: "#fcd34d", marginBottom: 6 }}>Когда лучше обратиться к врачу</div>
-                  <div style={{ color: "#fde68a", fontSize: 14, lineHeight: 1.6 }}>
+                  <div style={{ fontWeight: 700, color: "#92400e", marginBottom: 6 }}>Когда лучше обратиться к врачу</div>
+                  <div style={{ color: "#78350f", fontSize: 14, lineHeight: 1.6 }}>
                     По вашим данным есть признаки, которые стоит обсудить со специалистом. Рекомендуем записаться к терапевту в ближайшие дни.
                   </div>
                 </div>
@@ -6426,8 +6423,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
               {bodyIntakeResult?.care_recommendation?.level === "urgent_help" && (
                 <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.3)" }}>
-                  <div style={{ fontWeight: 700, color: "#fca5a5", marginBottom: 6 }}>Возможно, нужна срочная помощь</div>
-                  <div style={{ color: "#fecaca", fontSize: 14, lineHeight: 1.6 }}>
+                  <div style={{ fontWeight: 700, color: "#991b1b", marginBottom: 6 }}>Возможно, нужна срочная помощь</div>
+                  <div style={{ color: "#7f1d1d", fontSize: 14, lineHeight: 1.6 }}>
                     Если у вас или рядом с вами есть симптомы, которые требуют немедленной помощи — звоните 103 или 112.
                   </div>
                 </div>
@@ -6435,31 +6432,31 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
               <div style={{ marginTop: 24, display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <button style={{
-                  padding: "14px 22px", borderRadius: 20, background: "white",
-                  color: "#020617", fontWeight: 800, border: 0, cursor: "pointer",
+                  padding: "14px 22px", borderRadius: 20, background: "#7D9A89",
+                  color: "#ffffff", fontWeight: 800, border: 0, cursor: "pointer",
                 }} onClick={() => setBodyIntakeStage("filling")}>
                   Заполнить заново
                 </button>
                 <button style={{
-                  padding: "14px 22px", borderRadius: 20, background: "rgba(255,255,255,.08)",
-                  color: "white", fontWeight: 700, border: "1px solid rgba(255,255,255,.18)", cursor: "pointer",
+                  padding: "14px 22px", borderRadius: 20, background: "#ede7dc",
+                  color: "#2f2925", fontWeight: 700, border: "1px solid #d8cec1", cursor: "pointer",
                 }} onClick={downloadBodyIntakeJSON}>
                   Скачать JSON
                 </button>
                 <button style={{
-                  padding: "14px 22px", borderRadius: 20, background: "rgba(255,255,255,.08)",
-                  color: "white", fontWeight: 700, border: "1px solid rgba(255,255,255,.18)", cursor: "pointer",
+                  padding: "14px 22px", borderRadius: 20, background: "#ede7dc",
+                  color: "#2f2925", fontWeight: 700, border: "1px solid #d8cec1", cursor: "pointer",
                 }} onClick={() => { setBodyIntakeStage("idle"); setMode(""); }}>
                   На главную
                 </button>
               </div>
 
               {(window.location.hostname === "localhost" || import.meta.env?.DEV) && bodyIntakeResult && (
-                <div style={{ marginTop: 28, padding: 14, borderRadius: 14, background: "rgba(0,0,0,.3)", border: "1px solid rgba(255,255,255,.1)" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 8, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                <div style={{ marginTop: 28, padding: 14, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#665c52", marginBottom: 8, letterSpacing: "0.05em", textTransform: "uppercase" }}>
                     Debug / Dev
                   </div>
-                  <pre style={{ fontSize: 11, color: "#cbd5e1", lineHeight: 1.5, whiteSpace: "pre-wrap", margin: 0 }}>
+                  <pre style={{ fontSize: 11, color: "#5f574f", lineHeight: 1.5, whiteSpace: "pre-wrap", margin: 0 }}>
 {JSON.stringify({
   module: bodyIntakeResult.module || "body",
   stage: "intake_completed",

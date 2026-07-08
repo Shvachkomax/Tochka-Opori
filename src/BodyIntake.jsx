@@ -72,43 +72,43 @@ const RED_FLAGS_OPTIONS = [
 
 const s = {
   form: { maxWidth: 680, margin: "0 auto", padding: "0 24px 60px" },
-  heading: { fontSize: 28, fontWeight: 800, marginBottom: 8, letterSpacing: "-0.03em" },
-  subheading: { color: "#94a3b8", fontSize: 15, lineHeight: 1.5, marginBottom: 28 },
+  heading: { fontSize: 28, fontWeight: 800, marginBottom: 8, letterSpacing: "-0.03em", color: "#2f2925" },
+  subheading: { color: "#665c52", fontSize: 15, lineHeight: 1.5, marginBottom: 28 },
   field: { marginBottom: 22 },
-  label: { display: "block", color: "#e2e8f0", fontSize: 15, fontWeight: 600, marginBottom: 6 },
-  optional: { color: "#64748b", fontWeight: 400, fontSize: 12 },
+  label: { display: "block", color: "#5f574f", fontSize: 15, fontWeight: 600, marginBottom: 6 },
+  optional: { color: "#8d8378", fontWeight: 400, fontSize: 12 },
   input: {
     width: "100%", height: 48, padding: "0 16px", borderRadius: 14,
-    border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)",
-    color: "#f1f5f9", fontSize: 16, outline: "none",
-    fontFamily: "inherit",
+    border: "1px solid #d8cec1", background: "#ffffff",
+    color: "#2f2925", fontSize: 16, outline: "none",
+    fontFamily: "inherit", boxSizing: "border-box",
   },
   select: {
     width: "100%", height: 48, padding: "0 16px", borderRadius: 14,
-    border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)",
-    color: "#f1f5f9", fontSize: 16, outline: "none", appearance: "auto",
+    border: "1px solid #d8cec1", background: "#ffffff",
+    color: "#2f2925", fontSize: 16, outline: "none", appearance: "auto", boxSizing: "border-box",
   },
   textarea: {
     width: "100%", minHeight: 100, padding: 14, borderRadius: 14,
-    border: "1px solid rgba(255,255,255,.18)", background: "rgba(255,255,255,.08)",
-    color: "#f1f5f9", fontSize: 16, outline: "none", resize: "vertical",
-    fontFamily: "inherit",
+    border: "1px solid #d8cec1", background: "#ffffff",
+    color: "#2f2925", fontSize: 16, outline: "none", resize: "vertical",
+    fontFamily: "inherit", boxSizing: "border-box",
   },
   checkboxGroup: { display: "flex", flexDirection: "column", gap: 10 },
-  checkboxRow: { display: "flex", alignItems: "center", gap: 10, cursor: "pointer", color: "#e2e8f0", fontSize: 15 },
-  checkbox: { width: 20, height: 20, accentColor: "#3b82f6", flexShrink: 0 },
-  error: { color: "#fca5a5", fontSize: 13, marginTop: 4 },
+  checkboxRow: { display: "flex", alignItems: "center", gap: 10, cursor: "pointer", color: "#5f574f", fontSize: 15 },
+  checkbox: { width: 20, height: 20, accentColor: "#86a08f", flexShrink: 0 },
+  error: { color: "#b5473f", fontSize: 13, marginTop: 4 },
   button: {
-    width: "100%", height: 52, borderRadius: 20, background: "white",
-    color: "#020617", fontWeight: 800, fontSize: 16, border: 0, cursor: "pointer", marginTop: 8,
+    width: "100%", height: 52, borderRadius: 20, background: "#7D9A89",
+    color: "#ffffff", fontWeight: 800, fontSize: 16, border: 0, cursor: "pointer", marginTop: 8,
   },
   buttonDisabled: {
     width: "100%", height: 52, borderRadius: 20,
-    background: "rgba(255,255,255,.12)", color: "#64748b",
+    background: "#c4d0c6", color: "#ffffff",
     fontWeight: 800, fontSize: 16, border: 0, cursor: "not-allowed", marginTop: 8,
   },
-  progressBar: { background: "rgba(255,255,255,.08)", borderRadius: 999, height: 6, marginBottom: 28, overflow: "hidden" },
-  progressFill: { background: "#3b82f6", height: "100%", borderRadius: 999, transition: "width .3s" },
+  progressBar: { background: "#e8e2d8", borderRadius: 999, height: 6, marginBottom: 28, overflow: "hidden" },
+  progressFill: { background: "#86a08f", height: "100%", borderRadius: 999, transition: "width .3s" },
 };
 
 export default function BodyIntake({ onComplete }) {
@@ -209,7 +209,7 @@ export default function BodyIntake({ onComplete }) {
     return (
       <div style={s.field}>
         <label style={s.label}>{FIELD_LABELS[key]}</label>
-        <input style={s.input} type={type} placeholder={placeholder} value={fields[key]} onChange={e => set(key, e.target.value)} />
+        <input className="body-intake-input" style={s.input} type={type} placeholder={placeholder} value={fields[key]} onChange={e => set(key, e.target.value)} />
         {errors[key] && <div style={s.error}>{errors[key]}</div>}
       </div>
     );
@@ -219,7 +219,7 @@ export default function BodyIntake({ onComplete }) {
     return (
       <div style={s.field}>
         <label style={s.label}>{FIELD_LABELS[key]}</label>
-        <select style={{ ...s.select, color: fields[key] ? "#f1f5f9" : "#94a3b8" }} value={fields[key]} onChange={e => set(key, e.target.value)}>
+        <select style={{ ...s.select, color: fields[key] ? "#2f2925" : "#8d8378" }} value={fields[key]} onChange={e => set(key, e.target.value)}>
           <option value="" disabled>{placeholder}</option>
           {options.map(o => <option key={o.value} value={o.value} style={{ color: "#020617" }}>{o.label}</option>)}
         </select>
@@ -230,6 +230,18 @@ export default function BodyIntake({ onComplete }) {
 
   return (
     <form onSubmit={handleSubmit} style={s.form}>
+      <style>{`
+        .body-intake-input:focus,
+        .body-intake-select:focus,
+        .body-intake-textarea:focus {
+          border-color: #86a08f !important;
+          box-shadow: 0 0 0 3px rgba(134,160,143,.18) !important;
+        }
+        .body-intake-input::placeholder,
+        .body-intake-textarea::placeholder {
+          color: #8d8378 !important;
+        }
+      `}</style>
       <h2 style={s.heading}>Давайте познакомимся</h2>
       <p style={s.subheading}>Несколько вопросов, чтобы понять вашу ситуацию. Мы не собираем ФИО и не храним личные данные.</p>
 
@@ -248,7 +260,7 @@ export default function BodyIntake({ onComplete }) {
 
       <div style={s.field}>
         <label style={s.label}>{FIELD_LABELS.work_activity_level}</label>
-        <select style={{ ...s.select, color: fields.work_activity_level ? "#f1f5f9" : "#94a3b8" }} value={fields.work_activity_level} onChange={e => set("work_activity_level", e.target.value)}>
+        <select className="body-intake-select" style={{ ...s.select, color: fields.work_activity_level ? "#2f2925" : "#8d8378" }} value={fields.work_activity_level} onChange={e => set("work_activity_level", e.target.value)}>
           <option value="" disabled>Выберите...</option>
           {ACTIVITY_OPTIONS.map(o => <option key={o.value} value={o.value} style={{ color: "#020617" }}>{o.label}</option>)}
         </select>
@@ -261,7 +273,7 @@ export default function BodyIntake({ onComplete }) {
 
       <div style={s.field}>
         <label style={s.label}>{FIELD_LABELS.health_limitations} <span style={s.optional}>(необязательно)</span></label>
-        <textarea style={s.textarea} value={fields.health_limitations} onChange={e => set("health_limitations", e.target.value)} placeholder="Например: проблемы с коленями, гипертония, диабет..." />
+        <textarea className="body-intake-textarea" style={s.textarea} value={fields.health_limitations} onChange={e => set("health_limitations", e.target.value)} placeholder="Например: проблемы с коленями, гипертония, диабет..." />
       </div>
 
       <div style={s.field}>
@@ -278,7 +290,7 @@ export default function BodyIntake({ onComplete }) {
       </div>
 
       {submitError && (
-        <div style={{ color: "#fca5a5", fontSize: 14, marginTop: 12, lineHeight: 1.5 }}>
+        <div style={{ color: "#b5473f", fontSize: 14, marginTop: 12, lineHeight: 1.5 }}>
           {submitError}
         </div>
       )}
