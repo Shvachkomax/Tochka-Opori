@@ -2627,6 +2627,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const isDedicatedSubdomain = typeof window !== "undefined" && (
     window.location.hostname === "health.tochka-opori.online" || window.location.hostname.startsWith("health.")
   );
+  const isDev = typeof window !== "undefined" && (
+    window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || import.meta.env?.DEV
+  );
+  const showModuleSwitcher = isDev || adminRole === "super";
 
   const s = {
     page: {
@@ -6176,13 +6180,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img
               src="/logo-tochka-opory-header.png"
-              alt="Точка опоры"
+              alt={isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : "Точка опоры"}
               className="app-logo"
               style={{ display: "block", flexShrink: 0, objectFit: "contain", height: 96, width: "auto" }}
             />
             <div>
-              <div style={s.logo}>Точка опоры</div>
-              <div style={s.sub}>Анонимно. Безопасно. Можно просто поговорить.</div>
+              <div style={s.logo}>{isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : "Точка опоры"}</div>
+              <div style={s.sub}>{isDedicatedSubdomain ? "Забота о теле без давления и крайностей." : "Анонимно. Безопасно. Можно просто поговорить."}</div>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -6220,6 +6224,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </button>
               </div>
             )}
+            {!isDedicatedSubdomain && (<>
             <button
               style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
               onClick={() => setExpertModalOpen(true)}
@@ -6232,6 +6237,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             >
               Срочная помощь
             </button>
+            </>)}
           </div>
         </header>
 
@@ -6289,7 +6295,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </button>
             </div>
 
-            {!isDedicatedSubdomain && (
+            {showModuleSwitcher && (
             <div style={{ ...s.row, marginTop: 8, gap: 6 }} className="app-actions">
               <button
                 style={activeModule === "support" ? s.primary : s.secondary}
@@ -6306,7 +6312,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </div>
             )}
 
-            {!isDedicatedSubdomain && (
+            {activeModule === "support" && (
             <div style={s.row} className="app-actions">
               <button
                 style={{ ...s.secondary, marginTop: 8 }}
@@ -6520,16 +6526,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     style={s.textarea}
                     value={text}
                     onChange={(e) => setText(e.target.value)}
-                    placeholder="Например: последние недели плохо сплю, тревожусь, не могу собраться, стало трудно заниматься обычными делами…"
+                    placeholder={isDedicatedSubdomain ? "Например: хочу снизить вес, наладить питание, больше двигаться, лучше спать и понять, с чего начать…" : "Например: последние недели плохо сплю, тревожусь, не могу собраться, стало трудно заниматься обычными делами…"}
                   />
                   <button
                     style={s.wide}
-                    onClick={submitRound}
+                    onClick={isDedicatedSubdomain ? () => setBodyIntakeStage("filling") : submitRound}
                     disabled={loading}
                   >
-                    {loading
+                      {loading
                       ? "Формируем вопросы..."
-                      : "Начать разбор"}
+                      : isDedicatedSubdomain ? "Перейти к анкете" : "Начать разбор"}
                   </button>
                 </>
               ) : phase === "questions" ? (
