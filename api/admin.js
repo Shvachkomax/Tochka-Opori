@@ -31,6 +31,10 @@ export default async function handler(req, res) {
         return await handleListBodyIntake(req, res);
       case "getBodyIntakeDetail":
         return await handleGetBodyIntakeDetail(req, res);
+      case "deleteBodyIntake":
+        return await handleDeleteBodyIntake(req, res);
+      case "restoreBodyIntake":
+        return await handleRestoreBodyIntake(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -53,16 +57,24 @@ async function handleVerify(req, res) {
 }
 
 async function handleListBodyIntake(req, res) {
-  const { password, limit = 50, offset = 0 } = req.body || {};
+  const { password, limit = 50, offset = 0, showDeleted = false } = req.body || {};
   const role = resolveRole(password);
   if (!checkAccess(role, "body")) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
 
   const supabase = getSupabase();
-  const { data, error, count } = await supabase
+  let query = supabase
     .from("body_intake_forms")
-    .select("*", { count: "exact" })
+    .select("*", { count: "exact" });
+
+  if (showDeleted) {
+    query = query.not("deleted_at", "is", null);
+  } else {
+    query = query.is("deleted_at", null);
+  }
+
+  const { data, error, count } = await query
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -96,4 +108,58 @@ async function handleGetBodyIntakeDetail(req, res) {
   }
 
   return res.status(200).json({ ok: true, record: data });
+}
+
+async function handleDeleteBodyIntake(req, res) {
+  const { password, id } = req.body || {};
+  const role = resolveRole(password);
+  if (!checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("body_intake_forms")
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: role,
+    })
+    .eq("id", id);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handleRestoreBodyIntake(req, res) {
+  const { password, id } = req.body || {};
+  const role = resolveRole(password);
+  if (!checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("body_intake_forms")
+    .update({
+      deleted_at: null,
+      deleted_by: null,
+    })
+    .eq("id", id);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.status(200).json({ ok: true });
 }

@@ -323,6 +323,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [bodyIntakeLoading, setBodyIntakeLoading] = useState(false);
   const [bodyIntakeDetail, setBodyIntakeDetail] = useState(null);
   const [bodyIntakeDetailOpen, setBodyIntakeDetailOpen] = useState(false);
+  const [bodyIntakeShowDeleted, setBodyIntakeShowDeleted] = useState(false);
+  const [bodyIntakeDeleteConfirm, setBodyIntakeDeleteConfirm] = useState(null);
 
   // Training table state
   const [trainingSessions, setTrainingSessions] = useState([]);
@@ -1639,6 +1641,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         setAdminAuthed(true);
         setAdminRole(data.role || null);
         if (adminModuleRoute === "body") {
+          setBodyIntakeShowDeleted(false);
           adminLoadBodyIntake();
         } else {
           adminLoadReviews(adminFilter, adminEnv, adminExpertFilter, adminReviewShowTrash);
@@ -1658,7 +1661,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const res = await fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listBodyIntake", password: adminPassword, limit: maxCount }),
+        body: JSON.stringify({ action: "listBodyIntake", password: adminPassword, limit: maxCount, showDeleted: bodyIntakeShowDeleted }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -1690,6 +1693,45 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       }
     } catch {
       showToast("Ошибка загрузки деталей", "error");
+    }
+  }
+
+  async function adminDeleteBodyIntake(id) {
+    setBodyIntakeDeleteConfirm(null);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "deleteBodyIntake", password: adminPassword, id }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Анкета перемещена в корзину", "success");
+        adminLoadBodyIntake();
+      } else {
+        showToast(data.error || "Ошибка удаления", "error");
+      }
+    } catch {
+      showToast("Ошибка удаления", "error");
+    }
+  }
+
+  async function adminRestoreBodyIntake(id) {
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restoreBodyIntake", password: adminPassword, id }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Анкета восстановлена", "success");
+        adminLoadBodyIntake();
+      } else {
+        showToast(data.error || "Ошибка восстановления", "error");
+      }
+    } catch {
+      showToast("Ошибка восстановления", "error");
     }
   }
 
@@ -3914,7 +3956,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             <>
               {/* Body intake admin header */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                <div style={{ fontSize: 20, fontWeight: 700 }}>Body Intake / Анкеты здоровья</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>Опора. Здоровье & Стройность / Админ-панель · Анкеты здоровья</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <button
                     onClick={() => adminLoadBodyIntake()}
@@ -3925,17 +3967,46 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   >
                     Обновить
                   </button>
-                  <a href="/" style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>← На главную</a>
+                  <a href="https://health.tochka-opori.online" style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>← На главную</a>
                 </div>
+              </div>
+
+              {/* Active / Trash toggle */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                    background: !bodyIntakeShowDeleted ? t.tabActive : t.tabBg,
+                    color: !bodyIntakeShowDeleted ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setBodyIntakeShowDeleted(false); setBodyIntakeDetailOpen(false); adminLoadBodyIntake(); }}
+                >
+                  Активные
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                    background: bodyIntakeShowDeleted ? t.tabActive : t.tabBg,
+                    color: bodyIntakeShowDeleted ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setBodyIntakeShowDeleted(true); setBodyIntakeDetailOpen(false); adminLoadBodyIntake(); }}
+                >
+                  Корзина
+                </button>
               </div>
 
               {/* Body intake table */}
               {bodyIntakeLoading ? (
                 <div style={{ textAlign: "center", padding: 40, color: t.muted }}>Загрузка...</div>
-              ) : bodyIntakeRecords.length === 0 ? (
+              ) : bodyIntakeRecords.length === 0 && !bodyIntakeShowDeleted ? (
                 <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
                   <div style={{ fontSize: 18, marginBottom: 8 }}>Пока нет анкет модуля Здоровье & Стройность</div>
                   <div style={{ fontSize: 14 }}>Заполненные intake-анкеты появятся здесь.</div>
+                </div>
+              ) : bodyIntakeRecords.length === 0 && bodyIntakeShowDeleted ? (
+                <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
+                  <div style={{ fontSize: 18, marginBottom: 8 }}>Корзина пуста</div>
+                  <div style={{ fontSize: 14 }}>Удалённых анкет нет.</div>
                 </div>
               ) : (
                 <>
@@ -3950,14 +4021,31 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           border: `1px solid ${t.cardBorder}`, borderRadius: 16, padding: "16px 20px",
                           background: t.cardBg, cursor: "pointer",
                         }}
-                        onClick={() => adminOpenBodyIntakeDetail(rec.id)}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                          <div style={{ fontSize: 13, color: t.muted }}>
-                            {new Date(rec.created_at).toLocaleString("ru-RU")}
+                          <div>
+                            <div style={{ fontSize: 13, color: t.muted }}>
+                              {new Date(rec.created_at).toLocaleString("ru-RU")}
+                            </div>
+                            {/* Enhanced info: name / goal */}
+                            {rec.answers?.user_name && (
+                              <div style={{ fontSize: 14, fontWeight: 600, color: t.text, marginTop: 4 }}>
+                                {rec.answers.user_name}
+                              </div>
+                            )}
+                            {rec.answers?.goal && (
+                              <div style={{ fontSize: 12, color: t.muted, marginTop: 2, fontStyle: "italic" }}>
+                                {rec.answers.goal}
+                              </div>
+                            )}
                           </div>
-                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                             {rec.bmi && <span style={{ fontSize: 13, color: t.muted }}>ИМТ: {rec.bmi}</span>}
+                            {rec.triggered_red_flags?.length > 0 && (
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "rgba(239,68,68,.2)", color: "#fca5a5" }}>
+                                {rec.triggered_red_flags.length} флаг(ов)
+                              </span>
+                            )}
                             {rec.care_recommendation && (
                               <span style={{
                                 fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
@@ -3974,6 +4062,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         </div>
                         <div style={{ fontSize: 12, color: t.muted, marginBottom: 4 }}>
                           session: {rec.session_id || "—"} | version: {rec.version || "—"}
+                          {rec.deleted_at && <> | удалён: {new Date(rec.deleted_at).toLocaleString("ru-RU")}</>}
                         </div>
                         {rec.answers?.user_report && (
                           <div style={{ fontSize: 14, lineHeight: 1.5, color: t.text, marginTop: 4 }}>
@@ -3981,17 +4070,95 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             {(rec.answers.user_report || "").length > 200 ? "..." : ""}
                           </div>
                         )}
-                        {/* Fallback: check top-level user_report if answers haven't been normalized */}
                         {!rec.answers?.user_report && rec.user_report && (
                           <div style={{ fontSize: 14, lineHeight: 1.5, color: t.text, marginTop: 4 }}>
                             {rec.user_report.slice(0, 200)}
                             {rec.user_report.length > 200 ? "..." : ""}
                           </div>
                         )}
+                        {/* Card actions */}
+                        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); adminOpenBodyIntakeDetail(rec.id); }}
+                            style={{
+                              background: t.accent, color: "#fff", border: 0, borderRadius: 8,
+                              padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                            }}
+                          >
+                            Открыть
+                          </button>
+                          {bodyIntakeShowDeleted ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); adminRestoreBodyIntake(rec.id); }}
+                              style={{
+                                background: "transparent", color: t.accent, border: `1px solid ${t.accent}`, borderRadius: 8,
+                                padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              Восстановить
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setBodyIntakeDeleteConfirm(rec.id); }}
+                              style={{
+                                background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 8,
+                                padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              Удалить
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); adminDownloadBodyIntakeJSON(rec); }}
+                            style={{
+                              background: "transparent", color: t.muted, border: `1px solid ${t.border}`, borderRadius: 8,
+                              padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                            }}
+                          >
+                            JSON
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </>
+              )}
+
+              {/* Delete confirmation modal */}
+              {bodyIntakeDeleteConfirm && (
+                <div style={{
+                  position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
+                  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+                }} onClick={() => setBodyIntakeDeleteConfirm(null)}>
+                  <div style={{
+                    background: t.bg, borderRadius: 20, padding: 32, maxWidth: 400, width: "90%",
+                  }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>Удалить анкету?</div>
+                    <div style={{ fontSize: 14, color: t.muted, marginBottom: 24, lineHeight: 1.5 }}>
+                      Анкета будет перемещена в корзину. Вы сможете восстановить её позже.
+                    </div>
+                    <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                      <button
+                        onClick={() => setBodyIntakeDeleteConfirm(null)}
+                        style={{
+                          background: "transparent", color: t.text, border: `1px solid ${t.border}`, borderRadius: 12,
+                          padding: "10px 20px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                        }}
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        onClick={() => adminDeleteBodyIntake(bodyIntakeDeleteConfirm)}
+                        style={{
+                          background: "#ef4444", color: "#fff", border: 0, borderRadius: 12,
+                          padding: "10px 20px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                        }}
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* Body intake detail modal */}
@@ -4005,7 +4172,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     maxHeight: "85vh", overflowY: "auto",
                   }} onClick={(e) => e.stopPropagation()}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
-                      <div style={{ fontSize: 20, fontWeight: 700 }}>Body Intake #{bodyIntakeDetail.id?.slice(0, 8)}</div>
+                      <div style={{ fontSize: 20, fontWeight: 700 }}>Анкета здоровья #{bodyIntakeDetail.id?.slice(0, 8)}</div>
                       <button
                         onClick={() => setBodyIntakeDetailOpen(false)}
                         style={{ background: "none", border: 0, color: t.muted, cursor: "pointer", fontSize: 20 }}
@@ -4019,18 +4186,41 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       <div><strong>session_id:</strong> {bodyIntakeDetail.session_id || "—"}</div>
                       <div><strong>Версия:</strong> {bodyIntakeDetail.version || "—"}</div>
                       <div><strong>ИМТ:</strong> {bodyIntakeDetail.bmi ?? "—"}</div>
-                      <div><strong>care_recommendation:</strong> {bodyIntakeDetail.care_recommendation || "—"}</div>
+                      <div><strong>Рекомендация:</strong> {bodyIntakeDetail.care_recommendation === "urgent_help" ? "Срочная помощь" : bodyIntakeDetail.care_recommendation === "medical_consultation" ? "Консультация врача" : bodyIntakeDetail.care_recommendation === "self_care" ? "Self-care" : bodyIntakeDetail.care_recommendation || "—"}</div>
                       <div><strong>used_fallback:</strong> {bodyIntakeDetail.used_fallback ? "true" : "false"}</div>
                       <div><strong>Красные флаги:</strong> {bodyIntakeDetail.triggered_red_flags?.length ? bodyIntakeDetail.triggered_red_flags.join(", ") : "—"}</div>
-                      <div><strong>red_flag_care_level:</strong> {bodyIntakeDetail.red_flag_care_level || "—"}</div>
-                      {bodyIntakeDetail.model_used && <div><strong>model_used:</strong> {bodyIntakeDetail.model_used}</div>}
+                      <div><strong>Уровень заботы:</strong> {bodyIntakeDetail.red_flag_care_level || "—"}</div>
+                      {bodyIntakeDetail.deleted_at && <div><strong>Удалён:</strong> {new Date(bodyIntakeDetail.deleted_at).toLocaleString("ru-RU")} ({bodyIntakeDetail.deleted_by})</div>}
                     </div>
+
+                    {/* User name and goal */}
+                    {bodyIntakeDetail.answers?.user_name && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Имя / псевдоним</div>
+                        <div style={{ fontSize: 16, color: t.text }}>{bodyIntakeDetail.answers.user_name}</div>
+                      </div>
+                    )}
+                    {bodyIntakeDetail.answers?.goal && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Цель</div>
+                        <div style={{ fontSize: 14, color: t.muted, fontStyle: "italic" }}>{bodyIntakeDetail.answers.goal}</div>
+                      </div>
+                    )}
 
                     {bodyIntakeDetail.answers?.user_report && (
                       <div style={{ marginBottom: 20 }}>
                         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>user_report</div>
                         <div style={{ fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}` }}>
                           {bodyIntakeDetail.answers.user_report}
+                        </div>
+                      </div>
+                    )}
+
+                    {bodyIntakeDetail.care_recommendation && bodyIntakeDetail.answers?.user_report && (
+                      <div style={{ marginBottom: 20, padding: 16, borderRadius: 12, background: bodyIntakeDetail.care_recommendation === "urgent_help" ? "rgba(239,68,68,.1)" : bodyIntakeDetail.care_recommendation === "medical_consultation" ? "rgba(251,191,36,.1)" : "rgba(34,197,94,.1)", border: `1px solid ${t.cardBorder}` }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>Заключение по анкете</div>
+                        <div style={{ fontSize: 14, lineHeight: 1.6, color: t.text, whiteSpace: "pre-wrap" }}>
+                          {bodyIntakeDetail.answers.body_plan?.care_text || bodyIntakeDetail.care_recommendation}
                         </div>
                       </div>
                     )}
@@ -4045,21 +4235,44 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     )}
 
                     <div style={{ marginBottom: 20 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>intake_answers</div>
+                      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>intake_answers (сырые данные)</div>
                       <pre style={{ fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}`, maxHeight: 300, overflowY: "auto", margin: 0 }}>
                         {JSON.stringify(bodyIntakeDetail.answers || {}, null, 2)}
                       </pre>
                     </div>
 
-                    <button
-                      onClick={() => adminDownloadBodyIntakeJSON(bodyIntakeDetail)}
-                      style={{
-                        background: t.accent, color: "#fff", border: 0, borderRadius: 12,
-                        padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", width: "100%",
-                      }}
-                    >
-                      Скачать JSON
-                    </button>
+                    <div style={{ display: "flex", gap: 12 }}>
+                      <button
+                        onClick={() => adminDownloadBodyIntakeJSON(bodyIntakeDetail)}
+                        style={{
+                          background: t.accent, color: "#fff", border: 0, borderRadius: 12,
+                          padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", flex: 1,
+                        }}
+                      >
+                        Скачать JSON
+                      </button>
+                      {bodyIntakeDetail.deleted_at ? (
+                        <button
+                          onClick={() => { adminRestoreBodyIntake(bodyIntakeDetail.id); setBodyIntakeDetailOpen(false); }}
+                          style={{
+                            background: "transparent", color: t.accent, border: `1px solid ${t.accent}`, borderRadius: 12,
+                            padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                          }}
+                        >
+                          Восстановить
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => { setBodyIntakeDetailOpen(false); setBodyIntakeDeleteConfirm(bodyIntakeDetail.id); }}
+                          style={{
+                            background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 12,
+                            padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                          }}
+                        >
+                          Удалить
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
