@@ -1,7 +1,7 @@
 import { getSupabase } from "../lib/supabase.js";
 import { createClient } from "@supabase/supabase-js";
 import { maskSensitiveData, getPrivacySafeMode, maskText } from "../lib/sanitize.js";
-import { runTextAnalysis } from "../lib/aiClient.js";
+import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
 import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback } from "../lib/conversation.js";
 import { readFileSync, existsSync } from "node:fs";
 
@@ -1776,7 +1776,7 @@ async function handleGenerateQualityInsight(req, res) {
 
     let result;
     try {
-      result = await runTextAnalysis({
+      result = await runTask(TASK_TYPES.QUALITY_REVIEW, {
         systemPrompt,
         userPrompt,
         model: qualityModel,

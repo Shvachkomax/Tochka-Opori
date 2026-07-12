@@ -1,4 +1,4 @@
-import { runTextAnalysis } from "../lib/aiClient.js";
+import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
 import { getModule, isValidModule, DEFAULT_MODULE } from "../lib/modules.js";
 import { readModulePrompt, readCorePrompt } from "../lib/prompts.js";
 
@@ -152,7 +152,7 @@ ${violations.join("\n")}
 { "user_report": "исправленный текст" }`;
 
   try {
-    const result = await runTextAnalysis({
+    const result = await runTask(TASK_TYPES.PROMPT_REPAIR, {
       systemPrompt: "Ты — редактор отчётов для психологического сервиса. Исправляй user_report согласно инструкции.",
       userPrompt: repairPrompt,
       model: process.env.AI_MODEL_TRIAGE || "gpt-4.1-mini",
@@ -309,7 +309,7 @@ ${violations.join("\n")}
 { "care_recommendation": { "level": "...", "timeframe": "...", "specialist_types": [], "reasons": [], "interim_support": [], "urgent_triggers": [] } }`;
 
   try {
-    const result = await runTextAnalysis({
+    const result = await runTask(TASK_TYPES.PROMPT_REPAIR, {
       systemPrompt: "Ты — редактор маршрутизации помощи. Исправляй care_recommendation согласно инструкции.",
       userPrompt: repairPrompt,
       model: process.env.AI_MODEL_TRIAGE || "gpt-4.1-mini",
@@ -359,7 +359,7 @@ function calcBMI(heightCm, weightKg) {
   return Math.round((w / ((h / 100) * (h / 100))) * 10) / 10;
 }
 
-async function trySaveIntake(intake, bmi, careLevel) {
+async function trySaveIntake(intake, bmi, careLevel, routerMeta) {
   try {
     const { getSupabase } = await import("../lib/supabase.js");
     const supabase = getSupabase();
@@ -372,6 +372,11 @@ async function trySaveIntake(intake, bmi, careLevel) {
       answers,
       bmi: bmi ?? null,
       care_recommendation: careLevel || null,
+      provider: routerMeta?.provider || null,
+      ai_model: routerMeta?.model_used || null,
+      task_type: routerMeta?.task_type || null,
+      router_version: routerMeta?.router_version || null,
+      request_duration_ms: routerMeta?.request_duration || null,
     };
     await supabase.from("body_intake_forms").insert(payload);
   } catch (err) {
@@ -457,7 +462,7 @@ ${conversationStyle}
     const MODEL_FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
     const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
 
-    const result = await runTextAnalysis({
+    const result = await runTask(TASK_TYPES.BODY_INTAKE, {
       systemPrompt,
       userPrompt,
       model: MODEL_TRIAGE,
@@ -504,7 +509,7 @@ ${conversationStyle}
     }
 
     // Save intake with care recommendation (non-blocking)
-    trySaveIntake(intake, bmi, careLevel);
+    trySaveIntake(intake, bmi, careLevel, result);
 
     return res.status(200).json({
       type: "intake_analysis",
@@ -517,6 +522,9 @@ ${conversationStyle}
       used_fallback: !!result.fallback_used,
       model_used: result.model_used,
       fallback_used: result.fallback_used,
+      provider: result.provider,
+      task_type: result.task_type,
+      request_duration: result.request_duration,
       module: "body",
       intake_answers: intake,
     });
@@ -919,7 +927,7 @@ ${antiRepeatBlock}
   const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
 
   try {
-    const result = await runTextAnalysis({
+    const result = await runTask(TASK_TYPES.PATIENT_DIALOG, {
       systemPrompt,
       userPrompt,
       model: MODEL_TRIAGE,
@@ -952,6 +960,9 @@ ${antiRepeatBlock}
         questions: parsed.questions.filter(Boolean).slice(0, 7),
         model_used: modelUsed,
         fallback_used: fallbackUsed,
+        provider: result.provider,
+        task_type: result.task_type,
+        request_duration: result.request_duration,
         module: activeModule,
       });
     }
@@ -1104,6 +1115,9 @@ ${antiRepeatBlock}
       report,
       model_used: modelUsed,
       fallback_used: fallbackUsed,
+      provider: result.provider,
+      task_type: result.task_type,
+      request_duration: result.request_duration,
       module: activeModule,
       care_recommendation: careRec,
       _debug: debugInfo,
