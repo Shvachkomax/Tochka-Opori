@@ -592,10 +592,26 @@ async function handleDailyLogAnalysis(req, res) {
     const { getSupabase } = await import("../lib/supabase.js");
     const supabase = getSupabase();
 
-    await supabase.from("body_daily_logs").insert({
-      session_id,
-      ...daily_log,
-    });
+    const ALLOWED_COLS = [
+      "session_id", "module", "log_date",
+      "weight_kg", "waist_cm",
+      "steps", "activity_comment",
+      "workout_done", "workout_type", "workout_minutes", "workout_intensity", "workout_comment",
+      "calories", "meals_count", "breakfast", "lunch", "dinner", "snacks", "nutrition_comment",
+      "overeating_level", "sweet_cravings",
+      "water_l", "sleep_hours", "sleep_quality",
+      "energy_level", "mood_level",
+      "day_text", "voice_transcript",
+      "plate_photos",
+    ];
+    const safeLog = { session_id, module: "body" };
+    for (const key of ALLOWED_COLS) {
+      if (daily_log[key] !== undefined) {
+        safeLog[key] = daily_log[key];
+      }
+    }
+
+    await supabase.from("body_daily_logs").insert(safeLog);
 
     try {
       const { data: existing } = await supabase

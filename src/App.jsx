@@ -4768,7 +4768,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
                     {/* Nutrition */}
                     <Section title="Питание">
-                      <Field label="Приёмов пищи" value={bodyDiaryDetail.meal_count ?? "—"} />
+                      <Field label="Приёмов пищи" value={bodyDiaryDetail.meals_count ?? "—"} />
                       <Field label="Калории (оценка)" value={bodyDiaryDetail.calories ? `${bodyDiaryDetail.calories} ккал` : "—"} />
                       <Field label="Переедание" value={{
                         none: "Нет",
@@ -4777,8 +4777,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         severe: "Выраженно",
                       }[bodyDiaryDetail.overeating_level] || bodyDiaryDetail.overeating_level || "—"} />
                       <Field label="Тяга к сладкому" value={bodyDiaryDetail.sweet_cravings || "—"} />
-                      {bodyDiaryDetail.nutrition_notes && (
-                        <Field label="Заметки о питании" value={bodyDiaryDetail.nutrition_notes} />
+                      {bodyDiaryDetail.nutrition_comment && (
+                        <Field label="Заметки о питании" value={bodyDiaryDetail.nutrition_comment} />
                       )}
                     </Section>
 
@@ -4793,22 +4793,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         excellent: "Отличное",
                       }[bodyDiaryDetail.sleep_quality] || bodyDiaryDetail.sleep_quality || "—"} />
                       <Field label="Уровень энергии" value={bodyDiaryDetail.energy_level ? `${bodyDiaryDetail.energy_level}/10` : "—"} />
-                      <Field label="Настроение" value={{
-                        very_bad: "Очень плохое",
-                        bad: "Плохое",
-                        neutral: "Нейтральное",
-                        good: "Хорошее",
-                        very_good: "Отличное",
-                      }[bodyDiaryDetail.mood] || bodyDiaryDetail.mood || "—"} />
+                      <Field label="Настроение" value={bodyDiaryDetail.mood_level ? `${bodyDiaryDetail.mood_level}/10` : "—"} />
                       {bodyDiaryDetail.health_notes && (
                         <Field label="Заметки о самочувствии" value={bodyDiaryDetail.health_notes} />
                       )}
                     </Section>
 
                     {/* Water */}
-                    {bodyDiaryDetail.water_glasses && (
+                    {bodyDiaryDetail.water_l != null && (
                       <Section title="Вода">
-                        <Field label="Стаканов воды" value={`${bodyDiaryDetail.water_glasses} шт.`} />
+                        <Field label="Воды, литры" value={`${bodyDiaryDetail.water_l} л`} />
                       </Section>
                     )}
 
