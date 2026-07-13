@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback, buildConversationPairs } from "../lib/conversation.js";
 import BodyIntake from "./BodyIntake.jsx";
+import BodyDiary from "./BodyDiary.jsx";
 
 export default function App() {
   const [mode, setMode] = useState("text");
@@ -343,6 +344,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [bodyIntakeSourceFilter, setBodyIntakeSourceFilter] = useState("all");
 
   const [bodyCodeCopied, setBodyCodeCopied] = useState(false);
+
+  // Body diary state
+  const [bodyDiarySessionId, setBodyDiarySessionId] = useState(null);
+  const [bodyDiaryOpen, setBodyDiaryOpen] = useState(false);
+  const [bodyDiaryResult, setBodyDiaryResult] = useState(null);
+  const [bodyDiaryRecords, setBodyDiaryRecords] = useState([]);
+  const [bodyDiaryLoading, setBodyDiaryLoading] = useState(false);
+  const [bodyDiaryDetail, setBodyDiaryDetail] = useState(null);
+  const [bodyDiaryDetailOpen, setBodyDiaryDetailOpen] = useState(false);
+  const [bodyDiarySessionFilter, setBodyDiarySessionFilter] = useState("");
+  const [bodyAdminTab, setBodyAdminTab] = useState("intake"); // intake | diary | trash
 
   // Restore body intake result from localStorage
   const [savedBodyResult, setSavedBodyResult] = useState(() => {
@@ -1814,6 +1826,67 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     a.download = `body-intake-${record.id || "unknown"}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function adminLoadBodyDailyLogs(maxCount = 50) {
+    setBodyDiaryLoading(true);
+    try {
+      const body = { action: "listBodyDailyLogs", password: adminPassword, limit: maxCount };
+      if (bodyDiarySessionFilter) body.session_id = bodyDiarySessionFilter;
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setBodyDiaryRecords(data.records || []);
+      } else {
+        showToast(data.error || "Ошибка загрузки дневников", "error");
+      }
+    } catch {
+      showToast("Ошибка загрузки дневников", "error");
+    } finally {
+      setBodyDiaryLoading(false);
+    }
+  }
+
+  async function adminOpenBodyDailyLogDetail(id) {
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getBodyDailyLogDetail", password: adminPassword, id }),
+      });
+      const data = await res.json();
+      if (data.ok && data.record) {
+        setBodyDiaryDetail(data.record);
+        setBodyDiaryDetailOpen(true);
+      } else {
+        showToast(data.error || "Ошибка загрузки дневника", "error");
+      }
+    } catch {
+      showToast("Ошибка загрузки дневника", "error");
+    }
+  }
+
+  async function adminDeleteBodyDailyLog(id) {
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "deleteBodyDailyLog", password: adminPassword, id }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Запись удалена", "success");
+        adminLoadBodyDailyLogs();
+      } else {
+        showToast(data.error || "Ошибка удаления", "error");
+      }
+    } catch {
+      showToast("Ошибка удаления", "error");
+    }
   }
 
   async function loadTrainingSessions() {
@@ -4027,32 +4100,32 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </div>
               </div>
 
-              {/* Active / Trash toggle */}
+              {/* Tabs: Анкеты | Дневники | Корзина */}
               <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                <button
-                  style={{
-                    border: 0, borderRadius: 14, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer",
-                    background: !bodyIntakeShowDeleted ? t.tabActive : t.tabBg,
-                    color: !bodyIntakeShowDeleted ? t.tabActiveText : t.text,
-                  }}
-                  onClick={() => { setBodyIntakeShowDeleted(false); setBodyIntakeDetailOpen(false); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }}
-                >
-                  Активные
-                </button>
-                <button
-                  style={{
-                    border: 0, borderRadius: 14, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer",
-                    background: bodyIntakeShowDeleted ? t.tabActive : t.tabBg,
-                    color: bodyIntakeShowDeleted ? t.tabActiveText : t.text,
-                  }}
-                  onClick={() => { setBodyIntakeShowDeleted(true); setBodyIntakeDetailOpen(false); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }}
-                >
-                  Корзина
-                </button>
+                {["intake", "diary", "trash"].map(tab => (
+                  <button
+                    key={tab}
+                    style={{
+                      border: 0, borderRadius: 14, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                      background: bodyAdminTab === tab ? t.tabActive : t.tabBg,
+                      color: bodyAdminTab === tab ? t.tabActiveText : t.text,
+                    }}
+                    onClick={() => {
+                      setBodyAdminTab(tab);
+                      setBodyIntakeDetailOpen(false);
+                      setBodyDiaryDetailOpen(false);
+                      if (tab === "intake") { setBodyIntakeShowDeleted(false); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }
+                      else if (tab === "trash") { setBodyIntakeShowDeleted(true); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }
+                      else if (tab === "diary") { adminLoadBodyDailyLogs(); }
+                    }}
+                  >
+                    {tab === "intake" ? "Анкеты" : tab === "diary" ? "Дневники" : "Корзина"}
+                  </button>
+                ))}
               </div>
 
-              {/* Source filter tabs (only for active view) */}
-              {!bodyIntakeShowDeleted && (
+              {/* Source filter tabs (only for intake tab) */}
+              {bodyAdminTab === "intake" && (
                 <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
                   {[
                     { key: "all", label: "Все" },
@@ -4076,141 +4149,255 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </div>
               )}
 
-              {/* Body intake table */}
-              {bodyIntakeLoading ? (
-                <div style={{ textAlign: "center", padding: 40, color: t.muted }}>Загрузка...</div>
-              ) : bodyIntakeRecords.length === 0 && !bodyIntakeShowDeleted ? (
-                <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
-                  <div style={{ fontSize: 18, marginBottom: 8 }}>Пока нет анкет модуля Здоровье & Стройность</div>
-                  <div style={{ fontSize: 14 }}>Заполненные intake-анкеты появятся здесь.</div>
-                </div>
-              ) : bodyIntakeRecords.length === 0 && bodyIntakeShowDeleted ? (
-                <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
-                  <div style={{ fontSize: 18, marginBottom: 8 }}>Корзина пуста</div>
-                  <div style={{ fontSize: 14 }}>Удалённых анкет нет.</div>
-                </div>
-              ) : (
-                <>
-                  <div style={{ fontSize: 13, color: t.muted, marginBottom: 12 }}>
-                    Всего записей: {bodyIntakeTotal}
+              {/* Body intake table (intake or trash tab) */}
+              {(bodyAdminTab === "intake" || bodyAdminTab === "trash") && (
+                bodyIntakeLoading ? (
+                  <div style={{ textAlign: "center", padding: 40, color: t.muted }}>Загрузка...</div>
+                ) : bodyIntakeRecords.length === 0 && !bodyIntakeShowDeleted ? (
+                  <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
+                    <div style={{ fontSize: 18, marginBottom: 8 }}>Пока нет анкет модуля Здоровье & Стройность</div>
+                    <div style={{ fontSize: 14 }}>Заполненные intake-анкеты появятся здесь.</div>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {bodyIntakeRecords.map((rec) => {
-                      const answers = rec.answers || {};
-                      const client = rec.client || {};
-                      const careLevel = typeof rec.care_recommendation === "object"
-                        ? rec.care_recommendation.level
-                        : rec.care_recommendation;
-                      const sourceLabel = {
-                        alena_client: "Алена",
-                        self_signup: "Самост.",
-                        specialist_referral: "Направление",
-                        test: "Тест",
-                      }[rec.source] || rec.source || "—";
-                      const sourceColor = {
-                        alena_client: "#86a08f",
-                        self_signup: "#8d8378",
-                        specialist_referral: "#b8946e",
-                        test: "#a0a0a0",
-                      }[rec.source] || "#8d8378";
-                      return (
-                      <div
-                        key={rec.id}
-                        style={{
-                          border: `1px solid ${t.cardBorder}`, borderRadius: 16, padding: "16px 20px",
-                          background: t.cardBg, cursor: "pointer",
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                            <span style={{ fontSize: 13, color: t.muted }}>
-                              {new Date(rec.created_at).toLocaleString("ru-RU")}
-                            </span>
-                            <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${sourceColor}22`, color: sourceColor }}>
-                              {sourceLabel}
-                            </span>
-                            {rec.specialist_name && (
-                              <span style={{ fontSize: 12, color: t.muted, fontStyle: "italic" }}>
-                                → {rec.specialist_name}
+                ) : bodyIntakeRecords.length === 0 && bodyIntakeShowDeleted ? (
+                  <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
+                    <div style={{ fontSize: 18, marginBottom: 8 }}>Корзина пуста</div>
+                    <div style={{ fontSize: 14 }}>Удалённых анкет нет.</div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 13, color: t.muted, marginBottom: 12 }}>
+                      Всего записей: {bodyIntakeTotal}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {bodyIntakeRecords.map((rec) => {
+                        const answers = rec.answers || {};
+                        const client = rec.client || {};
+                        const careLevel = typeof rec.care_recommendation === "object"
+                          ? rec.care_recommendation.level
+                          : rec.care_recommendation;
+                        const sourceLabel = {
+                          alena_client: "Алена",
+                          self_signup: "Самост.",
+                          specialist_referral: "Направление",
+                          test: "Тест",
+                        }[rec.source] || rec.source || "—";
+                        const sourceColor = {
+                          alena_client: "#86a08f",
+                          self_signup: "#8d8378",
+                          specialist_referral: "#b8946e",
+                          test: "#a0a0a0",
+                        }[rec.source] || "#8d8378";
+                        return (
+                        <div
+                          key={rec.id}
+                          style={{
+                            border: `1px solid ${t.cardBorder}`, borderRadius: 16, padding: "16px 20px",
+                            background: t.cardBg, cursor: "pointer",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 13, color: t.muted }}>
+                                {new Date(rec.created_at).toLocaleString("ru-RU")}
                               </span>
-                            )}
-                          </div>
-                          <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
-                            {rec.triggered_red_flags?.length > 0 && (
-                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "rgba(239,68,68,.2)", color: "#fca5a5" }}>
-                                {rec.triggered_red_flags.length} флаг
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${sourceColor}22`, color: sourceColor }}>
+                                {sourceLabel}
                               </span>
-                            )}
-                            {careLevel && (
-                              <span style={{
-                                fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
-                                background: careLevel === "urgent_help" ? "rgba(239,68,68,.2)" :
-                                  careLevel === "medical_consultation" ? "rgba(251,191,36,.2)" : "rgba(34,197,94,.2)",
-                                color: careLevel === "urgent_help" ? "#fca5a5" :
-                                  careLevel === "medical_consultation" ? "#fde68a" : "#bbf7d0",
-                              }}>
-                                {careLevel === "urgent_help" ? "Срочно" :
-                                 careLevel === "medical_consultation" ? "Врач" : "Self-care"}
-                              </span>
-                            )}
+                              {rec.specialist_name && (
+                                <span style={{ fontSize: 12, color: t.muted, fontStyle: "italic" }}>
+                                  → {rec.specialist_name}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+                              {rec.triggered_red_flags?.length > 0 && (
+                                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "rgba(239,68,68,.2)", color: "#fca5a5" }}>
+                                  {rec.triggered_red_flags.length} флаг
+                                </span>
+                              )}
+                              {careLevel && (
+                                <span style={{
+                                  fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                                  background: careLevel === "urgent_help" ? "rgba(239,68,68,.2)" :
+                                    careLevel === "medical_consultation" ? "rgba(251,191,36,.2)" : "rgba(34,197,94,.2)",
+                                  color: careLevel === "urgent_help" ? "#fca5a5" :
+                                    careLevel === "medical_consultation" ? "#fde68a" : "#bbf7d0",
+                                }}>
+                                  {careLevel === "urgent_help" ? "Срочно" :
+                                   careLevel === "medical_consultation" ? "Врач" : "Self-care"}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
 
-                        {/* Name + Goal */}
-                        <div style={{ fontSize: 15, fontWeight: 600, color: t.text }}>
-                          {answers.display_name || client.display_name || "Без имени"}
-                        </div>
-                        {answers.goal && (
-                          <div style={{ fontSize: 12, color: t.muted, marginTop: 1, fontStyle: "italic" }}>
-                            Цель: {answers.goal}
+                          <div style={{ fontSize: 15, fontWeight: 600, color: t.text }}>
+                            {answers.display_name || client.display_name || "Без имени"}
                           </div>
-                        )}
+                          {answers.goal && (
+                            <div style={{ fontSize: 12, color: t.muted, marginTop: 1, fontStyle: "italic" }}>
+                              Цель: {answers.goal}
+                            </div>
+                          )}
 
-                        {/* Continuation code */}
-                        {rec.session_id && (
-                          <div style={{ fontSize: 12, color: t.muted, marginTop: 4, fontFamily: "monospace" }}>
-                            Код: {rec.session_id}
-                          </div>
-                        )}
+                          {rec.session_id && (
+                            <div style={{ fontSize: 12, color: t.muted, marginTop: 4, fontFamily: "monospace" }}>
+                              Код: {rec.session_id}
+                            </div>
+                          )}
 
-                        {/* User report preview */}
-                        {(rec.user_report || answers.user_report) && (
-                          <div style={{ fontSize: 13, lineHeight: 1.5, color: t.text, marginTop: 6 }}>
-                            {(rec.user_report || answers.user_report || "").slice(0, 200)}
-                            {(rec.user_report || answers.user_report || "").length > 200 ? "..." : ""}
-                          </div>
-                        )}
+                          {(rec.user_report || answers.user_report) && (
+                            <div style={{ fontSize: 13, lineHeight: 1.5, color: t.text, marginTop: 6 }}>
+                              {(rec.user_report || answers.user_report || "").slice(0, 200)}
+                              {(rec.user_report || answers.user_report || "").length > 200 ? "..." : ""}
+                            </div>
+                          )}
 
-                        {rec.deleted_at && (
-                          <div style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>
-                            Удалён: {new Date(rec.deleted_at).toLocaleString("ru-RU")} ({rec.deleted_by})
-                          </div>
-                        )}
+                          {rec.deleted_at && (
+                            <div style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>
+                              Удалён: {new Date(rec.deleted_at).toLocaleString("ru-RU")} ({rec.deleted_by})
+                            </div>
+                          )}
 
-                        {/* Card actions */}
-                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); adminOpenBodyIntakeDetail(rec.id); }}
-                            style={{
-                              background: t.accent, color: "#fff", border: 0, borderRadius: 8,
-                              padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                            }}
-                          >
-                            Открыть
-                          </button>
-                          {bodyIntakeShowDeleted ? (
+                          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                             <button
-                              onClick={(e) => { e.stopPropagation(); adminRestoreBodyIntake(rec.id); }}
+                              onClick={(e) => { e.stopPropagation(); adminOpenBodyIntakeDetail(rec.id); }}
                               style={{
-                                background: "transparent", color: t.accent, border: `1px solid ${t.accent}`, borderRadius: 8,
+                                background: t.accent, color: "#fff", border: 0, borderRadius: 8,
                                 padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
                               }}
                             >
-                              Восстановить
+                              Открыть
                             </button>
-                          ) : (
+                            {bodyIntakeShowDeleted ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); adminRestoreBodyIntake(rec.id); }}
+                                style={{
+                                  background: "transparent", color: t.accent, border: `1px solid ${t.accent}`, borderRadius: 8,
+                                  padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                                }}
+                              >
+                                Восстановить
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setBodyIntakeDeleteConfirm(rec.id); }}
+                                style={{
+                                  background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 8,
+                                  padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                                }}
+                              >
+                                Удалить
+                              </button>
+                            )}
                             <button
-                              onClick={(e) => { e.stopPropagation(); setBodyIntakeDeleteConfirm(rec.id); }}
+                              onClick={(e) => { e.stopPropagation(); adminDownloadBodyIntakeJSON(rec); }}
+                              style={{
+                                background: "transparent", color: t.muted, border: `1px solid ${t.border}`, borderRadius: 8,
+                                padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              JSON
+                            </button>
+                          </div>
+                        </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )
+              )}
+
+              {/* Body daily logs table (diary tab) */}
+              {bodyAdminTab === "diary" && (
+                <>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
+                    <input
+                      type="text"
+                      placeholder="Фильтр по session_id"
+                      value={bodyDiarySessionFilter}
+                      onChange={(e) => setBodyDiarySessionFilter(e.target.value)}
+                      style={{
+                        flex: 1, height: 36, padding: "0 12px", borderRadius: 8,
+                        border: `1px solid ${t.border}`, background: t.inputBg, color: t.inputText,
+                        fontSize: 13, outline: "none", fontFamily: "monospace",
+                      }}
+                    />
+                    <button
+                      onClick={() => adminLoadBodyDailyLogs()}
+                      style={{
+                        height: 36, padding: "0 14px", borderRadius: 8, border: 0,
+                        background: t.tabBg, color: t.text, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                      }}
+                    >
+                      Поиск
+                    </button>
+                    <button
+                      onClick={() => { setBodyDiarySessionFilter(""); adminLoadBodyDailyLogs(); }}
+                      style={{
+                        height: 36, padding: "0 14px", borderRadius: 8, border: `1px solid ${t.border}`,
+                        background: "transparent", color: t.muted, fontWeight: 500, fontSize: 13, cursor: "pointer",
+                      }}
+                    >
+                      Сбросить
+                    </button>
+                  </div>
+
+                  {bodyDiaryLoading ? (
+                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>Загрузка...</div>
+                  ) : bodyDiaryRecords.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
+                      <div style={{ fontSize: 18, marginBottom: 8 }}>Дневников пока нет</div>
+                      <div style={{ fontSize: 14 }}>Записи дневника появятся здесь после того, как клиенты начнут их заполнять.</div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {bodyDiaryRecords.map((rec) => (
+                        <div
+                          key={rec.id}
+                          style={{
+                            border: `1px solid ${t.cardBorder}`, borderRadius: 16, padding: "14px 18px",
+                            background: t.cardBg,
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                            <div style={{ fontSize: 13, color: t.muted }}>
+                              {rec.log_date} {rec.created_at ? new Date(rec.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : ""}
+                            </div>
+                            <div style={{ fontSize: 12, color: t.muted, fontFamily: "monospace" }}>
+                              {rec.session_id?.slice(0, 12)}…
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: t.text, marginBottom: 4 }}>
+                            Шаги: {rec.steps ?? "—"} | Тренировка: {rec.workout_done ? rec.workout_type || "да" : "нет"} | Калории: {rec.calories ?? "—"}
+                          </div>
+                          {rec.overeating_level && (
+                            <div style={{ fontSize: 12, color: t.muted }}>
+                              Переедание: {rec.overeating_level === "severe" ? "выраженно" : rec.overeating_level === "slight" ? "немного" : rec.overeating_level}
+                              {rec.sweet_cravings ? ` | Тяга: ${rec.sweet_cravings}` : ""}
+                            </div>
+                          )}
+                          {rec.sleep_hours && (
+                            <div style={{ fontSize: 12, color: t.muted }}>
+                              Сон: {rec.sleep_hours} ч | Энергия: {rec.energy_level ?? "—"}/10
+                            </div>
+                          )}
+                          {rec.ai_day_summary && (
+                            <div style={{ fontSize: 13, color: t.text, marginTop: 4, lineHeight: 1.5, fontStyle: "italic" }}>
+                              {rec.ai_day_summary.slice(0, 150)}{rec.ai_day_summary.length > 150 ? "..." : ""}
+                            </div>
+                          )}
+                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                            <button
+                              onClick={() => adminOpenBodyDailyLogDetail(rec.id)}
+                              style={{
+                                background: t.accent, color: "#fff", border: 0, borderRadius: 8,
+                                padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              Открыть
+                            </button>
+                            <button
+                              onClick={() => adminDeleteBodyDailyLog(rec.id)}
                               style={{
                                 background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 8,
                                 padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
@@ -4218,21 +4405,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             >
                               Удалить
                             </button>
-                          )}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); adminDownloadBodyIntakeJSON(rec); }}
-                            style={{
-                              background: "transparent", color: t.muted, border: `1px solid ${t.border}`, borderRadius: 8,
-                              padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                            }}
-                          >
-                            JSON
-                          </button>
+                          </div>
                         </div>
-                      </div>
-                      );
-                    })}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
 
@@ -4552,6 +4729,143 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         </button>
                       )}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Body diary detail modal */}
+              {bodyDiaryDetailOpen && bodyDiaryDetail && (
+                <div style={{
+                  position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
+                  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+                }} onClick={() => setBodyDiaryDetailOpen(false)}>
+                  <div style={{
+                    background: t.bg, borderRadius: 20, padding: 32, maxWidth: 640, width: "90%",
+                    maxHeight: "85vh", overflowY: "auto",
+                  }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20, alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>Запись дневника</div>
+                        <div style={{ fontSize: 14, color: t.muted, fontFamily: "monospace", fontWeight: 600, marginTop: 2 }}>
+                          {bodyDiaryDetail.session_id} · {bodyDiaryDetail.log_date}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setBodyDiaryDetailOpen(false)}
+                        style={{ background: "none", border: 0, color: t.muted, cursor: "pointer", fontSize: 20 }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Activity */}
+                    <Section title="Активность">
+                      <Field label="Шаги" value={bodyDiaryDetail.steps ?? "—"} />
+                      <Field label="Тренировка" value={bodyDiaryDetail.workout_done ? (bodyDiaryDetail.workout_type || "Да") : "Нет"} />
+                      <Field label="Интенсивность" value={bodyDiaryDetail.workout_intensity || "—"} />
+                      <Field label="Минут активности" value={bodyDiaryDetail.activity_minutes ?? "—"} />
+                    </Section>
+
+                    {/* Nutrition */}
+                    <Section title="Питание">
+                      <Field label="Приёмов пищи" value={bodyDiaryDetail.meal_count ?? "—"} />
+                      <Field label="Калории (оценка)" value={bodyDiaryDetail.calories ? `${bodyDiaryDetail.calories} ккал` : "—"} />
+                      <Field label="Переедание" value={{
+                        none: "Нет",
+                        slight: "Немного",
+                        moderate: "Умеренно",
+                        severe: "Выраженно",
+                      }[bodyDiaryDetail.overeating_level] || bodyDiaryDetail.overeating_level || "—"} />
+                      <Field label="Тяга к сладкому" value={bodyDiaryDetail.sweet_cravings || "—"} />
+                      {bodyDiaryDetail.nutrition_notes && (
+                        <Field label="Заметки о питании" value={bodyDiaryDetail.nutrition_notes} />
+                      )}
+                    </Section>
+
+                    {/* Sleep & Health */}
+                    <Section title="Сон и самочувствие">
+                      <Field label="Часов сна" value={bodyDiaryDetail.sleep_hours ? `${bodyDiaryDetail.sleep_hours} ч` : "—"} />
+                      <Field label="Качество сна" value={{
+                        terrible: "Ужасное",
+                        poor: "Плохое",
+                        average: "Среднее",
+                        good: "Хорошее",
+                        excellent: "Отличное",
+                      }[bodyDiaryDetail.sleep_quality] || bodyDiaryDetail.sleep_quality || "—"} />
+                      <Field label="Уровень энергии" value={bodyDiaryDetail.energy_level ? `${bodyDiaryDetail.energy_level}/10` : "—"} />
+                      <Field label="Настроение" value={{
+                        very_bad: "Очень плохое",
+                        bad: "Плохое",
+                        neutral: "Нейтральное",
+                        good: "Хорошее",
+                        very_good: "Отличное",
+                      }[bodyDiaryDetail.mood] || bodyDiaryDetail.mood || "—"} />
+                      {bodyDiaryDetail.health_notes && (
+                        <Field label="Заметки о самочувствии" value={bodyDiaryDetail.health_notes} />
+                      )}
+                    </Section>
+
+                    {/* Water */}
+                    {bodyDiaryDetail.water_glasses && (
+                      <Section title="Вода">
+                        <Field label="Стаканов воды" value={`${bodyDiaryDetail.water_glasses} шт.`} />
+                      </Section>
+                    )}
+
+                    {/* AI Summary */}
+                    {bodyDiaryDetail.ai_day_summary && (
+                      <Section title="AI-итог дня">
+                        <div style={{
+                          fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap",
+                          background: t.cardBg, padding: 14, borderRadius: 12,
+                          border: `1px solid ${t.cardBorder}`,
+                        }}>
+                          {bodyDiaryDetail.ai_day_summary}
+                        </div>
+                      </Section>
+                    )}
+
+                    {/* Voice transcript */}
+                    {bodyDiaryDetail.voice_transcript && (
+                      <Section title="Голосовой ввод (расшифровка)">
+                        <div style={{
+                          fontSize: 13, lineHeight: 1.5, fontStyle: "italic", color: t.muted,
+                          background: t.cardBg, padding: 14, borderRadius: 12,
+                          border: `1px solid ${t.cardBorder}`,
+                        }}>
+                          {bodyDiaryDetail.voice_transcript}
+                        </div>
+                      </Section>
+                    )}
+
+                    {/* Plate photos */}
+                    {bodyDiaryDetail.plate_photos?.length > 0 && (
+                      <Section title="Фото тарелок">
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {bodyDiaryDetail.plate_photos.map((photo, i) => (
+                            <img
+                              key={i}
+                              src={photo}
+                              alt={`Фото тарелки ${i + 1}`}
+                              style={{
+                                width: 120, height: 120, borderRadius: 12,
+                                objectFit: "cover", border: `1px solid ${t.cardBorder}`,
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </Section>
+                    )}
+
+                    {/* Raw JSON (technical) */}
+                    <details style={{ marginBottom: 16 }}>
+                      <summary style={{ cursor: "pointer", fontSize: 13, color: t.muted, fontWeight: 600, padding: 8, borderRadius: 8, background: t.cardBg }}>
+                        Технические данные
+                      </summary>
+                      <pre style={{ fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}`, maxHeight: 300, overflowY: "auto", margin: 0 }}>
+                        {JSON.stringify(bodyDiaryDetail, null, 2)}
+                      </pre>
+                    </details>
                   </div>
                 </div>
               )}
@@ -6808,7 +7122,38 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </button>
               )}
             </div>
-            {/* voice input for body diary stage, not intake stage */}
+
+            {activeModule === "body" && (
+              <div style={{ marginTop: 16, padding: 16, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 8 }}>
+                  Уже есть код продолжения?
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="text"
+                    placeholder="HEALTH-XXXX-XXX"
+                    value={bodyDiarySessionId || ""}
+                    onChange={(e) => setBodyDiarySessionId(e.target.value.toUpperCase())}
+                    style={{
+                      flex: 1, height: 44, padding: "0 14px", borderRadius: 12,
+                      border: "1px solid #d8cec1", background: "#ffffff",
+                      color: "#2f2925", fontSize: 15, outline: "none",
+                      fontFamily: "monospace", boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    onClick={() => { if (bodyDiarySessionId) setBodyDiaryOpen(true); }}
+                    style={{
+                      height: 44, padding: "0 18px", borderRadius: 12, border: 0,
+                      background: "#7D9A89", color: "#ffffff", fontWeight: 700,
+                      fontSize: 14, cursor: "pointer", whiteSpace: "nowrap",
+                    }}
+                  >
+                    Продолжить
+                  </button>
+                </div>
+              </div>
+            )}
 
             {showModuleSwitcher && (
             <div style={{ ...s.row, marginTop: 8, gap: 6 }} className="app-actions">
@@ -6983,6 +7328,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
               <div style={{ marginTop: 24, display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <button style={{
+                  padding: "14px 22px", borderRadius: 20, background: "#5f8b7a",
+                  color: "#ffffff", fontWeight: 800, border: 0, cursor: "pointer",
+                }} onClick={() => {
+                  const sid = bodyIntakeResult?.session_id;
+                  if (sid) { setBodyDiarySessionId(sid); setBodyDiaryOpen(true); }
+                }}>
+                  ✎ Записать день в дневник
+                </button>
+                <button style={{
                   padding: "14px 22px", borderRadius: 20, background: "#7D9A89",
                   color: "#ffffff", fontWeight: 800, border: 0, cursor: "pointer",
                 }} onClick={copyBodyCode}>
@@ -7028,6 +7382,55 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </pre>
                 </div>
               )}
+            </section>
+          )}
+
+          {/* Body diary form */}
+          {bodyDiaryOpen && bodyDiarySessionId && (
+            <BodyDiary
+              sessionId={bodyDiarySessionId}
+              onComplete={(result) => {
+                setBodyDiaryResult(result);
+                setBodyDiaryOpen(false);
+                showToast("Дневник сохранён", "success");
+              }}
+              onCancel={() => setBodyDiaryOpen(false)}
+            />
+          )}
+
+          {/* Body diary result */}
+          {bodyDiaryResult && !bodyDiaryOpen && (
+            <section style={s.card} className="app-card">
+              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, color: "#2f2925" }}>
+                Итог дня
+              </div>
+              {bodyDiaryResult.ai_day_summary && (
+                <div style={{ fontSize: 15, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#2f2925", marginBottom: 16 }}>
+                  {bodyDiaryResult.ai_day_summary}
+                </div>
+              )}
+              {bodyDiaryResult.ai_focus_tomorrow && (
+                <div style={{ padding: 14, borderRadius: 14, background: "#f0f5f1", border: "1px solid #c4d0c6", marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 4 }}>Фокус на завтра</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.6, color: "#5f574f" }}>
+                    {bodyDiaryResult.ai_focus_tomorrow}
+                  </div>
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 12 }}>
+                <button onClick={() => { setBodyDiaryOpen(true); }} style={{
+                  padding: "12px 20px", borderRadius: 20, background: "#7D9A89",
+                  color: "#fff", fontWeight: 700, border: 0, cursor: "pointer", flex: 1,
+                }}>
+                  Записать ещё день
+                </button>
+                <button onClick={() => { setBodyDiaryResult(null); }} style={{
+                  padding: "12px 20px", borderRadius: 20, background: "#ede7dc",
+                  color: "#2f2925", fontWeight: 700, border: "1px solid #d8cec1", cursor: "pointer",
+                }}>
+                  Закрыть
+                </button>
+              </div>
             </section>
           )}
 

@@ -78,3 +78,25 @@ npm run preview
 - Перед commit проверять `data/`, `.vercel/`, `.env*`, экспортированные JSON/JSONL/CSV и скачанные отчеты.
 - При работе с пользовательским текстом сохранять privacy-safe подход и маскирование контактов.
 
+## Текущий статус (Body module / health.tochka-opori.online)
+
+### Что сделано
+- Host-based routing: health.tochka-opori.online → body, любой другой хост → support
+- Header/hero/alarm/voice адаптированы для health-домена
+- **BodyIntake**: полная анкета здоровья, изолированные красные флаги (healthRedFlags*), генерация кода `HEALTH-XXXX-XXX`, сохранение в localStorage
+- **body_clients таблица** (миграция 015): source (alena_client/self_signup/specialist_referral/test), specialist_id, specialist_name
+- **api/analyze.js**: trySaveIntake сохраняет source/specialist + upsert body_clients; handleDailyLogAnalysis для daily_log_submitted
+- **api/admin.js**: multi-token RBAC (SUPER/SUPPORT/BODY_ADMIN_TOKEN), source-фильтр, слияние body_clients, soft delete/restore; daily log CRUD (listBodyDailyLogs, getBodyDailyLogDetail, deleteBodyDailyLog)
+- **App.jsx admin/body**: вкладки Анкеты / Дневники / Корзина; фильтр источника; читаемые карточки анкет + модалка с AI-разбором и планом на 7 дней; вкладка Дневники с поиском по session_id и модалка итога дня
+- **BodyDiary.jsx**: форма дневника (вес, активность, тренировка, питание, сон, самочувствие, голосовой ввод, фото тарелок)
+- Миграции 014 (deleted_at/deleted_by) и 015 (body_clients + source) применены; миграция 016 (body_daily_logs) создана, НЕ применена
+- Всё закоммичено и залито на Vercel
+
+### Что не сделано
+- Миграция 016 (body_daily_logs) не применена к БД — таблица не существует
+- Фото тарелок хранятся как base64 в JSONB (TODO: Supabase Storage)
+- Тестирование сценариев: повторный визит по коду, голосовой дневник, фото
+
+### Следующий шаг
+Применить миграцию 016 через Supabase Dashboard SQL Editor, затем проверить /admin/body → вкладка Дневники.
+

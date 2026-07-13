@@ -580,12 +580,162 @@ ${conversationStyle}
   }
 }
 
+// Body diary daily log handler
+async function handleDailyLogAnalysis(req, res) {
+  const { session_id, daily_log } = req.body || {};
+
+  if (!session_id || !daily_log) {
+    return res.status(400).json({ error: "Missing session_id or daily_log" });
+  }
+
+  try {
+    const { getSupabase } = await import("../lib/supabase.js");
+    const supabase = getSupabase();
+
+    await supabase.from("body_daily_logs").insert({
+      session_id,
+      ...daily_log,
+    });
+
+    try {
+      const { data: existing } = await supabase
+        .from("body_clients")
+        .select("id")
+        .eq("session_id", session_id)
+        .single();
+
+      if (!existing) {
+        await supabase.from("body_clients").upsert({
+          session_id,
+          source: "self_signup",
+          status: "active",
+        }, { onConflict: "session_id" });
+      }
+    } catch (clientErr) {
+      console.log("Body client check skipped:", clientErr.message);
+    }
+  } catch (err) {
+    console.error("Daily log DB save error:", err.message);
+  }
+
+  try {
+    const conversationStyle = readCorePrompt("conversation-style.md") || "";
+    const diary = daily_log;
+
+    const systemPrompt = `
+Ты — доброжелательный ассистент модуля "Здоровье & Стройность". Пользователь заполнил дневник дня.
+
+Твоя задача: написать короткий итог дня (2–3 предложения) и один мягкий фокус на завтра.
+
+ПРАВИЛА:
+- Не стыдить, не ругать
+- Не требовать компенсировать еду тренировкой
+- Не назначать лекарства, БАДы, витамины
+- Не давать жесткие нормы калорий
+- Не ставить диагноз
+- Отвечать только на русском языке
+- Если есть явные признаки: боль в груди, обморок, кровь в стуле, сильное головокружение, резкое ухудшение — написать "Лучше не продолжать программу сейчас и обратиться за медицинской помощью"
+- Верни JSON с полями: ai_day_summary (текст итога дня), ai_focus_tomorrow (один мягкий фокус на завтра)
+
+${conversationStyle}
+`;
+
+    const dayDesc = [
+      diary.steps ? `Шаги: ${diary.steps}` : null,
+      diary.activity_comment ? `Активность: ${diary.activity_comment}` : null,
+      diary.workout_done ? `Тренировка: ${diary.workout_type || "да"} ${diary.workout_minutes ? `(${diary.workout_minutes} мин)` : ""}` : "Тренировки не было",
+      diary.calories ? `Калории: ${diary.calories}` : null,
+      diary.breakfast ? `Завтрак: ${diary.breakfast}` : null,
+      diary.lunch ? `Обед: ${diary.lunch}` : null,
+      diary.dinner ? `Ужин: ${diary.dinner}` : null,
+      diary.snacks ? `Перекусы: ${diary.snacks}` : null,
+      diary.nutrition_comment ? `Комментарий питание: ${diary.nutrition_comment}` : null,
+      diary.overeating_level !== null && diary.overeating_level !== undefined ? `Переедание: ${diary.overeating_level}` : null,
+      diary.sweet_cravings ? `Тяга к сладкому: ${diary.sweet_cravings}` : null,
+      diary.water_l ? `Вода: ${diary.water_l} л` : null,
+      diary.sleep_hours ? `Сон: ${diary.sleep_hours} ч` : null,
+      diary.sleep_quality ? `Качество сна: ${diary.sleep_quality}` : null,
+      diary.energy_level ? `Энергия: ${diary.energy_level}/10` : null,
+      diary.mood_level ? `Настроение: ${diary.mood_level}/10` : null,
+      diary.day_text ? `Комментарий: ${diary.day_text}` : null,
+    ].filter(Boolean).join("\n");
+
+    const userPrompt = `Пользователь записал день в дневник здоровья.
+
+${dayDesc || "Нет заполненных полей."}
+
+Напиши короткий итог дня и один мягкий фокус на завтра.`;
+
+    const MODEL = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
+    const FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
+    const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
+
+    const result = await runTask(TASK_TYPES.BODY_INTAKE, {
+      systemPrompt,
+      userPrompt,
+      model: MODEL,
+      fallbackModel: FALLBACK,
+      reasoningEffort: REASONING_EFFORT,
+    });
+
+    const parsed = result.parsed;
+
+    if (!parsed || !parsed.ai_day_summary) {
+      return res.status(200).json({
+        ok: true,
+        session_id,
+        ai_day_summary: "Спасибо, день записан. Продолжайте наблюдение, завтра посмотрим динамику.",
+        ai_focus_tomorrow: "Обратите внимание на режим сна и питания.",
+        model_used: result.model_used,
+        fallback_used: true,
+      });
+    }
+
+    try {
+      const { getSupabase } = await import("../lib/supabase.js");
+      const supabase = getSupabase();
+      await supabase
+        .from("body_daily_logs")
+        .update({
+          ai_day_summary: parsed.ai_day_summary,
+          ai_focus_tomorrow: parsed.ai_focus_tomorrow,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("session_id", session_id)
+        .eq("log_date", daily_log.log_date)
+        .is("ai_day_summary", null)
+        .order("created_at", { ascending: false })
+        .limit(1);
+    } catch (updateErr) {
+      console.log("AI summary update skipped:", updateErr.message);
+    }
+
+    return res.status(200).json({
+      ok: true,
+      session_id,
+      ai_day_summary: parsed.ai_day_summary,
+      ai_focus_tomorrow: parsed.ai_focus_tomorrow,
+      model_used: result.model_used,
+      fallback_used: !!result.fallback_used,
+    });
+  } catch (error) {
+    console.error("Daily log AI error:", error.message);
+    return res.status(200).json({
+      ok: true,
+      session_id,
+      ai_day_summary: "Спасибо, день записан. Продолжайте наблюдение.",
+      ai_focus_tomorrow: "Постарайтесь сегодня лечь спать вовремя.",
+      used_fallback: true,
+    });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations, module: reqModule, stage, intake: intakeData } = req.body || {};
+  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations, module: reqModule, stage, intake: intakeData, session_id, daily_log } = req.body || {};
 
   const activeModule = isValidModule(reqModule) ? reqModule : DEFAULT_MODULE;
 
@@ -593,6 +743,11 @@ export default async function handler(req, res) {
   const bodyIntake = intakeData || answers;
   if (stage === "intake_completed" && activeModule === "body" && bodyIntake) {
     return await handleBodyIntakeAnalysis(req, res, bodyIntake);
+  }
+
+  // Body diary daily log stage
+  if (stage === "daily_log_submitted" && activeModule === "body" && session_id && daily_log) {
+    return await handleDailyLogAnalysis(req, res);
   }
 
   if (!text || text.trim().length < 10) {

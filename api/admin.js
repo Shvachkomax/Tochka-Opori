@@ -35,6 +35,12 @@ export default async function handler(req, res) {
         return await handleDeleteBodyIntake(req, res);
       case "restoreBodyIntake":
         return await handleRestoreBodyIntake(req, res);
+      case "listBodyDailyLogs":
+        return await handleListBodyDailyLogs(req, res);
+      case "getBodyDailyLogDetail":
+        return await handleGetBodyDailyLogDetail(req, res);
+      case "deleteBodyDailyLog":
+        return await handleDeleteBodyDailyLog(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -186,6 +192,83 @@ async function handleRestoreBodyIntake(req, res) {
       deleted_at: null,
       deleted_by: null,
     })
+    .eq("id", id);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handleListBodyDailyLogs(req, res) {
+  const { password, limit = 50, offset = 0, session_id: sessionFilter } = req.body || {};
+  const role = resolveRole(password);
+  if (!checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const supabase = getSupabase();
+  let query = supabase
+    .from("body_daily_logs")
+    .select("*", { count: "exact" });
+
+  if (sessionFilter) {
+    query = query.eq("session_id", sessionFilter);
+  }
+
+  const { data, error, count } = await query
+    .order("log_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.status(200).json({ ok: true, records: data || [], count: count || 0 });
+}
+
+async function handleGetBodyDailyLogDetail(req, res) {
+  const { password, id } = req.body || {};
+  const role = resolveRole(password);
+  if (!checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("body_daily_logs")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.status(200).json({ ok: true, record: data });
+}
+
+async function handleDeleteBodyDailyLog(req, res) {
+  const { password, id } = req.body || {};
+  const role = resolveRole(password);
+  if (!checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("body_daily_logs")
+    .delete()
     .eq("id", id);
 
   if (error) {
