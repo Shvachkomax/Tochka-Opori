@@ -1,7 +1,37 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, Component } from "react";
 import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback, buildConversationPairs } from "../lib/conversation.js";
 import BodyIntake from "./BodyIntake.jsx";
 import BodyDiary from "./BodyDiary.jsx";
+
+class AdminErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null, errorInfo: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, errorInfo) {
+    this.setState({ errorInfo });
+    console.error("AdminErrorBoundary caught:", error, errorInfo);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 40, fontFamily: "monospace", minHeight: "100vh", background: "#050817", color: "#fecaca" }}>
+          <h2 style={{ color: "#fca5a5", marginBottom: 16 }}>Ошибка в админ-панели</h2>
+          <div style={{ background: "rgba(239,68,68,.1)", padding: 16, borderRadius: 12, marginBottom: 16, border: "1px solid rgba(239,68,68,.3)" }}>
+            <strong style={{ color: "#fca5a5" }}>{this.state.error?.message || "Неизвестная ошибка"}</strong>
+          </div>
+          <pre style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "pre-wrap", maxHeight: 400, overflow: "auto", background: "rgba(0,0,0,.3)", padding: 16, borderRadius: 8 }}>
+            {this.state.error?.stack || ""}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
   const [mode, setMode] = useState("text");
@@ -4023,7 +4053,29 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       copyToClipboard(text, "Обезличенная сессия скопирована");
     }
 
+    function Section({ title, children }) {
+      return (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: t.text, marginBottom: 8, paddingBottom: 4, borderBottom: `1px solid ${t.border}` }}>
+            {title}
+          </div>
+          {children}
+        </div>
+      );
+    }
+
+    function Field({ label, value, mono }) {
+      if (!value || value === "—" || value === "") return null;
+      return (
+        <div style={{ display: "flex", gap: 8, marginBottom: 4, fontSize: 14, lineHeight: 1.6 }}>
+          {label && <span style={{ color: t.muted, minWidth: 130, flexShrink: 0 }}>{label}:</span>}
+          <span style={{ color: t.text, fontFamily: mono ? "monospace" : "inherit", fontWeight: mono ? 600 : 400 }}>{value}</span>
+        </div>
+      );
+    }
+
     return (
+      <AdminErrorBoundary>
       <div style={{ minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "Inter, system-ui, Arial", padding: 32 }}>
         <style>{`
   * { box-sizing: border-box; }
@@ -6872,27 +6924,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           </div>
         )}
       </div>
-    );
-  }
-
-  function Section({ title, children }) {
-    return (
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: t.text, marginBottom: 8, paddingBottom: 4, borderBottom: `1px solid ${t.border}` }}>
-          {title}
-        </div>
-        {children}
-      </div>
-    );
-  }
-
-  function Field({ label, value, mono }) {
-    if (!value || value === "—" || value === "") return null;
-    return (
-      <div style={{ display: "flex", gap: 8, marginBottom: 4, fontSize: 14, lineHeight: 1.6 }}>
-        {label && <span style={{ color: t.muted, minWidth: 130, flexShrink: 0 }}>{label}:</span>}
-        <span style={{ color: t.text, fontFamily: mono ? "monospace" : "inherit", fontWeight: mono ? 600 : 400 }}>{value}</span>
-      </div>
+    </AdminErrorBoundary>
     );
   }
 
