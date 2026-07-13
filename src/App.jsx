@@ -7429,7 +7429,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           )}
 
           {/* Default support card / body card before intake */}
-          {!(activeModule === "body" && bodyIntakeStage !== "idle") && (
+          {!(activeModule === "body" && (bodyIntakeStage !== "idle" || bodyDiaryOpen || bodyDiaryResult)) && (
           <section style={s.card} className="app-card">
             <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif" }}>
               {activeModule === "body" ? "Готовы начать?" : "С чего начать?"}

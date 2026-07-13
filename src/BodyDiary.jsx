@@ -118,17 +118,24 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
         stream.getTracks().forEach(t => t.stop());
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         if (blob.size < 100) return;
-        const fd = new FormData();
-        fd.append("audio", blob, "diary.webm");
         try {
-          const res = await fetch("/api/transcribe", { method: "POST", body: fd });
-          const data = await res.json();
-          if (data.text) {
-            setVoiceTranscript(data.text);
-            setDayText(prev => prev ? prev + "\n" + data.text : data.text);
+          const res = await fetch("/api/transcribe", {
+            method: "POST",
+            headers: { "Content-Type": "audio/webm" },
+            body: blob,
+          });
+          let data;
+          const text = await res.text();
+          try { data = JSON.parse(text); } catch { data = null; }
+          if (!res.ok || !data || !data.text) {
+            setSubmitError("Не удалось расшифровать запись. Можно написать день текстом.");
+            return;
           }
+          setVoiceTranscript(data.text);
+          setDayText(prev => prev ? prev + "\n" + data.text : data.text);
         } catch (e) {
           console.error("Transcription error:", e);
+          setSubmitError("Не удалось расшифровать запись. Можно написать день текстом.");
         }
       };
       mr.start();
