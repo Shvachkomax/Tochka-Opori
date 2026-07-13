@@ -4074,6 +4074,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       );
     }
 
+    function normalizeCare(v, fallback) {
+      if (v == null) return fallback || "self_care";
+      if (typeof v === "object") return v.level || fallback || "self_care";
+      return v;
+    }
+
+    function careLabel(level) {
+      const n = normalizeCare(level);
+      if (n === "urgent_help") return "Срочно";
+      if (n === "medical_consultation") return "Врач";
+      return "Self-care";
+    }
+
     return (
       <AdminErrorBoundary>
       <div style={{ minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "Inter, system-ui, Arial", padding: 32 }}>
@@ -4224,9 +4237,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       {bodyIntakeRecords.map((rec) => {
                         const answers = rec.answers || {};
                         const client = rec.client || {};
-                        const careLevel = typeof rec.care_recommendation === "object"
-                          ? rec.care_recommendation.level
-                          : rec.care_recommendation;
+                        const careLevel = normalizeCare(rec.care_recommendation);
                         const sourceLabel = {
                           alena_client: "Алена",
                           self_signup: "Самост.",
@@ -4275,8 +4286,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                                   color: careLevel === "urgent_help" ? "#fca5a5" :
                                     careLevel === "medical_consultation" ? "#fde68a" : "#bbf7d0",
                                 }}>
-                                  {careLevel === "urgent_help" ? "Срочно" :
-                                   careLevel === "medical_consultation" ? "Врач" : "Self-care"}
+                                  {careLabel(careLevel)}
                                 </span>
                               )}
                             </div>
@@ -4635,12 +4645,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     {/* 5. Care Recommendation */}
                     {(() => {
                       const care = bodyIntakeDetail.care_recommendation;
-                      const careLevel = typeof care === "object" ? care.level : care;
+                      const careLevel = normalizeCare(care);
                       const careBg = careLevel === "urgent_help" ? "rgba(239,68,68,.1)" :
                         careLevel === "medical_consultation" ? "rgba(251,191,36,.1)" : "rgba(34,197,94,.1)";
                       const careColor = careLevel === "urgent_help" ? "#991b1b" :
                         careLevel === "medical_consultation" ? "#92400e" : "#166534";
-                      const careLabel = careLevel === "urgent_help" ? "Срочная помощь" :
+                      const careLabelText = careLevel === "urgent_help" ? "Срочная помощь" :
                         careLevel === "medical_consultation" ? "Консультация врача" : "Self-care";
                       const data = bodyIntakeDetail;
                       return (
@@ -4655,7 +4665,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           )}
                           {care && (
                             <div style={{ padding: 14, borderRadius: 12, background: careBg, border: `1px solid ${t.cardBorder}` }}>
-                              <div style={{ fontWeight: 700, fontSize: 14, color: careColor, marginBottom: 4 }}>Уровень: {careLabel}</div>
+                              <div style={{ fontWeight: 700, fontSize: 14, color: careColor, marginBottom: 4 }}>Уровень: {careLabelText}</div>
                               {typeof care === "object" && care.reasons?.length > 0 && (
                                 <div style={{ fontSize: 13, color: t.text, marginTop: 6 }}>
                                   <strong>Причины:</strong> {care.reasons.join(", ")}
