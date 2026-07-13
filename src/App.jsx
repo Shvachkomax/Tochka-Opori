@@ -4509,10 +4509,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       </div>
                     )}
 
-                    {/* Raw JSON in details */}
+                    {/* Raw JSON in details (technical) */}
                     <details style={{ marginBottom: 20 }}>
                       <summary style={{ cursor: "pointer", fontSize: 13, color: t.muted, fontWeight: 600, padding: 8, borderRadius: 8, background: t.cardBg }}>
-                        Сырые данные (JSON)
+                        Технические данные
                       </summary>
                       <pre style={{ fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}`, maxHeight: 300, overflowY: "auto", margin: 0 }}>
                         {JSON.stringify(bodyIntakeDetail.answers || {}, null, 2)}
