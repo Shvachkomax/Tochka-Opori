@@ -57,7 +57,7 @@ async function handleVerify(req, res) {
 }
 
 async function handleListBodyIntake(req, res) {
-  const { password, limit = 50, offset = 0, showDeleted = false } = req.body || {};
+  const { password, limit = 50, offset = 0, showDeleted = false, source: sourceFilter } = req.body || {};
   const role = resolveRole(password);
   if (!checkAccess(role, "body")) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
@@ -74,6 +74,10 @@ async function handleListBodyIntake(req, res) {
     query = query.is("deleted_at", null);
   }
 
+  if (sourceFilter) {
+    query = query.eq("source", sourceFilter);
+  }
+
   const { data, error, count } = await query
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
@@ -82,7 +86,23 @@ async function handleListBodyIntake(req, res) {
     return res.status(500).json({ ok: false, error: error.message });
   }
 
-  return res.status(200).json({ ok: true, records: data || [], count: count || 0 });
+  // Merge body_clients info for each record
+  let records = data || [];
+  const sessionIds = records.map(r => r.session_id).filter(Boolean);
+  if (sessionIds.length > 0) {
+    const { data: clients } = await supabase
+      .from("body_clients")
+      .select("*")
+      .in("session_id", sessionIds);
+    const clientMap = {};
+    (clients || []).forEach(c => { clientMap[c.session_id] = c; });
+    records = records.map(r => ({
+      ...r,
+      client: clientMap[r.session_id] || null,
+    }));
+  }
+
+  return res.status(200).json({ ok: true, records, count: count || 0 });
 }
 
 async function handleGetBodyIntakeDetail(req, res) {
@@ -107,7 +127,18 @@ async function handleGetBodyIntakeDetail(req, res) {
     return res.status(500).json({ ok: false, error: error.message });
   }
 
-  return res.status(200).json({ ok: true, record: data });
+  // Merge body_clients info
+  let record = data;
+  if (record && record.session_id) {
+    const { data: client } = await supabase
+      .from("body_clients")
+      .select("*")
+      .eq("session_id", record.session_id)
+      .single();
+    record = { ...record, client: client || null };
+  }
+
+  return res.status(200).json({ ok: true, record });
 }
 
 async function handleDeleteBodyIntake(req, res) {

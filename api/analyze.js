@@ -2,6 +2,12 @@ import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
 import { getModule, isValidModule, DEFAULT_MODULE } from "../lib/modules.js";
 import { readModulePrompt, readCorePrompt } from "../lib/prompts.js";
 
+function generateBodyCode() {
+  const p1 = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const p2 = Math.random().toString(36).substring(2, 5).toUpperCase();
+  return `HEALTH-${p1}-${p2}`;
+}
+
 function buildAntiRepeatBlock(convHistory, module = "support") {
   if (!Array.isArray(convHistory) || convHistory.length === 0) return "";
 
@@ -359,7 +365,7 @@ function calcBMI(heightCm, weightKg) {
   return Math.round((w / ((h / 100) * (h / 100))) * 10) / 10;
 }
 
-async function trySaveIntake(intake, bmi, careLevel, routerMeta) {
+async function trySaveIntake(intake, bmi, careLevel, routerMeta, sessionCode, source = "self_signup", specialistId = null, specialistName = null) {
   try {
     const { getSupabase } = await import("../lib/supabase.js");
     const supabase = getSupabase();
@@ -368,7 +374,7 @@ async function trySaveIntake(intake, bmi, careLevel, routerMeta) {
     const payload = {
       module: "body",
       version: "body-intake-v0.1",
-      session_id: intake.session_id || null,
+      session_id: sessionCode || intake.session_id || null,
       answers,
       bmi: bmi ?? null,
       care_recommendation: careLevel || null,
@@ -377,8 +383,27 @@ async function trySaveIntake(intake, bmi, careLevel, routerMeta) {
       task_type: routerMeta?.task_type || null,
       router_version: routerMeta?.router_version || null,
       request_duration_ms: routerMeta?.request_duration || null,
+      source,
+      specialist_id: specialistId,
+      specialist_name: specialistName,
     };
     await supabase.from("body_intake_forms").insert(payload);
+
+    try {
+      const displayName = intake.display_name || null;
+      const goal = intake.goal || null;
+      await supabase.from("body_clients").upsert({
+        session_id: sessionCode || intake.session_id,
+        display_name: displayName,
+        source,
+        specialist_id: specialistId,
+        specialist_name: specialistName,
+        goal,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "session_id" });
+    } catch (clientErr) {
+      console.log("Body client upsert skipped:", clientErr.message);
+    }
   } catch (err) {
     console.log("Body intake DB save skipped (table may not exist):", err.message);
   }
@@ -386,6 +411,11 @@ async function trySaveIntake(intake, bmi, careLevel, routerMeta) {
 
 async function handleBodyIntakeAnalysis(req, res, intake) {
   const bmi = calcBMI(intake.height_cm, intake.weight_kg);
+
+  // Extract referral info from request body
+  const source = req.body.source || "self_signup";
+  const specialistId = req.body.specialist_id || null;
+  const specialistName = req.body.specialist_name || null;
 
   // Backend care level override based on red flags (safety backstop)
   const redFlags = Array.isArray(intake.red_flags_check) ? intake.red_flags_check : [];
@@ -395,8 +425,11 @@ async function handleBodyIntakeAnalysis(req, res, intake) {
   if (hasUrgentFlag) redFlagCareLevel = "urgent_help";
   else if (hasMedicalFlag) redFlagCareLevel = "medical_consultation";
 
+  // Generate continuation code
+  const sessionCode = generateBodyCode();
+
   // Try to save intake data (non-blocking)
-  trySaveIntake(intake, bmi, null);
+  trySaveIntake(intake, bmi, null, null, sessionCode, source, specialistId, specialistName);
 
   const DISCLAIMER = "\n\nЭто не диагноз и не медицинское назначение.";
 
@@ -475,6 +508,7 @@ ${conversationStyle}
     if (!parsed || !parsed.user_report) {
       return res.status(200).json({
         ...BODY_FALLBACK_RESPONSE,
+        session_id: sessionCode,
         bmi,
         care_recommendation: redFlagCareLevel
           ? { ...BODY_FALLBACK_RESPONSE.care_recommendation, level: redFlagCareLevel }
@@ -509,10 +543,11 @@ ${conversationStyle}
     }
 
     // Save intake with care recommendation (non-blocking)
-    trySaveIntake(intake, bmi, careLevel, result);
+    trySaveIntake(intake, bmi, careLevel, result, sessionCode, source, specialistId, specialistName);
 
     return res.status(200).json({
       type: "intake_analysis",
+      session_id: sessionCode,
       user_report: parsed.user_report,
       body_plan: parsed.body_plan || BODY_FALLBACK_RESPONSE.body_plan,
       care_recommendation: safeCareRecommendation,
@@ -532,6 +567,7 @@ ${conversationStyle}
     console.error("Body intake analysis error:", error.message);
     return res.status(200).json({
       ...BODY_FALLBACK_RESPONSE,
+      session_id: sessionCode,
       bmi,
       care_recommendation: redFlagCareLevel
         ? { ...BODY_FALLBACK_RESPONSE.care_recommendation, level: redFlagCareLevel }

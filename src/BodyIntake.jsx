@@ -71,7 +71,7 @@ const RED_FLAGS_OPTIONS = [
 ];
 
 const s = {
-  form: { maxWidth: 680, margin: "0 auto", padding: "0 24px 60px" },
+  form: { maxWidth: 680, margin: "0 auto", padding: "0 24px 60px", width: "100%", boxSizing: "border-box", overflowX: "hidden" },
   heading: { fontSize: 28, fontWeight: 800, marginBottom: 8, letterSpacing: "-0.03em", color: "#2f2925" },
   subheading: { color: "#665c52", fontSize: 15, lineHeight: 1.5, marginBottom: 28 },
   field: { marginBottom: 22 },
@@ -94,9 +94,6 @@ const s = {
     color: "#2f2925", fontSize: 16, outline: "none", resize: "vertical",
     fontFamily: "inherit", boxSizing: "border-box",
   },
-  checkboxGroup: { display: "flex", flexDirection: "column", gap: 10 },
-  checkboxRow: { display: "flex", alignItems: "center", gap: 10, cursor: "pointer", color: "#5f574f", fontSize: 15 },
-  checkbox: { width: 20, height: 20, accentColor: "#86a08f", flexShrink: 0 },
   error: { color: "#b5473f", fontSize: 13, marginTop: 4 },
   button: {
     width: "100%", height: 52, borderRadius: 20, background: "#7D9A89",
@@ -176,6 +173,11 @@ export default function BodyIntake({ onComplete }) {
 
     setSubmitting(true);
 
+    // Read referral info from localStorage
+    const bodyReferralSource = localStorage.getItem("body_referral_source") || "self_signup";
+    const bodySpecialistId = localStorage.getItem("body_specialist_id") || null;
+    const bodySpecialistName = localStorage.getItem("body_specialist_name") || null;
+
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -185,6 +187,9 @@ export default function BodyIntake({ onComplete }) {
           stage: "intake_completed",
           answers: fields,
           text: "Анкета здоровья заполнена, проанализируй данные.",
+          source: bodyReferralSource,
+          specialist_id: bodySpecialistId,
+          specialist_name: bodySpecialistName,
         }),
       });
       const json = await res.json();
@@ -229,7 +234,7 @@ export default function BodyIntake({ onComplete }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={s.form}>
+    <form data-body-intake onSubmit={handleSubmit} style={s.form}>
       <style>{`
         .body-intake-input:focus,
         .body-intake-select:focus,
@@ -240,6 +245,107 @@ export default function BodyIntake({ onComplete }) {
         .body-intake-input::placeholder,
         .body-intake-textarea::placeholder {
           color: #8d8378 !important;
+        }
+
+        .healthRedFlagsBlock {
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          overflow: visible;
+          margin-top: 24px;
+        }
+        .healthRedFlagsTitle {
+          color: #5f574f;
+          font-size: 22px;
+          font-weight: 700;
+          line-height: 1.25;
+          margin-bottom: 16px;
+        }
+        .healthRedFlagsList {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+        .healthRedFlagItem {
+          display: grid;
+          grid-template-columns: 24px minmax(0, 1fr);
+          column-gap: 12px;
+          align-items: start;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          padding: 0;
+          margin: 0;
+          color: #5f574f;
+          font-size: 16px;
+          font-weight: 500;
+          line-height: 1.35;
+          cursor: pointer;
+          position: static;
+          transform: none;
+        }
+        .healthRedFlagCheckbox {
+          width: 22px;
+          height: 22px;
+          min-width: 22px;
+          margin: 2px 0 0 0;
+          padding: 0;
+          accent-color: #86a08f;
+          position: static;
+          transform: none;
+        }
+        .healthRedFlagText {
+          display: block;
+          min-width: 0;
+          width: auto;
+          max-width: 100%;
+          color: #5f574f;
+          font-size: 16px;
+          line-height: 1.35;
+          white-space: normal;
+          overflow-wrap: break-word;
+          word-break: normal;
+          position: static;
+          transform: none;
+          margin: 0;
+          padding: 0;
+        }
+
+        @media (max-width: 640px) {
+          form[data-body-intake] {
+            max-width: 100% !important;
+            padding-left: 20px !important;
+            padding-right: 20px !important;
+            overflow-x: hidden !important;
+          }
+          .healthRedFlagsBlock,
+          .healthRedFlagsList,
+          .healthRedFlagItem {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            overflow: visible !important;
+          }
+          .healthRedFlagItem {
+            display: grid !important;
+            grid-template-columns: 24px minmax(0, 1fr) !important;
+            column-gap: 12px !important;
+            align-items: start !important;
+            justify-content: start !important;
+          }
+          .healthRedFlagText {
+            min-width: 0 !important;
+            max-width: 100% !important;
+            white-space: normal !important;
+            overflow-wrap: break-word !important;
+            word-break: normal !important;
+            margin-left: 0 !important;
+            position: static !important;
+            transform: none !important;
+          }
         }
       `}</style>
       <h2 style={s.heading}>Давайте познакомимся</h2>
@@ -276,13 +382,13 @@ export default function BodyIntake({ onComplete }) {
         <textarea className="body-intake-textarea" style={s.textarea} value={fields.health_limitations} onChange={e => set("health_limitations", e.target.value)} placeholder="Например: проблемы с коленями, гипертония, диабет..." />
       </div>
 
-      <div style={s.field}>
-        <label style={s.label}>{FIELD_LABELS.red_flags_check}</label>
-        <div style={s.checkboxGroup}>
+      <div className="healthRedFlagsBlock">
+        <div className="healthRedFlagsTitle">{FIELD_LABELS.red_flags_check}</div>
+        <div className="healthRedFlagsList">
           {RED_FLAGS_OPTIONS.map(o => (
-            <label key={o.value} style={s.checkboxRow}>
-              <input style={s.checkbox} type="checkbox" checked={fields.red_flags_check.includes(o.value)} onChange={() => toggleRedFlag(o.value)} />
-              {o.label}
+            <label key={o.value} className="healthRedFlagItem">
+              <input className="healthRedFlagCheckbox" type="checkbox" checked={fields.red_flags_check.includes(o.value)} onChange={() => toggleRedFlag(o.value)} />
+              <span className="healthRedFlagText">{o.label}</span>
             </label>
           ))}
         </div>

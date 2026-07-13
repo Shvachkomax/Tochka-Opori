@@ -102,6 +102,7 @@ export default function App() {
     if (!bodyIntakeResult) return;
     const data = {
       timestamp: new Date().toISOString(),
+      session_id: bodyIntakeResult.session_id || null,
       intake: bodyIntakeResult.intake_answers || null,
       bmi: bodyIntakeResult.bmi,
       care_recommendation: bodyIntakeResult.care_recommendation,
@@ -298,6 +299,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }, []);
 
+  // Handle ?ref=alena / ?source=alena query params
+  React.useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("ref");
+      const source = params.get("source");
+      if (ref === "alena" || source === "alena") {
+        localStorage.setItem("body_referral_source", "alena_client");
+        localStorage.setItem("body_specialist_id", "alena_zhukova");
+        localStorage.setItem("body_specialist_name", "Алена Жукова");
+      }
+    } catch (e) {}
+  }, []);
+
   const [adminReqTab, setAdminReqTab] = useState("reviews");
   const [adminRequests, setAdminRequests] = useState([]);
   const [adminReqFilter, setAdminReqFilter] = useState("pending");
@@ -325,6 +340,18 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [bodyIntakeDetailOpen, setBodyIntakeDetailOpen] = useState(false);
   const [bodyIntakeShowDeleted, setBodyIntakeShowDeleted] = useState(false);
   const [bodyIntakeDeleteConfirm, setBodyIntakeDeleteConfirm] = useState(null);
+  const [bodyIntakeSourceFilter, setBodyIntakeSourceFilter] = useState("all");
+
+  const [bodyCodeCopied, setBodyCodeCopied] = useState(false);
+
+  // Restore body intake result from localStorage
+  const [savedBodyResult, setSavedBodyResult] = useState(() => {
+    try {
+      const raw = localStorage.getItem("body_last_result");
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return null;
+  });
 
   // Training table state
   const [trainingSessions, setTrainingSessions] = useState([]);
@@ -1553,6 +1580,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   function handleBodyIntakeComplete(response) {
     setBodyIntakeResult(response);
     setBodyIntakeStage("result");
+    try {
+      localStorage.setItem("body_last_session_id", response?.session_id || "");
+      localStorage.setItem("body_last_result", JSON.stringify(response));
+      localStorage.setItem("body_last_created_at", new Date().toISOString());
+    } catch (e) {}
+  }
+
+  function copyBodyCode() {
+    const code = bodyIntakeResult?.session_id || localStorage.getItem("body_last_session_id");
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      setBodyCodeCopied(true);
+      setTimeout(() => setBodyCodeCopied(false), 2500);
+    }).catch(() => {});
   }
 
   function handleReset() {
@@ -1596,6 +1637,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setCareRecommendation(null);
     setBodyIntakeStage("idle");
     setBodyIntakeResult(null);
+    try {
+      localStorage.removeItem("body_last_session_id");
+      localStorage.removeItem("body_last_result");
+      localStorage.removeItem("body_last_created_at");
+    } catch (e) {}
+    setSavedBodyResult(null);
     setShowConsultPrep(false);
     setShowMessageToClose(false);
     setMessageText("");
@@ -1658,10 +1705,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function adminLoadBodyIntake(maxCount = 50) {
     setBodyIntakeLoading(true);
     try {
+      const body = {
+        action: "listBodyIntake",
+        password: adminPassword,
+        limit: maxCount,
+        showDeleted: bodyIntakeShowDeleted,
+      };
+      if (bodyIntakeSourceFilter !== "all") {
+        body.source = bodyIntakeSourceFilter;
+      }
       const res = await fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listBodyIntake", password: adminPassword, limit: maxCount, showDeleted: bodyIntakeShowDeleted }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.ok) {
@@ -3907,10 +3963,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 40 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <img src="/logo-tochka-opory-header.png" alt="Точка опоры" style={{ height: 44, width: "auto", display: "block" }} />
+              <img src="/logo-tochka-opory-header.png" alt={adminModuleRoute === "body" ? "Опора. Здоровье & Стройность" : "Точка опоры"} style={{ height: 44, width: "auto", display: "block" }} />
               <div>
-                <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2 }}>Точка опоры</div>
-                <div style={{ fontSize: 14, color: t.muted }}>{isTrainingPage ? "Таблица тренировок" : "Админ-панель / Отзывы о сессиях"}</div>
+                <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2 }}>{adminModuleRoute === "body" ? "Опора. Здоровье & Стройность" : "Точка опоры"}</div>
+                <div style={{ fontSize: 14, color: t.muted }}>{adminModuleRoute === "body" ? "Админ-панель / Анкеты здоровья" : isTrainingPage ? "Таблица тренировок" : "Админ-панель / Отзывы о сессиях"}</div>
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -3923,7 +3979,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               >
                 {adminDarkMode ? "☀️ Светлая" : "🌙 Тёмная"}
               </button>
-              <a href="/" style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>← На главную</a>
+              <a href={adminModuleRoute === "body" ? "https://health.tochka-opori.online" : "/"} style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>← На главную</a>
             </div>
           </div>
 
@@ -3956,7 +4012,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             <>
               {/* Body intake admin header */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                <div style={{ fontSize: 20, fontWeight: 700 }}>Опора. Здоровье & Стройность / Админ-панель · Анкеты здоровья</div>
+                <div><div style={{ fontSize: 22, fontWeight: 700 }}>Анкеты здоровья</div><div style={{ fontSize: 13, color: t.muted, marginTop: 2 }}>Первичные анкеты и AI-разборы клиентов</div></div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <button
                     onClick={() => adminLoadBodyIntake()}
@@ -3972,14 +4028,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
 
               {/* Active / Trash toggle */}
-              <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                 <button
                   style={{
                     border: 0, borderRadius: 14, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer",
                     background: !bodyIntakeShowDeleted ? t.tabActive : t.tabBg,
                     color: !bodyIntakeShowDeleted ? t.tabActiveText : t.text,
                   }}
-                  onClick={() => { setBodyIntakeShowDeleted(false); setBodyIntakeDetailOpen(false); adminLoadBodyIntake(); }}
+                  onClick={() => { setBodyIntakeShowDeleted(false); setBodyIntakeDetailOpen(false); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }}
                 >
                   Активные
                 </button>
@@ -3989,11 +4045,36 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     background: bodyIntakeShowDeleted ? t.tabActive : t.tabBg,
                     color: bodyIntakeShowDeleted ? t.tabActiveText : t.text,
                   }}
-                  onClick={() => { setBodyIntakeShowDeleted(true); setBodyIntakeDetailOpen(false); adminLoadBodyIntake(); }}
+                  onClick={() => { setBodyIntakeShowDeleted(true); setBodyIntakeDetailOpen(false); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }}
                 >
                   Корзина
                 </button>
               </div>
+
+              {/* Source filter tabs (only for active view) */}
+              {!bodyIntakeShowDeleted && (
+                <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+                  {[
+                    { key: "all", label: "Все" },
+                    { key: "alena_client", label: "Клиенты Алены" },
+                    { key: "self_signup", label: "Самостоятельные" },
+                    { key: "specialist_referral", label: "По направлению" },
+                    { key: "test", label: "Тестовые" },
+                  ].map(f => (
+                    <button
+                      key={f.key}
+                      style={{
+                        border: 0, borderRadius: 10, padding: "5px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                        background: bodyIntakeSourceFilter === f.key ? t.tabActive : t.tabBg,
+                        color: bodyIntakeSourceFilter === f.key ? t.tabActiveText : t.text,
+                      }}
+                      onClick={() => { setBodyIntakeSourceFilter(f.key); adminLoadBodyIntake(); }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Body intake table */}
               {bodyIntakeLoading ? (
@@ -4014,7 +4095,25 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     Всего записей: {bodyIntakeTotal}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {bodyIntakeRecords.map((rec) => (
+                    {bodyIntakeRecords.map((rec) => {
+                      const answers = rec.answers || {};
+                      const client = rec.client || {};
+                      const careLevel = typeof rec.care_recommendation === "object"
+                        ? rec.care_recommendation.level
+                        : rec.care_recommendation;
+                      const sourceLabel = {
+                        alena_client: "Алена",
+                        self_signup: "Самост.",
+                        specialist_referral: "Направление",
+                        test: "Тест",
+                      }[rec.source] || rec.source || "—";
+                      const sourceColor = {
+                        alena_client: "#86a08f",
+                        self_signup: "#8d8378",
+                        specialist_referral: "#b8946e",
+                        test: "#a0a0a0",
+                      }[rec.source] || "#8d8378";
+                      return (
                       <div
                         key={rec.id}
                         style={{
@@ -4022,62 +4121,74 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           background: t.cardBg, cursor: "pointer",
                         }}
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                          <div>
-                            <div style={{ fontSize: 13, color: t.muted }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 13, color: t.muted }}>
                               {new Date(rec.created_at).toLocaleString("ru-RU")}
-                            </div>
-                            {/* Enhanced info: name / goal */}
-                            {rec.answers?.user_name && (
-                              <div style={{ fontSize: 14, fontWeight: 600, color: t.text, marginTop: 4 }}>
-                                {rec.answers.user_name}
-                              </div>
-                            )}
-                            {rec.answers?.goal && (
-                              <div style={{ fontSize: 12, color: t.muted, marginTop: 2, fontStyle: "italic" }}>
-                                {rec.answers.goal}
-                              </div>
+                            </span>
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${sourceColor}22`, color: sourceColor }}>
+                              {sourceLabel}
+                            </span>
+                            {rec.specialist_name && (
+                              <span style={{ fontSize: 12, color: t.muted, fontStyle: "italic" }}>
+                                → {rec.specialist_name}
+                              </span>
                             )}
                           </div>
-                          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                            {rec.bmi && <span style={{ fontSize: 13, color: t.muted }}>ИМТ: {rec.bmi}</span>}
+                          <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
                             {rec.triggered_red_flags?.length > 0 && (
                               <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "rgba(239,68,68,.2)", color: "#fca5a5" }}>
-                                {rec.triggered_red_flags.length} флаг(ов)
+                                {rec.triggered_red_flags.length} флаг
                               </span>
                             )}
-                            {rec.care_recommendation && (
+                            {careLevel && (
                               <span style={{
                                 fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
-                                background: rec.care_recommendation === "urgent_help" ? "rgba(239,68,68,.2)" :
-                                  rec.care_recommendation === "medical_consultation" ? "rgba(251,191,36,.2)" : "rgba(34,197,94,.2)",
-                                color: rec.care_recommendation === "urgent_help" ? "#fca5a5" :
-                                  rec.care_recommendation === "medical_consultation" ? "#fde68a" : "#bbf7d0",
+                                background: careLevel === "urgent_help" ? "rgba(239,68,68,.2)" :
+                                  careLevel === "medical_consultation" ? "rgba(251,191,36,.2)" : "rgba(34,197,94,.2)",
+                                color: careLevel === "urgent_help" ? "#fca5a5" :
+                                  careLevel === "medical_consultation" ? "#fde68a" : "#bbf7d0",
                               }}>
-                                {rec.care_recommendation === "urgent_help" ? "Срочно" :
-                                 rec.care_recommendation === "medical_consultation" ? "Врач" : "Self-care"}
+                                {careLevel === "urgent_help" ? "Срочно" :
+                                 careLevel === "medical_consultation" ? "Врач" : "Self-care"}
                               </span>
                             )}
                           </div>
                         </div>
-                        <div style={{ fontSize: 12, color: t.muted, marginBottom: 4 }}>
-                          session: {rec.session_id || "—"} | version: {rec.version || "—"}
-                          {rec.deleted_at && <> | удалён: {new Date(rec.deleted_at).toLocaleString("ru-RU")}</>}
+
+                        {/* Name + Goal */}
+                        <div style={{ fontSize: 15, fontWeight: 600, color: t.text }}>
+                          {answers.display_name || client.display_name || "Без имени"}
                         </div>
-                        {rec.answers?.user_report && (
-                          <div style={{ fontSize: 14, lineHeight: 1.5, color: t.text, marginTop: 4 }}>
-                            {(rec.answers.user_report || "").slice(0, 200)}
-                            {(rec.answers.user_report || "").length > 200 ? "..." : ""}
+                        {answers.goal && (
+                          <div style={{ fontSize: 12, color: t.muted, marginTop: 1, fontStyle: "italic" }}>
+                            Цель: {answers.goal}
                           </div>
                         )}
-                        {!rec.answers?.user_report && rec.user_report && (
-                          <div style={{ fontSize: 14, lineHeight: 1.5, color: t.text, marginTop: 4 }}>
-                            {rec.user_report.slice(0, 200)}
-                            {rec.user_report.length > 200 ? "..." : ""}
+
+                        {/* Continuation code */}
+                        {rec.session_id && (
+                          <div style={{ fontSize: 12, color: t.muted, marginTop: 4, fontFamily: "monospace" }}>
+                            Код: {rec.session_id}
                           </div>
                         )}
+
+                        {/* User report preview */}
+                        {(rec.user_report || answers.user_report) && (
+                          <div style={{ fontSize: 13, lineHeight: 1.5, color: t.text, marginTop: 6 }}>
+                            {(rec.user_report || answers.user_report || "").slice(0, 200)}
+                            {(rec.user_report || answers.user_report || "").length > 200 ? "..." : ""}
+                          </div>
+                        )}
+
+                        {rec.deleted_at && (
+                          <div style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>
+                            Удалён: {new Date(rec.deleted_at).toLocaleString("ru-RU")} ({rec.deleted_by})
+                          </div>
+                        )}
+
                         {/* Card actions */}
-                        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                           <button
                             onClick={(e) => { e.stopPropagation(); adminOpenBodyIntakeDetail(rec.id); }}
                             style={{
@@ -4119,7 +4230,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           </button>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}
@@ -4161,7 +4273,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </div>
               )}
 
-              {/* Body intake detail modal */}
+              {/* Body intake detail modal — human-readable */}
               {bodyIntakeDetailOpen && bodyIntakeDetail && (
                 <div style={{
                   position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
@@ -4171,8 +4283,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     background: t.bg, borderRadius: 20, padding: 32, maxWidth: 720, width: "90%",
                     maxHeight: "85vh", overflowY: "auto",
                   }} onClick={(e) => e.stopPropagation()}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
-                      <div style={{ fontSize: 20, fontWeight: 700 }}>Анкета здоровья #{bodyIntakeDetail.id?.slice(0, 8)}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20, alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>Анкета здоровья</div>
+                        {bodyIntakeDetail.session_id && (
+                          <div style={{ fontSize: 14, color: t.muted, fontFamily: "monospace", fontWeight: 600, marginTop: 2 }}>
+                            {bodyIntakeDetail.session_id}
+                          </div>
+                        )}
+                      </div>
                       <button
                         onClick={() => setBodyIntakeDetailOpen(false)}
                         style={{ background: "none", border: 0, color: t.muted, cursor: "pointer", fontSize: 20 }}
@@ -4181,66 +4300,226 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       </button>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20, fontSize: 13, color: t.text }}>
-                      <div><strong>Дата:</strong> {new Date(bodyIntakeDetail.created_at).toLocaleString("ru-RU")}</div>
-                      <div><strong>session_id:</strong> {bodyIntakeDetail.session_id || "—"}</div>
-                      <div><strong>Версия:</strong> {bodyIntakeDetail.version || "—"}</div>
-                      <div><strong>ИМТ:</strong> {bodyIntakeDetail.bmi ?? "—"}</div>
-                      <div><strong>Рекомендация:</strong> {bodyIntakeDetail.care_recommendation === "urgent_help" ? "Срочная помощь" : bodyIntakeDetail.care_recommendation === "medical_consultation" ? "Консультация врача" : bodyIntakeDetail.care_recommendation === "self_care" ? "Self-care" : bodyIntakeDetail.care_recommendation || "—"}</div>
-                      <div><strong>used_fallback:</strong> {bodyIntakeDetail.used_fallback ? "true" : "false"}</div>
-                      <div><strong>Красные флаги:</strong> {bodyIntakeDetail.triggered_red_flags?.length ? bodyIntakeDetail.triggered_red_flags.join(", ") : "—"}</div>
-                      <div><strong>Уровень заботы:</strong> {bodyIntakeDetail.red_flag_care_level || "—"}</div>
-                      {bodyIntakeDetail.deleted_at && <div><strong>Удалён:</strong> {new Date(bodyIntakeDetail.deleted_at).toLocaleString("ru-RU")} ({bodyIntakeDetail.deleted_by})</div>}
-                    </div>
+                    {/* 1. General Info */}
+                    <Section title="Общая информация">
+                      <Field label="Дата" value={new Date(bodyIntakeDetail.created_at).toLocaleString("ru-RU")} />
+                      <Field label="Источник" value={bodyIntakeDetail.source || "—"} />
+                      <Field label="Специалист" value={bodyIntakeDetail.specialist_name || "—"} />
+                      <Field label="Код продолжения" value={bodyIntakeDetail.session_id || "код не создан"} mono />
+                      <Field label="Версия" value={bodyIntakeDetail.version || "—"} />
+                      <Field label="ID" value={bodyIntakeDetail.id || "—"} mono />
+                    </Section>
 
-                    {/* User name and goal */}
-                    {bodyIntakeDetail.answers?.user_name && (
-                      <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Имя / псевдоним</div>
-                        <div style={{ fontSize: 16, color: t.text }}>{bodyIntakeDetail.answers.user_name}</div>
+                    {/* 2. Client Info */}
+                    {(() => {
+                      const a = bodyIntakeDetail.answers || {};
+                      const c = bodyIntakeDetail.client || {};
+                      return (
+                        <Section title="Информация о клиенте">
+                          <Field label="Имя / псевдоним" value={a.display_name || c.display_name || "—"} />
+                          <Field label="Пол" value={{ male: "Мужской", female: "Женский", other: "Другой", prefer_not: "Не указан" }[a.sex] || a.sex || "—"} />
+                          <Field label="Возраст" value={a.age || "—"} />
+                          <Field label="Цель" value={a.goal === "custom" ? a.goal_custom : ({
+                            improve_wellbeing: "Улучшить самочувствие",
+                            slimness: "Стройность",
+                            custom: a.goal_custom || "Свой вариант",
+                          })[a.goal] || a.goal || "—"} />
+                        </Section>
+                      );
+                    })()}
+
+                    {/* 3. Key Measurements */}
+                    {(() => {
+                      const a = bodyIntakeDetail.answers || {};
+                      const bmi = bodyIntakeDetail.bmi;
+                      return (
+                        <Section title="Основные показатели">
+                          {bmi && <Field label="ИМТ" value={bmi} />}
+                          <Field label="Рост" value={a.height_cm ? `${a.height_cm} см` : "—"} />
+                          <Field label="Вес" value={a.weight_kg ? `${a.weight_kg} кг` : "—"} />
+                          {a.waist_cm && <Field label="Объём талии" value={`${a.waist_cm} см`} />}
+                          <Field label="Активность на работе" value={{
+                            sedentary: "Сидячая",
+                            light: "Лёгкая",
+                            moderate: "Умеренная",
+                            heavy: "Тяжёлая",
+                          }[a.work_activity_level] || a.work_activity_level || "—"} />
+                          <Field label="Шагов в день" value={{
+                            less_3000: "Меньше 3000",
+                            "3000_6000": "3000–6000",
+                            "6000_10000": "6000–10000",
+                            more_10000: "Больше 10000",
+                          }[a.daily_steps_estimate] || a.daily_steps_estimate || "—"} />
+                          <Field label="Сон" value={{
+                            less_5: "Меньше 5 ч",
+                            "5_6": "5–6 ч",
+                            "6_7": "6–7 ч",
+                            "7_8": "7–8 ч",
+                            more_8: "Больше 8 ч",
+                          }[a.sleep_hours_estimate] || a.sleep_hours_estimate || "—"} />
+                          <Field label="Питание (главная проблема)" value={{
+                            overeating: "Переедание",
+                            unhealthy_food: "Нездоровый выбор",
+                            irregular: "Нерегулярное",
+                            portion_control: "Контроль порций",
+                            snacking: "Частые перекусы",
+                            other: "Другое",
+                          }[a.nutrition_main_problem] || a.nutrition_main_problem || "—"} />
+                          {a.health_limitations && <Field label="Ограничения по здоровью" value={a.health_limitations} />}
+                        </Section>
+                      );
+                    })()}
+
+                    {/* 4. Red Flags */}
+                    {(() => {
+                      const redFlags = bodyIntakeDetail.triggered_red_flags;
+                      const redLabels = {
+                        chest_pain: "Боль в груди",
+                        severe_dizziness: "Сильное головокружение",
+                        unexplained_weight_loss: "Необъяснимая потеря веса",
+                        blood_in_stool: "Кровь в стуле",
+                        fainting: "Обмороки",
+                        none: "Ничего",
+                      };
+                      const activeFlags = Array.isArray(redFlags) ? redFlags.filter(f => f !== "none") : [];
+                      return (
+                        <Section title="Красные флаги">
+                          {activeFlags.length > 0 ? (
+                            <ul style={{ margin: "4px 0 0 0", paddingLeft: 18, color: t.text, fontSize: 14, lineHeight: 1.7 }}>
+                              {activeFlags.map(f => (
+                                <li key={f}>{redLabels[f] || f}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <Field label="" value="Не отмечено" />
+                          )}
+                          {bodyIntakeDetail.red_flag_care_level && (
+                            <Field label="Уровень риска" value={{
+                              urgent_help: "Срочная помощь",
+                              medical_consultation: "Консультация врача",
+                            }[bodyIntakeDetail.red_flag_care_level] || bodyIntakeDetail.red_flag_care_level} />
+                          )}
+                        </Section>
+                      );
+                    })()}
+
+                    {/* 5. Care Recommendation */}
+                    {(() => {
+                      const care = bodyIntakeDetail.care_recommendation;
+                      const careLevel = typeof care === "object" ? care.level : care;
+                      const careBg = careLevel === "urgent_help" ? "rgba(239,68,68,.1)" :
+                        careLevel === "medical_consultation" ? "rgba(251,191,36,.1)" : "rgba(34,197,94,.1)";
+                      const careColor = careLevel === "urgent_help" ? "#991b1b" :
+                        careLevel === "medical_consultation" ? "#92400e" : "#166534";
+                      const careLabel = careLevel === "urgent_help" ? "Срочная помощь" :
+                        careLevel === "medical_consultation" ? "Консультация врача" : "Self-care";
+                      const data = bodyIntakeDetail;
+                      return (
+                        <Section title="AI-разбор">
+                          {data.user_report && (
+                            <div style={{ marginBottom: 16 }}>
+                              <div style={{ fontWeight: 600, fontSize: 13, color: t.muted, marginBottom: 6, letterSpacing: "0.03em" }}>Отчёт для пользователя</div>
+                              <div style={{ fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}` }}>
+                                {data.user_report}
+                              </div>
+                            </div>
+                          )}
+                          {care && (
+                            <div style={{ padding: 14, borderRadius: 12, background: careBg, border: `1px solid ${t.cardBorder}` }}>
+                              <div style={{ fontWeight: 700, fontSize: 14, color: careColor, marginBottom: 4 }}>Уровень: {careLabel}</div>
+                              {typeof care === "object" && care.reasons?.length > 0 && (
+                                <div style={{ fontSize: 13, color: t.text, marginTop: 6 }}>
+                                  <strong>Причины:</strong> {care.reasons.join(", ")}
+                                </div>
+                              )}
+                              {typeof care === "object" && care.specialist_types?.length > 0 && (
+                                <div style={{ fontSize: 13, color: t.text, marginTop: 4 }}>
+                                  <strong>Специалист:</strong> {{
+                                    emergency_service: "Скорая помощь",
+                                    general_physician: "Терапевт",
+                                    nutritionist: "Диетолог",
+                                    endocrinologist: "Эндокринолог",
+                                    gastroenterologist: "Гастроэнтеролог",
+                                    psychologist: "Психолог",
+                                    psychotherapist: "Психотерапевт",
+                                  }[care.specialist_types[0]] || care.specialist_types.join(", ")}
+                                </div>
+                              )}
+                              {typeof care === "object" && care.interim_support?.length > 0 && (
+                                <div style={{ marginTop: 8 }}>
+                                  {care.interim_support.map((s, i) => (
+                                    <div key={i} style={{ fontSize: 13, color: t.text, paddingLeft: 12, marginTop: 2 }}>
+                                      • {s}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {data.used_fallback && (
+                            <div style={{ marginTop: 8, fontSize: 12, color: t.muted, fontStyle: "italic" }}>
+                              Использован fallback (модель не дала структурированного ответа)
+                            </div>
+                          )}
+                        </Section>
+                      );
+                    })()}
+
+                    {/* 6. Body Plan */}
+                    {(() => {
+                      const plan = bodyIntakeDetail.body_plan || bodyIntakeDetail.answers?.body_plan;
+                      if (!plan) return null;
+                      const days = plan.days || [];
+                      return (
+                        <Section title="План на 7 дней">
+                          {plan.focus && (
+                            <div style={{ fontSize: 14, color: t.muted, fontStyle: "italic", marginBottom: 12 }}>
+                              Фокус: {plan.focus}
+                            </div>
+                          )}
+                          {days.map(d => (
+                            <div key={d.day} style={{
+                              border: `1px solid ${t.cardBorder}`,
+                              borderRadius: 12, padding: "12px 16px", marginBottom: 8,
+                              background: t.cardBg,
+                            }}>
+                              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4, color: t.text }}>
+                                День {d.day}: {d.title}
+                              </div>
+                              {d.actions?.map((a, i) => (
+                                <div key={i} style={{ color: t.muted, fontSize: 13, paddingLeft: 12, marginTop: 2 }}>
+                                  • {a}
+                                </div>
+                              ))}
+                              {d.note && (
+                                <div style={{ color: t.muted, fontSize: 12, fontStyle: "italic", marginTop: 4 }}>
+                                  {d.note}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </Section>
+                      );
+                    })()}
+
+                    {/* Deleted info */}
+                    {bodyIntakeDetail.deleted_at && (
+                      <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.2)", fontSize: 13, color: "#991b1b" }}>
+                        Удалён: {new Date(bodyIntakeDetail.deleted_at).toLocaleString("ru-RU")} ({bodyIntakeDetail.deleted_by})
                       </div>
                     )}
-                    {bodyIntakeDetail.answers?.goal && (
-                      <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Цель</div>
-                        <div style={{ fontSize: 14, color: t.muted, fontStyle: "italic" }}>{bodyIntakeDetail.answers.goal}</div>
-                      </div>
-                    )}
 
-                    {bodyIntakeDetail.answers?.user_report && (
-                      <div style={{ marginBottom: 20 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>user_report</div>
-                        <div style={{ fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}` }}>
-                          {bodyIntakeDetail.answers.user_report}
-                        </div>
-                      </div>
-                    )}
-
-                    {bodyIntakeDetail.care_recommendation && bodyIntakeDetail.answers?.user_report && (
-                      <div style={{ marginBottom: 20, padding: 16, borderRadius: 12, background: bodyIntakeDetail.care_recommendation === "urgent_help" ? "rgba(239,68,68,.1)" : bodyIntakeDetail.care_recommendation === "medical_consultation" ? "rgba(251,191,36,.1)" : "rgba(34,197,94,.1)", border: `1px solid ${t.cardBorder}` }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>Заключение по анкете</div>
-                        <div style={{ fontSize: 14, lineHeight: 1.6, color: t.text, whiteSpace: "pre-wrap" }}>
-                          {bodyIntakeDetail.answers.body_plan?.care_text || bodyIntakeDetail.care_recommendation}
-                        </div>
-                      </div>
-                    )}
-
-                    {bodyIntakeDetail.answers?.body_plan && (
-                      <div style={{ marginBottom: 20 }}>
-                        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>body_plan</div>
-                        <pre style={{ fontSize: 12, lineHeight: 1.5, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}`, margin: 0 }}>
-                          {JSON.stringify(bodyIntakeDetail.answers.body_plan, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-
-                    <div style={{ marginBottom: 20 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>intake_answers (сырые данные)</div>
+                    {/* Raw JSON in details */}
+                    <details style={{ marginBottom: 20 }}>
+                      <summary style={{ cursor: "pointer", fontSize: 13, color: t.muted, fontWeight: 600, padding: 8, borderRadius: 8, background: t.cardBg }}>
+                        Сырые данные (JSON)
+                      </summary>
                       <pre style={{ fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}`, maxHeight: 300, overflowY: "auto", margin: 0 }}>
                         {JSON.stringify(bodyIntakeDetail.answers || {}, null, 2)}
                       </pre>
-                    </div>
+                    </details>
 
+                    {/* Actions */}
                     <div style={{ display: "flex", gap: 12 }}>
                       <button
                         onClick={() => adminDownloadBodyIntakeJSON(bodyIntakeDetail)}
@@ -6288,6 +6567,27 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     );
   }
 
+  function Section({ title, children }) {
+    return (
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: t.text, marginBottom: 8, paddingBottom: 4, borderBottom: `1px solid ${t.border}` }}>
+          {title}
+        </div>
+        {children}
+      </div>
+    );
+  }
+
+  function Field({ label, value, mono }) {
+    if (!value || value === "—" || value === "") return null;
+    return (
+      <div style={{ display: "flex", gap: 8, marginBottom: 4, fontSize: 14, lineHeight: 1.6 }}>
+        {label && <span style={{ color: t.muted, minWidth: 130, flexShrink: 0 }}>{label}:</span>}
+        <span style={{ color: t.text, fontFamily: mono ? "monospace" : "inherit", fontWeight: mono ? 600 : 400 }}>{value}</span>
+      </div>
+    );
+  }
+
   return (
     <div style={s.page} className="app-page">
       <style>{`
@@ -6575,6 +6875,26 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 {bodyIntakeResult?.user_report || "Анализ завершён."}
               </div>
 
+              {/* Continuation code */}
+              {(bodyIntakeResult?.session_id) && (
+                <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 4 }}>Ваш код продолжения</div>
+                  <div style={{ color: "#665c52", fontSize: 13, marginBottom: 10, lineHeight: 1.5 }}>
+                    Сохраните этот код. По нему можно будет вернуться к плану и продолжить наблюдение.
+                  </div>
+                  <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "0.08em", color: "#2f2925", fontFamily: "monospace", marginBottom: 10 }}>
+                    {bodyIntakeResult.session_id}
+                  </div>
+                  <button onClick={copyBodyCode} style={{
+                    padding: "8px 18px", borderRadius: 12, border: 0,
+                    background: bodyCodeCopied ? "#4caf50" : "#7D9A89",
+                    color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                  }}>
+                    {bodyCodeCopied ? "Код скопирован" : "Скопировать код"}
+                  </button>
+                </div>
+              )}
+
               {bodyIntakeResult?.care_recommendation && (
                 <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
                   <div style={{ color: "#665c52", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
@@ -6624,6 +6944,22 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       )}
                     </div>
                   ))}
+
+                  {/* Day 1 observation block */}
+                  <div style={{ marginTop: 20, padding: 18, borderRadius: 16, background: "#f0f5f1", border: "1px solid #c4d0c6" }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2f2925", marginBottom: 4 }}>День 1: начнём с наблюдения</div>
+                    <div style={{ color: "#5f574f", fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>
+                      Сегодня не нужно резко менять режим. Ваша задача — собрать честную картину.
+                    </div>
+                    <div style={{ color: "#5f574f", fontSize: 14, lineHeight: 1.6, marginBottom: 4, fontWeight: 600 }}>Действия:</div>
+                    <div style={{ color: "#5f574f", fontSize: 14, lineHeight: 1.7, paddingLeft: 14 }}>
+                      • Запишите вес и, если можете, объём талии.<br />
+                      • Отметьте примерное количество шагов за день.<br />
+                      • Сфотографируйте или кратко запишите основные приёмы пищи.<br />
+                      • Отметьте время сна и подъёма.<br />
+                      • Вечером напишите 2–3 строки: что получилось, что помешало, где было сложнее всего.<br />
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -6649,14 +6985,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 <button style={{
                   padding: "14px 22px", borderRadius: 20, background: "#7D9A89",
                   color: "#ffffff", fontWeight: 800, border: 0, cursor: "pointer",
-                }} onClick={() => setBodyIntakeStage("filling")}>
-                  Заполнить заново
+                }} onClick={copyBodyCode}>
+                  {bodyCodeCopied ? "Код скопирован" : "Скопировать код"}
                 </button>
                 <button style={{
                   padding: "14px 22px", borderRadius: 20, background: "#ede7dc",
                   color: "#2f2925", fontWeight: 700, border: "1px solid #d8cec1", cursor: "pointer",
                 }} onClick={downloadBodyIntakeJSON}>
                   Скачать JSON
+                </button>
+                <button style={{
+                  padding: "14px 22px", borderRadius: 20, background: "#ede7dc",
+                  color: "#2f2925", fontWeight: 700, border: "1px solid #d8cec1", cursor: "pointer",
+                }} onClick={() => setBodyIntakeStage("filling")}>
+                  Заполнить заново
                 </button>
                 <button style={{
                   padding: "14px 22px", borderRadius: 20, background: "#ede7dc",
@@ -6675,6 +7017,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 {JSON.stringify({
   module: bodyIntakeResult.module || "body",
   stage: "intake_completed",
+  session_id: bodyIntakeResult.session_id || null,
   care_recommendation: bodyIntakeResult.care_recommendation,
   triggered_red_flags: bodyIntakeResult.triggered_red_flags || [],
   red_flag_care_level: bodyIntakeResult.red_flag_care_level || null,
@@ -6699,6 +7042,36 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 ? "Заполните короткую анкету — это займёт 2 минуты."
                 : "Опишите состояние своими словами."}
             </div>
+
+            {activeModule === "body" && localStorage.getItem("body_referral_source") === "alena_client" && bodyIntakeStage === "idle" && (
+              <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "#e8f0ea", border: "1px solid #c4d0c6" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#2f2925", marginBottom: 2 }}>
+                  Вы заполняете анкету по направлению
+                </div>
+                <div style={{ fontSize: 15, color: "#2f2925", fontWeight: 600 }}>
+                  {localStorage.getItem("body_specialist_name") || "Алена Жукова"}
+                </div>
+              </div>
+            )}
+
+            {activeModule === "body" && savedBodyResult && bodyIntakeStage === "idle" && (
+              <div style={{ marginTop: 16 }}>
+                <button onClick={() => {
+                  setBodyIntakeResult(savedBodyResult);
+                  setBodyIntakeStage("result");
+                }} style={{
+                  padding: "14px 22px", borderRadius: 20, background: "#7D9A89",
+                  color: "#ffffff", fontWeight: 800, fontSize: 15, border: 0, cursor: "pointer", width: "100%",
+                }}>
+                  Вернуться к последнему плану
+                </button>
+                <div style={{ color: "#8d8378", fontSize: 12, marginTop: 6, textAlign: "center" }}>
+                  У вас уже есть план от {localStorage.getItem("body_last_created_at")
+                    ? new Date(localStorage.getItem("body_last_created_at")).toLocaleDateString("ru-RU")
+                    : "предыдущего раза"}
+                </div>
+              </div>
+            )}
 
             <div style={s.inner}>
               {mode === "voice" ? (
