@@ -38,3 +38,4 @@ textarea { width: 100%; min-height: 225px; resize: none; border-radius: 22px; bo
 .crisis h2 { margin: 0 0 10px; }
 .crisis p { margin: 0; color: #fecaca; line-height: 1.6; }
 @media (max-width: 900px) { .hero, .cards, .bottom-cards { grid-template-columns: 1fr; } .header { flex-direction: column; align-items: flex-start; } }
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -42,6 +42,7 @@ create table if not exists body_daily_logs (
   voice_transcript text,
 
   plate_photos jsonb,
+  plate_analysis jsonb,
 
   ai_day_summary text,
   ai_focus_tomorrow text,

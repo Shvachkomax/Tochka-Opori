@@ -91,6 +91,9 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
   const [dayText, setDayText] = useState("");
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [photos, setPhotos] = useState([]); // array of { dataUrl, name }
+  const [plateAnalysis, setPlateAnalysis] = useState([]);
+  const [plateAnalysisLoading, setPlateAnalysisLoading] = useState(false);
+  const [plateAnalysisError, setPlateAnalysisError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -157,6 +160,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
   }, []);
 
   function handlePhotoUpload(e) {
+    setPlateAnalysis([]);
     const files = Array.from(e.target.files || []);
     const remaining = 6 - photos.length;
     const toAdd = files.slice(0, remaining);
@@ -190,6 +194,34 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
 
   function removePhoto(idx) {
     setPhotos(prev => prev.filter((_, i) => i !== idx));
+    setPlateAnalysis([]);
+  }
+
+  async function analyzePlatePhotos() {
+    setPlateAnalysisLoading(true);
+    setPlateAnalysisError("");
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          module: "body",
+          stage: "plate_photo_analysis",
+          session_id: sessionId,
+          photos: photos.map(p => p.dataUrl),
+        }),
+      });
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.results)) {
+        setPlateAnalysis(data.results);
+      } else {
+        setPlateAnalysisError("Не удалось проанализировать фото.");
+      }
+    } catch {
+      setPlateAnalysisError("Ошибка при анализе фото. Попробуйте ещё раз.");
+    } finally {
+      setPlateAnalysisLoading(false);
+    }
   }
 
   function formatTime(sec) {
@@ -231,6 +263,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
       day_text: dayText || null,
       voice_transcript: voiceTranscript || null,
       plate_photos: photos.length > 0 ? photos.map(p => p.dataUrl) : null,
+      plate_analysis: plateAnalysis.length > 0 ? plateAnalysis : null,
     };
 
     try {
@@ -480,7 +513,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
       <div style={s.section}>
         <div style={s.sectionTitle}>Фото тарелок</div>
         <div style={{ fontSize: 13, color: "#8d8378", marginBottom: 14, lineHeight: 1.5 }}>
-          Фото нужны для наблюдения за рационом. Это не точный расчёт калорий.
+          Сфотографируйте тарелку, чтобы увидеть примерный состав блюда. Это не точный расчёт калорий.
         </div>
         {photos.length > 0 && (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
@@ -492,11 +525,72 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
             ))}
           </div>
         )}
-        {photos.length < 6 && (
-          <label style={{ display: "inline-flex", padding: "10px 18px", borderRadius: 12, border: "1px dashed #d8cec1", background: "#faf6ef", cursor: "pointer", fontSize: 14, color: "#5f574f" }}>
-            📷 Добавить фото ({photos.length}/6)
-            <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handlePhotoUpload} />
-          </label>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          {photos.length < 6 && (
+            <label style={{ display: "inline-flex", padding: "10px 18px", borderRadius: 12, border: "1px dashed #d8cec1", background: "#faf6ef", cursor: "pointer", fontSize: 14, color: "#5f574f" }}>
+              📷 Добавить фото ({photos.length}/6)
+              <input type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handlePhotoUpload} />
+            </label>
+          )}
+          {photos.length > 0 && !plateAnalysisLoading && plateAnalysis.length === 0 && (
+            <button type="button" onClick={analyzePlatePhotos} style={{
+              padding: "10px 18px", borderRadius: 12, border: "1px solid #d8cec1",
+              background: "#ffffff", cursor: "pointer", fontSize: 14, color: "#2f2925",
+              fontWeight: 600, fontFamily: "inherit",
+            }}>
+              🔍 Проанализировать тарелку
+            </button>
+          )}
+          {photos.length > 0 && plateAnalysis.length > 0 && (
+            <button type="button" onClick={analyzePlatePhotos} style={{
+              padding: "10px 18px", borderRadius: 12, border: "1px solid #d8cec1",
+              background: "#ffffff", cursor: "pointer", fontSize: 14, color: "#2f2925",
+              fontWeight: 600, fontFamily: "inherit",
+            }}>
+              🔍 Анализировать заново
+            </button>
+          )}
+        </div>
+        {plateAnalysisLoading && (
+          <div style={{ fontSize: 14, color: "#7D9A89", marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ display: "inline-block", width: 16, height: 16, border: "2px solid #7D9A89", borderRadius: "50%", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
+            Смотрим состав тарелки…
+          </div>
+        )}
+        {plateAnalysisError && (
+          <div style={{ color: "#b5473f", fontSize: 13, marginTop: 10 }}>
+            {plateAnalysisError}
+          </div>
+        )}
+        {plateAnalysis.length > 0 && (
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+            {plateAnalysis.map((a, i) => (
+              <div key={i} style={{ padding: 14, borderRadius: 12, background: "#ffffff", border: "1px solid #e8e2d8", fontSize: 14, lineHeight: 1.6 }}>
+                <div style={{ fontWeight: 700, color: "#2f2925", marginBottom: 8 }}>{a.photo_name || `Фото ${i + 1}`}</div>
+                {a.error ? (
+                  <div style={{ color: "#b5473f" }}>{a.error}</div>
+                ) : (
+                  <>
+                    {a.balance_summary && <div style={{ color: "#2f2925", marginBottom: 6 }}>{a.balance_summary}</div>}
+                    {a.what_is_missing && (
+                      <div style={{ color: "#5f574f", marginBottom: 6 }}>
+                        Чего не хватает: {Array.isArray(a.what_is_missing) ? a.what_is_missing.join(", ") : a.what_is_missing}
+                      </div>
+                    )}
+                    {a.gentle_suggestion && <div style={{ color: "#7D9A89", fontStyle: "italic", marginBottom: 8 }}>{a.gentle_suggestion}</div>}
+                    {a.confidence && typeof a.confidence === "number" && (
+                      <div style={{ color: "#8d8378", fontSize: 11, marginTop: 6 }}>
+                        Точность оценки: {Math.round(a.confidence * 100)}%
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+            <div style={{ fontSize: 11, color: "#8d8378", lineHeight: 1.4 }}>
+              ⓘ Это примерная оценка по фото, не точный расчёт калорий и не диетическая рекомендация.
+            </div>
+          </div>
         )}
       </div>
 

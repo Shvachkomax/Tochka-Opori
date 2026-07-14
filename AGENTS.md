@@ -85,19 +85,20 @@ npm run preview
 - Header/hero/alarm/voice адаптированы для health-домена
 - **BodyIntake**: полная анкета здоровья, изолированные красные флаги (healthRedFlags*), генерация кода `HEALTH-XXXX-XXX`, сохранение в localStorage
 - **body_clients таблица** (миграция 015): source (alena_client/self_signup/specialist_referral/test), specialist_id, specialist_name
-- **api/analyze.js**: trySaveIntake сохраняет source/specialist + upsert body_clients; handleDailyLogAnalysis для daily_log_submitted
+- **api/analyze.js**: trySaveIntake сохраняет source/specialist + upsert body_clients; handleDailyLogAnalysis для daily_log_submitted; **handlePlatePhotoAnalysis** для stage plate_photo_analysis
 - **api/admin.js**: multi-token RBAC (SUPER/SUPPORT/BODY_ADMIN_TOKEN), source-фильтр, слияние body_clients, soft delete/restore; daily log CRUD (listBodyDailyLogs, getBodyDailyLogDetail, deleteBodyDailyLog)
-- **App.jsx admin/body**: вкладки Анкеты / Дневники / Корзина; фильтр источника; читаемые карточки анкет + модалка с AI-разбором и планом на 7 дней; вкладка Дневники с поиском по session_id и модалка итога дня
-- **BodyDiary.jsx**: форма дневника (вес, активность, тренировка, питание, сон, самочувствие, голосовой ввод, фото тарелок)
-- Миграции 014 (deleted_at/deleted_by) и 015 (body_clients + source) применены; миграция 016 (body_daily_logs) создана, НЕ применена
+- **App.jsx admin/body**: вкладки Анкеты / Дневники / Корзина; фильтр источника; читаемые карточки анкет + модалка с AI-разбором и планом на 7 дней; вкладка Дневники с поиском по session_id и модалка итога дня; **plate_analysis** отображается под фото тарелок
+- **BodyDiary.jsx**: форма дневника (вес, активность, тренировка, питание, сон, самочувствие, голосовой ввод, фото тарелок); **кнопка «Проанализировать тарелку»** с AI-оценкой состава (правило тарелки, без калорий)
+- **prompts/body/plate-analysis.md**: промпт для анализа состава тарелки по фото
+- **src/style.css**: добавлен @keyframes spin
+- Миграции 014 (deleted_at/deleted_by) и 015 (body_clients + source) применены; миграция 016 (body_daily_logs) создана, применена
 - Всё закоммичено и залито на Vercel
 
 ### Что не сделано
 - Фото тарелок хранятся как base64 в JSONB (TODO: Supabase Storage)
-- Тестирование сценариев: повторный визит по коду, голосовой дневник, фото
+- Тестирование сценариев: повторный визит по коду, голосовой дневник, фото, анализ тарелки
 
 ### Следующий шаг
-Проверить /admin/body → вкладка Дневники: листинг, открытие, удаление.
-Проверить сценарий: заполнить анкету → «Записать день в дневник» → форма → AI-итог.
-Проверить голосовой ввод и фото тарелок.
+Проверить /admin/body → вкладка Дневники: листинг, открытие, удаление, plate_analysis.
+Проверить сценарий: заполнить анкету → «Записать день в дневник» → фото → «Проанализировать тарелку» → сохранить.
 

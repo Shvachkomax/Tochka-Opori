@@ -746,6 +746,101 @@ ${dayDesc || "Нет заполненных полей."}
   }
 }
 
+async function handlePlatePhotoAnalysis(req, res) {
+  const { session_id, photos } = req.body || {};
+
+  if (!session_id) {
+    return res.status(400).json({ error: "Missing session_id" });
+  }
+
+  if (!Array.isArray(photos) || photos.length === 0 || photos.length > 6) {
+    return res.status(400).json({ error: "Need 1-6 photos" });
+  }
+
+  const platePrompt = readModulePrompt("body", "plate-analysis.md") || "";
+  const conversationStyle = readCorePrompt("conversation-style.md") || "";
+  const systemPrompt = `${platePrompt}\n\n${conversationStyle}`;
+
+  const MODEL = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
+  const FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
+  const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
+
+  const results = [];
+
+  for (let i = 0; i < photos.length; i++) {
+    const photo = photos[i];
+    const dataUrl = typeof photo === "string" ? photo : photo.dataUrl || photo.data_url || "";
+    const photoName = typeof photo === "object" ? (photo.name || `Фото ${i + 1}`) : `Фото ${i + 1}`;
+
+    if (!dataUrl || !dataUrl.startsWith("data:image/")) {
+      results.push({
+        photo_index: i,
+        photo_name: photoName,
+        error: "Не удалось обработать фото",
+        confidence: "unclear",
+      });
+      continue;
+    }
+
+    try {
+      const userPrompt = `Проанализируй эту фотографию еды.
+
+Фото: вставлено как base64 изображение.
+
+Оцени состав тарелки по правилу тарелки. Верни JSON строго по схеме из инструкции.`;
+
+      const result = await runTask(TASK_TYPES.BODY_INTAKE, {
+        systemPrompt,
+        userPrompt,
+        model: MODEL,
+        fallbackModel: FALLBACK,
+        reasoningEffort: REASONING_EFFORT,
+        images: [dataUrl],
+      });
+
+      const parsed = result.parsed;
+
+      if (parsed && parsed.plate_components) {
+        results.push({
+          photo_index: i,
+          photo_name: photoName,
+          detected_foods: parsed.detected_foods || [],
+          plate_components: parsed.plate_components,
+          balance_summary: parsed.balance_summary || "",
+          what_is_missing: parsed.what_is_missing || [],
+          gentle_suggestion: parsed.gentle_suggestion || "",
+          confidence: parsed.confidence || "medium",
+        });
+      } else {
+        results.push({
+          photo_index: i,
+          photo_name: photoName,
+          error: "Не удалось проанализировать состав",
+          balance_summary: "Не удалось определить состав тарелки по фото.",
+          confidence: "unclear",
+        });
+      }
+    } catch (err) {
+      console.error(`Plate photo ${i} analysis error:`, err.message);
+      results.push({
+        photo_index: i,
+        photo_name: photoName,
+        error: "Ошибка анализа",
+        balance_summary: "Не удалось обработать фото. Попробуйте ещё раз.",
+        confidence: "unclear",
+      });
+    }
+  }
+
+  return res.status(200).json({
+    ok: true,
+    session_id,
+    results,
+    total_photos: photos.length,
+    analyzed: results.filter(r => !r.error).length,
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -764,6 +859,11 @@ export default async function handler(req, res) {
   // Body diary daily log stage
   if (stage === "daily_log_submitted" && activeModule === "body" && session_id && daily_log) {
     return await handleDailyLogAnalysis(req, res);
+  }
+
+  // Body plate photo analysis stage
+  if (stage === "plate_photo_analysis" && activeModule === "body" && session_id) {
+    return await handlePlatePhotoAnalysis(req, res);
   }
 
   if (!text || text.trim().length < 10) {

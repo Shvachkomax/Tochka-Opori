@@ -4897,7 +4897,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     {/* Plate photos */}
                     {bodyDiaryDetail.plate_photos?.length > 0 && (
                       <Section title="Фото тарелок">
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
                           {bodyDiaryDetail.plate_photos.map((photo, i) => (
                             <img
                               key={i}
@@ -4910,6 +4910,32 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             />
                           ))}
                         </div>
+                        {bodyDiaryDetail.plate_analysis?.length > 0 && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            {bodyDiaryDetail.plate_analysis.map((a, i) => (
+                              <div key={i} style={{ fontSize: 13, lineHeight: 1.5, padding: 12, borderRadius: 10, background: t.cardBg, border: `1px solid ${t.cardBorder}` }}>
+                                <div style={{ fontWeight: 700, color: t.text, marginBottom: 6 }}>{a.photo_name || `Фото ${i + 1}`}</div>
+                                {a.error ? (
+                                  <div style={{ color: "#b5473f" }}>{a.error}</div>
+                                ) : (
+                                  <>
+                                    {a.balance_summary && <div style={{ color: t.text, marginBottom: 4 }}>{a.balance_summary}</div>}
+                                    {a.what_is_missing && (
+                                      <div style={{ color: t.muted, marginBottom: 4 }}>
+                                        Чего не хватает: {Array.isArray(a.what_is_missing) ? a.what_is_missing.join(", ") : a.what_is_missing}
+                                      </div>
+                                    )}
+                                    {a.gentle_suggestion && <div style={{ color: "#7D9A89", fontStyle: "italic", marginBottom: 4 }}>{a.gentle_suggestion}</div>}
+                                    {a.confidence && typeof a.confidence === "number" && (
+                                      <div style={{ color: t.muted, fontSize: 11 }}>Точность: {Math.round(a.confidence * 100)}%</div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                            <div style={{ fontSize: 11, color: t.muted }}>Примерная оценка по фото, не точный расчёт калорий</div>
+                          </div>
+                        )}
                       </Section>
                     )}
 
