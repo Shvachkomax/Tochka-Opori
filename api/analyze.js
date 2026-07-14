@@ -599,10 +599,11 @@ async function handleDailyLogAnalysis(req, res) {
       "workout_done", "workout_type", "workout_minutes", "workout_intensity", "workout_comment",
       "calories", "meals_count", "breakfast", "lunch", "dinner", "snacks", "nutrition_comment",
       "overeating_level", "sweet_cravings",
-      "water_l", "sleep_hours", "sleep_quality",
+      "water_l",
+      "sleep_hours", "sleep_quality",
       "energy_level", "mood_level",
       "day_text", "voice_transcript",
-      "plate_photos",
+      "plate_photos", "plate_analysis",
     ];
     const safeLog = { session_id, module: "body" };
     for (const key of ALLOWED_COLS) {
@@ -641,7 +642,7 @@ async function handleDailyLogAnalysis(req, res) {
     const systemPrompt = `
 Ты — доброжелательный ассистент модуля "Здоровье & Стройность". Пользователь заполнил дневник дня.
 
-Твоя задача: написать короткий итог дня (2–3 предложения) и один мягкий фокус на завтра.
+Твоя задача: написать короткий итог дня (2–4 предложения) и один мягкий фокус на завтра.
 
 ПРАВИЛА:
 - Не стыдить, не ругать
@@ -653,8 +654,30 @@ async function handleDailyLogAnalysis(req, res) {
 - Если есть явные признаки: боль в груди, обморок, кровь в стуле, сильное головокружение, резкое ухудшение — написать "Лучше не продолжать программу сейчас и обратиться за медицинской помощью"
 - Верни JSON с полями: ai_day_summary (текст итога дня), ai_focus_tomorrow (один мягкий фокус на завтра)
 
+### Анализ шагов:
+- Если шагов меньше 5000: «Сегодня шагов маловато для вашей цели. Завтра можно поставить мягкую цель — выйти хотя бы на 5000 или добавить короткую прогулку.»
+- Если 5000+: «Хорошая база по активности — это уже помогает расходу энергии.»
+- Не делать жестких требований.
+
+### Анализ тренировки:
+- Если тренировки не было: не ругать, предложить короткую реалистичную активность.
+- Если была: отметить как плюс, учитывать тип и длительность.
+
+### Анализ питания и энергии:
+- Если переедания нет, но энергия/настроение низкие — не писать автоматически «всё хорошо».
+- Предположить, что дело может быть в составе тарелки, нерегулярности питания, недостатке белка/сложных углеводов/клетчатки.
+- Формулировка: «Переедания вы не отметили — это хороший знак. Но энергия и настроение низкие. Тут важно посмотреть не только размер порций, но и состав: хватает ли белка, сложных углеводов и овощей. Фото тарелок помогут увидеть это точнее.»
+
 ${conversationStyle}
 `;
+
+    const plateSummary = Array.isArray(diary.plate_analysis) && diary.plate_analysis.length > 0
+      ? diary.plate_analysis.map((p, i) => `Фото ${i + 1}: ${p.balance_summary || "—"}`).join("\n")
+      : null;
+
+    const waterNote = diary.water_glasses_done != null
+      ? `Вода: выпито ${diary.water_glasses_done} стакана(ов) из ${diary.water_goal_glasses || 5}`
+      : null;
 
     const dayDesc = [
       diary.steps ? `Шаги: ${diary.steps}` : null,
@@ -669,11 +692,13 @@ ${conversationStyle}
       diary.overeating_level !== null && diary.overeating_level !== undefined ? `Переедание: ${diary.overeating_level}` : null,
       diary.sweet_cravings ? `Тяга к сладкому: ${diary.sweet_cravings}` : null,
       diary.water_l ? `Вода: ${diary.water_l} л` : null,
+      waterNote,
       diary.sleep_hours ? `Сон: ${diary.sleep_hours} ч` : null,
       diary.sleep_quality ? `Качество сна: ${diary.sleep_quality}` : null,
       diary.energy_level ? `Энергия: ${diary.energy_level}/10` : null,
       diary.mood_level ? `Настроение: ${diary.mood_level}/10` : null,
       diary.day_text ? `Комментарий: ${diary.day_text}` : null,
+      plateSummary ? `Анализ тарелок:\n${plateSummary}` : null,
     ].filter(Boolean).join("\n");
 
     const userPrompt = `Пользователь записал день в дневник здоровья.

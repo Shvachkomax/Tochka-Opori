@@ -20,6 +20,8 @@ export default async function handler(req, res) {
         return await handleSaveConversationPairs(req, res);
       case "validateInviteToken":
         return await handleValidateInviteToken(req, res);
+      case "listBodyDailyLogs":
+        return await handleListBodyDailyLogs(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -364,6 +366,31 @@ function mergePairs(existing, incoming) {
   }
   merged.sort((a, b) => (a.round || 0) - (b.round || 0));
   return merged;
+}
+
+async function handleListBodyDailyLogs(req, res) {
+  try {
+    const { session_id } = req.body || {};
+
+    if (!session_id) {
+      return res.status(400).json({ ok: false, error: "Missing session_id" });
+    }
+
+    const { data, error } = await getSupabase()
+      .from("body_daily_logs")
+      .select("*")
+      .eq("session_id", session_id)
+      .order("log_date", { ascending: false })
+      .limit(30);
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: error.message });
+    }
+
+    return res.status(200).json({ ok: true, logs: data || [] });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message || "Error listing diary logs" });
+  }
 }
 
 async function handleValidateInviteToken(req, res) {

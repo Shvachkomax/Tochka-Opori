@@ -379,6 +379,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [bodyDiarySessionId, setBodyDiarySessionId] = useState(null);
   const [bodyDiaryOpen, setBodyDiaryOpen] = useState(false);
   const [bodyDiaryResult, setBodyDiaryResult] = useState(null);
+  const [bodyDiaryHistory, setBodyDiaryHistory] = useState(null);
+  const [bodyDiaryHistoryOpen, setBodyDiaryHistoryOpen] = useState(false);
+  const [bodyDiaryHistoryLoading, setBodyDiaryHistoryLoading] = useState(false);
+  const [bodyDiaryHistoryDetail, setBodyDiaryHistoryDetail] = useState(null);
   const [bodyDiaryRecords, setBodyDiaryRecords] = useState([]);
   const [bodyDiaryLoading, setBodyDiaryLoading] = useState(false);
   const [bodyDiaryDetail, setBodyDiaryDetail] = useState(null);
@@ -1636,6 +1640,28 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setBodyCodeCopied(true);
       setTimeout(() => setBodyCodeCopied(false), 2500);
     }).catch(() => {});
+  }
+
+  async function loadBodyDiaryHistory() {
+    setBodyDiaryHistoryLoading(true);
+    const sid = bodyDiarySessionId || bodyIntakeResult?.session_id || localStorage.getItem("body_last_session_id");
+    if (!sid) { setBodyDiaryHistoryLoading(false); return; }
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listBodyDailyLogs", session_id: sid }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setBodyDiaryHistory(data.logs);
+        setBodyDiaryHistoryOpen(true);
+      }
+    } catch (e) {
+      console.error("Failed to load diary history:", e);
+    } finally {
+      setBodyDiaryHistoryLoading(false);
+    }
   }
 
   function handleReset() {
@@ -4609,6 +4635,43 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       );
                     })()}
 
+                    {/* 3b. Lifestyle & Nutrition */}
+                    {(() => {
+                      const a = bodyIntakeDetail.answers || {};
+                      const trnTypes = Array.isArray(a.training_types) ? a.training_types.join(", ") : a.training_types;
+                      const drinks = Array.isArray(a.daily_drinks) ? a.daily_drinks.join(", ") : a.daily_drinks;
+                      const foodOrg = Array.isArray(a.food_organization) ? a.food_organization.join(", ") : a.food_organization;
+                      return (
+                        <Section title="Образ жизни и питание">
+                          <Field label="Тренировки" value={{
+                            none: "Нет",
+                            irregular: "Нерегулярно",
+                            "1_2_week": "1–2 раза в неделю",
+                            "3plus_week": "3+ раза в неделю",
+                          }[a.training_current] || a.training_current || "—"} />
+                          {trnTypes && <Field label="Типы тренировок" value={trnTypes} />}
+                          <Field label="Ограничения при нагрузке" value={a.training_limitations || "—"} />
+                          <Field label="Время отхода ко сну" value={a.sleep_bedtime || "—"} />
+                          <Field label="Время подъёма" value={a.sleep_wake_time || "—"} />
+                          <Field label="Разница будни/выходные" value={{
+                            no: "Нет",
+                            slight: "Небольшая",
+                            yes: "Сильная",
+                          }[a.sleep_schedule_shift] || a.sleep_schedule_shift || "—"} />
+                          <Field label="Напитки" value={drinks || "—"} />
+                          <Field label="Воды в день (оценка)" value={a.water_l_estimate ? `${a.water_l_estimate} л` : "—"} />
+                          <Field label="Приёмов пищи в день" value={{
+                            "1": "1",
+                            "2": "2",
+                            "3": "3",
+                            "4plus": "4+",
+                            irregular: "Нерегулярно",
+                          }[a.meals_per_day] || a.meals_per_day || "—"} />
+                          <Field label="Организация питания" value={foodOrg || "—"} />
+                        </Section>
+                      );
+                    })()}
+
                     {/* 4. Red Flags */}
                     {(() => {
                       const redFlags = bodyIntakeDetail.triggered_red_flags;
@@ -7479,21 +7542,93 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 </div>
               )}
-              <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <button onClick={() => { setBodyDiaryOpen(true); }} style={{
                   padding: "12px 20px", borderRadius: 20, background: "#7D9A89",
-                  color: "#fff", fontWeight: 700, border: 0, cursor: "pointer", flex: 1,
+                  color: "#fff", fontWeight: 700, border: 0, cursor: "pointer", flex: 1, minWidth: 160,
                 }}>
                   Записать ещё день
                 </button>
+                <button onClick={loadBodyDiaryHistory} style={{
+                  padding: "12px 20px", borderRadius: 20, background: "#ffffff",
+                  color: "#5f574f", fontWeight: 600, border: "1px solid #d8cec1", cursor: "pointer", flex: 1, minWidth: 160,
+                }}>
+                  {bodyDiaryHistoryLoading ? "Загрузка..." : "Мои прошлые дни"}
+                </button>
                 <button onClick={() => { setBodyDiaryResult(null); }} style={{
                   padding: "12px 20px", borderRadius: 20, background: "#ede7dc",
-                  color: "#2f2925", fontWeight: 700, border: "1px solid #d8cec1", cursor: "pointer",
+                  color: "#2f2925", fontWeight: 600, border: "1px solid #d8cec1", cursor: "pointer",
                 }}>
                   Закрыть
                 </button>
               </div>
             </section>
+          )}
+
+          {/* Diary history modal */}
+          {bodyDiaryHistoryOpen && (
+            <div style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1000,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }} onClick={() => setBodyDiaryHistoryOpen(false)}>
+              <div style={{
+                background: "#ffffff", borderRadius: 20, padding: 28, maxWidth: 640, width: "90%",
+                maxHeight: "80vh", overflowY: "auto",
+              }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "#2f2925" }}>Мои прошлые дни</div>
+                  <button onClick={() => setBodyDiaryHistoryOpen(false)} style={{ background: "none", border: 0, fontSize: 20, cursor: "pointer", color: "#8d8378" }}>✕</button>
+                </div>
+                {bodyDiaryHistoryDetail ? (
+                  <div>
+                    <button onClick={() => setBodyDiaryHistoryDetail(null)} style={{
+                      background: "none", border: 0, color: "#7D9A89", cursor: "pointer",
+                      fontWeight: 600, fontSize: 14, marginBottom: 16, display: "inline-flex", alignItems: "center", gap: 4,
+                    }}>
+                      ← Назад к списку
+                    </button>
+                    <div style={{ fontSize: 14, color: "#2f2925", marginBottom: 8 }}>
+                      {bodyDiaryHistoryDetail.log_date}
+                    </div>
+                    {bodyDiaryHistoryDetail.ai_day_summary && (
+                      <div style={{ padding: 14, borderRadius: 12, background: "#f6f9f7", marginBottom: 12, fontSize: 14, lineHeight: 1.6 }}>
+                        {bodyDiaryHistoryDetail.ai_day_summary}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, color: "#5f574f" }}>
+                      {bodyDiaryHistoryDetail.steps != null && <div>🚶 Шаги: {bodyDiaryHistoryDetail.steps}</div>}
+                      {bodyDiaryHistoryDetail.workout_done && <div>💪 Тренировка: {bodyDiaryHistoryDetail.workout_type || "да"}{bodyDiaryHistoryDetail.workout_minutes ? ` (${bodyDiaryHistoryDetail.workout_minutes} мин)` : ""}</div>}
+                      {bodyDiaryHistoryDetail.sleep_hours != null && <div>😴 Сон: {bodyDiaryHistoryDetail.sleep_hours} ч</div>}
+                      {bodyDiaryHistoryDetail.water_l != null && <div>💧 Вода: {bodyDiaryHistoryDetail.water_l} л</div>}
+                      {bodyDiaryHistoryDetail.energy_level != null && <div>⚡ Энергия: {bodyDiaryHistoryDetail.energy_level}/10</div>}
+                      {bodyDiaryHistoryDetail.mood_level != null && <div>😊 Настроение: {bodyDiaryHistoryDetail.mood_level}/10</div>}
+                    </div>
+                  </div>
+                ) : (
+                  bodyDiaryHistory?.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {bodyDiaryHistory.map((log, i) => (
+                        <button key={i} onClick={() => setBodyDiaryHistoryDetail(log)} style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          padding: "14px 16px", borderRadius: 14, background: "#f6f0e7",
+                          border: "1px solid #e8e2d8", cursor: "pointer", width: "100%", textAlign: "left",
+                          fontFamily: "inherit", fontSize: 14, color: "#2f2925",
+                        }}>
+                          <span style={{ fontWeight: 600 }}>{log.log_date}</span>
+                          <span style={{ color: "#8d8378", fontSize: 13 }}>
+                            {log.ai_day_summary ? "✓ есть итог" : "—"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: "center", padding: "30px 0", color: "#8d8378" }}>
+                      {bodyDiaryHistoryLoading ? "Загрузка..." : "Пока нет записей"}
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
           )}
 
           {/* Default support card / body card before intake */}

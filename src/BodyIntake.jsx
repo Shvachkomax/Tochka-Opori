@@ -14,6 +14,16 @@ const FIELD_LABELS = {
   health_limitations: "Ограничения по здоровью (необязательно)",
   sleep_hours_estimate: "Сколько часов в сутки вы спите?",
   nutrition_main_problem: "Главная проблема питания",
+  training_current: "Тренируетесь ли сейчас?",
+  training_types: "Какие тренировки бывают?",
+  training_limitations: "Есть ли ограничения или дискомфорт при нагрузке?",
+  sleep_bedtime: "Во сколько обычно ложитесь?",
+  sleep_wake_time: "Во сколько обычно встаете?",
+  sleep_schedule_shift: "Есть ли сильная разница между буднями и выходными?",
+  daily_drinks: "Что вы пьете в течение дня?",
+  water_l_estimate: "Сколько примерно воды в день? (если знаете)",
+  meals_per_day: "Сколько обычно приемов пищи в день?",
+  food_organization: "Как обычно организовано питание?",
   red_flags_check: "Отметьте, если что-то из этого было в последнее время",
 };
 
@@ -59,6 +69,59 @@ const NUTRITION_OPTIONS = [
   { value: "portion_control", label: "Контроль порций" },
   { value: "snacking", label: "Частые перекусы" },
   { value: "other", label: "Другое" },
+];
+
+const TRAINING_CURRENT_OPTIONS = [
+  { value: "none", label: "Нет" },
+  { value: "irregular", label: "Да, нерегулярно" },
+  { value: "1_2_week", label: "Да, 1–2 раза в неделю" },
+  { value: "3plus_week", label: "Да, 3+ раза в неделю" },
+];
+
+const TRAINING_TYPES_OPTIONS = [
+  { value: "strength", label: "Силовые" },
+  { value: "cardio", label: "Кардио" },
+  { value: "walking", label: "Ходьба" },
+  { value: "pool", label: "Бассейн" },
+  { value: "stretching", label: "Растяжка / мобилити" },
+  { value: "group", label: "Групповые занятия" },
+  { value: "other", label: "Другое" },
+];
+
+const SLEEP_SHIFT_OPTIONS = [
+  { value: "no", label: "Нет, примерно одинаково" },
+  { value: "slight", label: "Небольшая разница" },
+  { value: "yes", label: "Да, сильно отличается" },
+];
+
+const DRINKS_OPTIONS = [
+  { value: "water", label: "Вода" },
+  { value: "tea", label: "Чай" },
+  { value: "coffee", label: "Кофе" },
+  { value: "sweet", label: "Сладкие напитки" },
+  { value: "juice", label: "Соки" },
+  { value: "energy", label: "Энергетики" },
+  { value: "alcohol", label: "Алкоголь" },
+  { value: "rarely_water", label: "Почти не пью воду" },
+  { value: "other_drinks", label: "Другое" },
+];
+
+const MEALS_OPTIONS = [
+  { value: "1", label: "1" },
+  { value: "2", label: "2" },
+  { value: "3", label: "3" },
+  { value: "4plus", label: "4+" },
+  { value: "irregular", label: "Нерегулярно" },
+];
+
+const FOOD_ORG_OPTIONS = [
+  { value: "self_cook", label: "Готовлю сам / сама" },
+  { value: "cafeteria", label: "Ем в столовой / кафе / общепите" },
+  { value: "ready_meal", label: "Заказываю готовую еду" },
+  { value: "take_away", label: "Беру еду с собой" },
+  { value: "snacks", label: "Часто перекусываю из магазина" },
+  { value: "irregular_food", label: "Ем нерегулярно, как получится" },
+  { value: "other_food", label: "Другое" },
 ];
 
 const RED_FLAGS_OPTIONS = [
@@ -123,6 +186,16 @@ export default function BodyIntake({ onComplete }) {
     health_limitations: "",
     sleep_hours_estimate: "",
     nutrition_main_problem: "",
+    training_current: "",
+    training_types: [],
+    training_limitations: "",
+    sleep_bedtime: "",
+    sleep_wake_time: "",
+    sleep_schedule_shift: "",
+    daily_drinks: [],
+    water_l_estimate: "",
+    meals_per_day: "",
+    food_organization: [],
     red_flags_check: [],
   });
 
@@ -134,6 +207,14 @@ export default function BodyIntake({ onComplete }) {
     setFields(prev => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: null }));
     if (submitError) setSubmitError("");
+  }
+
+  function toggleMulti(key, value) {
+    setFields(prev => {
+      const current = prev[key];
+      if (current.includes(value)) return { ...prev, [key]: current.filter(v => v !== value) };
+      return { ...prev, [key]: [...current, value] };
+    });
   }
 
   function toggleRedFlag(value) {
@@ -159,6 +240,8 @@ export default function BodyIntake({ onComplete }) {
     if (!fields.daily_steps_estimate) errs.daily_steps_estimate = "Оцените количество шагов";
     if (!fields.sleep_hours_estimate) errs.sleep_hours_estimate = "Оцените сон";
     if (!fields.nutrition_main_problem) errs.nutrition_main_problem = "Выберите главную проблему питания";
+    if (fields.training_current && fields.training_current !== "none" && fields.training_types.length === 0) errs.training_types = "Укажите типы тренировок";
+    if (!fields.meals_per_day) errs.meals_per_day = "Укажите количество приёмов пищи";
     if (!fields.red_flags_check.length) errs.red_flags_check = "Отметьте симптомы или «ничего из перечисленного»";
     return errs;
   }
@@ -201,11 +284,12 @@ export default function BodyIntake({ onComplete }) {
     }
   }
 
-  const totalFields = 13;
+  const totalFields = 20;
   const filled = Object.entries(fields).filter(([k, v]) => {
     if (k === "goal_custom") return false;
-    if (k === "waist_cm" || k === "health_limitations") return false;
-    if (k === "red_flags_check") return v.length > 0;
+    const optional = ["waist_cm", "health_limitations", "training_limitations", "water_l_estimate", "sleep_bedtime", "sleep_wake_time"];
+    if (optional.includes(k)) return false;
+    if (k === "red_flags_check" || k === "training_types" || k === "daily_drinks" || k === "food_organization") return v.length > 0;
     return v !== "";
   }).length;
   const progress = Math.min(filled / totalFields, 1);
@@ -375,11 +459,70 @@ export default function BodyIntake({ onComplete }) {
 
       {select("daily_steps_estimate", STEPS_OPTIONS)}
       {select("sleep_hours_estimate", SLEEP_OPTIONS)}
+
+      <div style={{ ...s.field, marginTop: 32 }}>
+        <div style={{ ...s.label, fontSize: 17, borderBottom: "1px solid #e8e2d8", paddingBottom: 8 }}>Режим сна</div>
+      </div>
+      {input("sleep_bedtime", "text", "Например: 23:00")}
+      {input("sleep_wake_time", "text", "Например: 7:00")}
+      {select("sleep_schedule_shift", SLEEP_SHIFT_OPTIONS)}
+
       {select("nutrition_main_problem", NUTRITION_OPTIONS)}
+
+      <div style={{ ...s.field, marginTop: 32 }}>
+        <div style={{ ...s.label, fontSize: 17, borderBottom: "1px solid #e8e2d8", paddingBottom: 8 }}>Тренировки</div>
+      </div>
+      {select("training_current", TRAINING_CURRENT_OPTIONS)}
+      {fields.training_current && fields.training_current !== "none" && (
+        <div style={s.field}>
+          <label style={s.label}>{FIELD_LABELS.training_types}</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 6 }}>
+            {TRAINING_TYPES_OPTIONS.map(o => (
+              <label key={o.value} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 15, color: "#5f574f" }}>
+                <input type="checkbox" checked={fields.training_types.includes(o.value)} onChange={() => toggleMulti("training_types", o.value)} style={{ accentColor: "#86a08f", width: 20, height: 20 }} />
+                {o.label}
+              </label>
+            ))}
+          </div>
+          {errors.training_types && <div style={s.error}>{errors.training_types}</div>}
+        </div>
+      )}
+      <div style={s.field}>
+        <label style={s.label}>{FIELD_LABELS.training_limitations} <span style={s.optional}>(необязательно)</span></label>
+        <textarea className="body-intake-textarea" style={s.textarea} value={fields.training_limitations} onChange={e => set("training_limitations", e.target.value)} placeholder="Например: болят колени при беге, дискомфорт в пояснице..." />
+      </div>
+
+      <div style={{ ...s.field, marginTop: 32 }}>
+        <div style={{ ...s.label, fontSize: 17, borderBottom: "1px solid #e8e2d8", paddingBottom: 8 }}>Питание и напитки</div>
+      </div>
+      {select("meals_per_day", MEALS_OPTIONS)}
+      <div style={s.field}>
+        <label style={s.label}>{FIELD_LABELS.daily_drinks}</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 6 }}>
+          {DRINKS_OPTIONS.map(o => (
+            <label key={o.value} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 15, color: "#5f574f" }}>
+              <input type="checkbox" checked={fields.daily_drinks.includes(o.value)} onChange={() => toggleMulti("daily_drinks", o.value)} style={{ accentColor: "#86a08f", width: 20, height: 20 }} />
+              {o.label}
+            </label>
+          ))}
+        </div>
+      </div>
+      {input("water_l_estimate", "number", "Например: 1.5")}
+      <div style={s.field}>
+        <label style={s.label}>{FIELD_LABELS.food_organization}</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 6 }}>
+          {FOOD_ORG_OPTIONS.map(o => (
+            <label key={o.value} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 15, color: "#5f574f" }}>
+              <input type="checkbox" checked={fields.food_organization.includes(o.value)} onChange={() => toggleMulti("food_organization", o.value)} style={{ accentColor: "#86a08f", width: 20, height: 20 }} />
+              {o.label}
+            </label>
+          ))}
+        </div>
+      </div>
 
       <div style={s.field}>
         <label style={s.label}>{FIELD_LABELS.health_limitations} <span style={s.optional}>(необязательно)</span></label>
-        <textarea className="body-intake-textarea" style={s.textarea} value={fields.health_limitations} onChange={e => set("health_limitations", e.target.value)} placeholder="Например: проблемы с коленями, гипертония, диабет..." />
+        <textarea className="body-intake-textarea" style={s.textarea} value={fields.health_limitations} onChange={e => set("health_limitations", e.target.value)} placeholder="Например: проблемы с коленями, гипертония, диабет, гипотиреоз..." />
       </div>
 
       <div className="healthRedFlagsBlock">

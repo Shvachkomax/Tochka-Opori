@@ -84,6 +84,8 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
   const [overeatingLevel, setOvereatingLevel] = useState("");
   const [sweetCravings, setSweetCravings] = useState("");
   const [waterL, setWaterL] = useState("");
+  const [waterGlassesDone, setWaterGlassesDone] = useState(0);
+  const [waterGoalGlasses, setWaterGoalGlasses] = useState(5);
   const [sleepHours, setSleepHours] = useState("");
   const [sleepQuality, setSleepQuality] = useState("");
   const [energyLevel, setEnergyLevel] = useState(5);
@@ -458,6 +460,40 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
           <div style={s.field}>
             <label style={s.label}>Вода, литры</label>
             <input style={s.input} type="number" step="0.1" placeholder="1.5" value={waterL} onChange={e => setWaterL(e.target.value)} />
+            <div style={{ marginTop: 10 }}>
+              <label style={{ ...s.label, fontSize: 13, marginBottom: 6 }}>Стаканы воды сегодня ({waterGlassesDone}/{waterGoalGlasses})</label>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {Array.from({ length: waterGoalGlasses }, (_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setWaterGlassesDone(i < waterGlassesDone ? i : i + 1)}
+                    style={{
+                      width: 40, height: 40, borderRadius: 10,
+                      border: i < waterGlassesDone ? "2px solid #7D9A89" : "2px solid #d8cec1",
+                      background: i < waterGlassesDone ? "#e8f0ea" : "#ffffff",
+                      color: i < waterGlassesDone ? "#7D9A89" : "#8d8378",
+                      fontSize: 18, cursor: "pointer", display: "flex",
+                      alignItems: "center", justifyContent: "center",
+                      transition: "all .15s",
+                    }}
+                    title={i < waterGlassesDone ? "Убрать стакан" : "Выпить стакан"}
+                  >
+                    🥤
+                  </button>
+                ))}
+              </div>
+              {waterGlassesDone >= waterGoalGlasses && (
+                <div style={{ fontSize: 13, color: "#7D9A89", marginTop: 6, fontWeight: 600 }}>
+                  ✓ Отлично, питьевой режим сегодня закрыт.
+                </div>
+              )}
+              {waterGlassesDone > 0 && waterGlassesDone < waterGoalGlasses && (
+                <div style={{ fontSize: 12, color: "#8d8378", marginTop: 4 }}>
+                  До цели ещё {waterGoalGlasses - waterGlassesDone} {waterGoalGlasses - waterGlassesDone === 1 ? "стакан" : "стакана"}
+                </div>
+              )}
+            </div>
           </div>
           <div style={s.field}>
             <label style={s.label}>Сон, часов</label>
