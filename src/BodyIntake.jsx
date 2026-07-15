@@ -398,6 +398,56 @@ export default function BodyIntake({ onComplete }) {
           padding: 0;
         }
 
+        .healthCheckboxList {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          margin-top: 6px;
+        }
+        .healthCheckboxItem {
+          display: grid;
+          grid-template-columns: 24px minmax(0, 1fr);
+          align-items: start;
+          gap: 10px;
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+          cursor: pointer;
+          color: #5f574f;
+          font-size: 15px;
+          line-height: 1.35;
+          padding: 0;
+          margin: 0;
+          position: static;
+          transform: none;
+        }
+        .healthCheckboxInput {
+          width: 20px;
+          height: 20px;
+          min-width: 20px;
+          margin: 2px 0 0 0;
+          padding: 0;
+          accent-color: #86a08f;
+          position: static;
+          transform: none;
+        }
+        .healthCheckboxText {
+          display: block;
+          min-width: 0;
+          max-width: 100%;
+          white-space: normal;
+          overflow-wrap: break-word;
+          word-break: normal;
+          line-height: 1.35;
+          margin: 0;
+          padding: 0;
+          position: static;
+          transform: none;
+        }
+
         @media (max-width: 640px) {
           form[data-body-intake] {
             max-width: 100% !important;
@@ -427,6 +477,28 @@ export default function BodyIntake({ onComplete }) {
             overflow-wrap: break-word !important;
             word-break: normal !important;
             margin-left: 0 !important;
+            position: static !important;
+            transform: none !important;
+          }
+          .healthCheckboxList {
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          .healthCheckboxItem {
+            display: grid !important;
+            grid-template-columns: 24px minmax(0, 1fr) !important;
+            gap: 10px !important;
+            align-items: start !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          .healthCheckboxText {
+            min-width: 0 !important;
+            max-width: 100% !important;
+            white-space: normal !important;
+            overflow-wrap: break-word !important;
+            word-break: normal !important;
+            font-size: 15px !important;
             position: static !important;
             transform: none !important;
           }
@@ -476,11 +548,11 @@ export default function BodyIntake({ onComplete }) {
       {fields.training_current && fields.training_current !== "none" && (
         <div style={s.field}>
           <label style={s.label}>{FIELD_LABELS.training_types}</label>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 6 }}>
+          <div className="healthCheckboxList">
             {TRAINING_TYPES_OPTIONS.map(o => (
-              <label key={o.value} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 15, color: "#5f574f" }}>
-                <input type="checkbox" checked={fields.training_types.includes(o.value)} onChange={() => toggleMulti("training_types", o.value)} style={{ accentColor: "#86a08f", width: 20, height: 20 }} />
-                {o.label}
+              <label key={o.value} className="healthCheckboxItem">
+                <input className="healthCheckboxInput" type="checkbox" checked={fields.training_types.includes(o.value)} onChange={() => toggleMulti("training_types", o.value)} />
+                <span className="healthCheckboxText">{o.label}</span>
               </label>
             ))}
           </div>
@@ -498,11 +570,11 @@ export default function BodyIntake({ onComplete }) {
       {select("meals_per_day", MEALS_OPTIONS)}
       <div style={s.field}>
         <label style={s.label}>{FIELD_LABELS.daily_drinks}</label>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 6 }}>
+        <div className="healthCheckboxList">
           {DRINKS_OPTIONS.map(o => (
-            <label key={o.value} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 15, color: "#5f574f" }}>
-              <input type="checkbox" checked={fields.daily_drinks.includes(o.value)} onChange={() => toggleMulti("daily_drinks", o.value)} style={{ accentColor: "#86a08f", width: 20, height: 20 }} />
-              {o.label}
+            <label key={o.value} className="healthCheckboxItem">
+              <input className="healthCheckboxInput" type="checkbox" checked={fields.daily_drinks.includes(o.value)} onChange={() => toggleMulti("daily_drinks", o.value)} />
+              <span className="healthCheckboxText">{o.label}</span>
             </label>
           ))}
         </div>
@@ -510,11 +582,11 @@ export default function BodyIntake({ onComplete }) {
       {input("water_l_estimate", "number", "Например: 1.5")}
       <div style={s.field}>
         <label style={s.label}>{FIELD_LABELS.food_organization}</label>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 6 }}>
+        <div className="healthCheckboxList">
           {FOOD_ORG_OPTIONS.map(o => (
-            <label key={o.value} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 15, color: "#5f574f" }}>
-              <input type="checkbox" checked={fields.food_organization.includes(o.value)} onChange={() => toggleMulti("food_organization", o.value)} style={{ accentColor: "#86a08f", width: 20, height: 20 }} />
-              {o.label}
+            <label key={o.value} className="healthCheckboxItem">
+              <input className="healthCheckboxInput" type="checkbox" checked={fields.food_organization.includes(o.value)} onChange={() => toggleMulti("food_organization", o.value)} />
+              <span className="healthCheckboxText">{o.label}</span>
             </label>
           ))}
         </div>
