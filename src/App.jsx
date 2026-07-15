@@ -388,7 +388,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [bodyDiaryDetail, setBodyDiaryDetail] = useState(null);
   const [bodyDiaryDetailOpen, setBodyDiaryDetailOpen] = useState(false);
   const [bodyDiarySessionFilter, setBodyDiarySessionFilter] = useState("");
-  const [bodyAdminTab, setBodyAdminTab] = useState("intake"); // intake | diary | trash
+  const [bodyAdminTab, setBodyAdminTab] = useState("intake"); // intake | diary | trash | reviews
+  const [bodyExpertReviews, setBodyExpertReviews] = useState([]);
+  const [bodyExpertReviewsLoading, setBodyExpertReviewsLoading] = useState(false);
+  const [bodyExpertReviewFormOpen, setBodyExpertReviewFormOpen] = useState(false);
+  const [bodyExpertReviewForm, setBodyExpertReviewForm] = useState(null);
+  const [bodyExpertReviewSaving, setBodyExpertReviewSaving] = useState(false);
+  const [bodyExportingCases, setBodyExportingCases] = useState(false);
 
   // Restore body intake result from localStorage
   const [savedBodyResult, setSavedBodyResult] = useState(() => {
@@ -1904,6 +1910,94 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       showToast("Ошибка загрузки дневников", "error");
     } finally {
       setBodyDiaryLoading(false);
+    }
+  }
+
+  async function adminLoadBodyExpertReviews() {
+    setBodyExpertReviewsLoading(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listBodyExpertReviews", password: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setBodyExpertReviews(data.records || []);
+      }
+    } catch {
+      showToast("Ошибка загрузки правок", "error");
+    } finally {
+      setBodyExpertReviewsLoading(false);
+    }
+  }
+
+  function adminOpenBodyExpertReviewForm(targetType, targetId, sessionId, sourcePayload, aiOutput) {
+    setBodyExpertReviewForm({
+      target_type: targetType,
+      target_id: targetId,
+      session_id: sessionId,
+      reviewer_name: "Алена Жукова",
+      reviewer_role: "body_expert",
+      rating_safety: "ok",
+      rating_usefulness: 3,
+      rating_practicality: 3,
+      rating_tone: 3,
+      error_tags: [],
+      what_ai_did_well: "",
+      what_ai_missed: "",
+      corrected_recommendation: "",
+      suggested_questions: "",
+      expert_comment: "",
+      source_payload: sourcePayload || null,
+      ai_output: aiOutput || null,
+    });
+    setBodyExpertReviewFormOpen(true);
+  }
+
+  async function adminSaveBodyExpertReview() {
+    if (!bodyExpertReviewForm) return;
+    setBodyExpertReviewSaving(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "saveBodyExpertReview", password: adminPassword, review: bodyExpertReviewForm }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Правка сохранена", "success");
+        setBodyExpertReviewFormOpen(false);
+        adminLoadBodyExpertReviews();
+      } else {
+        showToast(data.error || "Ошибка сохранения", "error");
+      }
+    } catch {
+      showToast("Ошибка сохранения", "error");
+    } finally {
+      setBodyExpertReviewSaving(false);
+    }
+  }
+
+  async function adminExportBodyExpertCases() {
+    setBodyExportingCases(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "exportBodyExpertCases", password: adminPassword }),
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `body-expert-cases-${new Date().toISOString().split("T")[0]}.jsonl`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      showToast("Ошибка выгрузки", "error");
+    } finally {
+      setBodyExportingCases(false);
     }
   }
 
@@ -4193,26 +4287,27 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
               {/* Tabs: Анкеты | Дневники | Корзина */}
               <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                {["intake", "diary", "trash"].map(tab => (
-                  <button
-                    key={tab}
-                    style={{
-                      border: 0, borderRadius: 14, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer",
-                      background: bodyAdminTab === tab ? t.tabActive : t.tabBg,
-                      color: bodyAdminTab === tab ? t.tabActiveText : t.text,
-                    }}
-                    onClick={() => {
-                      setBodyAdminTab(tab);
-                      setBodyIntakeDetailOpen(false);
-                      setBodyDiaryDetailOpen(false);
-                      if (tab === "intake") { setBodyIntakeShowDeleted(false); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }
-                      else if (tab === "trash") { setBodyIntakeShowDeleted(true); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }
-                      else if (tab === "diary") { adminLoadBodyDailyLogs(); }
-                    }}
-                  >
-                    {tab === "intake" ? "Анкеты" : tab === "diary" ? "Дневники" : "Корзина"}
-                  </button>
-                ))}
+          {["intake", "diary", "trash", "reviews"].map(tab => (
+            <button
+              key={tab}
+              style={{
+                border: 0, borderRadius: 14, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                background: bodyAdminTab === tab ? t.tabActive : t.tabBg,
+                color: bodyAdminTab === tab ? t.tabActiveText : t.text,
+              }}
+              onClick={() => {
+                setBodyAdminTab(tab);
+                setBodyIntakeDetailOpen(false);
+                setBodyDiaryDetailOpen(false);
+                if (tab === "intake") { setBodyIntakeShowDeleted(false); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }
+                else if (tab === "trash") { setBodyIntakeShowDeleted(true); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }
+                else if (tab === "diary") { adminLoadBodyDailyLogs(); }
+                else if (tab === "reviews") { adminLoadBodyExpertReviews(); }
+              }}
+            >
+              {tab === "intake" ? "Анкеты" : tab === "diary" ? "Дневники" : tab === "trash" ? "Корзина" : "Экспертные правки"}
+            </button>
+          ))}
               </div>
 
               {/* Source filter tabs (only for intake tab) */}
@@ -4499,6 +4594,217 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     </div>
                   )}
                 </>
+              )}
+
+              {/* Reviews tab */}
+              {bodyAdminTab === "reviews" && (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>
+                      Экспертные правки ({bodyExpertReviews.length})
+                    </div>
+                    <button
+                      onClick={adminExportBodyExpertCases}
+                      disabled={bodyExportingCases}
+                      style={{
+                        padding: "10px 18px", borderRadius: 12, border: `1px solid ${t.border}`,
+                        background: t.tabBg, color: t.text, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                        opacity: bodyExportingCases ? 0.5 : 1,
+                      }}
+                    >
+                      {bodyExportingCases ? "Выгрузка..." : "Скачать кейсы (.jsonl)"}
+                    </button>
+                  </div>
+                  {bodyExpertReviewsLoading ? (
+                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>Загрузка...</div>
+                  ) : bodyExpertReviews.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>
+                      <div style={{ fontSize: 18, marginBottom: 8 }}>Экспертных правок пока нет</div>
+                      <div style={{ fontSize: 13 }}>Откройте анкету или дневник и нажмите «Экспертная правка»</div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {bodyExpertReviews.map((r, i) => (
+                        <div key={r.id || i} style={{
+                          border: `1px solid ${t.cardBorder}`, borderRadius: 16, padding: "14px 18px",
+                          background: t.cardBg,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                            <div style={{ fontSize: 13, color: t.muted }}>
+                              {new Date(r.created_at).toLocaleString("ru-RU")} · {r.reviewer_name}
+                            </div>
+                            <div style={{ fontSize: 12, color: t.muted }}>
+                              {r.target_type === "intake" ? "Анкета" : r.target_type === "daily_log" ? "Дневник" : "Тарелка"}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 12, color: t.muted, marginBottom: 4 }}>
+                            <span>Безопасность: {r.rating_safety || "—"}</span>
+                            <span>Полезность: {r.rating_usefulness ?? "—"}/5</span>
+                            <span>Практичность: {r.rating_practicality ?? "—"}/5</span>
+                            <span>Тон: {r.rating_tone ?? "—"}/5</span>
+                          </div>
+                          {Array.isArray(r.error_tags) && r.error_tags.length > 0 && (
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 4 }}>
+                              {r.error_tags.map((tag, j) => (
+                                <span key={j} style={{
+                                  fontSize: 11, padding: "2px 8px", borderRadius: 6,
+                                  background: "rgba(239,68,68,.1)", color: "#991b1b",
+                                }}>
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {r.corrected_recommendation && (
+                            <div style={{ fontSize: 13, color: t.text, lineHeight: 1.5, marginTop: 4, fontStyle: "italic" }}>
+                              {r.corrected_recommendation.slice(0, 200)}{r.corrected_recommendation.length > 200 ? "..." : ""}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Expert review form modal */}
+              {bodyExpertReviewFormOpen && bodyExpertReviewForm && (
+                <div style={{
+                  position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 1100,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }} onClick={() => setBodyExpertReviewFormOpen(false)}>
+                  <div style={{
+                    background: "#ffffff", borderRadius: 20, padding: 28, maxWidth: 600, width: "90%",
+                    maxHeight: "85vh", overflowY: "auto",
+                  }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: "#2f2925" }}>
+                        Экспертная правка
+                      </div>
+                      <button onClick={() => setBodyExpertReviewFormOpen(false)} style={{ background: "none", border: 0, fontSize: 20, cursor: "pointer", color: "#8d8378" }}>✕</button>
+                    </div>
+
+                    <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 16 }}>
+                      {bodyExpertReviewForm.target_type === "intake" ? "Анкета здоровья" :
+                       bodyExpertReviewForm.target_type === "daily_log" ? "Дневник" : "Анализ тарелки"}
+                      {" · "}
+                      {bodyExpertReviewForm.session_id}
+                    </div>
+
+                    {/* Safety */}
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#2f2925", marginBottom: 6 }}>Безопасность</label>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {[
+                          { value: "ok", label: "Ок" },
+                          { value: "questionable", label: "Спорно" },
+                          { value: "dangerous", label: "Опасно" },
+                        ].map(o => (
+                          <button key={o.value} type="button" onClick={() => setBodyExpertReviewForm(prev => ({ ...prev, rating_safety: o.value }))} style={{
+                            padding: "8px 16px", borderRadius: 10, border: bodyExpertReviewForm.rating_safety === o.value ? "2px solid #7D9A89" : "1px solid #d8cec1",
+                            background: bodyExpertReviewForm.rating_safety === o.value ? "#e8f0ea" : "#ffffff",
+                            color: "#2f2925", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                          }}>
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Ratings */}
+                    {["rating_usefulness", "rating_practicality", "rating_tone"].map((key, idx) => (
+                      <div key={key} style={{ marginBottom: 14 }}>
+                        <label style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#2f2925", marginBottom: 4 }}>
+                          {["Полезность", "Практичность", "Тон"][idx]}
+                        </label>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {[1, 2, 3, 4, 5].map(n => (
+                            <button key={n} type="button" onClick={() => setBodyExpertReviewForm(prev => ({ ...prev, [key]: n }))} style={{
+                              width: 36, height: 36, borderRadius: 8,
+                              border: bodyExpertReviewForm[key] === n ? "2px solid #7D9A89" : "1px solid #d8cec1",
+                              background: bodyExpertReviewForm[key] === n ? "#e8f0ea" : "#ffffff",
+                              color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                            }}>
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Error tags */}
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#2f2925", marginBottom: 6 }}>Ошибки</label>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {[
+                          "не хватает вопросов", "слишком общий план", "неверная оценка питания",
+                          "неверная оценка активности", "неверная оценка сна", "неверная оценка тарелки",
+                          "нужно к врачу", "слишком жестко", "слишком мягко", "канцелярит", "другое",
+                        ].map(tag => {
+                          const checked = bodyExpertReviewForm.error_tags.includes(tag);
+                          return (
+                            <label key={tag} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "#5f574f" }}>
+                              <input type="checkbox" checked={checked} onChange={() => {
+                                setBodyExpertReviewForm(prev => ({
+                                  ...prev,
+                                  error_tags: checked
+                                    ? prev.error_tags.filter(t => t !== tag)
+                                    : [...prev.error_tags, tag],
+                                }));
+                              }} style={{ accentColor: "#86a08f", width: 18, height: 18 }} />
+                              {tag}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Text fields */}
+                    {[
+                      { key: "what_ai_did_well", label: "Что AI сделал хорошо" },
+                      { key: "what_ai_missed", label: "Что AI упустил" },
+                      { key: "corrected_recommendation", label: "Как бы вы сформулировали рекомендацию" },
+                      { key: "suggested_questions", label: "Какие вопросы нужно добавить" },
+                      { key: "expert_comment", label: "Комментарий эксперта" },
+                    ].map(f => (
+                      <div key={f.key} style={{ marginBottom: 14 }}>
+                        <label style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#2f2925", marginBottom: 4 }}>{f.label}</label>
+                        <textarea
+                          style={{
+                            width: "100%", minHeight: 60, padding: 10, borderRadius: 10,
+                            border: "1px solid #d8cec1", fontSize: 14, fontFamily: "inherit",
+                            resize: "vertical", outline: "none", boxSizing: "border-box",
+                          }}
+                          value={bodyExpertReviewForm[f.key] || ""}
+                          onChange={e => setBodyExpertReviewForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                        />
+                      </div>
+                    ))}
+
+                    <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                      <button
+                        onClick={adminSaveBodyExpertReview}
+                        disabled={bodyExpertReviewSaving}
+                        style={{
+                          flex: 1, height: 48, borderRadius: 14, border: 0,
+                          background: bodyExpertReviewSaving ? "#c4d0c6" : "#7D9A89",
+                          color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
+                        }}
+                      >
+                        {bodyExpertReviewSaving ? "Сохраняем..." : "Сохранить правку"}
+                      </button>
+                      <button
+                        onClick={() => setBodyExpertReviewFormOpen(false)}
+                        style={{
+                          padding: "0 24px", borderRadius: 14, border: "1px solid #d8cec1",
+                          background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                        }}
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* Delete confirmation modal */}
@@ -4822,15 +5128,33 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     </details>
 
                     {/* Actions */}
-                    <div style={{ display: "flex", gap: 12 }}>
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                       <button
                         onClick={() => adminDownloadBodyIntakeJSON(bodyIntakeDetail)}
                         style={{
                           background: t.accent, color: "#fff", border: 0, borderRadius: 12,
-                          padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", flex: 1,
+                          padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", flex: 1, minWidth: 140,
                         }}
                       >
                         Скачать JSON
+                      </button>
+                      <button
+                        onClick={() => {
+                          const a = bodyIntakeDetail.answers || {};
+                          adminOpenBodyExpertReviewForm("intake", bodyIntakeDetail.id, bodyIntakeDetail.session_id, a, {
+                            user_report: bodyIntakeDetail.user_report,
+                            body_plan: bodyIntakeDetail.body_plan,
+                            care_recommendation: bodyIntakeDetail.care_recommendation,
+                            bmi: bodyIntakeDetail.bmi,
+                            triggered_red_flags: bodyIntakeDetail.triggered_red_flags,
+                          });
+                        }}
+                        style={{
+                          background: "#e8f0ea", color: "#2f2925", border: "1px solid #c4d0c6", borderRadius: 12,
+                          padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", minWidth: 140,
+                        }}
+                      >
+                        ✏️ Экспертная правка
                       </button>
                       {bodyIntakeDetail.deleted_at ? (
                         <button
@@ -4999,6 +5323,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             <div style={{ fontSize: 11, color: t.muted }}>Примерная оценка по фото, не точный расчёт калорий</div>
                           </div>
                         )}
+                        <button
+                          onClick={() => {
+                            adminOpenBodyExpertReviewForm("plate_analysis", bodyDiaryDetail.id, bodyDiaryDetail.session_id, {
+                              plate_photos: bodyDiaryDetail.plate_photos,
+                            }, bodyDiaryDetail.plate_analysis);
+                          }}
+                          style={{
+                            marginTop: 10,
+                            background: "#f5f0e8", color: "#2f2925", border: "1px solid #d8cec1", borderRadius: 10,
+                            padding: "8px 16px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                          }}
+                        >
+                          ✏️ Экспертная правка по тарелке
+                        </button>
                       </Section>
                     )}
 
@@ -5011,6 +5349,42 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         {JSON.stringify(bodyDiaryDetail, null, 2)}
                       </pre>
                     </details>
+
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button
+                        onClick={() => {
+                          adminOpenBodyExpertReviewForm("daily_log", bodyDiaryDetail.id, bodyDiaryDetail.session_id, {
+                            log_date: bodyDiaryDetail.log_date,
+                            steps: bodyDiaryDetail.steps,
+                            workout_done: bodyDiaryDetail.workout_done,
+                            water_l: bodyDiaryDetail.water_l,
+                            sleep_hours: bodyDiaryDetail.sleep_hours,
+                            energy_level: bodyDiaryDetail.energy_level,
+                            mood_level: bodyDiaryDetail.mood_level,
+                            plate_photos: bodyDiaryDetail.plate_photos,
+                          }, {
+                            ai_day_summary: bodyDiaryDetail.ai_day_summary,
+                            ai_focus_tomorrow: bodyDiaryDetail.ai_focus_tomorrow,
+                            plate_analysis: bodyDiaryDetail.plate_analysis,
+                          });
+                        }}
+                        style={{
+                          background: "#e8f0ea", color: "#2f2925", border: "1px solid #c4d0c6", borderRadius: 12,
+                          padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer", flex: 1,
+                        }}
+                      >
+                        ✏️ Экспертная правка
+                      </button>
+                      <button
+                        onClick={() => { adminDeleteBodyDailyLog(bodyDiaryDetail.id); setBodyDiaryDetailOpen(false); }}
+                        style={{
+                          background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 12,
+                          padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                        }}
+                      >
+                        Удалить
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
