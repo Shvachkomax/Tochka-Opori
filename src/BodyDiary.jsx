@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { getClientToken } from "./lib/clientToken.js";
 
 const OVER_EATING = [
   { value: "none", label: "Нет" },
@@ -124,11 +125,27 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         if (blob.size < 100) return;
         try {
-          const res = await fetch("/api/transcribe", {
+          let token;
+          try { token = await getClientToken("body", "transcribe"); } catch {}
+          const tHeaders = { "Content-Type": "audio/webm" };
+          if (token) tHeaders["Authorization"] = `Bearer ${token}`;
+
+          let res = await fetch("/api/transcribe", {
             method: "POST",
-            headers: { "Content-Type": "audio/webm" },
+            headers: tHeaders,
             body: blob,
           });
+
+          if (res.status === 401 && token) {
+            try { token = await getClientToken("body", "transcribe"); } catch {}
+            tHeaders["Authorization"] = `Bearer ${token}`;
+            res = await fetch("/api/transcribe", {
+              method: "POST",
+              headers: tHeaders,
+              body: blob,
+            });
+          }
+
           let data;
           const text = await res.text();
           try { data = JSON.parse(text); } catch { data = null; }
@@ -203,9 +220,14 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
     setPlateAnalysisLoading(true);
     setPlateAnalysisError("");
     try {
-      const res = await fetch("/api/analyze", {
+      let token;
+      try { token = await getClientToken("body", "analyze"); } catch {}
+      const hdrs = { "Content-Type": "application/json" };
+      if (token) hdrs["Authorization"] = `Bearer ${token}`;
+
+      let res = await fetch("/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: hdrs,
         body: JSON.stringify({
           module: "body",
           stage: "plate_photo_analysis",
@@ -213,6 +235,22 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
           photos: photos.map(p => p.dataUrl),
         }),
       });
+
+      if (res.status === 401 && token) {
+        try { token = await getClientToken("body", "analyze"); } catch {}
+        hdrs["Authorization"] = `Bearer ${token}`;
+        res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({
+            module: "body",
+            stage: "plate_photo_analysis",
+            session_id: sessionId,
+            photos: photos.map(p => p.dataUrl),
+          }),
+        });
+      }
+
       const data = await res.json();
       if (data.ok && Array.isArray(data.results)) {
         setPlateAnalysis(data.results);
@@ -269,9 +307,14 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
     };
 
     try {
-      const res = await fetch("/api/analyze", {
+      let token;
+      try { token = await getClientToken("body", "analyze"); } catch {}
+      const hdrs = { "Content-Type": "application/json" };
+      if (token) hdrs["Authorization"] = `Bearer ${token}`;
+
+      let res = await fetch("/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: hdrs,
         body: JSON.stringify({
           module: "body",
           stage: "daily_log_submitted",
@@ -279,6 +322,22 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
           daily_log: log,
         }),
       });
+
+      if (res.status === 401 && token) {
+        try { token = await getClientToken("body", "analyze"); } catch {}
+        hdrs["Authorization"] = `Bearer ${token}`;
+        res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({
+            module: "body",
+            stage: "daily_log_submitted",
+            session_id: sessionId,
+            daily_log: log,
+          }),
+        });
+      }
+
       const data = await res.json();
       onComplete(data);
     } catch (err) {

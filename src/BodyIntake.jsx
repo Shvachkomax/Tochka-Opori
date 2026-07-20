@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { getClientToken } from "./lib/clientToken.js";
 
 const FIELD_LABELS = {
   display_name: "Как к вам обращаться?",
@@ -262,9 +263,14 @@ export default function BodyIntake({ onComplete }) {
     const bodySpecialistName = localStorage.getItem("body_specialist_name") || null;
 
     try {
-      const res = await fetch("/api/analyze", {
+      let token;
+      try { token = await getClientToken("body", "analyze"); } catch {}
+      const hdrs = { "Content-Type": "application/json" };
+      if (token) hdrs["Authorization"] = `Bearer ${token}`;
+
+      let res = await fetch("/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: hdrs,
         body: JSON.stringify({
           module: "body",
           stage: "intake_completed",
@@ -275,6 +281,25 @@ export default function BodyIntake({ onComplete }) {
           specialist_name: bodySpecialistName,
         }),
       });
+
+      if (res.status === 401 && token) {
+        try { token = await getClientToken("body", "analyze"); } catch {}
+        hdrs["Authorization"] = `Bearer ${token}`;
+        res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({
+            module: "body",
+            stage: "intake_completed",
+            answers: fields,
+            text: "Анкета здоровья заполнена, проанализируй данные.",
+            source: bodyReferralSource,
+            specialist_id: bodySpecialistId,
+            specialist_name: bodySpecialistName,
+          }),
+        });
+      }
+
       const json = await res.json();
       onComplete(json);
     } catch (err) {
