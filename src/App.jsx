@@ -103,6 +103,7 @@ export default function App() {
   // Body intake state
   const [bodyIntakeStage, setBodyIntakeStage] = useState("idle"); // idle | filling | analyzing | result
   const [bodyIntakeResult, setBodyIntakeResult] = useState(null);
+  const [bodyIntakeStep, setBodyIntakeStep] = useState(0); // 0=summary, 1=code, 2=plan, 3=cta
 
   // Support Toolkit state
   const [supportPlan, setSupportPlan] = useState(null);
@@ -1632,6 +1633,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   function handleBodyIntakeComplete(response) {
     setBodyIntakeResult(response);
     setBodyIntakeStage("result");
+    setBodyIntakeStep(0);
     try {
       localStorage.setItem("body_last_session_id", response?.session_id || "");
       localStorage.setItem("body_last_result", JSON.stringify(response));
@@ -7708,165 +7710,182 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </section>
           )}
 
-          {/* Body intake result */}
-          {activeModule === "body" && bodyIntakeStage === "result" && (
+          {/* Body intake result — step-by-step flow */}
+          {activeModule === "body" && bodyIntakeStage === "result" && bodyIntakeResult && (
             <section style={s.card} className="app-card">
-              <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16, color: "#2f2925" }}>
-                Ваш первый разбор
-              </div>
 
-              <div style={{ fontSize: 16, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#2f2925" }}>
-                {bodyIntakeResult?.user_report || "Анализ завершён."}
-              </div>
+              {/* Step 1: Summary */}
+              {bodyIntakeStep === 0 && (
+                <>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16, color: "#2f2925" }}>
+                    Ваш первый разбор
+                  </div>
 
-              {/* Continuation code */}
-              {(bodyIntakeResult?.session_id) && (
-                <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 4 }}>Ваш код продолжения</div>
-                  <div style={{ color: "#665c52", fontSize: 13, marginBottom: 10, lineHeight: 1.5 }}>
-                    Сохраните этот код. По нему можно будет вернуться к плану и продолжить наблюдение.
+                  <div style={{ fontSize: 16, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#2f2925" }}>
+                    {bodyIntakeResult.user_report}
                   </div>
-                  <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "0.08em", color: "#2f2925", fontFamily: "monospace", marginBottom: 10 }}>
-                    {bodyIntakeResult.session_id}
-                  </div>
-                  <button onClick={copyBodyCode} style={{
-                    padding: "8px 18px", borderRadius: 12, border: 0,
-                    background: bodyCodeCopied ? "#4caf50" : "#7D9A89",
-                    color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",
+
+                  {/* Urgent/medical warning — shown on step 1 */}
+                  {bodyIntakeResult?.care_recommendation?.level === "medical_consultation" && (
+                    <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: "rgba(251,191,36,.10)", border: "1px solid rgba(251,191,36,.25)" }}>
+                      <div style={{ fontWeight: 700, color: "#92400e", marginBottom: 6 }}>Когда лучше обратиться к врачу</div>
+                      <div style={{ color: "#78350f", fontSize: 14, lineHeight: 1.6 }}>
+                        По вашим данным есть признаки, которые стоит обсудить со специалистом. Рекомендуем записаться к терапевту в ближайшие дни.
+                      </div>
+                    </div>
+                  )}
+                  {bodyIntakeResult?.care_recommendation?.level === "urgent_help" && (
+                    <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.3)" }}>
+                      <div style={{ fontWeight: 700, color: "#991b1b", marginBottom: 6 }}>Возможно, нужна срочная помощь</div>
+                      <div style={{ color: "#7f1d1d", fontSize: 14, lineHeight: 1.6 }}>
+                        Если у вас или рядом с вами есть симптомы, которые требуют немедленной помощи — звоните 103 или 112.
+                      </div>
+                    </div>
+                  )}
+
+                  <button onClick={() => setBodyIntakeStep(1)} style={{
+                    marginTop: 24, width: "100%", height: 52, borderRadius: 16, border: 0,
+                    background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
                   }}>
-                    {bodyCodeCopied ? "Код скопирован" : "Скопировать код"}
+                    Дальше
                   </button>
-                </div>
+                </>
               )}
 
-              {bodyIntakeResult?.care_recommendation && (
-                <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
-                  <div style={{ color: "#665c52", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
-                    Почему такой уровень рекомендации
+              {/* Step 2: Session code */}
+              {bodyIntakeStep === 1 && bodyIntakeResult.session_id && (
+                <>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16, color: "#2f2925" }}>
+                    Ваш код продолжения
                   </div>
-                  <div style={{ color: "#2f2925", fontSize: 14, lineHeight: 1.6 }}>
-                    {bodyIntakeResult.care_recommendation.level === "self_care" && "В анкете нет признаков, требующих срочной помощи; можно начать с мягкого самонаблюдения."}
-                    {bodyIntakeResult.care_recommendation.level === "medical_consultation" && "Есть признаки или ограничения, которые лучше обсудить со специалистом перед нагрузками."}
-                    {bodyIntakeResult.care_recommendation.level === "urgent_help" && "Вы отметили симптом, при котором лучше не продолжать программу и обратиться за срочной помощью."}
+                  <div style={{ color: "#665c52", fontSize: 14, marginBottom: 16, lineHeight: 1.6 }}>
+                    Сохраните этот код. По нему можно вернуться к плану, дневнику и истории записей.
                   </div>
-                </div>
+                  <div style={{
+                    textAlign: "center", padding: 24, borderRadius: 16, background: "#f6f0e7",
+                    border: "1px solid #d8cec1", marginBottom: 20,
+                  }}>
+                    <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "0.08em", color: "#2f2925", fontFamily: "monospace", marginBottom: 12 }}>
+                      {bodyIntakeResult.session_id}
+                    </div>
+                    <button onClick={copyBodyCode} style={{
+                      padding: "10px 24px", borderRadius: 12, border: 0,
+                      background: bodyCodeCopied ? "#4caf50" : "#7D9A89",
+                      color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      {bodyCodeCopied ? "Код скопирован" : "Скопировать код"}
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                    <button onClick={() => setBodyIntakeStep(0)} style={{
+                      flex: 1, height: 48, borderRadius: 14, border: "1px solid #d8cec1",
+                      background: "#ede7dc", color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      Назад
+                    </button>
+                    <button onClick={() => setBodyIntakeStep(2)} style={{
+                      flex: 2, height: 48, borderRadius: 14, border: 0,
+                      background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      Продолжить
+                    </button>
+                  </div>
+                </>
               )}
 
-              {bodyIntakeResult?.bmi && (
-                <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
-                  <div style={{ color: "#2f2925", fontSize: 14, lineHeight: 1.6 }}>
-                    По введенным данным ИМТ примерно {bodyIntakeResult.bmi}. Это ориентировочный показатель: он помогает увидеть общую картину, но не заменяет оценку состава тела, объема талии, самочувствия и консультацию специалиста.
+              {/* Step 3: 3-day plan */}
+              {bodyIntakeStep === 2 && bodyIntakeResult.body_plan?.days && (
+                <>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 4, color: "#2f2925" }}>
+                    План на 3 дня
                   </div>
-                </div>
-              )}
-
-              {bodyIntakeResult?.body_plan && (
-                <div style={{ marginTop: 28 }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, color: "#2f2925" }}>План на 7 дней</div>
-                  <div style={{ color: "#665c52", fontSize: 14, marginBottom: 16, fontStyle: "italic" }}>
+                  <div style={{ color: "#665c52", fontSize: 14, marginBottom: 20, fontStyle: "italic" }}>
                     {bodyIntakeResult.body_plan.focus}
                   </div>
 
-                  {bodyIntakeResult.body_plan.days?.map(d => (
+                  {bodyIntakeResult.body_plan.days.slice(0, 3).map(d => (
                     <div key={d.day} style={{
-                      border: "1px solid #d8cec1",
-                      borderRadius: 16, padding: "14px 18px", marginBottom: 10,
-                      background: "#faf6ef",
+                      border: "1px solid #d8cec1", borderRadius: 16, padding: "16px 18px",
+                      marginBottom: 10, background: "#faf6ef",
                     }}>
-                      <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 6, color: "#2f2925" }}>
-                        День {d.day}: {d.title}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                        <div style={{
+                          width: 32, height: 32, borderRadius: "50%", background: "#5f8b7a",
+                          color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                          fontWeight: 700, fontSize: 14, flexShrink: 0,
+                        }}>
+                          {d.day}
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: 16, color: "#2f2925" }}>
+                          {d.title}
+                        </div>
                       </div>
                       {d.actions?.map((a, i) => (
-                        <div key={i} style={{ color: "#5f574f", fontSize: 14, paddingLeft: 14, marginBottom: 3 }}>
+                        <div key={i} style={{ color: "#5f574f", fontSize: 14, paddingLeft: 14, marginBottom: 3, lineHeight: 1.5 }}>
                           • {a}
                         </div>
                       ))}
                       {d.note && (
-                        <div style={{ color: "#665c52", fontSize: 13, fontStyle: "italic", marginTop: 6 }}>
+                        <div style={{ color: "#665c52", fontSize: 13, fontStyle: "italic", marginTop: 8, lineHeight: 1.5 }}>
                           {d.note}
                         </div>
                       )}
                     </div>
                   ))}
 
-                  {/* Day 1 observation block */}
-                  <div style={{ marginTop: 20, padding: 18, borderRadius: 16, background: "#f0f5f1", border: "1px solid #c4d0c6" }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2f2925", marginBottom: 4 }}>День 1: начнём с наблюдения</div>
-                    <div style={{ color: "#5f574f", fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>
-                      Сегодня не нужно резко менять режим. Ваша задача — собрать честную картину.
+                  <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                    <button onClick={() => setBodyIntakeStep(1)} style={{
+                      flex: 1, height: 48, borderRadius: 14, border: "1px solid #d8cec1",
+                      background: "#ede7dc", color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      Назад
+                    </button>
+                    <button onClick={() => setBodyIntakeStep(3)} style={{
+                      flex: 2, height: 48, borderRadius: 14, border: 0,
+                      background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      Начать дневник
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Step 4: CTA to diary */}
+              {bodyIntakeStep === 3 && (
+                <>
+                  <div style={{ textAlign: "center", padding: "20px 0" }}>
+                    <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 12, color: "#2f2925" }}>
+                      Готовы записать первый день?
                     </div>
-                    <div style={{ color: "#5f574f", fontSize: 14, lineHeight: 1.6, marginBottom: 4, fontWeight: 600 }}>Действия:</div>
-                    <div style={{ color: "#5f574f", fontSize: 14, lineHeight: 1.7, paddingLeft: 14 }}>
-                      • Запишите вес и, если можете, объём талии.<br />
-                      • Отметьте примерное количество шагов за день.<br />
-                      • Сфотографируйте или кратко запишите основные приёмы пищи.<br />
-                      • Отметьте время сна и подъёма.<br />
-                      • Вечером напишите 2–3 строки: что получилось, что помешало, где было сложнее всего.<br />
+                    <div style={{ color: "#665c52", fontSize: 15, lineHeight: 1.6, marginBottom: 28 }}>
+                      Откройте дневник, чтобы начать наблюдение — записать вес, шаги, питание и самочувствие.
                     </div>
+                    <button onClick={() => {
+                      const sid = bodyIntakeResult?.session_id;
+                      if (sid) { setBodyDiarySessionId(sid); setBodyDiaryOpen(true); }
+                    }} style={{
+                      width: "100%", height: 52, borderRadius: 16, border: 0,
+                      background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", marginBottom: 12, fontFamily: "inherit",
+                    }}>
+                      Начать дневник
+                    </button>
+                    <button onClick={() => { setBodyIntakeStage("idle"); setBodyIntakeResult(null); setMode(""); }} style={{
+                      width: "100%", height: 48, borderRadius: 14, border: "1px solid #d8cec1",
+                      background: "#ede7dc", color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      На главную
+                    </button>
                   </div>
-                </div>
+                </>
               )}
 
-              {bodyIntakeResult?.care_recommendation?.level === "medical_consultation" && (
-                <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: "rgba(251,191,36,.10)", border: "1px solid rgba(251,191,36,.25)" }}>
-                  <div style={{ fontWeight: 700, color: "#92400e", marginBottom: 6 }}>Когда лучше обратиться к врачу</div>
-                  <div style={{ color: "#78350f", fontSize: 14, lineHeight: 1.6 }}>
-                    По вашим данным есть признаки, которые стоит обсудить со специалистом. Рекомендуем записаться к терапевту в ближайшие дни.
-                  </div>
-                </div>
-              )}
-
-              {bodyIntakeResult?.care_recommendation?.level === "urgent_help" && (
-                <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.3)" }}>
-                  <div style={{ fontWeight: 700, color: "#991b1b", marginBottom: 6 }}>Возможно, нужна срочная помощь</div>
-                  <div style={{ color: "#7f1d1d", fontSize: 14, lineHeight: 1.6 }}>
-                    Если у вас или рядом с вами есть симптомы, которые требуют немедленной помощи — звоните 103 или 112.
-                  </div>
-                </div>
-              )}
-
-              <div style={{ marginTop: 24, display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button style={{
-                  padding: "14px 22px", borderRadius: 20, background: "#5f8b7a",
-                  color: "#ffffff", fontWeight: 800, border: 0, cursor: "pointer",
-                }} onClick={() => {
-                  const sid = bodyIntakeResult?.session_id;
-                  if (sid) { setBodyDiarySessionId(sid); setBodyDiaryOpen(true); }
-                }}>
-                  ✎ Записать день в дневник
-                </button>
-                <button style={{
-                  padding: "14px 22px", borderRadius: 20, background: "#7D9A89",
-                  color: "#ffffff", fontWeight: 800, border: 0, cursor: "pointer",
-                }} onClick={copyBodyCode}>
-                  {bodyCodeCopied ? "Код скопирован" : "Скопировать код"}
-                </button>
-                <button style={{
-                  padding: "14px 22px", borderRadius: 20, background: "#ede7dc",
-                  color: "#2f2925", fontWeight: 700, border: "1px solid #d8cec1", cursor: "pointer",
-                }} onClick={downloadBodyIntakeJSON}>
-                  Скачать JSON
-                </button>
-                <button style={{
-                  padding: "14px 22px", borderRadius: 20, background: "#ede7dc",
-                  color: "#2f2925", fontWeight: 700, border: "1px solid #d8cec1", cursor: "pointer",
-                }} onClick={() => setBodyIntakeStage("filling")}>
-                  Заполнить заново
-                </button>
-                <button style={{
-                  padding: "14px 22px", borderRadius: 20, background: "#ede7dc",
-                  color: "#2f2925", fontWeight: 700, border: "1px solid #d8cec1", cursor: "pointer",
-                }} onClick={() => { setBodyIntakeStage("idle"); setMode(""); }}>
-                  На главную
-                </button>
-              </div>
-
-              {(window.location.hostname === "localhost" || import.meta.env?.DEV) && bodyIntakeResult && (
-                <div style={{ marginTop: 28, padding: 14, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#665c52", marginBottom: 8, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                    Debug / Dev
-                  </div>
-                  <pre style={{ fontSize: 11, color: "#5f574f", lineHeight: 1.5, whiteSpace: "pre-wrap", margin: 0 }}>
+              {/* Debug — always accessible at bottom via toggle */}
+              {(window.location.hostname === "localhost" || import.meta.env?.DEV) && (
+                <details style={{ marginTop: 20 }}>
+                  <summary style={{ cursor: "pointer", fontSize: 12, color: "#8d8378", fontWeight: 600, padding: 8 }}>
+                    Информация для разработки
+                  </summary>
+                  <pre style={{ fontSize: 11, color: "#5f574f", lineHeight: 1.5, whiteSpace: "pre-wrap", margin: "8px 0 0" }}>
 {JSON.stringify({
   module: bodyIntakeResult.module || "body",
   stage: "intake_completed",
@@ -7879,8 +7898,36 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   model_used: bodyIntakeResult.model_used || null,
 }, null, 2)}
                   </pre>
-                </div>
+                </details>
               )}
+
+              {/* Detail expand — BMI, care reason, JSON */}
+              <details style={{ marginTop: 12 }}>
+                <summary style={{ cursor: "pointer", fontSize: 13, color: "#8d8378", fontWeight: 600, padding: 8 }}>
+                  Подробнее
+                </summary>
+                <div style={{ padding: "8px 0" }}>
+                  {bodyIntakeResult?.bmi && (
+                    <div style={{ padding: 12, borderRadius: 12, background: "#f6f0e7", marginBottom: 10, fontSize: 13, color: "#5f574f", lineHeight: 1.6 }}>
+                      По введенным данным ИМТ примерно {bodyIntakeResult.bmi}. Это ориентировочный показатель: он помогает увидеть общую картину, но не заменяет оценку состава тела, объема талии, самочувствия и консультацию специалиста.
+                    </div>
+                  )}
+                  {bodyIntakeResult?.care_recommendation && (
+                    <div style={{ padding: 12, borderRadius: 12, background: "#f6f0e7", marginBottom: 10, fontSize: 13, color: "#5f574f", lineHeight: 1.6 }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>Уровень рекомендации</div>
+                      {bodyIntakeResult.care_recommendation.level === "self_care" && "В анкете нет признаков, требующих срочной помощи; можно начать с мягкого самонаблюдения."}
+                      {bodyIntakeResult.care_recommendation.level === "medical_consultation" && "Есть признаки или ограничения, которые лучше обсудить со специалистом перед нагрузками."}
+                      {bodyIntakeResult.care_recommendation.level === "urgent_help" && "Вы отметили симптом, при котором лучше не продолжать программу и обратиться за срочной помощью."}
+                    </div>
+                  )}
+                  <button onClick={downloadBodyIntakeJSON} style={{
+                    padding: "8px 18px", borderRadius: 10, border: "1px solid #d8cec1",
+                    background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                  }}>
+                    Скачать JSON
+                  </button>
+                </div>
+              </details>
             </section>
           )}
 
@@ -8033,6 +8080,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 <button onClick={() => {
                   setBodyIntakeResult(savedBodyResult);
                   setBodyIntakeStage("result");
+                  setBodyIntakeStep(0);
                 }} style={{
                   padding: "14px 22px", borderRadius: 20, background: "#7D9A89",
                   color: "#ffffff", fontWeight: 800, fontSize: 15, border: 0, cursor: "pointer", width: "100%",
