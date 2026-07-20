@@ -83,6 +83,11 @@ async function handleSave(req, res) {
       .eq("session_id", sessionId)
       .maybeSingle();
 
+    if (existing.error) {
+      console.error("handleSave: SELECT error", existing.error);
+      return res.status(500).json({ ok: false, error: "База данных временно недоступна. Попробуйте позже." });
+    }
+
     let publicCode = existing?.data?.public_code;
     let organizationId = existing?.data?.organization_id || null;
     let primaryExpertId = existing?.data?.primary_expert_id || null;
@@ -199,10 +204,15 @@ async function handleSave(req, res) {
       });
     }
 
-    // Generate access_token for new sessions that don't have one yet
+    // Generate access_token for sessions that don't have one yet
     let accessToken = null;
     if (isNewSession || !alreadyHasToken) {
       accessToken = await generateSessionAccessToken(sessionId);
+      if (!accessToken) {
+        console.error("handleSave: failed to generate/store access token for", sessionId);
+        // Don't fail the save — token can be regenerated later.
+        // Legacy access still works until migrations are applied.
+      }
     }
 
     return res.status(200).json({
@@ -338,7 +348,11 @@ async function handleGenerateAccessToken(req, res) {
     }
 
     const { data, error } = await query;
-    if (error || !data) {
+    if (error) {
+      console.error("handleGenerateAccessToken: SELECT error", error);
+      return res.status(500).json({ ok: false, error: "База данных временно недоступна. Попробуйте позже." });
+    }
+    if (!data) {
       return res.status(404).json({ ok: false, error: "Сессия не найдена" });
     }
 
@@ -365,11 +379,16 @@ async function handleUpdateSupportPlan(req, res) {
 
     // Check access if non-legacy
     const supabase = getSupabase();
-    const { data: sessionData } = await supabase
+    const { data: sessionData, error: sessionError } = await supabase
       .from("sessions")
       .select("session_id, legacy_access")
       .eq(session_id ? "session_id" : "public_code", effectiveSessionId)
       .maybeSingle();
+
+    if (sessionError) {
+      console.error("handleUpdateSupportPlan: SELECT error", sessionError);
+      return res.status(500).json({ ok: false, error: "База данных временно недоступна. Попробуйте позже." });
+    }
 
     if (sessionData && !sessionData.legacy_access) {
       if (!access_token) {
@@ -420,11 +439,16 @@ async function handleSaveConversationPairs(req, res) {
     const supabase = getSupabase();
 
     // Check access
-    const { data: sessionData } = await supabase
+    const { data: sessionData, error: sessionError } = await supabase
       .from("sessions")
       .select("legacy_access")
       .eq("session_id", sessionId)
       .maybeSingle();
+
+    if (sessionError) {
+      console.error("handleSaveConversationPairs: SELECT error", sessionError);
+      return res.status(500).json({ ok: false, error: "База данных временно недоступна. Попробуйте позже." });
+    }
 
     if (sessionData && !sessionData.legacy_access) {
       if (!access_token) {
@@ -499,11 +523,16 @@ async function handleListBodyDailyLogs(req, res) {
     const supabase = getSupabase();
 
     // Check access if non-legacy
-    const { data: sessionData } = await supabase
+    const { data: sessionData, error: sessionError } = await supabase
       .from("sessions")
       .select("legacy_access")
       .eq("session_id", session_id)
       .maybeSingle();
+
+    if (sessionError) {
+      console.error("handleListBodyDailyLogs: SELECT error", sessionError);
+      return res.status(500).json({ ok: false, error: "База данных временно недоступна. Попробуйте позже." });
+    }
 
     if (sessionData && !sessionData.legacy_access) {
       if (!access_token) {
