@@ -2,18 +2,12 @@ import { getSupabase } from "../lib/supabase.js";
 import { maskText, maskSensitiveData, getPrivacySafeMode } from "../lib/sanitize.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
+import { validateSessionAccess, generateSessionAccessToken } from "../lib/security/access-token.js";
 
 function isValidSessionId(id) {
   if (!id || typeof id !== "string") return false;
   return /^[a-zA-Z0-9_-]{8,64}$/.test(id);
 }
-
-const ALLOWED_SESSION_FIELDS = [
-  "sessionId", "module", "publicCode",
-  "patient_input", "conversationHistory",
-  "conversationPairs", "user_report",
-  "doctor_report", "supportPlan", "riskLevel",
-];
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
@@ -25,7 +19,7 @@ export default async function handler(req, res) {
   }
 
   const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 60, prefix: "session:" });
-  const limited = limit(req, res);
+  const limited = await limit(req, res);
   if (limited) return;
 
   const { action } = req.body || {};
@@ -44,6 +38,8 @@ export default async function handler(req, res) {
         return await handleValidateInviteToken(req, res);
       case "listBodyDailyLogs":
         return await handleListBodyDailyLogs(req, res);
+      case "generateAccessToken":
+        return await handleGenerateAccessToken(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -83,7 +79,7 @@ async function handleSave(req, res) {
 
     const existing = await supabase
       .from("sessions")
-      .select("public_code, organization_id, primary_expert_id")
+      .select("public_code, organization_id, primary_expert_id, access_token_hash, legacy_access")
       .eq("session_id", sessionId)
       .maybeSingle();
 
@@ -91,11 +87,12 @@ async function handleSave(req, res) {
     let organizationId = existing?.data?.organization_id || null;
     let primaryExpertId = existing?.data?.primary_expert_id || null;
     let inviteToken = existing?.data?.invite_token || null;
+    const isNewSession = !existing?.data;
+    const alreadyHasToken = existing?.data?.access_token_hash != null;
 
     if (publicCode && (organizationId || primaryExpertId)) {
-      // Existing session with links — keep them
+      // keep
     } else if (publicCode && !organizationId && !primaryExpertId) {
-      // Existing session but no links — try to find from patient_assignment
       const { data: assignment } = await supabase
         .from("patient_assignments")
         .select("organization_id, primary_expert_id")
@@ -111,7 +108,6 @@ async function handleSave(req, res) {
     if (!publicCode) {
       publicCode = generatePublicCode();
 
-      // Handle invite_token for new sessions
       if (invite_token) {
         const invite = await validateInviteToken(invite_token);
         if (invite) {
@@ -119,7 +115,6 @@ async function handleSave(req, res) {
           primaryExpertId = invite.expert_id;
           inviteToken = invite_token;
 
-          // Create patient_assignment if not exists
           const { data: existingAssignment } = await supabase
             .from("patient_assignments")
             .select("id")
@@ -127,34 +122,26 @@ async function handleSave(req, res) {
             .maybeSingle();
 
           if (!existingAssignment) {
-            await supabase
-              .from("patient_assignments")
-              .insert({
-                public_code: publicCode,
-                organization_id: organizationId,
-                primary_expert_id: primaryExpertId,
-                assigned_by_expert_id: primaryExpertId,
-                assigned_by_expert_name: "auto",
-                source: "invite_link",
-                status: "active",
-              })
-              .then(() => {});
+            await supabase.from("patient_assignments").insert({
+              public_code: publicCode,
+              organization_id: organizationId,
+              primary_expert_id: primaryExpertId,
+              assigned_by_expert_id: primaryExpertId,
+              assigned_by_expert_name: "auto",
+              source: "invite_link",
+              status: "active",
+            });
 
-            // Create patient_access for the expert
-            await supabase
-              .from("patient_access")
-              .insert({
-                public_code: publicCode,
-                organization_id: organizationId,
-                expert_id: primaryExpertId,
-                access_role: "owner",
-                granted_by_expert_id: primaryExpertId,
-                granted_by_expert_name: "auto",
-              })
-              .then(() => {});
+            await supabase.from("patient_access").insert({
+              public_code: publicCode,
+              organization_id: organizationId,
+              expert_id: primaryExpertId,
+              access_role: "owner",
+              granted_by_expert_id: primaryExpertId,
+              granted_by_expert_name: "auto",
+            });
           }
 
-          // Increment invite link usage
           await useInviteToken(invite_token);
         }
       }
@@ -162,11 +149,10 @@ async function handleSave(req, res) {
 
     const { data: existingRow } = await supabase
       .from("sessions")
-      .select("id")
+      .select("id, json_data")
       .eq("session_id", sessionId)
       .maybeSingle();
 
-    // Preserve conversation_pairs from existing json_data
     const existingPairs = existingRow?.json_data?.conversation_pairs || [];
 
     const payload = {
@@ -213,6 +199,12 @@ async function handleSave(req, res) {
       });
     }
 
+    // Generate access_token for new sessions that don't have one yet
+    let accessToken = null;
+    if (isNewSession || !alreadyHasToken) {
+      accessToken = await generateSessionAccessToken(sessionId);
+    }
+
     return res.status(200).json({
       ok: true,
       message: "Сессия сохранена. Вы можете продолжить позже.",
@@ -220,6 +212,7 @@ async function handleSave(req, res) {
       publicCode,
       organization_id: organizationId,
       primary_expert_id: primaryExpertId,
+      access_token: accessToken,
     });
   } catch (error) {
     return res.status(500).json({
@@ -231,7 +224,7 @@ async function handleSave(req, res) {
 
 async function handleLoad(req, res) {
   try {
-    const { publicCode } = req.body || {};
+    const { publicCode, access_token } = req.body || {};
 
     if (!publicCode || typeof publicCode !== "string") {
       return res.status(400).json({ error: "Введите код диалога" });
@@ -239,7 +232,6 @@ async function handleLoad(req, res) {
 
     const normalized = publicCode.trim().toUpperCase();
 
-    // Validate format: ТОЧКА-XXXX-XXXX or HEALTH-XXXX-XXX
     const isSupportCode = /^ТОЧКА-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(normalized);
     const isHealthCode = /^HEALTH-[A-Z0-9]{4}-[A-Z0-9]{3}$/.test(normalized);
     if (!isSupportCode && !isHealthCode) {
@@ -254,7 +246,7 @@ async function handleLoad(req, res) {
       .select("" +
         "session_id, module, public_code, patient_text, conversation_history, " +
         "user_report, doctor_report, support_plan, risk_level, json_data, " +
-        "organization_id, primary_expert_id, invite_token, created_at"
+        "organization_id, primary_expert_id, invite_token, legacy_access, created_at"
       )
       .eq("public_code", normalized)
       .maybeSingle();
@@ -269,11 +261,10 @@ async function handleLoad(req, res) {
     if (!data) {
       return res.status(404).json({
         ok: false,
-        error: "Код не найден. Проверьте правильность ввода (формат: ТОЧКА-XXXX-XXXX).",
+        error: "Код не найден. Проверьте правильность ввода.",
       });
     }
 
-    // Module filtering: health codes only return body sessions
     if (isHealthCode && data.module !== "body") {
       return res.status(404).json({ ok: false, error: "Код не найден." });
     }
@@ -281,8 +272,19 @@ async function handleLoad(req, res) {
       return res.status(404).json({ ok: false, error: "Код не найден." });
     }
 
+    // Access token validation
+    if (!data.legacy_access) {
+      if (!access_token) {
+        return res.status(401).json({ ok: false, error: "Требуется код доступа к сессии." });
+      }
+      const valid = await validateSessionAccess(data.session_id, access_token);
+      if (!valid) {
+        return res.status(403).json({ ok: false, error: "Неверный код доступа." });
+      }
+    }
+
     const jsonData = data.json_data || {};
-    const pairs = jsonData.conversation_pairs || data.conversation_pairs || [];
+    const pairs = jsonData.conversation_pairs || [];
     const session = {
       sessionId: data.session_id,
       module: data.module || 'support',
@@ -294,9 +296,6 @@ async function handleLoad(req, res) {
       doctor_report: data.doctor_report,
       supportPlan: data.support_plan,
       riskLevel: data.risk_level,
-      organization_id: data.organization_id,
-      primary_expert_id: data.primary_expert_id,
-      invite_token: data.invite_token,
       dialogDepth: jsonData.dialogDepth ?? 0,
       previousPatientReport: jsonData.previousPatientReport || "",
       previousDoctorReport: jsonData.previousDoctorReport || "",
@@ -304,11 +303,13 @@ async function handleLoad(req, res) {
       resourceFactors: jsonData.resourceFactors || "",
       questions: jsonData.questions || null,
       answers: jsonData.answers || {},
+      // Legacy flag so frontend knows if access_token is needed for writes
+      legacyAccess: data.legacy_access === true,
     };
 
     return res.status(200).json({
       ok: true,
-      message: "Сессия загружена. Можно продолжить разбор.",
+      message: "Сессия загружена.",
       session,
     });
   } catch (error) {
@@ -319,15 +320,68 @@ async function handleLoad(req, res) {
   }
 }
 
+async function handleGenerateAccessToken(req, res) {
+  try {
+    const { sessionId, publicCode } = req.body || {};
+
+    if (!sessionId && !publicCode) {
+      return res.status(400).json({ ok: false, error: "Missing sessionId or publicCode" });
+    }
+
+    const supabase = getSupabase();
+    let query = supabase.from("sessions").select("session_id, legacy_access").maybeSingle();
+
+    if (sessionId) {
+      query = query.eq("session_id", sessionId);
+    } else {
+      query = query.eq("public_code", publicCode);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) {
+      return res.status(404).json({ ok: false, error: "Сессия не найдена" });
+    }
+
+    const rawToken = await generateSessionAccessToken(data.session_id);
+    if (!rawToken) {
+      return res.status(500).json({ ok: false, error: "Не удалось сгенерировать токен" });
+    }
+
+    return res.status(200).json({ ok: true, access_token: rawToken });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message || "Error" });
+  }
+}
+
 async function handleUpdateSupportPlan(req, res) {
   try {
-    const { public_code, session_id, support_plan } = req.body || {};
+    const { public_code, session_id, support_plan, access_token } = req.body || {};
 
     if (!public_code && !session_id) {
       return res.status(400).json({ ok: false, error: "Missing public_code or session_id" });
     }
 
-    let query = getSupabase().from("sessions").update({ support_plan, updated_at: new Date().toISOString() });
+    const effectiveSessionId = session_id || public_code;
+
+    // Check access if non-legacy
+    const supabase = getSupabase();
+    const { data: sessionData } = await supabase
+      .from("sessions")
+      .select("session_id, legacy_access")
+      .eq(session_id ? "session_id" : "public_code", effectiveSessionId)
+      .maybeSingle();
+
+    if (sessionData && !sessionData.legacy_access) {
+      if (!access_token) {
+        return res.status(401).json({ ok: false, error: "Требуется код доступа." });
+      }
+      const valid = await validateSessionAccess(sessionData.session_id, access_token);
+      if (!valid) {
+        return res.status(403).json({ ok: false, error: "Неверный код доступа." });
+      }
+    }
+
+    let query = supabase.from("sessions").update({ support_plan, updated_at: new Date().toISOString() });
 
     if (public_code) {
       query = query.eq("public_code", public_code);
@@ -335,10 +389,10 @@ async function handleUpdateSupportPlan(req, res) {
       query = query.eq("session_id", session_id);
     }
 
-    const { error } = await query;
+    const { error: updateError } = await query;
 
-    if (error) {
-      console.error("updateSupportPlan error:", error);
+    if (updateError) {
+      console.error("updateSupportPlan error:", updateError);
       return res.status(500).json({ ok: false, error: "Failed to update support plan" });
     }
 
@@ -350,7 +404,7 @@ async function handleUpdateSupportPlan(req, res) {
 
 async function handleSaveConversationPairs(req, res) {
   try {
-    const { sessionId, pairs } = req.body || {};
+    const { sessionId, pairs, access_token } = req.body || {};
 
     if (!sessionId) {
       return res.status(400).json({ ok: false, error: "Missing sessionId" });
@@ -364,6 +418,23 @@ async function handleSaveConversationPairs(req, res) {
     }
 
     const supabase = getSupabase();
+
+    // Check access
+    const { data: sessionData } = await supabase
+      .from("sessions")
+      .select("legacy_access")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    if (sessionData && !sessionData.legacy_access) {
+      if (!access_token) {
+        return res.status(401).json({ ok: false, error: "Требуется код доступа." });
+      }
+      const valid = await validateSessionAccess(sessionId, access_token);
+      if (!valid) {
+        return res.status(403).json({ ok: false, error: "Неверный код доступа." });
+      }
+    }
 
     const { data: existingRow } = await supabase
       .from("sessions")
@@ -419,13 +490,32 @@ function mergePairs(existing, incoming) {
 
 async function handleListBodyDailyLogs(req, res) {
   try {
-    const { session_id } = req.body || {};
+    const { session_id, access_token } = req.body || {};
 
     if (!session_id) {
       return res.status(400).json({ ok: false, error: "Missing session_id" });
     }
 
-    const { data, error } = await getSupabase()
+    const supabase = getSupabase();
+
+    // Check access if non-legacy
+    const { data: sessionData } = await supabase
+      .from("sessions")
+      .select("legacy_access")
+      .eq("session_id", session_id)
+      .maybeSingle();
+
+    if (sessionData && !sessionData.legacy_access) {
+      if (!access_token) {
+        return res.status(401).json({ ok: false, error: "Требуется код доступа." });
+      }
+      const valid = await validateSessionAccess(session_id, access_token);
+      if (!valid) {
+        return res.status(403).json({ ok: false, error: "Неверный код доступа." });
+      }
+    }
+
+    const { data, error } = await supabase
       .from("body_daily_logs")
       .select("*")
       .eq("session_id", session_id)

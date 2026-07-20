@@ -4,6 +4,7 @@ import { getModule, isValidModule, DEFAULT_MODULE } from "../lib/modules.js";
 import { readModulePrompt, readCorePrompt } from "../lib/prompts.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
+import { requireClientToken } from "../lib/security/client-token.js";
 
 function generateBodyCode() {
   const p1 = crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 4);
@@ -881,8 +882,12 @@ export default async function handler(req, res) {
   }
 
   const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 20, prefix: "analyze:" });
-  const limited = limit(req, res);
+  const limited = await limit(req, res);
   if (limited) return;
+
+  // Require short-lived client token
+  const tokenCheck = requireClientToken(["analyze"])(req, res);
+  if (!tokenCheck) return;
 
   const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations, module: reqModule, stage, intake: intakeData, session_id, daily_log } = req.body || {};
 

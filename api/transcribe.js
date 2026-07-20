@@ -1,6 +1,7 @@
 import { transcribe, analyzeVoice, TASK_TYPES } from "../lib/modelRouter.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
+import { requireClientToken } from "../lib/security/client-token.js";
 
 const MAX_AUDIO_SIZE = 20 * 1024 * 1024; // 20 MB
 
@@ -30,8 +31,12 @@ export default async function handler(req, res) {
   }
 
   const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 10, prefix: "transcribe:" });
-  const limited = limit(req, res);
+  const limited = await limit(req, res);
   if (limited) return;
+
+  // Require short-lived client token
+  const tokenCheck = requireClientToken(["transcribe"])(req, res);
+  if (!tokenCheck) return;
 
   try {
     if (!process.env.OPENAI_API_KEY) {

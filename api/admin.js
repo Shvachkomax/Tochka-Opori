@@ -1,12 +1,13 @@
 import { getSupabase } from "../lib/supabase.js";
-import { applyCors, handleOptions } from "../lib/security/cors.js";
+import { applyCors, handleOptions, timingSafeEqual, getAdminTokenFromHeader } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
+import { logAdminAction, getClientIp } from "../lib/security/audit.js";
 
 function resolveRole(token) {
   if (!token) return null;
-  if (process.env.SUPER_ADMIN_TOKEN && token === process.env.SUPER_ADMIN_TOKEN) return "super";
-  if (process.env.SUPPORT_ADMIN_TOKEN && token === process.env.SUPPORT_ADMIN_TOKEN) return "support";
-  if (process.env.BODY_ADMIN_TOKEN && token === process.env.BODY_ADMIN_TOKEN) return "body";
+  if (process.env.SUPER_ADMIN_TOKEN && timingSafeEqual(token, process.env.SUPER_ADMIN_TOKEN)) return "super";
+  if (process.env.SUPPORT_ADMIN_TOKEN && timingSafeEqual(token, process.env.SUPPORT_ADMIN_TOKEN)) return "support";
+  if (process.env.BODY_ADMIN_TOKEN && timingSafeEqual(token, process.env.BODY_ADMIN_TOKEN)) return "body";
   return null;
 }
 
@@ -16,6 +17,14 @@ function checkAccess(role, requiredModule) {
   if (requiredModule === "support" && role === "support") return true;
   if (requiredModule === "body" && role === "body") return true;
   return false;
+}
+
+function extractPassword(req) {
+  // Prefer Authorization header, fall back to body field
+  const headerToken = getAdminTokenFromHeader(req);
+  if (headerToken) return headerToken;
+  const { password } = req.body || {};
+  return password || null;
 }
 
 export default async function handler(req, res) {
@@ -28,7 +37,7 @@ export default async function handler(req, res) {
   }
 
   const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 100, prefix: "admin:" });
-  const limited = limit(req, res);
+  const limited = await limit(req, res);
   if (limited) return;
 
   const { action } = req.body || {};
@@ -67,11 +76,14 @@ export default async function handler(req, res) {
 
 async function handleVerify(req, res) {
   try {
-    const { password } = req.body || {};
+    const password = extractPassword(req);
     const role = resolveRole(password);
     if (!role) {
+      const ip = getClientIp(req);
+      await logAdminAction("unknown", "admin_login_failure", { ipAddress: ip });
       return res.status(403).json({ ok: false, error: "Неверный пароль" });
     }
+    await logAdminAction(role, "admin_login_success", { ipAddress: getClientIp(req) });
     return res.status(200).json({ ok: true, role });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error.message || "Ошибка проверки" });
@@ -79,11 +91,13 @@ async function handleVerify(req, res) {
 }
 
 async function handleListBodyIntake(req, res) {
-  const { password, limit = 50, offset = 0, showDeleted = false, source: sourceFilter } = req.body || {};
+  const password = extractPassword(req);
   const role = resolveRole(password);
   if (!checkAccess(role, "body")) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
+
+  const { limit: reqLimit = 50, offset = 0, showDeleted = false, source: sourceFilter } = req.body || {};
 
   const supabase = getSupabase();
   let query = supabase
@@ -102,13 +116,12 @@ async function handleListBodyIntake(req, res) {
 
   const { data, error, count } = await query
     .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .range(offset, offset + reqLimit - 1);
 
   if (error) {
     return res.status(500).json({ ok: false, error: error.message });
   }
 
-  // Merge body_clients info for each record
   let records = data || [];
   const sessionIds = records.map(r => r.session_id).filter(Boolean);
   if (sessionIds.length > 0) {
@@ -128,12 +141,13 @@ async function handleListBodyIntake(req, res) {
 }
 
 async function handleGetBodyIntakeDetail(req, res) {
-  const { password, id } = req.body || {};
+  const password = extractPassword(req);
   const role = resolveRole(password);
   if (!checkAccess(role, "body")) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
 
+  const { id } = req.body || {};
   if (!id) {
     return res.status(400).json({ ok: false, error: "Missing id" });
   }
@@ -149,7 +163,6 @@ async function handleGetBodyIntakeDetail(req, res) {
     return res.status(500).json({ ok: false, error: error.message });
   }
 
-  // Merge body_clients info
   let record = data;
   if (record && record.session_id) {
     const { data: client } = await supabase
@@ -164,12 +177,13 @@ async function handleGetBodyIntakeDetail(req, res) {
 }
 
 async function handleDeleteBodyIntake(req, res) {
-  const { password, id } = req.body || {};
+  const password = extractPassword(req);
   const role = resolveRole(password);
   if (!checkAccess(role, "body")) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
 
+  const { id } = req.body || {};
   if (!id) {
     return res.status(400).json({ ok: false, error: "Missing id" });
   }
@@ -187,16 +201,24 @@ async function handleDeleteBodyIntake(req, res) {
     return res.status(500).json({ ok: false, error: error.message });
   }
 
+  await logAdminAction(role, "delete_body_intake", {
+    targetType: "body_intake_form",
+    targetId: id,
+    module: "body",
+    ipAddress: getClientIp(req),
+  });
+
   return res.status(200).json({ ok: true });
 }
 
 async function handleRestoreBodyIntake(req, res) {
-  const { password, id } = req.body || {};
+  const password = extractPassword(req);
   const role = resolveRole(password);
   if (!checkAccess(role, "body")) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
 
+  const { id } = req.body || {};
   if (!id) {
     return res.status(400).json({ ok: false, error: "Missing id" });
   }
@@ -214,15 +236,24 @@ async function handleRestoreBodyIntake(req, res) {
     return res.status(500).json({ ok: false, error: error.message });
   }
 
+  await logAdminAction(role, "restore_body_intake", {
+    targetType: "body_intake_form",
+    targetId: id,
+    module: "body",
+    ipAddress: getClientIp(req),
+  });
+
   return res.status(200).json({ ok: true });
 }
 
 async function handleListBodyDailyLogs(req, res) {
-  const { password, limit = 50, offset = 0, session_id: sessionFilter } = req.body || {};
+  const password = extractPassword(req);
   const role = resolveRole(password);
   if (!checkAccess(role, "body")) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
+
+  const { limit: reqLimit = 50, offset = 0, session_id: sessionFilter } = req.body || {};
 
   const supabase = getSupabase();
   let query = supabase
@@ -236,7 +267,7 @@ async function handleListBodyDailyLogs(req, res) {
   const { data, error, count } = await query
     .order("log_date", { ascending: false })
     .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .range(offset, offset + reqLimit - 1);
 
   if (error) {
     return res.status(500).json({ ok: false, error: error.message });
@@ -246,12 +277,13 @@ async function handleListBodyDailyLogs(req, res) {
 }
 
 async function handleGetBodyDailyLogDetail(req, res) {
-  const { password, id } = req.body || {};
+  const password = extractPassword(req);
   const role = resolveRole(password);
   if (!checkAccess(role, "body")) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
 
+  const { id } = req.body || {};
   if (!id) {
     return res.status(400).json({ ok: false, error: "Missing id" });
   }
@@ -271,12 +303,13 @@ async function handleGetBodyDailyLogDetail(req, res) {
 }
 
 async function handleDeleteBodyDailyLog(req, res) {
-  const { password, id } = req.body || {};
+  const password = extractPassword(req);
   const role = resolveRole(password);
   if (!checkAccess(role, "body")) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
 
+  const { id } = req.body || {};
   if (!id) {
     return res.status(400).json({ ok: false, error: "Missing id" });
   }
@@ -291,16 +324,24 @@ async function handleDeleteBodyDailyLog(req, res) {
     return res.status(500).json({ ok: false, error: error.message });
   }
 
+  await logAdminAction(role, "delete_body_daily_log", {
+    targetType: "body_daily_log",
+    targetId: id,
+    module: "body",
+    ipAddress: getClientIp(req),
+  });
+
   return res.status(200).json({ ok: true });
 }
 
 async function handleSaveBodyExpertReview(req, res) {
-  const { password, review } = req.body || {};
+  const password = extractPassword(req);
   const role = resolveRole(password);
   if (!checkAccess(role, "body")) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
 
+  const { review } = req.body || {};
   if (!review || !review.session_id || !review.target_type || !review.target_id) {
     return res.status(400).json({ ok: false, error: "Missing required review fields" });
   }
@@ -326,7 +367,7 @@ async function handleSaveBodyExpertReview(req, res) {
     ai_output: review.ai_output || null,
   };
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("body_expert_reviews")
     .insert(payload)
     .select()
@@ -336,22 +377,32 @@ async function handleSaveBodyExpertReview(req, res) {
     return res.status(500).json({ ok: false, error: error.message });
   }
 
-  return res.status(200).json({ ok: true, review: data });
+  await logAdminAction(role, "save_expert_review", {
+    targetType: "body_expert_review",
+    targetId: review.session_id,
+    module: "body",
+    ipAddress: getClientIp(req),
+    details: { target_type: review.target_type, reviewer_name: review.reviewer_name },
+  });
+
+  return res.status(200).json({ ok: true });
 }
 
 async function handleListBodyExpertReviews(req, res) {
-  const { password, limit = 50, offset = 0 } = req.body || {};
+  const password = extractPassword(req);
   const role = resolveRole(password);
   if (!checkAccess(role, "body")) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
+
+  const { limit: reqLimit = 50, offset = 0 } = req.body || {};
 
   const supabase = getSupabase();
   const { data, error, count } = await supabase
     .from("body_expert_reviews")
     .select("*", { count: "exact" })
     .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+    .range(offset, offset + reqLimit - 1);
 
   if (error) {
     return res.status(500).json({ ok: false, error: error.message });
@@ -361,7 +412,7 @@ async function handleListBodyExpertReviews(req, res) {
 }
 
 async function handleExportBodyExpertCases(req, res) {
-  const { password } = req.body || {};
+  const password = extractPassword(req);
   const role = resolveRole(password);
   if (!checkAccess(role, "body")) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
@@ -376,6 +427,13 @@ async function handleExportBodyExpertCases(req, res) {
   if (error) {
     return res.status(500).json({ ok: false, error: error.message });
   }
+
+  await logAdminAction(role, "export_expert_cases", {
+    targetType: "body_expert_review",
+    module: "body",
+    ipAddress: getClientIp(req),
+    details: { record_count: (data || []).length },
+  });
 
   const lines = (data || []).map(r => JSON.stringify({
     session_id: r.session_id,
