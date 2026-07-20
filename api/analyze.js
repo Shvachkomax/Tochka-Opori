@@ -1,10 +1,13 @@
+import crypto from "node:crypto";
 import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
 import { getModule, isValidModule, DEFAULT_MODULE } from "../lib/modules.js";
 import { readModulePrompt, readCorePrompt } from "../lib/prompts.js";
+import { applyCors, handleOptions } from "../lib/security/cors.js";
+import { rateLimit } from "../lib/security/rate-limit.js";
 
 function generateBodyCode() {
-  const p1 = Math.random().toString(36).substring(2, 6).toUpperCase();
-  const p2 = Math.random().toString(36).substring(2, 5).toUpperCase();
+  const p1 = crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 4);
+  const p2 = crypto.randomBytes(3).toString("hex").toUpperCase().slice(0, 3);
   return `HEALTH-${p1}-${p2}`;
 }
 
@@ -866,14 +869,36 @@ async function handlePlatePhotoAnalysis(req, res) {
   });
 }
 
+const VALID_STAGES = ["intake_completed", "daily_log_submitted", "plate_photo_analysis"];
+const MAX_TEXT_LENGTH = 15000;
+const MAX_CONVERSATION_TURNS = 50;
+
 export default async function handler(req, res) {
+  if (handleOptions(req, res)) return;
+
+  applyCors(req, res);
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 20, prefix: "analyze:" });
+  const limited = limit(req, res);
+  if (limited) return;
+
   const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations, module: reqModule, stage, intake: intakeData, session_id, daily_log } = req.body || {};
 
   const activeModule = isValidModule(reqModule) ? reqModule : DEFAULT_MODULE;
+
+  // Validate module
+  if (reqModule && !isValidModule(reqModule)) {
+    return res.status(400).json({ error: "Invalid module" });
+  }
+
+  // Validate stage
+  if (stage && !VALID_STAGES.includes(stage)) {
+    return res.status(400).json({ error: "Invalid stage" });
+  }
 
   // Body intake stage: one-shot analysis from completed intake form
   const bodyIntake = intakeData || answers;
@@ -893,6 +918,14 @@ export default async function handler(req, res) {
 
   if (!text || text.trim().length < 10) {
     return res.status(400).json({ error: "Опишите состояние подробнее" });
+  }
+
+  if (text.length > MAX_TEXT_LENGTH) {
+    return res.status(400).json({ error: `Текст не должен превышать ${MAX_TEXT_LENGTH} символов` });
+  }
+
+  if (rawHistory && Array.isArray(rawHistory) && rawHistory.length > MAX_CONVERSATION_TURNS) {
+    return res.status(400).json({ error: `История диалога не должна превышать ${MAX_CONVERSATION_TURNS} сообщений` });
   }
   const moduleConfig = getModule(activeModule);
   const MIN_DEPTH = 3;

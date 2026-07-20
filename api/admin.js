@@ -1,4 +1,6 @@
 import { getSupabase } from "../lib/supabase.js";
+import { applyCors, handleOptions } from "../lib/security/cors.js";
+import { rateLimit } from "../lib/security/rate-limit.js";
 
 function resolveRole(token) {
   if (!token) return null;
@@ -17,9 +19,17 @@ function checkAccess(role, requiredModule) {
 }
 
 export default async function handler(req, res) {
+  if (handleOptions(req, res)) return;
+
+  applyCors(req, res);
+
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
+
+  const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 100, prefix: "admin:" });
+  const limited = limit(req, res);
+  if (limited) return;
 
   const { action } = req.body || {};
 

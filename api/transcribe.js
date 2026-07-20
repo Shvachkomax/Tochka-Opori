@@ -1,4 +1,8 @@
 import { transcribe, analyzeVoice, TASK_TYPES } from "../lib/modelRouter.js";
+import { applyCors, handleOptions } from "../lib/security/cors.js";
+import { rateLimit } from "../lib/security/rate-limit.js";
+
+const MAX_AUDIO_SIZE = 20 * 1024 * 1024; // 20 MB
 
 export const config = {
   api: {
@@ -17,9 +21,17 @@ async function readRequestBody(req) {
 }
 
 export default async function handler(req, res) {
+  if (handleOptions(req, res)) return;
+
+  applyCors(req, res);
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 10, prefix: "transcribe:" });
+  const limited = limit(req, res);
+  if (limited) return;
 
   try {
     if (!process.env.OPENAI_API_KEY) {
@@ -29,6 +41,10 @@ export default async function handler(req, res) {
     }
 
     const audioBuffer = await readRequestBody(req);
+
+    if (audioBuffer.length > MAX_AUDIO_SIZE) {
+      return res.status(413).json({ error: "Файл слишком большой. Максимум 20 МБ." });
+    }
 
     console.log("Transcribe request:", {
       contentType: req.headers["content-type"],
@@ -87,7 +103,8 @@ export default async function handler(req, res) {
       request_duration: transcription.request_duration,
     });
   } catch (error) {
-    return res.status(500).json({
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({
       error: error.message || "Transcription server error"
     });
   }

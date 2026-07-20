@@ -1,6 +1,6 @@
 # Security Audit — «Точка Опоры»
 
-Date: 2026-07-20  
+Date: 2026-07-20 (updated 2026-07-20 — Security pass 1 applied)
 Scope: Full repository scan including Git history, API authorization, Supabase configuration, frontend bundle, and input handling.  
 Method: Manual review + `rg`/`git log` scanning. No automated secret scanner was installed (see note below).
 
@@ -192,3 +192,90 @@ const part = () => crypto.randomUUID().replace(/-/g, "").slice(0, 4).toUpperCase
 | 10 | LOW | Remove test fixture files from git history if repo goes public | `data/case-reviews.jsonl`, `data/body/test-runs/` |
 
 > **Note:** No secrets were found in git history. No keys need to be rotated or revoked at this time.
+
+---
+
+## Security pass 1 — Applied (commit `security: add api cors validation and request limits`)
+
+Changes implemented:
+
+### New files
+| File | Purpose |
+|------|---------|
+| `lib/security/cors.js` | Centralized CORS helper — `applyCors()`, `handleOptions()`, `assertAllowedOrigin()`. Allowed origins: production domains + localhost for dev. |
+| `lib/security/rate-limit.js` | In-memory rate limiter with configurable window/max. Note: per-instance on Vercel; add Upstash/Vercel KV for production scale. |
+
+### Fixed: Code generation uses `crypto.randomBytes` instead of `Math.random()`
+| File | Change |
+|------|--------|
+| `lib/publicCode.js` | `ТОЧКА-XXXX-XXXX` codes now use `crypto.randomBytes()` |
+| `lib/expertCode.js` | `EXPERT-XXXX-XXXX` codes now use `crypto.randomBytes()` |
+| `api/analyze.js` | `HEALTH-XXXX-XXX` codes now use `crypto.randomBytes().toString("hex")` |
+
+### CORS added to all API endpoints
+Every API handler now calls `handleOptions(req, res)` (returns 204 for OPTIONS) and `applyCors(req, res)` (sets `Access-Control-Allow-Origin` for allowed origins only):
+
+- `api/analyze.js`
+- `api/session.js`
+- `api/transcribe.js`
+- `api/admin.js`
+- `api/experts.js`
+- `api/crisis.js`
+- `api/reviews.js`
+
+### Rate limiting added to public endpoints
+| Endpoint | Limit | Prefix |
+|----------|-------|--------|
+| `/api/analyze` | 20 requests / 10 min | `analyze:` |
+| `/api/transcribe` | 10 requests / 10 min | `transcribe:` |
+| `/api/session` | 60 requests / 10 min | `session:` |
+| `/api/admin` | 100 requests / 10 min | `admin:` |
+
+### Input validation added
+| File | Validation |
+|------|------------|
+| `api/analyze.js` | Stage whitelist (`intake_completed`, `daily_log_submitted`, `plate_photo_analysis`); module validation via `isValidModule()`; max text length 15k chars; max conversation turns 50 |
+| `api/session.js` | Session ID format validation (`/^[a-zA-Z0-9_-]{8,64}$/`); public code format validation (ТОЧКА-XXXX-XXXX or HEALTH-XXXX-XXX); module filtering (health codes only return body sessions) |
+| `api/transcribe.js` | Max audio size 20 MB with early rejection during streaming read |
+
+### Admin auth — already correct
+No changes needed. All admin actions check `resolveRole()` + `checkAccess()` and return 403 without token.
+
+---
+
+## Security pass 2 plan — Supabase RLS policies
+
+Not implemented yet — requires separate testing to avoid production breakage.
+
+### Tables that need RLS
+
+| Table | Module | Sensitivity | Suggested Policy |
+|-------|--------|-------------|-----------------|
+| `sessions` | support / body | HIGH — patient text, reports | Admins + assigned experts can read; writers can insert by session_id |
+| `body_intake_forms` | body | HIGH — health data | Read by session_id + body admin |
+| `body_daily_logs` | body | HIGH — daily health | Read by session_id + body admin |
+| `body_clients` | body | MEDIUM — client registry | Body admin only |
+| `body_expert_reviews` | body | MEDIUM — expert feedback | Body admin only |
+| `crisis_requests` | support | HIGH — crisis contact info | Support admin only |
+| `experts` | support | MEDIUM — credentials | Self + admin |
+| `expert_requests` | support | MEDIUM — registration requests | Admin only |
+| `case_reviews` | support | MEDIUM — quality reviews | Support admin only |
+| `training_sessions` | support | LOW — conversation pairs | Support admin only |
+
+### Current situation
+- `lib/supabase.js` creates client with `SUPABASE_SERVICE_ROLE_KEY` — **bypasses RLS entirely**
+- All authorization is in application code only
+- No RLS policies exist on any table
+
+### Migration approach
+1. Create a new migration `scripts/019-add-rls-policies.sql`
+2. For each table: `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`
+3. Create policies: admin roles can see everything; user-level access by `session_id` or `public_code`
+4. Create a database role for the anon key with limited SELECT/INSERT
+5. Test thoroughly in staging before production
+6. Do NOT change `SUPABASE_SERVICE_ROLE_KEY` usage in backend — service role still needed for admin bulk operations
+
+### Risk
+- RLS policies could break existing API calls if not aligned with query patterns
+- `getSupabase()` currently returns a service-role client; adding an anon-key client would require refactoring
+- Recommend deferring to a dedicated security pass

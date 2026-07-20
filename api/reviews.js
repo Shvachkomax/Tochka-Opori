@@ -4,6 +4,7 @@ import { maskSensitiveData, getPrivacySafeMode, maskText } from "../lib/sanitize
 import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
 import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback } from "../lib/conversation.js";
 import { readFileSync, existsSync } from "node:fs";
+import { applyCors, handleOptions } from "../lib/security/cors.js";
 
 const ALLOWED_STATUSES = ["pending", "approved", "rejected", "needs_review", "local_auto_saved"];
 const TRAINING_STATUSES = ["new", "reviewed", "needs_prompt_update", "approved_for_learning", "rejected", "archived"];
@@ -25,6 +26,10 @@ async function getSupabaseClient() {
 }
 
 export default async function handler(req, res) {
+  if (handleOptions(req, res)) return;
+
+  applyCors(req, res);
+
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }

@@ -1,10 +1,32 @@
 import { getSupabase } from "../lib/supabase.js";
 import { maskText, maskSensitiveData, getPrivacySafeMode } from "../lib/sanitize.js";
+import { applyCors, handleOptions } from "../lib/security/cors.js";
+import { rateLimit } from "../lib/security/rate-limit.js";
+
+function isValidSessionId(id) {
+  if (!id || typeof id !== "string") return false;
+  return /^[a-zA-Z0-9_-]{8,64}$/.test(id);
+}
+
+const ALLOWED_SESSION_FIELDS = [
+  "sessionId", "module", "publicCode",
+  "patient_input", "conversationHistory",
+  "conversationPairs", "user_report",
+  "doctor_report", "supportPlan", "riskLevel",
+];
 
 export default async function handler(req, res) {
+  if (handleOptions(req, res)) return;
+
+  applyCors(req, res);
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 60, prefix: "session:" });
+  const limited = limit(req, res);
+  if (limited) return;
 
   const { action } = req.body || {};
 
@@ -43,6 +65,9 @@ async function handleSave(req, res) {
 
     if (!sessionId) {
       return res.status(400).json({ ok: false, error: "Missing sessionId" });
+    }
+    if (!isValidSessionId(sessionId)) {
+      return res.status(400).json({ ok: false, error: "Invalid sessionId format" });
     }
 
     const supabase = getSupabase();
@@ -214,9 +239,23 @@ async function handleLoad(req, res) {
 
     const normalized = publicCode.trim().toUpperCase();
 
+    // Validate format: ТОЧКА-XXXX-XXXX or HEALTH-XXXX-XXX
+    const isSupportCode = /^ТОЧКА-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(normalized);
+    const isHealthCode = /^HEALTH-[A-Z0-9]{4}-[A-Z0-9]{3}$/.test(normalized);
+    if (!isSupportCode && !isHealthCode) {
+      return res.status(400).json({
+        ok: false,
+        error: "Неверный формат кода. Ожидается ТОЧКА-XXXX-XXXX или HEALTH-XXXX-XXX.",
+      });
+    }
+
     const { data, error } = await getSupabase()
       .from("sessions")
-      .select("*")
+      .select("" +
+        "session_id, module, public_code, patient_text, conversation_history, " +
+        "user_report, doctor_report, support_plan, risk_level, json_data, " +
+        "organization_id, primary_expert_id, invite_token, created_at"
+      )
       .eq("public_code", normalized)
       .maybeSingle();
 
@@ -232,6 +271,14 @@ async function handleLoad(req, res) {
         ok: false,
         error: "Код не найден. Проверьте правильность ввода (формат: ТОЧКА-XXXX-XXXX).",
       });
+    }
+
+    // Module filtering: health codes only return body sessions
+    if (isHealthCode && data.module !== "body") {
+      return res.status(404).json({ ok: false, error: "Код не найден." });
+    }
+    if (isSupportCode && data.module !== "support" && data.module !== "body") {
+      return res.status(404).json({ ok: false, error: "Код не найден." });
     }
 
     const jsonData = data.json_data || {};
@@ -257,7 +304,6 @@ async function handleLoad(req, res) {
       resourceFactors: jsonData.resourceFactors || "",
       questions: jsonData.questions || null,
       answers: jsonData.answers || {},
-      ...(jsonData || {}),
     };
 
     return res.status(200).json({
@@ -308,6 +354,9 @@ async function handleSaveConversationPairs(req, res) {
 
     if (!sessionId) {
       return res.status(400).json({ ok: false, error: "Missing sessionId" });
+    }
+    if (!isValidSessionId(sessionId)) {
+      return res.status(400).json({ ok: false, error: "Invalid sessionId format" });
     }
 
     if (!Array.isArray(pairs)) {

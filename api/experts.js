@@ -1,7 +1,12 @@
 import { getSupabase } from "../lib/supabase.js";
 import { getPrivacySafeMode } from "../lib/sanitize.js";
+import { applyCors, handleOptions } from "../lib/security/cors.js";
 
 export default async function handler(req, res) {
+  if (handleOptions(req, res)) return;
+
+  applyCors(req, res);
+
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
