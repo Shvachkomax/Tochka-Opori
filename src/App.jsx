@@ -2,6 +2,8 @@ import React, { useRef, useState, useEffect, Component } from "react";
 import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback, buildConversationPairs } from "../lib/conversation.js";
 import BodyIntake from "./BodyIntake.jsx";
 import BodyDiary from "./BodyDiary.jsx";
+import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
+import { saveBodySession, saveSupportSession, getBodySession, getSupportSession, clearBodySession, withAccessToken } from "./lib/sessionAccess.js";
 
 class AdminErrorBoundary extends Component {
   constructor(props) {
@@ -221,10 +223,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     const sp = plan || supportPlan;
     if (!sp) return;
     if (publicCode) {
+      const updateBody = withAccessToken({
+        action: "updateSupportPlan", public_code: publicCode, session_id: sessionId, support_plan: sp,
+      }, sessionId);
       fetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "updateSupportPlan", public_code: publicCode, session_id: sessionId, support_plan: sp }),
+        body: JSON.stringify(updateBody),
       }).catch(() => {});
     }
     localStorage.setItem("tochka_support_plan", JSON.stringify(sp));
@@ -1043,13 +1048,28 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         setTranscribing(true);
 
         try {
-          const response = await fetch("/api/transcribe", {
+          const mod = "support";
+          let token;
+          try { token = await getClientToken(mod, "transcribe"); } catch {}
+          const tHeaders = { "Content-Type": "audio/webm" };
+          if (token) tHeaders["Authorization"] = `Bearer ${token}`;
+
+          let response = await fetch("/api/transcribe", {
             method: "POST",
-            headers: {
-              "Content-Type": "audio/webm",
-            },
+            headers: tHeaders,
             body: audioBlob,
           });
+
+          // Retry once on 401
+          if (response.status === 401 && token) {
+            try { token = await getClientToken(mod, "transcribe"); } catch {}
+            tHeaders["Authorization"] = `Bearer ${token}`;
+            response = await fetch("/api/transcribe", {
+              method: "POST",
+              headers: tHeaders,
+              body: audioBlob,
+            });
+          }
 
           let data;
           const responseText = await response.text();
@@ -1150,13 +1170,27 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         setQuestionTranscribingIndex(index);
 
         try {
-          const response = await fetch("/api/transcribe", {
+          const mod = "support";
+          let token;
+          try { token = await getClientToken(mod, "transcribe"); } catch {}
+          const tHeaders = { "Content-Type": "audio/webm" };
+          if (token) tHeaders["Authorization"] = `Bearer ${token}`;
+
+          let response = await fetch("/api/transcribe", {
             method: "POST",
-            headers: {
-              "Content-Type": "audio/webm",
-            },
+            headers: tHeaders,
             body: audioBlob,
           });
+
+          if (response.status === 401 && token) {
+            try { token = await getClientToken(mod, "transcribe"); } catch {}
+            tHeaders["Authorization"] = `Bearer ${token}`;
+            response = await fetch("/api/transcribe", {
+              method: "POST",
+              headers: tHeaders,
+              body: audioBlob,
+            });
+          }
 
           const responseText = await response.text();
           let data;
@@ -1258,13 +1292,27 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         setCrisisTranscribing(true);
 
         try {
-          const response = await fetch("/api/transcribe", {
+          const mod = "support";
+          let token;
+          try { token = await getClientToken(mod, "transcribe"); } catch {}
+          const tHeaders = { "Content-Type": "audio/webm" };
+          if (token) tHeaders["Authorization"] = `Bearer ${token}`;
+
+          let response = await fetch("/api/transcribe", {
             method: "POST",
-            headers: {
-              "Content-Type": "audio/webm",
-            },
+            headers: tHeaders,
             body: audioBlob,
           });
+
+          if (response.status === 401 && token) {
+            try { token = await getClientToken(mod, "transcribe"); } catch {}
+            tHeaders["Authorization"] = `Bearer ${token}`;
+            response = await fetch("/api/transcribe", {
+              method: "POST",
+              headers: tHeaders,
+              body: audioBlob,
+            });
+          }
 
           const responseText = await response.text();
           let data;
@@ -1331,7 +1379,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setQuestions(null);
 
     try {
-      const res = await fetch("/api/analyze", {
+      const mod = activeModule || "support";
+      const res = await fetchWithClientToken("/api/analyze", mod, "analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1346,12 +1395,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           resourceFactors,
           supportPlan,
           voiceObservations,
-          module: activeModule,
+          module: mod,
         }),
       });
 
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText ? JSON.parse(errText).error : "Ошибка");
+      }
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка");
 
       if (data.type === "questions") {
         const qs = Array.isArray(data.questions)
@@ -1378,11 +1431,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             [...conversationHistory, { role: "user", answers }],
             { questions, answers, patient_input: text }
           );
-          if (pairs.length > 0) {
+            if (pairs.length > 0) {
+            const pairsBody = withAccessToken({ action: "save_conversation_pairs", sessionId, pairs }, sessionId);
             fetch("/api/session", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "save_conversation_pairs", sessionId, pairs }),
+              body: JSON.stringify(pairsBody),
             }).catch(() => {});
           }
         }
@@ -1402,41 +1456,49 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           ...(dialogDepth > 0 ? [{ role: "user", answers }] : []),
         ];
 
+        const saveSessionBody = withAccessToken({
+          action: "save",
+          sessionId: sid,
+          module: activeModule,
+          patient_text: text,
+          conversationHistory: finalHistory,
+          user_report: data.report?.split("===DOCTOR_REPORT===")[0]?.replace("===USER_REPORT===", "").trim() || "",
+          doctor_report: data.report?.split("===DOCTOR_REPORT===")[1]?.trim() || "",
+          riskLevel: null,
+          supportPlan: supportPlan,
+          dialogDepth,
+          previousPatientReport: previousPatientReport || "",
+          previousDoctorReport: previousDoctorReport || "",
+          homeTasks: homeTasks || "",
+          resourceFactors: resourceFactors || "",
+          questions,
+          answers,
+          voiceObservations: voiceObservations || null,
+          _debug: data._debug || null,
+          care_recommendation: data.care_recommendation || null,
+          invite_token: inviteToken,
+        }, sid);
+
         fetch("/api/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "save",
-            sessionId: sid,
-            module: activeModule,
-            patient_text: text,
-            conversationHistory: finalHistory,
-            user_report: data.report?.split("===DOCTOR_REPORT===")[0]?.replace("===USER_REPORT===", "").trim() || "",
-            doctor_report: data.report?.split("===DOCTOR_REPORT===")[1]?.trim() || "",
-            riskLevel: null,
-            supportPlan: supportPlan,
-            dialogDepth,
-            previousPatientReport: previousPatientReport || "",
-            previousDoctorReport: previousDoctorReport || "",
-            homeTasks: homeTasks || "",
-            resourceFactors: resourceFactors || "",
-            questions,
-            answers,
-            voiceObservations: voiceObservations || null,
-            _debug: data._debug || null,
-            care_recommendation: data.care_recommendation || null,
-            invite_token: inviteToken, // pass invite token from URL/localStorage
-          }),
+          body: JSON.stringify(saveSessionBody),
         })
           .then((r) => r.json())
           .then((result) => {
             if (result.ok) {
+              // Save access_token for future requests
+              if (result.access_token) {
+                saveSupportSession(sid, result.access_token);
+              }
               // Also persist conversation pairs for all rounds at final save
               const finalPairs = buildConversationPairs(finalHistory, { questions, answers, patient_input: text });
               if (finalPairs.length > 0) {
+                const pairsBody = withAccessToken({ action: "save_conversation_pairs", sessionId: sid, pairs: finalPairs }, sid);
                 fetch("/api/session", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ action: "save_conversation_pairs", sessionId: sid, pairs: finalPairs }),
+                  body: JSON.stringify(pairsBody),
                 }).catch(() => {});
               }
               const code = result.publicCode || publicCode || "";
@@ -1635,9 +1697,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setBodyIntakeStage("result");
     setBodyIntakeStep(0);
     try {
-      localStorage.setItem("body_last_session_id", response?.session_id || "");
+      const sid = response?.session_id || "";
+      localStorage.setItem("body_last_session_id", sid);
       localStorage.setItem("body_last_result", JSON.stringify(response));
       localStorage.setItem("body_last_created_at", new Date().toISOString());
+      if (sid) {
+        const stored = getBodySession();
+        if (!stored.accessToken && response?.access_token) {
+          saveBodySession(sid, response.access_token);
+        }
+      }
     } catch (e) {}
   }
 
@@ -1655,10 +1724,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     const sid = bodyDiarySessionId || bodyIntakeResult?.session_id || localStorage.getItem("body_last_session_id");
     if (!sid) { setBodyDiaryHistoryLoading(false); return; }
     try {
+      const listBody = withAccessToken({ action: "listBodyDailyLogs", session_id: sid }, sid);
       const res = await fetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listBodyDailyLogs", session_id: sid }),
+        body: JSON.stringify(listBody),
       });
       const data = await res.json();
       if (data.ok) {
@@ -1717,6 +1787,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       localStorage.removeItem("body_last_session_id");
       localStorage.removeItem("body_last_result");
       localStorage.removeItem("body_last_created_at");
+      clearBodySession();
     } catch (e) {}
     setSavedBodyResult(null);
     setShowConsultPrep(false);
@@ -8978,10 +9049,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     try {
                       const code = sessionCodeInput.trim();
 
+                      const loadBody = withAccessToken({ action: "load", publicCode: code }, code);
                       let res = await fetch("/api/session", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ action: "load", publicCode: code }),
+                        body: JSON.stringify(loadBody),
                       });
                       let data = await res.json();
                       if (!res.ok || !data.ok) {
