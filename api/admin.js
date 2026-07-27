@@ -2,6 +2,7 @@ import { getSupabase } from "../lib/supabase.js";
 import { applyCors, handleOptions, timingSafeEqual, getAdminTokenFromHeader } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { logAdminAction, getClientIp } from "../lib/security/audit.js";
+import { generateInviteToken, generateExpertAccessToken, hashToken } from "../lib/security/council-token.js";
 
 function resolveRole(token) {
   if (!token) return null;
@@ -16,6 +17,8 @@ function checkAccess(role, requiredModule) {
   if (role === "super") return true;
   if (requiredModule === "support" && role === "support") return true;
   if (requiredModule === "body" && role === "body") return true;
+  // council: only super (explicit check for clarity)
+  if (requiredModule === "council") return false;
   return false;
 }
 
@@ -66,6 +69,30 @@ export default async function handler(req, res) {
         return await handleListBodyExpertReviews(req, res);
       case "exportBodyExpertCases":
         return await handleExportBodyExpertCases(req, res);
+      case "createCouncilInvitation":
+        return await handleCreateCouncilInvitation(req, res);
+      case "listCouncilInvitations":
+        return await handleListCouncilInvitations(req, res);
+      case "getCouncilInvitationDetail":
+        return await handleGetCouncilInvitationDetail(req, res);
+      case "revokeCouncilInvitation":
+        return await handleRevokeCouncilInvitation(req, res);
+      case "listCouncilExperts":
+        return await handleListCouncilExperts(req, res);
+      case "getCouncilExpertDetail":
+        return await handleGetCouncilExpertDetail(req, res);
+      case "approveCouncilExpert":
+        return await handleApproveCouncilExpert(req, res);
+      case "rejectCouncilExpert":
+        return await handleRejectCouncilExpert(req, res);
+      case "pauseCouncilExpert":
+        return await handlePauseCouncilExpert(req, res);
+      case "restoreCouncilExpert":
+        return await handleRestoreCouncilExpert(req, res);
+      case "revokeCouncilExpertToken":
+        return await handleRevokeCouncilExpertToken(req, res);
+      case "exportCouncilExperts":
+        return await handleExportCouncilExperts(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -458,5 +485,457 @@ async function handleExportBodyExpertCases(req, res) {
 
   res.setHeader("Content-Type", "application/jsonl");
   res.setHeader("Content-Disposition", `attachment; filename="body-expert-cases-${new Date().toISOString().split("T")[0]}.jsonl"`);
+  return res.status(200).send(lines.join("\n"));
+}
+
+// --- Clinical Council handlers (SUPER_ADMIN only) ---
+
+async function handleCreateCouncilInvitation(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { first_name, last_name, email, specialty, organization, notes, expires_days } = req.body || {};
+  if (!first_name || !last_name) {
+    return res.status(400).json({ ok: false, error: "Missing required fields: first_name, last_name" });
+  }
+
+  const { raw, hash, inviteCode } = generateInviteToken();
+  const supabase = getSupabase();
+
+  const expiresAt = expires_days
+    ? new Date(Date.now() + expires_days * 24 * 60 * 60 * 1000).toISOString()
+    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // default 30 days
+
+  const { error } = await supabase
+    .from("clinical_council_invitations")
+    .insert({
+      invite_code: inviteCode,
+      token_hash: hash,
+      invited_first_name: first_name,
+      invited_last_name: last_name,
+      invited_email: email || null,
+      specialty: specialty || null,
+      organization: organization || null,
+      invited_by: role,
+      notes: notes || null,
+      status: "created",
+      expires_at: expiresAt,
+    });
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "create_council_invitation", {
+    targetType: "clinical_council_invitation",
+    targetId: inviteCode,
+    module: "council",
+    ipAddress: getClientIp(req),
+    details: { first_name, last_name, email },
+  });
+
+  return res.status(200).json({
+    ok: true,
+    invitation: {
+      code: inviteCode,
+      token: raw,
+      expires_at: expiresAt,
+    },
+  });
+}
+
+async function handleListCouncilInvitations(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { limit: reqLimit = 50, offset = 0, status } = req.body || {};
+  const supabase = getSupabase();
+
+  let query = supabase
+    .from("clinical_council_invitations")
+    .select("id, invite_code, invited_first_name, invited_last_name, invited_email, specialty, organization, invited_by, status, expires_at, use_count, max_uses, created_at, accepted_at, revoked_at", { count: "exact" });
+
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    .range(offset, offset + reqLimit - 1);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.status(200).json({ ok: true, records: data || [], count: count || 0 });
+}
+
+async function handleGetCouncilInvitationDetail(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("clinical_council_invitations")
+    .select("id, invite_code, invited_first_name, invited_last_name, invited_email, specialty, organization, invited_by, notes, status, expires_at, max_uses, use_count, opened_at, accepted_at, revoked_at, created_at, updated_at")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.status(200).json({ ok: true, record: data });
+}
+
+async function handleRevokeCouncilInvitation(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("clinical_council_invitations")
+    .update({ status: "revoked", revoked_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "revoke_council_invitation", {
+    targetType: "clinical_council_invitation",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handleListCouncilExperts(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { limit: reqLimit = 50, offset = 0, status } = req.body || {};
+  const supabase = getSupabase();
+
+  let query = supabase
+    .from("clinical_council_experts")
+    .select("id, first_name, last_name, email, phone, specialty, position, organization, professional_note, status, role, public_name_consent, approved_by, approved_at, created_at", { count: "exact" });
+
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    .range(offset, offset + reqLimit - 1);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.status(200).json({ ok: true, records: data || [], count: count || 0 });
+}
+
+async function handleGetCouncilExpertDetail(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("clinical_council_experts")
+    .select("id, invitation_id, first_name, last_name, email, phone, specialty, position, organization, professional_note, status, role, public_name_consent, participation_terms_accepted_at, approved_by, approved_at, rejected_at, created_at, updated_at")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.status(200).json({ ok: true, record: data });
+}
+
+async function handleApproveCouncilExpert(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+
+  // Generate access token for the expert
+  const { raw: accessRaw, hash: accessHash } = generateExpertAccessToken();
+
+  const { error } = await supabase
+    .from("clinical_council_experts")
+    .update({
+      status: "active",
+      approved_by: role,
+      approved_at: new Date().toISOString(),
+      access_token_hash: accessHash,
+      access_token_generated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("status", "pending_review");
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "approve_council_expert", {
+    targetType: "clinical_council_expert",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({
+    ok: true,
+    expert_id: id,
+    access_token: accessRaw,
+  });
+}
+
+async function handleRejectCouncilExpert(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("clinical_council_experts")
+    .update({
+      status: "rejected",
+      rejected_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("status", "pending_review");
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "reject_council_expert", {
+    targetType: "clinical_council_expert",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handlePauseCouncilExpert(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("clinical_council_experts")
+    .update({ status: "paused" })
+    .eq("id", id)
+    .eq("status", "active");
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "pause_council_expert", {
+    targetType: "clinical_council_expert",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handleRestoreCouncilExpert(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("clinical_council_experts")
+    .update({ status: "active" })
+    .eq("id", id)
+    .eq("status", "paused");
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "restore_council_expert", {
+    targetType: "clinical_council_expert",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handleRevokeCouncilExpertToken(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+
+  // Check expert exists and is active
+  const { data: expert, error: fetchError } = await supabase
+    .from("clinical_council_experts")
+    .select("id, status")
+    .eq("id", id)
+    .single();
+
+  if (fetchError || !expert) {
+    return res.status(404).json({ ok: false, error: "Эксперт не найден" });
+  }
+
+  if (expert.status !== "active") {
+    return res.status(400).json({ ok: false, error: "Токен можно отозвать только у активного эксперта" });
+  }
+
+  const { error } = await supabase
+    .from("clinical_council_experts")
+    .update({
+      access_token_hash: null,
+      access_token_generated_at: null,
+      status: "paused",
+    })
+    .eq("id", id)
+    .eq("status", "active");
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "pause_council_expert", {
+    targetType: "clinical_council_expert",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+    details: { reason: "token_revoked" },
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handleExportCouncilExperts(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("clinical_council_experts")
+    .select("id, first_name, last_name, email, phone, specialty, position, organization, professional_note, status, role, public_name_consent, approved_by, approved_at, rejected_at, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "export_council_experts", {
+    targetType: "clinical_council_expert",
+    module: "council",
+    ipAddress: getClientIp(req),
+    details: { record_count: (data || []).length },
+  });
+
+  const lines = (data || []).map(r => JSON.stringify({
+    id: r.id,
+    first_name: r.first_name,
+    last_name: r.last_name,
+    email: r.email,
+    phone: r.phone,
+    specialty: r.specialty,
+    position: r.position,
+    organization: r.organization,
+    professional_note: r.professional_note,
+    status: r.status,
+    role: r.role,
+    public_name_consent: r.public_name_consent,
+    approved_by: r.approved_by,
+    approved_at: r.approved_at,
+    rejected_at: r.rejected_at,
+    created_at: r.created_at,
+  }));
+
+  res.setHeader("Content-Type", "application/jsonl");
+  res.setHeader("Content-Disposition", `attachment; filename="council-experts-${new Date().toISOString().split("T")[0]}.jsonl"`);
   return res.status(200).send(lines.join("\n"));
 }
