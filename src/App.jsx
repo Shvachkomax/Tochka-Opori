@@ -371,6 +371,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   // Admin role (super / support / body)
   const [adminRole, setAdminRole] = useState(null);
+  // Admin sub-page for SPA navigation (null = derive from URL)
+  const [adminSubPage, setAdminSubPage] = useState(null);
 
   // Body intake admin state
   const [bodyIntakeRecords, setBodyIntakeRecords] = useState([]);
@@ -3020,9 +3022,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   const isAdminPage = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
   const isTrainingPage = typeof window !== "undefined" && window.location.pathname === "/admin/training";
-  const adminModuleRoute = typeof window !== "undefined"
+  const adminModuleRoute = adminSubPage || (typeof window !== "undefined"
     ? window.location.pathname === "/admin/body" ? "body" : window.location.pathname === "/admin/council" ? "council" : "support"
-    : "support";
+    : "support");
   const isDedicatedSubdomain = typeof window !== "undefined" && (
     window.location.hostname === "health.tochka-opori.online" || window.location.hostname.startsWith("health.")
   );
@@ -4315,7 +4317,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               >
                 {adminDarkMode ? "☀️ Светлая" : "🌙 Тёмная"}
               </button>
-              <a href={adminModuleRoute === "body" ? "https://health.tochka-opori.online" : adminModuleRoute === "council" ? "/admin" : "/"} style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>← {adminModuleRoute === "council" ? "В панель администратора" : "На главную"}</a>
+              <a href={adminModuleRoute === "body" ? "https://health.tochka-opori.online" : adminModuleRoute === "council" ? "/admin" : "/"} onClick={adminModuleRoute === "council" ? (e) => { e.preventDefault(); setAdminSubPage(null); window.history.pushState({}, "", "/admin"); } : undefined} style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>← {adminModuleRoute === "council" ? "В панель администратора" : "На главную"}</a>
             </div>
           </div>
 
@@ -5534,15 +5536,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   Организации
                 </button>
                 {adminRole === "super" && (
-                  <a
-                    href="/admin/council"
+                  <button
                     style={{
                       border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                      background: t.tabBg, color: t.text, textDecoration: "none", display: "inline-flex", alignItems: "center",
+                      background: t.tabBg, color: t.text,
                     }}
+                    onClick={() => { setAdminSubPage("council"); window.history.pushState({}, "", "/admin/council"); }}
                   >
                     Экспертный совет →
-                  </a>
+                  </button>
                 )}
               </div>
 
