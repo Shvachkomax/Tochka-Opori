@@ -4315,7 +4315,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               >
                 {adminDarkMode ? "☀️ Светлая" : "🌙 Тёмная"}
               </button>
-              <a href={adminModuleRoute === "body" ? "https://health.tochka-opori.online" : "/"} style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>← {adminModuleRoute === "council" ? "В панель администратора" : "На главную"}</a>
+              <a href={adminModuleRoute === "body" ? "https://health.tochka-opori.online" : adminModuleRoute === "council" ? "/admin" : "/"} style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>← {adminModuleRoute === "council" ? "В панель администратора" : "На главную"}</a>
             </div>
           </div>
 
@@ -5533,6 +5533,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 >
                   Организации
                 </button>
+                {adminRole === "super" && (
+                  <a
+                    href="/admin/council"
+                    style={{
+                      border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                      background: t.tabBg, color: t.text, textDecoration: "none", display: "inline-flex", alignItems: "center",
+                    }}
+                  >
+                    Экспертный совет →
+                  </a>
+                )}
               </div>
 
               {adminReqTab === "crisis" ? (

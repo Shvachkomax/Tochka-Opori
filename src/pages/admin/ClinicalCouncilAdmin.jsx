@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-export default function ClinicalCouncilAdmin({ adminPassword, theme: t }) {
+export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
   const [tab, setTab] = useState("invitations");
   const [invitations, setInvitations] = useState([]);
   const [invitationsCount, setInvitationsCount] = useState(0);
@@ -107,17 +107,17 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme: t }) {
     <>
       {/* Tab switcher */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {["invitations", "candidates", "experts"].map(t => (
+        {["invitations", "candidates", "experts"].map(tabKey => (
           <button
-            key={t}
+            key={tabKey}
             style={{
               border: 0, borderRadius: 14, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer",
-              background: tab === t ? theme.tabActive : theme.tabBg,
-              color: tab === t ? theme.tabActiveText : theme.text,
+              background: tab === tabKey ? theme.tabActive : theme.tabBg,
+              color: tab === tabKey ? theme.tabActiveText : theme.text,
             }}
-            onClick={() => switchTab(t)}
+            onClick={() => switchTab(tabKey)}
           >
-            {t === "invitations" ? "Приглашения" : t === "candidates" ? "Кандидаты" : "Эксперты"}
+            {tabKey === "invitations" ? "Приглашения" : tabKey === "candidates" ? "Кандидаты" : "Эксперты"}
           </button>
         ))}
       </div>
