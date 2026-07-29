@@ -93,6 +93,20 @@ export default async function handler(req, res) {
         return await handleRevokeCouncilExpertToken(req, res);
       case "exportCouncilExperts":
         return await handleExportCouncilExperts(req, res);
+      case "trashCouncilInvitation":
+        return await handleTrashCouncilInvitation(req, res);
+      case "trashCouncilExpert":
+        return await handleTrashCouncilExpert(req, res);
+      case "listCouncilTrash":
+        return await handleListCouncilTrash(req, res);
+      case "restoreCouncilInvitation":
+        return await handleRestoreCouncilInvitation(req, res);
+      case "restoreCouncilExpert":
+        return await handleRestoreCouncilExpert(req, res);
+      case "permanentlyDeleteCouncilInvitation":
+        return await handlePermanentlyDeleteCouncilInvitation(req, res);
+      case "permanentlyDeleteCouncilExpert":
+        return await handlePermanentlyDeleteCouncilExpert(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -561,6 +575,8 @@ async function handleListCouncilInvitations(req, res) {
     .from("clinical_council_invitations")
     .select("id, invite_code, invited_first_name, invited_last_name, invited_email, specialty, organization, invited_by, status, expires_at, use_count, max_uses, created_at, accepted_at, revoked_at", { count: "exact" });
 
+  query = query.is("deleted_at", null);
+
   if (status) {
     query = query.eq("status", status);
   }
@@ -647,6 +663,8 @@ async function handleListCouncilExperts(req, res) {
   let query = supabase
     .from("clinical_council_experts")
     .select("id, first_name, last_name, email, phone, specialty, position, organization, professional_note, status, role, public_name_consent, approved_by, approved_at, created_at", { count: "exact" });
+
+  query = query.is("deleted_at", null);
 
   if (status) {
     query = query.eq("status", status);
@@ -938,4 +956,280 @@ async function handleExportCouncilExperts(req, res) {
   res.setHeader("Content-Type", "application/jsonl");
   res.setHeader("Content-Disposition", `attachment; filename="council-experts-${new Date().toISOString().split("T")[0]}.jsonl"`);
   return res.status(200).send(lines.join("\n"));
+}
+
+// ---- Soft delete / trash handlers ----
+
+async function handleTrashCouncilInvitation(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("clinical_council_invitations")
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: role,
+      status: "revoked",
+      revoked_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "council_invitation_trashed", {
+    targetType: "clinical_council_invitation",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handleTrashCouncilExpert(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("clinical_council_experts")
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: role,
+      status: "revoked",
+      access_token_hash: null,
+    })
+    .eq("id", id);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "council_expert_trashed", {
+    targetType: "clinical_council_expert",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handleListCouncilTrash(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const supabase = getSupabase();
+
+  const [invitations, experts] = await Promise.all([
+    supabase
+      .from("clinical_council_invitations")
+      .select("id, invite_code, invited_first_name, invited_last_name, invited_email, specialty, organization, status, expires_at, use_count, max_uses, deleted_at, deleted_by")
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("clinical_council_experts")
+      .select("id, first_name, last_name, email, specialty, position, organization, status, role, approved_at, deleted_at, deleted_by")
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false })
+      .limit(50),
+  ]);
+
+  const records = [];
+  (invitations.data || []).forEach(r => {
+    records.push({
+      type: "invitation",
+      id: r.id,
+      name: `${r.invited_first_name || ""} ${r.invited_last_name || ""}`.trim(),
+      email: r.invited_email,
+      code: r.invite_code,
+      previous_status: r.status,
+      specialty: r.specialty,
+      organization: r.organization,
+      deleted_at: r.deleted_at,
+      deleted_by: r.deleted_by,
+    });
+  });
+  (experts.data || []).forEach(r => {
+    records.push({
+      type: r.status === "pending_review" ? "candidate" : "expert",
+      id: r.id,
+      name: `${r.first_name || ""} ${r.last_name || ""}`.trim(),
+      email: r.email,
+      code: null,
+      previous_status: r.status,
+      specialty: r.specialty,
+      organization: r.organization,
+      deleted_at: r.deleted_at,
+      deleted_by: r.deleted_by,
+    });
+  });
+
+  records.sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
+
+  return res.status(200).json({ ok: true, records });
+}
+
+async function handleRestoreCouncilInvitation(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  // Restore but keep status revoked — admin must create new invite if needed
+  const { error } = await supabase
+    .from("clinical_council_invitations")
+    .update({ deleted_at: null, deleted_by: null })
+    .eq("id", id);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "council_invitation_restored", {
+    targetType: "clinical_council_invitation",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handleRestoreCouncilExpert(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  // Restore as paused (not active), clear access_token_hash
+  const { error } = await supabase
+    .from("clinical_council_experts")
+    .update({
+      deleted_at: null,
+      deleted_by: null,
+      status: "paused",
+      access_token_hash: null,
+    })
+    .eq("id", id);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "council_expert_restored", {
+    targetType: "clinical_council_expert",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handlePermanentlyDeleteCouncilInvitation(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  // First null out the FK in clinical_council_experts to avoid violations
+  await supabase
+    .from("clinical_council_experts")
+    .update({ invitation_id: null })
+    .eq("invitation_id", id);
+
+  const { error } = await supabase
+    .from("clinical_council_invitations")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: "Невозможно окончательно удалить: запись используется. " + error.message });
+  }
+
+  await logAdminAction(role, "council_invitation_purged", {
+    targetType: "clinical_council_invitation",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handlePermanentlyDeleteCouncilExpert(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("clinical_council_experts")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: "Невозможно окончательно удалить: " + error.message });
+  }
+
+  await logAdminAction(role, "council_expert_purged", {
+    targetType: "clinical_council_expert",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true });
 }

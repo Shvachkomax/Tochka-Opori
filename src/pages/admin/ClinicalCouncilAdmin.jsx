@@ -7,6 +7,8 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
   const [invitationsLoading, setInvitationsLoading] = useState(false);
   const [experts, setExperts] = useState([]);
   const [expertsLoading, setExpertsLoading] = useState(false);
+  const [trash, setTrash] = useState([]);
+  const [trashLoading, setTrashLoading] = useState(false);
   const [inviteForm, setInviteForm] = useState({ first_name: "", last_name: "", email: "", specialty: "", organization: "", notes: "", expires_days: 30 });
   const [inviteSaving, setInviteSaving] = useState(false);
   const [inviteResult, setInviteResult] = useState(null);
@@ -14,6 +16,7 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
   const [tokenCopied, setTokenCopied] = useState(false);
   const [toast, setToast] = useState({ message: "", type: "" });
   const [approvedToken, setApprovedToken] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
 
   function showToast(message, type = "success") {
     setToast({ message, type });
@@ -55,6 +58,23 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
     }
   }
 
+  async function loadTrash() {
+    setTrashLoading(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listCouncilTrash", password: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrash(data.records || []);
+      }
+    } catch {} finally {
+      setTrashLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadInvitations();
   }, []);
@@ -85,6 +105,21 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
           showToast("Эксперт приостановлен");
         } else if (action === "restoreCouncilExpert") {
           showToast("Эксперт восстановлен");
+        } else if (action === "trashCouncilInvitation") {
+          showToast("Приглашение перемещено в корзину");
+        } else if (action === "trashCouncilExpert") {
+          showToast("Запись перемещена в корзину");
+        } else if (action === "restoreCouncilInvitation" || action === "restoreCouncilExpert") {
+          showToast("Запись восстановлена");
+          loadTrash();
+        } else if (action === "permanentlyDeleteCouncilInvitation") {
+          showToast("Приглашение окончательно удалено");
+          loadTrash();
+          return;
+        } else if (action === "permanentlyDeleteCouncilExpert") {
+          showToast("Запись окончательно удалена");
+          loadTrash();
+          return;
         }
         loadInvitations();
         loadExperts();
@@ -95,20 +130,24 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
       showToast("Ошибка запроса", "error");
     } finally {
       setActionLoading(null);
+      setConfirmAction(null);
     }
   }
 
   function switchTab(newTab) {
     setTab(newTab);
     if (newTab === "invitations") loadInvitations();
+    else if (newTab === "trash") loadTrash();
     else loadExperts();
   }
+
+  const tabKeys = ["invitations", "candidates", "experts", "trash"];
 
   return (
     <>
       {/* Tab switcher */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {["invitations", "candidates", "experts"].map(tabKey => (
+        {tabKeys.map(tabKey => (
           <button
             key={tabKey}
             style={{
@@ -118,7 +157,7 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
             }}
             onClick={() => switchTab(tabKey)}
           >
-            {tabKey === "invitations" ? "Приглашения" : tabKey === "candidates" ? "Кандидаты" : "Эксперты"}
+            {tabKey === "invitations" ? "Приглашения" : tabKey === "candidates" ? "Кандидаты" : tabKey === "trash" ? "Корзина" : "Эксперты"}
           </button>
         ))}
       </div>
@@ -219,6 +258,13 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
                           Отозвать
                         </button>
                       )}
+                      <button
+                        disabled={actionLoading === "trashCouncilInvitation" + inv.id}
+                        style={{ border: 0, borderRadius: 10, padding: "6px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer", background: "transparent", color: "#7A7268", border: "1px solid #7A7268" }}
+                        onClick={() => setConfirmAction({ action: "trashCouncilInvitation", id: inv.id, message: "Переместить приглашение в корзину? Персональная ссылка перестанет работать." })}
+                      >
+                        🗑
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -261,6 +307,13 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
                           onClick={() => doAction("rejectCouncilExpert", exp.id)}
                         >
                           {actionLoading === "rejectCouncilExpert" + exp.id ? "..." : "Отклонить"}
+                        </button>
+                        <button
+                          disabled={actionLoading === "trashCouncilExpert" + exp.id}
+                          style={{ border: 0, borderRadius: 10, padding: "6px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer", background: "transparent", color: "#7A7268", border: "1px solid #7A7268" }}
+                          onClick={() => setConfirmAction({ action: "trashCouncilExpert", id: exp.id, message: "Переместить анкету кандидата в корзину? Её можно будет восстановить." })}
+                        >
+                          🗑
                         </button>
                       </div>
                     </div>
@@ -321,12 +374,106 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
                             {actionLoading === "restoreCouncilExpert" + exp.id ? "..." : "Восстановить"}
                           </button>
                         )}
+                        <button
+                          disabled={actionLoading === "trashCouncilExpert" + exp.id}
+                          style={{ border: 0, borderRadius: 10, padding: "6px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer", background: "transparent", color: "#7A7268", border: "1px solid #7A7268" }}
+                          onClick={() => setConfirmAction({ action: "trashCouncilExpert", id: exp.id, message: "Переместить эксперта в корзину? Доступ в кабинет будет немедленно закрыт." })}
+                        >
+                          🗑
+                        </button>
                       </div>
                     </div>
                     {exp.email && <div style={{ fontSize: 12, color: theme.muted }}>Email: {exp.email}</div>}
                     {exp.approved_at && <div style={{ fontSize: 12, color: theme.muted }}>Утверждён: {new Date(exp.approved_at).toLocaleDateString("ru-RU")}</div>}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Trash tab */}
+      {tab === "trash" && (
+        <div>
+          <div style={{ background: theme.cardBg, border: `1px solid ${theme.cardBorder}`, borderRadius: 20, padding: 24 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Корзина</h3>
+            {trashLoading ? (
+              <div style={{ color: theme.muted, fontSize: 14, padding: 20 }}>Загрузка...</div>
+            ) : trash.length === 0 ? (
+              <div style={{ color: theme.muted, fontSize: 14, padding: 20 }}>Корзина пуста</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {trash.map(item => (
+                  <div key={item.type + item.id} style={{ padding: "12px 16px", borderRadius: 14, background: theme.cardBg, border: `1px solid ${theme.cardBorder}` }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                      <div>
+                        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: theme.muted, marginRight: 8 }}>
+                          {item.type === "invitation" ? "Приглашение" : item.type === "candidate" ? "Кандидат" : "Эксперт"}
+                        </span>
+                        <span style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</span>
+                        {item.email && <span style={{ marginLeft: 10, fontSize: 12, color: theme.muted }}>· {item.email}</span>}
+                        {item.code && <span style={{ marginLeft: 10, fontSize: 12, color: theme.muted }}>· {item.code}</span>}
+                        <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>
+                          Прежний статус: <span style={{ fontWeight: 600 }}>{item.previous_status}</span>
+                          <span> · Удалён: {new Date(item.deleted_at).toLocaleDateString("ru-RU")}</span>
+                          {item.deleted_by && <span> · Кем: {item.deleted_by}</span>}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          disabled={actionLoading === "restore" + item.id}
+                          style={{ border: 0, borderRadius: 10, padding: "6px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer", background: "#5F7D6C", color: "#fff" }}
+                          onClick={() => doAction(item.type === "invitation" ? "restoreCouncilInvitation" : "restoreCouncilExpert", item.id)}
+                        >
+                          {actionLoading === "restore" + item.id ? "..." : "Восстановить"}
+                        </button>
+                        <button
+                          disabled={actionLoading === "purge" + item.id}
+                          style={{ border: 0, borderRadius: 10, padding: "6px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer", background: "transparent", color: "#ef4444", border: "1px solid #ef4444" }}
+                          onClick={() => setConfirmAction({
+                            action: item.type === "invitation" ? "permanentlyDeleteCouncilInvitation" : "permanentlyDeleteCouncilExpert",
+                            id: item.id,
+                            destructive: true,
+                            message: "Удаление необратимо. Введите УДАЛИТЬ.",
+                          })}
+                        >
+                          Удалить окончательно
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation dialog */}
+      {confirmAction && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9000,
+          background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{ background: "#fff", border: "1px solid rgba(46,42,37,.1)", borderRadius: 20, padding: 28, maxWidth: 440, width: "90%", boxShadow: "0 8px 30px rgba(0,0,0,.15)" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{confirmAction.message}</div>
+            {confirmAction.destructive ? (
+              <ConfirmDestructive onConfirm={() => doAction(confirmAction.action, confirmAction.id)} onCancel={() => setConfirmAction(null)} actionLoading={actionLoading} theme={theme} />
+            ) : (
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button
+                  style={{ border: "1px solid rgba(46,42,37,.15)", borderRadius: 12, padding: "10px 20px", fontWeight: 700, fontSize: 13, cursor: "pointer", background: "#fff", color: "#2E2A25" }}
+                  onClick={() => setConfirmAction(null)}
+                >
+                  Отмена
+                </button>
+                <button
+                  style={{ border: 0, borderRadius: 12, padding: "10px 20px", fontWeight: 700, fontSize: 13, cursor: "pointer", background: "#ef4444", color: "#fff" }}
+                  onClick={() => doAction(confirmAction.action, confirmAction.id)}
+                >
+                  {actionLoading ? "..." : "Подтвердить"}
+                </button>
               </div>
             )}
           </div>
@@ -375,5 +522,43 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
         </div>
       )}
     </>
+  );
+}
+
+function ConfirmDestructive({ onConfirm, onCancel, actionLoading, theme }) {
+  const [text, setText] = useState("");
+  const expected = "УДАЛИТЬ";
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
+        Введите <strong>{expected}</strong> для подтверждения:
+      </div>
+      <input
+        type="text"
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder={expected}
+        style={{ width: "100%", border: "1px solid rgba(46,42,37,.15)", borderRadius: 12, background: "#fff", color: "#2E2A25", padding: "10px 14px", fontSize: 14, outline: "none", marginBottom: 16, boxSizing: "border-box" }}
+      />
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <button
+          style={{ border: "1px solid rgba(46,42,37,.15)", borderRadius: 12, padding: "10px 20px", fontWeight: 700, fontSize: 13, cursor: "pointer", background: "#fff", color: "#2E2A25" }}
+          onClick={onCancel}
+        >
+          Отмена
+        </button>
+        <button
+          disabled={text !== expected || actionLoading}
+          style={{
+            border: 0, borderRadius: 12, padding: "10px 20px", fontWeight: 700, fontSize: 13, cursor: text === expected ? "pointer" : "not-allowed",
+            background: text === expected ? "#ef4444" : "#ccc", color: "#fff",
+          }}
+          onClick={onConfirm}
+        >
+          {actionLoading ? "..." : "Удалить окончательно"}
+        </button>
+      </div>
+    </div>
   );
 }
