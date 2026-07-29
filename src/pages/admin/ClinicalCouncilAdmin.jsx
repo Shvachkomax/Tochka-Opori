@@ -659,8 +659,8 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
                   onClick={handleEmailSaveDraft}>
                   {emailSaving ? "Сохранение..." : "Сохранить черновик"}
                 </button>
-                <button disabled={!currentCampaignId || emailSaving || !emailForm.subject || !emailForm.bodyText}
-                  style={{ border: 0, borderRadius: 12, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: (!currentCampaignId || emailSaving || !emailForm.subject || !emailForm.bodyText) ? "not-allowed" : "pointer", background: theme.tabBg, color: theme.text }}
+                <button disabled={emailSaving || !emailForm.subject || !emailForm.bodyText}
+                  style={{ border: 0, borderRadius: 12, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: (emailSaving || !emailForm.subject || !emailForm.bodyText) ? "not-allowed" : "pointer", background: theme.tabBg, color: theme.text }}
                   onClick={handleEmailSendTest}>
                   Отправить тест себе
                 </button>
