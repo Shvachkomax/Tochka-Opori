@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 export default function ExpertInvitePage() {
   const [token, setToken] = useState(() => {
@@ -15,9 +15,11 @@ export default function ExpertInvitePage() {
   });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const initialized = useRef(false);
 
   useEffect(() => {
     if (!token) return;
+    if (initialized.current) return;
     setLoading(true);
     fetch("/api/council", {
       method: "POST",
@@ -28,6 +30,18 @@ export default function ExpertInvitePage() {
       .then(data => {
         if (data.ok && data.invitation) {
           setPageData(data.invitation);
+          if (!initialized.current) {
+            initialized.current = true;
+            setFormFields(prev => ({
+              ...prev,
+              first_name: data.invitation.first_name || "",
+              last_name: data.invitation.last_name || "",
+              email: data.invitation.email || "",
+              specialty: data.invitation.specialty || "",
+              position: data.invitation.position || "",
+              organization: data.invitation.organization || "",
+            }));
+          }
         } else {
           setError(data.error || "Приглашение недействительно");
         }
@@ -45,7 +59,7 @@ export default function ExpertInvitePage() {
           <img src="/logo-tochka-opory-header.png" alt="Точка опоры" style={{ height: 72, display: "block" }} />
         </div>
         <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>Экспертный совет</h1>
-        <p style={{ fontSize: 14, color: "#7A7268", marginBottom: 24 }}>Приглашение в Expert Clinical Council</p>
+        <p style={{ fontSize: 14, color: "#7A7268", marginBottom: 24 }}>Приглашение в Экспертный совет</p>
 
         {loading && (
           <div style={{ fontSize: 14, color: "#7A7268", padding: 20 }}>Проверка приглашения...</div>
@@ -65,6 +79,9 @@ export default function ExpertInvitePage() {
             <div style={{ fontSize: 14, color: "#7A7268", marginBottom: 16 }}>
               {pageData.first_name && <span>Приглашаем: <strong>{pageData.first_name} {pageData.last_name}</strong></span>}
               {pageData.specialty && <span style={{ marginLeft: 8 }}>· {pageData.specialty}</span>}
+            </div>
+            <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 16, fontStyle: "italic" }}>
+              Мы заполнили данные из приглашения. При необходимости их можно исправить.
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ display: "flex", gap: 12 }}>

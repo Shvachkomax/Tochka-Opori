@@ -46,7 +46,7 @@ async function handleValidateInviteToken(req, res) {
 
   const { data: invite, error } = await supabase
     .from("clinical_council_invitations")
-    .select("id, invited_first_name, invited_last_name, invited_email, specialty, organization, status, expires_at, use_count, max_uses")
+    .select("id, invited_first_name, invited_last_name, invited_email, specialty, position, organization, invite_code, status, expires_at, use_count, max_uses")
     .eq("token_hash", tokenHash)
     .single();
 
@@ -86,12 +86,14 @@ async function handleValidateInviteToken(req, res) {
   return res.status(200).json({
     ok: true,
     invitation: {
-      id: invite.id,
       first_name: invite.invited_first_name,
       last_name: invite.invited_last_name,
       email: invite.invited_email,
       specialty: invite.specialty,
+      position: invite.position,
       organization: invite.organization,
+      invite_code: invite.invite_code,
+      expires_at: invite.expires_at,
     },
   });
 }
@@ -109,7 +111,7 @@ async function handleAcceptInvite(req, res) {
   // Step 1: Validate invitation (read-only)
   const { data: invite, error: inviteError } = await supabase
     .from("clinical_council_invitations")
-    .select("id, status, use_count, max_uses, expires_at")
+    .select("id, invited_first_name, invited_last_name, invited_email, specialty, position, organization, status, use_count, max_uses, expires_at")
     .eq("token_hash", tokenHash)
     .single();
 
@@ -176,15 +178,15 @@ async function handleAcceptInvite(req, res) {
     return res.status(409).json({ ok: false, error: "Вы уже зарегистрированы в Экспертном совете. Ожидайте подтверждения администратора." });
   }
 
-  // Step 4: Create expert record (pending_review)
+  // Step 4: Create expert record (pending_review) — use frontend value or fallback to invite data
   const trimmedFields = {
     first_name: first_name.trim(),
     last_name: last_name.trim(),
     email: email.toLowerCase().trim(),
     phone: phone ? phone.trim() : null,
-    specialty: specialty ? specialty.trim() : null,
-    position: position ? position.trim() : null,
-    organization: organization ? organization.trim() : null,
+    specialty: (specialty || invite.specialty || "").trim() || null,
+    position: (position || invite.position || "").trim() || null,
+    organization: (organization || invite.organization || "").trim() || null,
     professional_note: professional_note ? professional_note.trim() : null,
   };
 
