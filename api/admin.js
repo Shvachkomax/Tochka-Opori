@@ -1438,32 +1438,32 @@ async function handleSendCouncilEmailTest(req, res) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
 
-  const { subject, bodyText, recipientFilter } = req.body || {};
-  const testEmail = process.env.COUNCIL_EMAIL_FROM;
-  console.log("[email:test] COUNCIL_EMAIL_FROM present:", Boolean(testEmail));
-  if (!testEmail) {
-    return res.status(400).json({ ok: false, error: "COUNCIL_EMAIL_FROM не настроен" });
+  const { subject, bodyText } = req.body || {};
+  if (!subject || !subject.trim()) {
+    return res.status(400).json({ ok: false, error: "Тема письма обязательна" });
+  }
+  if (!bodyText || !bodyText.trim()) {
+    return res.status(400).json({ ok: false, error: "Текст письма обязателен" });
   }
 
-  const recipients = await resolveRecipients(recipientFilter || {});
-  const sampleRecipient = recipients.length > 0
-    ? recipients[0]
-    : { first_name: "Тест", last_name: "", specialty: "", organization: "" };
+  const rawTestTo = String(process.env.COUNCIL_EMAIL_TEST_TO || "").trim().toLowerCase();
+  const testToConfigured = rawTestTo.length > 0;
+  const testToValid = testToConfigured && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawTestTo);
+  console.log("[email:test] COUNCIL_EMAIL_TEST_TO configured:", testToConfigured, "valid:", testToValid);
 
-  const text = personalizeText(bodyText || "", sampleRecipient);
-  const subj = personalizeText(subject || "", sampleRecipient);
+  if (!testToValid) {
+    return res.status(400).json({ ok: false, error: "Не настроен адрес для тестового письма" });
+  }
 
-  console.log("[email:test] Calling sendEmail, to present:", Boolean(testEmail));
   const result = await sendEmail({
-    to: testEmail,
-    toName: "Admin",
-    subject: `[ТЕСТ] ${subj}`,
-    bodyText: text,
+    to: rawTestTo,
+    subject: `[ТЕСТ] ${subject.trim()}`,
+    bodyText: bodyText.trim(),
   });
-  console.log("[email:test] sendEmail result:", result.success, "messageId:", result.messageId ? result.messageId.substring(0, 20) + "..." : "none");
+  console.log("[email:test] sendEmail result success:", result.success, "messageId present:", Boolean(result.messageId));
 
   if (!result.success) {
-    return res.status(500).json({ ok: false, error: "Ошибка отправки теста: " + (result.error || "Unknown") });
+    return res.status(500).json({ ok: false, error: "Ошибка отправки теста" });
   }
 
   await logAdminAction(role, "council_email_test_sent", {
@@ -1471,9 +1471,12 @@ async function handleSendCouncilEmailTest(req, res) {
     targetId: null,
     module: "council",
     ipAddress: getClientIp(req),
+    details: { messageIdPresent: Boolean(result.messageId) },
   });
 
-  return res.status(200).json({ ok: true, messageId: result.messageId });
+  const masked = rawTestTo.replace(/^(.).*(@.*)$/, "$1***$2");
+
+  return res.status(200).json({ ok: true, messageId: result.messageId, testTo: masked });
 }
 
 async function handleSendCouncilEmailCampaign(req, res) {

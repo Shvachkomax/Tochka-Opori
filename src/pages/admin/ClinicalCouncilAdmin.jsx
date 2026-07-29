@@ -221,11 +221,9 @@ export default function ClinicalCouncilAdmin({ adminPassword, theme }) {
   }
 
   async function handleEmailSendTest() {
-    const filter = { group: emailForm.recipientGroup };
-    if (filter.group === "selected_records") filter.expertIds = expertSelection;
-    const data = await emailApiAction("sendCouncilEmailTest", { subject: emailForm.subject, bodyText: emailForm.bodyText, recipientFilter: filter });
+    const data = await emailApiAction("sendCouncilEmailTest", { subject: emailForm.subject, bodyText: emailForm.bodyText });
     if (data.ok) {
-      showToast("Тестовое письмо отправлено", "success");
+      showToast(`Тестовое письмо отправлено на ${data.testTo || "указанный адрес"}`, "success");
     } else {
       showToast(data.error || "Ошибка отправки теста", "error");
     }
