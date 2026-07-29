@@ -1440,6 +1440,7 @@ async function handleSendCouncilEmailTest(req, res) {
 
   const { subject, bodyText, recipientFilter } = req.body || {};
   const testEmail = process.env.COUNCIL_EMAIL_FROM;
+  console.log("[email:test] COUNCIL_EMAIL_FROM present:", Boolean(testEmail));
   if (!testEmail) {
     return res.status(400).json({ ok: false, error: "COUNCIL_EMAIL_FROM не настроен" });
   }
@@ -1452,12 +1453,14 @@ async function handleSendCouncilEmailTest(req, res) {
   const text = personalizeText(bodyText || "", sampleRecipient);
   const subj = personalizeText(subject || "", sampleRecipient);
 
+  console.log("[email:test] Calling sendEmail, to present:", Boolean(testEmail));
   const result = await sendEmail({
     to: testEmail,
     toName: "Admin",
     subject: `[ТЕСТ] ${subj}`,
     bodyText: text,
   });
+  console.log("[email:test] sendEmail result:", result.success, "messageId:", result.messageId ? result.messageId.substring(0, 20) + "..." : "none");
 
   if (!result.success) {
     return res.status(500).json({ ok: false, error: "Ошибка отправки теста: " + (result.error || "Unknown") });
