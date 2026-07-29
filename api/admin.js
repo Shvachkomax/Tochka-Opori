@@ -3,6 +3,7 @@ import { applyCors, handleOptions, timingSafeEqual, getAdminTokenFromHeader } fr
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { logAdminAction, getClientIp } from "../lib/security/audit.js";
 import { generateInviteToken, generateExpertAccessToken, hashToken } from "../lib/security/council-token.js";
+import { sendEmail } from "../lib/email/provider.js";
 
 function resolveRole(token) {
   if (!token) return null;
@@ -105,6 +106,22 @@ export default async function handler(req, res) {
         return await handlePermanentlyDeleteCouncilInvitation(req, res);
       case "permanentlyDeleteCouncilExpert":
         return await handlePermanentlyDeleteCouncilExpert(req, res);
+      case "createCouncilEmailDraft":
+        return await handleCreateCouncilEmailDraft(req, res);
+      case "updateCouncilEmailDraft":
+        return await handleUpdateCouncilEmailDraft(req, res);
+      case "previewCouncilEmailRecipients":
+        return await handlePreviewCouncilEmailRecipients(req, res);
+      case "sendCouncilEmailTest":
+        return await handleSendCouncilEmailTest(req, res);
+      case "sendCouncilEmailCampaign":
+        return await handleSendCouncilEmailCampaign(req, res);
+      case "listCouncilEmailCampaigns":
+        return await handleListCouncilEmailCampaigns(req, res);
+      case "getCouncilEmailCampaign":
+        return await handleGetCouncilEmailCampaign(req, res);
+      case "cancelCouncilEmailDraft":
+        return await handleCancelCouncilEmailDraft(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -1191,6 +1208,496 @@ async function handlePermanentlyDeleteCouncilExpert(req, res) {
 
   await logAdminAction(role, "council_expert_purged", {
     targetType: "clinical_council_expert",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+// ── Email Campaign helpers ──────────────────────────────────────────────────
+
+function personalizeText(text, recipient) {
+  if (!text) return "";
+  const cabinetUrl = "https://tochka-opori.online/expert";
+  return String(text)
+    .replace(/\{\{first_name\}\}/g, recipient.first_name || "")
+    .replace(/\{\{last_name\}\}/g, recipient.last_name || "")
+    .replace(/\{\{specialty\}\}/g, recipient.specialty || "")
+    .replace(/\{\{organization\}\}/g, recipient.organization || "")
+    .replace(/\{\{expert_cabinet_url\}\}/g, cabinetUrl);
+}
+
+async function resolveRecipients(filter) {
+  const supabase = getSupabase();
+  const { group, expertIds } = filter || {};
+  if (!group) return [];
+
+  let query;
+
+  if (group === "selected_records") {
+    if (!expertIds || !expertIds.length) return [];
+    query = supabase
+      .from("clinical_council_experts")
+      .select("id, first_name, last_name, email, specialty, organization, invitation_id")
+      .in("id", expertIds)
+      .is("deleted_at", null)
+      .not("email", "is", null);
+  } else {
+    const statusMap = {
+      active_experts: "active",
+      pending_candidates: "pending_review",
+      paused_experts: "paused",
+    };
+    const status = statusMap[group];
+    if (!status) return [];
+
+    query = supabase
+      .from("clinical_council_experts")
+      .select("id, first_name, last_name, email, specialty, organization, invitation_id")
+      .eq("status", status)
+      .is("deleted_at", null)
+      .not("email", "is", null);
+  }
+
+  const { data } = await query;
+  if (!data) return [];
+
+  const seen = new Set();
+  return data
+    .filter((r) => {
+      const e = (r.email || "").toLowerCase().trim();
+      if (!e || seen.has(e)) return false;
+      seen.add(e);
+      return true;
+    })
+    .map((r) => ({
+      expert_id: r.id,
+      invitation_id: r.invitation_id,
+      email: r.email.toLowerCase().trim(),
+      name: `${r.first_name || ""} ${r.last_name || ""}`.trim(),
+      first_name: r.first_name || "",
+      last_name: r.last_name || "",
+      specialty: r.specialty || "",
+      organization: r.organization || "",
+    }));
+}
+
+async function generateDeliveries(supabase, campaignId, recipients) {
+  const rows = recipients.map((r) => ({
+    campaign_id: campaignId,
+    expert_id: r.expert_id || null,
+    invitation_id: r.invitation_id || null,
+    recipient_email: r.email,
+    recipient_name: r.name || null,
+    status: "pending",
+  }));
+
+  const { data } = await supabase.from("clinical_council_email_deliveries").insert(rows).select();
+  return data || [];
+}
+
+// ── Email Campaign handlers ─────────────────────────────────────────────────
+
+async function handleCreateCouncilEmailDraft(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { subject, bodyText, recipientFilter } = req.body || {};
+  if (!subject || !subject.trim()) {
+    return res.status(400).json({ ok: false, error: "Тема письма обязательна" });
+  }
+  if (!bodyText || !bodyText.trim()) {
+    return res.status(400).json({ ok: false, error: "Текст письма обязателен" });
+  }
+
+  const filter = recipientFilter || {};
+  const recipients = await resolveRecipients(filter);
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("clinical_council_email_campaigns")
+    .insert({
+      subject: subject.trim(),
+      body_text: bodyText.trim(),
+      recipient_filter: filter,
+      status: "draft",
+      created_by: role,
+      total_count: recipients.length,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "council_email_draft_created", {
+    targetType: "clinical_council_email_campaign",
+    targetId: data.id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true, campaign: data });
+}
+
+async function handleUpdateCouncilEmailDraft(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id, subject, bodyText, recipientFilter } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing campaign id" });
+  }
+
+  const supabase = getSupabase();
+  const { data: existing } = await supabase
+    .from("clinical_council_email_campaigns")
+    .select("id, status")
+    .eq("id", id)
+    .single();
+
+  if (!existing) {
+    return res.status(404).json({ ok: false, error: "Кампания не найдена" });
+  }
+  if (existing.status !== "draft") {
+    return res.status(400).json({ ok: false, error: "Можно редактировать только черновик" });
+  }
+
+  const updates = {};
+  if (subject !== undefined) updates.subject = subject.trim();
+  if (bodyText !== undefined) updates.body_text = bodyText.trim();
+  if (recipientFilter !== undefined) {
+    updates.recipient_filter = recipientFilter;
+    const recipients = await resolveRecipients(recipientFilter);
+    updates.total_count = recipients.length;
+  }
+
+  const { data, error } = await supabase
+    .from("clinical_council_email_campaigns")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "council_email_draft_updated", {
+    targetType: "clinical_council_email_campaign",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true, campaign: data });
+}
+
+async function handlePreviewCouncilEmailRecipients(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { recipientFilter } = req.body || {};
+  if (!recipientFilter || !recipientFilter.group) {
+    return res.status(400).json({ ok: false, error: "Не указана группа получателей" });
+  }
+
+  const recipients = await resolveRecipients(recipientFilter);
+  const sample = recipients.slice(0, 10).map((r) => ({
+    email: r.email,
+    name: r.name,
+    first_name: r.first_name,
+    last_name: r.last_name,
+    specialty: r.specialty,
+    organization: r.organization,
+  }));
+
+  return res.status(200).json({
+    ok: true,
+    count: recipients.length,
+    sample,
+  });
+}
+
+async function handleSendCouncilEmailTest(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { subject, bodyText, recipientFilter } = req.body || {};
+  const testEmail = process.env.COUNCIL_EMAIL_FROM;
+  if (!testEmail) {
+    return res.status(400).json({ ok: false, error: "COUNCIL_EMAIL_FROM не настроен" });
+  }
+
+  const recipients = await resolveRecipients(recipientFilter || {});
+  const sampleRecipient = recipients.length > 0
+    ? recipients[0]
+    : { first_name: "Тест", last_name: "", specialty: "", organization: "" };
+
+  const text = personalizeText(bodyText || "", sampleRecipient);
+  const subj = personalizeText(subject || "", sampleRecipient);
+
+  const result = await sendEmail({
+    to: testEmail,
+    toName: "Admin",
+    subject: `[ТЕСТ] ${subj}`,
+    bodyText: text,
+  });
+
+  if (!result.success) {
+    return res.status(500).json({ ok: false, error: "Ошибка отправки теста: " + (result.error || "Unknown") });
+  }
+
+  await logAdminAction(role, "council_email_test_sent", {
+    targetType: "clinical_council_email_campaign",
+    targetId: null,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.status(200).json({ ok: true, messageId: result.messageId });
+}
+
+async function handleSendCouncilEmailCampaign(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing campaign id" });
+  }
+
+  const supabase = getSupabase();
+
+  const { data: campaign, error: claimError } = await supabase
+    .from("clinical_council_email_campaigns")
+    .update({ status: "sending", started_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "draft")
+    .select()
+    .single();
+
+  if (claimError || !campaign) {
+    return res.status(400).json({ ok: false, error: "Кампания не найдена или уже отправлена" });
+  }
+
+  const recipients = await resolveRecipients(campaign.recipient_filter || {});
+
+  if (recipients.length === 0) {
+    await supabase
+      .from("clinical_council_email_campaigns")
+      .update({ status: "completed", completed_at: new Date().toISOString() })
+      .eq("id", id);
+    return res.status(200).json({ ok: true, sentCount: 0, failedCount: 0 });
+  }
+
+  if (recipients.length > 50) {
+    await supabase
+      .from("clinical_council_email_campaigns")
+      .update({ status: "draft", started_at: null })
+      .eq("id", id);
+    return res.status(400).json({ ok: false, error: "Максимум 50 получателей для одной рассылки" });
+  }
+
+  const deliveries = await generateDeliveries(supabase, id, recipients);
+  if (deliveries.length === 0) {
+    await supabase
+      .from("clinical_council_email_campaigns")
+      .update({ status: "failed", completed_at: new Date().toISOString() })
+      .eq("id", id);
+    return res.status(500).json({ ok: false, error: "Не удалось создать записи доставки" });
+  }
+
+  let sentCount = 0;
+  let failedCount = 0;
+
+  for (const delivery of deliveries) {
+    const recip = recipients.find((r) => r.email === delivery.recipient_email);
+    if (!recip) {
+      failedCount++;
+      await supabase
+        .from("clinical_council_email_deliveries")
+        .update({ status: "skipped", error_message: "Recipient not found in snapshot" })
+        .eq("id", delivery.id);
+      continue;
+    }
+
+    try {
+      const text = personalizeText(campaign.body_text, recip);
+      const subj = personalizeText(campaign.subject, recip);
+
+      const result = await sendEmail({
+        to: recip.email,
+        toName: recip.name,
+        subject: subj,
+        bodyText: text,
+      });
+
+      if (result.success) {
+        sentCount++;
+        await supabase
+          .from("clinical_council_email_deliveries")
+          .update({ status: "sent", provider_message_id: result.messageId || null, sent_at: new Date().toISOString() })
+          .eq("id", delivery.id);
+      } else {
+        failedCount++;
+        await supabase
+          .from("clinical_council_email_deliveries")
+          .update({ status: "failed", error_message: (result.error || "Unknown error").substring(0, 500) })
+          .eq("id", delivery.id);
+      }
+    } catch (err) {
+      failedCount++;
+      await supabase
+        .from("clinical_council_email_deliveries")
+        .update({ status: "failed", error_message: (err.message || "Unknown error").substring(0, 500) })
+        .eq("id", delivery.id);
+    }
+  }
+
+  let finalStatus = "completed";
+  if (failedCount > 0 && sentCount > 0) finalStatus = "partially_failed";
+  else if (failedCount > 0 && sentCount === 0) finalStatus = "failed";
+
+  await supabase
+    .from("clinical_council_email_campaigns")
+    .update({
+      status: finalStatus,
+      completed_at: new Date().toISOString(),
+      sent_count: sentCount,
+      failed_count: failedCount,
+    })
+    .eq("id", id);
+
+  await logAdminAction(role, "council_email_campaign_started", {
+    targetType: "clinical_council_email_campaign",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+  });
+
+  await logAdminAction(role, "council_email_campaign_completed", {
+    targetType: "clinical_council_email_campaign",
+    targetId: id,
+    module: "council",
+    ipAddress: getClientIp(req),
+    details: { sentCount, failedCount, totalCount: recipients.length },
+  });
+
+  return res.status(200).json({ ok: true, sentCount, failedCount, totalCount: recipients.length });
+}
+
+async function handleListCouncilEmailCampaigns(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { limit = 50, offset = 0 } = req.body || {};
+
+  const supabase = getSupabase();
+  const { data, error, count } = await supabase
+    .from("clinical_council_email_campaigns")
+    .select("id, subject, status, created_by, created_at, started_at, completed_at, total_count, sent_count, failed_count", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.status(200).json({ ok: true, records: data || [], count: count || 0 });
+}
+
+async function handleGetCouncilEmailCampaign(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing campaign id" });
+  }
+
+  const supabase = getSupabase();
+  const { data: campaign, error } = await supabase
+    .from("clinical_council_email_campaigns")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !campaign) {
+    return res.status(404).json({ ok: false, error: "Кампания не найдена" });
+  }
+
+  const { data: deliveries } = await supabase
+    .from("clinical_council_email_deliveries")
+    .select("id, expert_id, invitation_id, recipient_email, recipient_name, status, provider_message_id, error_message, sent_at, created_at")
+    .eq("campaign_id", id)
+    .order("created_at", { ascending: true });
+
+  return res.status(200).json({ ok: true, campaign, deliveries: deliveries || [] });
+}
+
+async function handleCancelCouncilEmailDraft(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "council")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing campaign id" });
+  }
+
+  const supabase = getSupabase();
+  const { data: existing } = await supabase
+    .from("clinical_council_email_campaigns")
+    .select("id, status")
+    .eq("id", id)
+    .single();
+
+  if (!existing) {
+    return res.status(404).json({ ok: false, error: "Кампания не найдена" });
+  }
+
+  if (existing.status !== "draft" && existing.status !== "sending") {
+    return res.status(400).json({ ok: false, error: "Можно отменить только черновик или отправляемую кампанию" });
+  }
+
+  const { error } = await supabase
+    .from("clinical_council_email_campaigns")
+    .update({ status: "cancelled", completed_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  await logAdminAction(role, "council_email_campaign_cancelled", {
+    targetType: "clinical_council_email_campaign",
     targetId: id,
     module: "council",
     ipAddress: getClientIp(req),
