@@ -87,8 +87,6 @@ export default async function handler(req, res) {
         return await handleRejectCouncilExpert(req, res);
       case "pauseCouncilExpert":
         return await handlePauseCouncilExpert(req, res);
-      case "restoreCouncilExpert":
-        return await handleRestoreCouncilExpert(req, res);
       case "revokeCouncilExpertToken":
         return await handleRevokeCouncilExpertToken(req, res);
       case "exportCouncilExperts":
@@ -814,39 +812,6 @@ async function handlePauseCouncilExpert(req, res) {
   }
 
   await logAdminAction(role, "pause_council_expert", {
-    targetType: "clinical_council_expert",
-    targetId: id,
-    module: "council",
-    ipAddress: getClientIp(req),
-  });
-
-  return res.status(200).json({ ok: true });
-}
-
-async function handleRestoreCouncilExpert(req, res) {
-  const password = extractPassword(req);
-  const role = resolveRole(password);
-  if (!checkAccess(role, "council")) {
-    return res.status(403).json({ ok: false, error: "Нет доступа" });
-  }
-
-  const { id } = req.body || {};
-  if (!id) {
-    return res.status(400).json({ ok: false, error: "Missing id" });
-  }
-
-  const supabase = getSupabase();
-  const { error } = await supabase
-    .from("clinical_council_experts")
-    .update({ status: "active" })
-    .eq("id", id)
-    .eq("status", "paused");
-
-  if (error) {
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-
-  await logAdminAction(role, "restore_council_expert", {
     targetType: "clinical_council_expert",
     targetId: id,
     module: "council",
