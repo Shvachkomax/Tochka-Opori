@@ -63,6 +63,8 @@ export default function App() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [voiceObservations, setVoiceObservations] = useState([]);
   const voiceMsgCounterRef = useRef(0);
+  const sessionRef = useRef(null);
+  const startSessionPromiseRef = useRef(null);
 
   const [sessionReviewOpen, setSessionReviewOpen] = useState(false);
   const [patientRating, setPatientRating] = useState(0);
@@ -1028,10 +1030,35 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setCrisisShowHighRiskWarning(false);
   }
 
+  async function ensureStartSession() {
+    if (sessionRef.current) {
+      return sessionRef.current;
+    }
+    if (startSessionPromiseRef.current) {
+      return startSessionPromiseRef.current;
+    }
+    startSessionPromiseRef.current = (async () => {
+      const r = await fetch("/api/start-session", { method: "POST", headers: { "Content-Type": "application/json" } });
+      const d = await r.json();
+      if (!d.ok) throw new Error("Не удалось начать разговор. Попробуйте ещё раз.");
+      const data = { sessionId: d.session_id, accessToken: d.access_token };
+      sessionRef.current = data;
+      setSessionId(data.sessionId);
+      saveSupportSession(data.sessionId, data.accessToken);
+      return data;
+    })();
+    try {
+      return await startSessionPromiseRef.current;
+    } finally {
+      startSessionPromiseRef.current = null;
+    }
+  }
+
   async function startRecording() {
     setVoiceError("");
 
     try {
+      await ensureStartSession();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const recorder = new MediaRecorder(stream);
@@ -1060,7 +1087,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           const tHeaders = { "Content-Type": "audio/webm" };
           if (token) tHeaders["Authorization"] = `Bearer ${token}`;
 
-          let response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=support`, {
+          let response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionRef.current?.sessionId || "")}&module=support`, {
             method: "POST",
             headers: tHeaders,
             body: audioBlob,
@@ -1070,7 +1097,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           if (response.status === 401 && token) {
             try { token = await getClientToken(mod, "transcribe"); } catch {}
             tHeaders["Authorization"] = `Bearer ${token}`;
-            response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=support`, {
+            response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionRef.current?.sessionId || "")}&module=support`, {
               method: "POST",
               headers: tHeaders,
               body: audioBlob,
@@ -1150,6 +1177,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setVoiceError("");
 
     try {
+      await ensureStartSession();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const recorder = new MediaRecorder(stream);
@@ -1182,7 +1210,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           const tHeaders = { "Content-Type": "audio/webm" };
           if (token) tHeaders["Authorization"] = `Bearer ${token}`;
 
-          let response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=support`, {
+          let response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionRef.current?.sessionId || "")}&module=support`, {
             method: "POST",
             headers: tHeaders,
             body: audioBlob,
@@ -1191,7 +1219,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           if (response.status === 401 && token) {
             try { token = await getClientToken(mod, "transcribe"); } catch {}
             tHeaders["Authorization"] = `Bearer ${token}`;
-            response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=support`, {
+            response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionRef.current?.sessionId || "")}&module=support`, {
               method: "POST",
               headers: tHeaders,
               body: audioBlob,
@@ -1272,6 +1300,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setCrisisVoiceError("");
 
     try {
+      await ensureStartSession().catch(() => {});
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const recorder = new MediaRecorder(stream);
@@ -1304,7 +1333,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           const tHeaders = { "Content-Type": "audio/webm" };
           if (token) tHeaders["Authorization"] = `Bearer ${token}`;
 
-          let response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=support`, {
+          let response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionRef.current?.sessionId || "")}&module=support`, {
             method: "POST",
             headers: tHeaders,
             body: audioBlob,
@@ -1313,7 +1342,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           if (response.status === 401 && token) {
             try { token = await getClientToken(mod, "transcribe"); } catch {}
             tHeaders["Authorization"] = `Bearer ${token}`;
-            response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=support`, {
+            response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionRef.current?.sessionId || "")}&module=support`, {
               method: "POST",
               headers: tHeaders,
               body: audioBlob,
@@ -7719,19 +7748,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   setBodyIntakeStage("filling");
                   return;
                 }
-                if (loading || sessionId) return;
                 try {
-                  setLoading(true);
-                  const r = await fetch("/api/start-session", { method: "POST", headers: { "Content-Type": "application/json" } });
-                  const d = await r.json();
-                  if (d.ok) {
-                    setSessionId(d.session_id);
-                    saveSupportSession(d.session_id, d.access_token);
-                  }
+                  await ensureStartSession();
                 } catch (e) {
-                  console.warn("start-session error:", e.message);
-                } finally {
-                  setLoading(false);
+                  setError(e.message);
+                  return;
                 }
                 setMode("text");
               }}>
@@ -7739,19 +7760,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </button>
               {activeModule !== "body" && (
                 <button style={s.secondary} onClick={async () => {
-                  if (loading || sessionId) return;
                   try {
-                    setLoading(true);
-                    const r = await fetch("/api/start-session", { method: "POST", headers: { "Content-Type": "application/json" } });
-                    const d = await r.json();
-                    if (d.ok) {
-                      setSessionId(d.session_id);
-                      saveSupportSession(d.session_id, d.access_token);
-                    }
+                    await ensureStartSession();
                   } catch (e) {
-                    console.warn("start-session error:", e.message);
-                  } finally {
-                    setLoading(false);
+                    setError(e.message);
+                    return;
                   }
                   setMode("voice");
                 }}>
