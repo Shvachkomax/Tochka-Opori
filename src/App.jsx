@@ -1466,8 +1466,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText ? JSON.parse(errText).error : "Ошибка");
+        if (res instanceof Response) {
+          const errText = await res.text();
+          throw new Error(errText ? JSON.parse(errText).error : "Ошибка");
+        }
+        throw new Error(res.error || "Не удалось начать разбор. Попробуйте ещё раз.");
       }
 
       const data = await res.json();
