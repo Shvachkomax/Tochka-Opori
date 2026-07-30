@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 30, prefix: "transcribe:" });
+  const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 30, prefix: "transcribe:", message: "Слишком много голосовых сообщений. Подождите немного или введите ответ текстом." });
   const limited = await limit(req, res);
   if (limited) return;
 
