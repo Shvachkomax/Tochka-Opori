@@ -4,5 +4,10 @@
       "source": "/((?!api/.*|support-practices/.*).*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/transcribe.js": {
+      "includeFiles": "node_modules/opusscript/build/**"
+    }
+  }
 }
