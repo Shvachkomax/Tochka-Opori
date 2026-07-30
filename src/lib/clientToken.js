@@ -55,7 +55,9 @@ export async function withClientToken(module, purpose, fetchOptions = {}) {
   let token;
   try {
     token = await getClientToken(module, purpose);
-  } catch {
+    console.log("[clientToken] token obtained", { module, purpose, type: typeof token, prefix: String(token).slice(0, 10) });
+  } catch (e) {
+    console.error("[clientToken] token failed", { module, purpose, error: e.message });
     return { ok: false, error: "Не удалось получить токен доступа. Обновите страницу и попробуйте ещё раз." };
   }
 
