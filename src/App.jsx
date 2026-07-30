@@ -1038,7 +1038,18 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       return startSessionPromiseRef.current;
     }
     startSessionPromiseRef.current = (async () => {
-      const r = await fetch("/api/start-session", { method: "POST", headers: { "Content-Type": "application/json" } });
+      const mod = activeModule || "support";
+      let token;
+      try { token = await getClientToken(mod, "analyze"); } catch (e) {
+        throw new Error("Не удалось начать разговор. Попробуйте ещё раз.");
+      }
+      const r = await fetch("/api/start-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
       const d = await r.json();
       if (!d.ok) throw new Error("Не удалось начать разговор. Попробуйте ещё раз.");
       const data = { sessionId: d.session_id, accessToken: d.access_token };
