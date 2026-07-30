@@ -1369,7 +1369,20 @@ ${antiRepeatBlock}
   try {
     const t0 = Date.now();
     const sessionIdHash = session_id ? session_id.slice(-8) : "none";
-    console.log(`[timing] analyze_request_start session=${sessionIdHash} depth=${depth} continuation=${isContinuation}`);
+    const promptChars = (systemPrompt || "").length + (userPrompt || "").length;
+    const historyChars = (historyText || "").length;
+    const msgCount = Array.isArray(convHistory) ? convHistory.length : 0;
+    console.log(JSON.stringify({
+      stage: "analyze_request_start",
+      session: sessionIdHash,
+      model: MODEL_TRIAGE,
+      depth,
+      continuation: isContinuation,
+      msg_count: msgCount,
+      prompt_chars: promptChars,
+      history_chars: historyChars,
+      reasoning_effort: REASONING_EFFORT,
+    }));
 
     const result = await runTask(TASK_TYPES.PATIENT_DIALOG, {
       systemPrompt,
@@ -1380,7 +1393,14 @@ ${antiRepeatBlock}
     });
 
     const t1 = Date.now();
-    console.log(`[timing] openai_request_complete session=${sessionIdHash} elapsed=${t1 - t0}ms`);
+    console.log(JSON.stringify({
+      stage: "openai_request_complete",
+      session: sessionIdHash,
+      elapsed_ms: t1 - t0,
+      model_used: result.model_used,
+      fallback_used: result.fallback_used,
+      request_duration: result.request_duration,
+    }));
 
     const raw = result.raw;
     const parsed = result.parsed;
@@ -1583,7 +1603,11 @@ ${antiRepeatBlock}
     }
 
     const t2 = Date.now();
-    console.log(`[timing] response_sent session=${sessionIdHash} elapsed=${t2 - t0}ms`);
+    console.log(JSON.stringify({
+      stage: "response_sent",
+      session: sessionIdHash,
+      total_elapsed_ms: t2 - t0,
+    }));
 
     return res.status(200).json({
       type: "final",
