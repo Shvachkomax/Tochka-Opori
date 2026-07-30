@@ -571,14 +571,18 @@ ${conversationStyle}
     // Save intake with care recommendation — await to confirm code persistence
     const updated = await trySaveIntake(intake, bmi, careLevel, result, sessionCode, source, specialistId, specialistName);
 
-    debitCreditsForSession({
-      sessionId: sessionCode,
-      module: "body",
-      resourceType: "body_intake_analyze",
-      requestId: `body-intake-${sessionCode}-${Date.now()}`,
-      provider: result.provider,
-      model: result.model_used,
-    });
+    try {
+      await debitCreditsForSession({
+        sessionId: sessionCode,
+        module: "body",
+        resourceType: "body_intake_analyze",
+        requestId: `body-intake-${sessionCode}-${Date.now()}`,
+        provider: result.provider,
+        model: result.model_used,
+      });
+    } catch (e) {
+      console.error("[credits] body_intake_analyze debit failed:", e.message);
+    }
 
     // Only make wallet visible after code is confirmed saved
     if (updated) {
@@ -793,14 +797,18 @@ ${dayDesc || "Нет заполненных полей."}
       console.log("AI summary update skipped:", updateErr.message);
     }
 
-    debitCreditsForSession({
-      sessionId: session_id,
-      module: "body",
-      resourceType: "body_diary_ai_analysis",
-      requestId: `body-diary-ai-${session_id}-${Date.now()}`,
-      provider: result.provider,
-      model: result.model_used,
-    });
+    try {
+      await debitCreditsForSession({
+        sessionId: session_id,
+        module: "body",
+        resourceType: "body_diary_ai_analysis",
+        requestId: `body-diary-ai-${session_id}-${Date.now()}`,
+        provider: result.provider,
+        model: result.model_used,
+      });
+    } catch (e) {
+      console.error("[credits] body_diary_ai_analysis debit failed:", e.message);
+    }
 
     return res.status(200).json({
       ok: true,
@@ -910,13 +918,17 @@ async function handlePlatePhotoAnalysis(req, res) {
 
   const analyzedCount = results.filter(r => !r.error).length;
   if (analyzedCount > 0) {
-    debitCreditsForSession({
-      sessionId: session_id,
-      module: "body",
-      resourceType: "plate_analysis",
-      requestId: `plate-${session_id}-${Date.now()}`,
-      imageCount: analyzedCount,
-    });
+    try {
+      await debitCreditsForSession({
+        sessionId: session_id,
+        module: "body",
+        resourceType: "plate_analysis",
+        requestId: `plate-${session_id}-${Date.now()}`,
+        imageCount: analyzedCount,
+      });
+    } catch (e) {
+      console.error("[credits] plate_analysis debit failed:", e.message);
+    }
   }
 
   return res.status(200).json({
@@ -1383,14 +1395,18 @@ ${antiRepeatBlock}
     }
 
     if (parsed.type === "questions" && Array.isArray(parsed.questions)) {
-      debitCreditsForSession({
-        sessionId: req.body.session_id,
-        module: activeModule,
-        resourceType: "support_analyze",
-        requestId: `analyze-questions-${req.body.session_id || "no-session"}-${Date.now()}`,
-        provider: result.provider,
-        model: modelUsed,
-      });
+      try {
+        await debitCreditsForSession({
+          sessionId: req.body.session_id,
+          module: activeModule,
+          resourceType: "support_analyze",
+          requestId: `analyze-questions-${req.body.session_id || "no-session"}-${Date.now()}`,
+          provider: result.provider,
+          model: modelUsed,
+        });
+      } catch (e) {
+        console.error("[credits] support_analyze questions debit failed:", e.message);
+      }
       return res.status(200).json({
         type: "questions",
         questions: parsed.questions.filter(Boolean).slice(0, 7),
@@ -1546,14 +1562,18 @@ ${antiRepeatBlock}
       minimum_level: minimumLevel,
     };
 
-    debitCreditsForSession({
-      sessionId: req.body.session_id,
-      module: activeModule,
-      resourceType: "support_analyze",
-      requestId: `analyze-final-${req.body.session_id || "no-session"}-${Date.now()}`,
-      provider: result.provider,
-      model: modelUsed,
-    });
+    try {
+      await debitCreditsForSession({
+        sessionId: req.body.session_id,
+        module: activeModule,
+        resourceType: "support_analyze",
+        requestId: `analyze-final-${req.body.session_id || "no-session"}-${Date.now()}`,
+        provider: result.provider,
+        model: modelUsed,
+      });
+    } catch (e) {
+      console.error("[credits] support_analyze final debit failed:", e.message);
+    }
 
     return res.status(200).json({
       type: "final",

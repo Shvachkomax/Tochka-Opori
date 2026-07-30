@@ -156,26 +156,34 @@ export default async function handler(req, res) {
         : { status: "not_available", experimental: true };
     }
 
-    // Debit credits for validated sessions only
+    // Debit credits for validated sessions only (must complete before response)
     if (sessionId && module) {
       const audioDurationSec = Math.ceil((audioBuffer.length / 16000) / 2); // rough estimate: ~16KB/sec for opus
-      debitCreditsForSession({
-        sessionId,
-        module,
-        resourceType: "transcription",
-        requestId: `transcribe-${sessionId}-${Date.now()}`,
-        provider: transcription.provider,
-        audioSeconds: audioDurationSec,
-      });
+      try {
+        await debitCreditsForSession({
+          sessionId,
+          module,
+          resourceType: "transcription",
+          requestId: `transcribe-${sessionId}-${Date.now()}`,
+          provider: transcription.provider,
+          audioSeconds: audioDurationSec,
+        });
+      } catch (e) {
+        console.error("[credits] transcribe debit failed:", e.message);
+      }
 
       // Debit for successful voice analysis separately
       if (voiceAnalysisSucceeded) {
-        debitCreditsForSession({
-          sessionId,
-          module,
-          resourceType: "voice_analysis",
-          requestId: `voice-${sessionId}-${Date.now()}`,
-        });
+        try {
+          await debitCreditsForSession({
+            sessionId,
+            module,
+            resourceType: "voice_analysis",
+            requestId: `voice-${sessionId}-${Date.now()}`,
+          });
+        } catch (e) {
+          console.error("[credits] voice_analysis debit failed:", e.message);
+        }
       }
     }
 
