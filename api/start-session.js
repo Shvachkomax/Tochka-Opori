@@ -3,6 +3,7 @@ import { getSupabase } from "../lib/supabase.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
+import { generatePublicCode } from "../lib/publicCode.js";
 
 function generateSessionId() {
   return "sess_" + crypto.randomBytes(16).toString("base64url").slice(0, 32);
@@ -28,6 +29,7 @@ export default async function handler(req, res) {
     const supabase = getSupabase();
     const sessionId = generateSessionId();
     const anonymousOwnerId = crypto.randomUUID();
+    const publicCode = generatePublicCode();
 
     const { ensureWallet } = await import("../lib/usage/wallet.js");
     const wallet = await ensureWallet({
@@ -40,7 +42,7 @@ export default async function handler(req, res) {
       session_id: sessionId,
       module: "support",
       anonymous_owner_id: anonymousOwnerId,
-      public_code: null,
+      public_code: publicCode,
       patient_text: "",
       conversation_history: [],
       json_data: { dialogDepth: 0 },
@@ -48,12 +50,17 @@ export default async function handler(req, res) {
     });
 
     if (insertError) {
-      console.error("start-session INSERT error:", insertError.message);
-      return res.status(500).json({ ok: false, error: "Не удалось создать сессию. Попробуйте позже." });
+      console.error("start-session INSERT error:", insertError.message, insertError.code, insertError.constraint);
+      return res.status(500).json({ ok: false, code: "SESSION_INSERT_FAILED", error: "Не удалось создать сессию. Попробуйте позже." });
     }
 
     const { generateSessionAccessToken } = await import("../lib/security/access-token.js");
     const accessToken = await generateSessionAccessToken(sessionId);
+
+    if (!accessToken) {
+      console.error("start-session: access token generation failed for session", sessionId);
+      return res.status(500).json({ ok: false, code: "SESSION_TOKEN_SAVE_FAILED", error: "Не удалось создать сессию. Попробуйте позже." });
+    }
 
     return res.status(200).json({
       ok: true,
