@@ -1041,32 +1041,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const mod = activeModule || "support";
       let token;
       try { token = await getClientToken(mod, "analyze"); } catch (e) {
-        console.error("[start-session] getClientToken failed:", e.message);
-        throw new Error("Не удалось начать разговор (TOKEN_FAILED). Попробуйте ещё раз.");
+        throw new Error("Не удалось начать разговор. Попробуйте ещё раз.");
       }
-      console.log("[start-session] token present:", !!token, "type:", typeof token, "prefix:", String(token).slice(0, 10));
-      let r;
-      try {
-        r = await fetch("/api/start-session", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-        });
-      } catch (fetchErr) {
-        console.error("[start-session] fetch failed:", fetchErr.message);
-        throw new Error("Не удалось начать разговор (FETCH_FAILED). Попробуйте ещё раз.");
-      }
-      console.log("[start-session] response status:", r.status, "ok:", r.ok);
-      let d;
-      try {
-        d = await r.json();
-      } catch (parseErr) {
-        console.error("[start-session] JSON parse failed, status:", r.status);
-        throw new Error(`Не удалось начать разговор (PARSE_${r.status}). Попробуйте ещё раз.`);
-      }
-      console.log("[start-session] response body:", JSON.stringify(d));
+      const r = await fetch("/api/start-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      const d = await r.json();
       if (!d.ok) {
         const code = d.code || (r.status === 401 ? "SESSION_START_401" : r.status === 404 ? "SESSION_START_404" : "SESSION_CREATE_FAILED");
         throw new Error(`Не удалось начать разговор (${code}). Попробуйте ещё раз.`);
