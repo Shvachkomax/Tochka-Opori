@@ -55,9 +55,7 @@ export async function withClientToken(module, purpose, fetchOptions = {}) {
   let token;
   try {
     token = await getClientToken(module, purpose);
-    console.log("[clientToken] token obtained", { module, purpose, type: typeof token, prefix: String(token).slice(0, 10) });
   } catch (e) {
-    console.error("[clientToken] token failed", { module, purpose, error: e.message });
     return { ok: false, error: "Не удалось получить токен доступа. Обновите страницу и попробуйте ещё раз." };
   }
 
@@ -72,7 +70,7 @@ export async function withClientToken(module, purpose, fetchOptions = {}) {
 // Wrapper around fetch that auto-retries with a fresh token on 401
 export async function fetchWithClientToken(url, module, purpose, options = {}) {
   const enhanced = await withClientToken(module, purpose, options);
-  if (!enhanced.ok) return enhanced;
+  if (enhanced.ok === false) return enhanced;
 
   let res = await fetch(url, enhanced);
   if (res.status === 401 && !enhanced._tokenRetried) {

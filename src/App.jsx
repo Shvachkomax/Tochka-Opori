@@ -1445,7 +1445,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
     try {
       const mod = activeModule || "support";
-      console.log("[analyze] submitRound start", { mod, sessionId: sessionId || "none", textLen: text.length, dialogDepth });
       const res = await fetchWithClientToken("/api/analyze", mod, "analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1466,15 +1465,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         }),
       });
 
-      console.log("[analyze] response received", { isResponse: res instanceof Response, ok: res.ok, status: res.status || "n/a" });
-
       if (!res.ok) {
         if (res instanceof Response) {
           const errText = await res.text();
-          console.error("[analyze] HTTP error", res.status, errText?.slice(0, 200));
           throw new Error(errText ? JSON.parse(errText).error : "Ошибка");
         }
-        console.error("[analyze] non-Response error", JSON.stringify(res));
         throw new Error(res.error || "Не удалось начать разбор. Попробуйте ещё раз.");
       }
 
