@@ -1364,7 +1364,7 @@ ${antiRepeatBlock}
 
   const MODEL_TRIAGE = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
   const MODEL_FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
-  const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
+  const REASONING_EFFORT = process.env.OPENAI_REASONING_EFFORT || process.env.AI_REASONING_EFFORT || "medium";
 
   try {
     const t0 = Date.now();
