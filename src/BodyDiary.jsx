@@ -97,6 +97,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
   const [plateAnalysis, setPlateAnalysis] = useState([]);
   const [plateAnalysisLoading, setPlateAnalysisLoading] = useState(false);
   const [plateAnalysisError, setPlateAnalysisError] = useState("");
+  const [usageBalance, setUsageBalance] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -112,6 +113,20 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    fetch("/api/usage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "getUsageBalance", sessionId, module: "body" }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.visible) setUsageBalance(data);
+      })
+      .catch(() => {});
+  }, [sessionId]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -130,7 +145,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
           const tHeaders = { "Content-Type": "audio/webm" };
           if (token) tHeaders["Authorization"] = `Bearer ${token}`;
 
-          let res = await fetch("/api/transcribe", {
+          let res = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=body`, {
             method: "POST",
             headers: tHeaders,
             body: blob,
@@ -139,7 +154,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
           if (res.status === 401 && token) {
             try { token = await getClientToken("body", "transcribe"); } catch {}
             tHeaders["Authorization"] = `Bearer ${token}`;
-            res = await fetch("/api/transcribe", {
+            res = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=body`, {
               method: "POST",
               headers: tHeaders,
               body: blob,
@@ -379,6 +394,13 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
           }
         }
       `}</style>
+
+      {usageBalance && usageBalance.visible && (
+        <div style={{ padding: "8px 12px", background: "#f0fdf4", borderRadius: 8, marginBottom: 12, fontSize: 13, color: "#166534" }}>
+          Доступный ресурс: {usageBalance.balance.toLocaleString("ru-RU")} кредитов<br />
+          <span style={{ fontSize: 11, color: "#6b7280" }}>Тестовый баланс. Деньги не списываются.</span>
+        </div>
+      )}
 
       <h2 style={s.heading}>Дневник дня</h2>
       <p style={s.subheading}>Отметьте, как прошёл день. Не нужно идеально — нам важна честная картина.</p>

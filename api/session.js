@@ -76,10 +76,11 @@ async function handleSave(req, res) {
 
     const { generatePublicCode } = await import("../lib/publicCode.js");
     const { validateInviteToken, useInviteToken } = await import("./experts.js");
+    const { ensureWallet, setWalletVisible } = await import("../lib/usage/wallet.js");
 
     const existing = await supabase
       .from("sessions")
-      .select("public_code, organization_id, primary_expert_id, access_token_hash, legacy_access")
+      .select("public_code, organization_id, primary_expert_id, access_token_hash, legacy_access, anonymous_owner_id")
       .eq("session_id", sessionId)
       .maybeSingle();
 
@@ -94,6 +95,10 @@ async function handleSave(req, res) {
     let inviteToken = existing?.data?.invite_token || null;
     const isNewSession = !existing?.data;
     const alreadyHasToken = existing?.data?.access_token_hash != null;
+
+    // Ensure anonymous_owner_id exists (created server-side, never from frontend)
+    let anonymousOwnerId = existing?.data?.anonymous_owner_id || null;
+    const codeJustCreated = !publicCode;
 
     if (publicCode && (organizationId || primaryExpertId)) {
       // keep
@@ -110,8 +115,20 @@ async function handleSave(req, res) {
       }
     }
 
+    // Generate anonymous_owner_id for new sessions
+    if (!anonymousOwnerId) {
+      const { randomUUID } = await import("node:crypto");
+      anonymousOwnerId = randomUUID();
+    }
+
+    let newWalletId = null;
     if (!publicCode) {
       publicCode = generatePublicCode();
+
+      // Create wallet (hidden) once code is generated.
+      // Visibility set only after DB save confirms code persistence.
+      const wallet = await ensureWallet({ ownerType: "anonymous_case", ownerId: anonymousOwnerId, module: "support" });
+      newWalletId = wallet?.id || null;
 
       if (invite_token) {
         const invite = await validateInviteToken(invite_token);
@@ -163,6 +180,7 @@ async function handleSave(req, res) {
     const payload = {
       session_id: sessionId,
       module: sessionModule || 'support',
+      anonymous_owner_id: anonymousOwnerId,
       patient_text: maskedPatientText,
       conversation_history: maskedConversation,
       user_report: maskedUserReport,
@@ -204,6 +222,12 @@ async function handleSave(req, res) {
       });
     }
 
+    // Only make wallet visible after code persistence is confirmed
+    if (newWalletId) {
+      const { setWalletVisible } = await import("../lib/usage/wallet.js");
+      setWalletVisible({ walletId: newWalletId });
+    }
+
     // Generate access_token for sessions that don't have one yet
     let accessToken = null;
     if (isNewSession || !alreadyHasToken) {
@@ -215,6 +239,16 @@ async function handleSave(req, res) {
       }
     }
 
+    // Return wallet balance if visible
+    let usageBalance = null;
+    try {
+      const wallet = await ensureWallet({ ownerType: "anonymous_case", ownerId: anonymousOwnerId, module: "support" });
+      if (wallet) {
+        const { getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
+        usageBalance = await getUsageBalanceForClient({ walletId: wallet.id });
+      }
+    } catch (_) { /* non-blocking */ }
+
     return res.status(200).json({
       ok: true,
       message: "Сессия сохранена. Вы можете продолжить позже.",
@@ -223,6 +257,8 @@ async function handleSave(req, res) {
       organization_id: organizationId,
       primary_expert_id: primaryExpertId,
       access_token: accessToken,
+      anonymous_owner_id: anonymousOwnerId,
+      usage_balance: usageBalance,
     });
   } catch (error) {
     return res.status(500).json({
@@ -256,7 +292,7 @@ async function handleLoad(req, res) {
       .select("" +
         "session_id, module, public_code, patient_text, conversation_history, " +
         "user_report, doctor_report, support_plan, risk_level, json_data, " +
-        "organization_id, primary_expert_id, invite_token, legacy_access, created_at"
+        "organization_id, primary_expert_id, invite_token, legacy_access, created_at, anonymous_owner_id"
       )
       .eq("public_code", normalized)
       .maybeSingle();
@@ -317,10 +353,23 @@ async function handleLoad(req, res) {
       legacyAccess: data.legacy_access === true,
     };
 
+    // Return wallet balance if visible
+    let usageBalance = null;
+    if (data.anonymous_owner_id) {
+      try {
+        const { ensureWallet, getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
+        const wallet = await ensureWallet({ ownerType: "anonymous_case", ownerId: data.anonymous_owner_id, module: "support" });
+        if (wallet) {
+          usageBalance = await getUsageBalanceForClient({ walletId: wallet.id });
+        }
+      } catch (_) { /* non-blocking */ }
+    }
+
     return res.status(200).json({
       ok: true,
       message: "Сессия загружена.",
       session,
+      usage_balance: usageBalance,
     });
   } catch (error) {
     return res.status(500).json({

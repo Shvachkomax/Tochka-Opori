@@ -122,6 +122,20 @@ export default async function handler(req, res) {
         return await handleGetCouncilEmailCampaign(req, res);
       case "cancelCouncilEmailDraft":
         return await handleCancelCouncilEmailDraft(req, res);
+      case "listUsageWallets":
+        return await handleListUsageWallets(req, res);
+      case "getUsageWallet":
+        return await handleGetUsageWallet(req, res);
+      case "adjustUsageBalance":
+        return await handleAdjustUsageBalance(req, res);
+      case "refillUsageWallet":
+        return await handleRefillUsageWallet(req, res);
+      case "pauseUsageWallet":
+        return await handlePauseUsageWallet(req, res);
+      case "restoreUsageWallet":
+        return await handleRestoreUsageWallet(req, res);
+      case "exportUsageLedger":
+        return await handleExportUsageLedger(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -1710,4 +1724,185 @@ async function handleCancelCouncilEmailDraft(req, res) {
   });
 
   return res.status(200).json({ ok: true });
+}
+
+// ============================================================
+// USAGE CREDITS ADMIN (SUPER_ADMIN only)
+// ============================================================
+
+async function requireSuperAdmin(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (role !== "super") {
+    res.status(403).json({ ok: false, error: "Нет доступа" });
+    return null;
+  }
+  return role;
+}
+
+async function handleListUsageWallets(req, res) {
+  const role = await requireSuperAdmin(req, res);
+  if (!role) return;
+
+  const { offset = 0, limit = 50 } = req.body || {};
+  const supabase = getSupabase();
+
+  const { data: wallets, error } = await supabase
+    .from("usage_wallets")
+    .select("id, owner_type, module, balance, status, visible_to_client, cycle_number, total_used, total_refilled, created_at, updated_at")
+    .order("updated_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) return res.status(500).json({ ok: false, error: error.message });
+
+  const { count } = await supabase
+    .from("usage_wallets")
+    .select("id", { count: "exact", head: true });
+
+  return res.json({ ok: true, wallets: wallets || [], total: count || 0 });
+}
+
+async function handleGetUsageWallet(req, res) {
+  const role = await requireSuperAdmin(req, res);
+  if (!role) return;
+
+  const { walletId } = req.body || {};
+  if (!walletId) return res.status(400).json({ ok: false, error: "Missing walletId" });
+
+  const supabase = getSupabase();
+  const { data: wallet } = await supabase
+    .from("usage_wallets")
+    .select("*")
+    .eq("id", walletId)
+    .single();
+
+  if (!wallet) return res.status(404).json({ ok: false, error: "Wallet not found" });
+
+  const { data: entries } = await supabase
+    .from("usage_ledger")
+    .select("*")
+    .eq("wallet_id", walletId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  return res.json({ ok: true, wallet, entries: entries || [] });
+}
+
+async function handleAdjustUsageBalance(req, res) {
+  const role = await requireSuperAdmin(req, res);
+  if (!role) return;
+
+  const { walletId, amount, reason } = req.body || {};
+  if (!walletId) return res.status(400).json({ ok: false, error: "Missing walletId" });
+  if (amount === undefined || amount === null) return res.status(400).json({ ok: false, error: "Missing amount" });
+  if (!reason) return res.status(400).json({ ok: false, error: "Reason required" });
+
+  const { adminAdjustment } = await import("../lib/usage/wallet.js");
+  const result = await adminAdjustment({ walletId, amount, reason, adminPassword: "super" });
+
+  if (!result.success) return res.status(500).json({ ok: false, error: result.error });
+
+  await logAdminAction(role, "usage_admin_adjustment", {
+    targetType: "usage_wallet",
+    targetId: walletId,
+    module: "finance",
+    ipAddress: getClientIp(req),
+    details: { amount, reason, balance_before: result.balance_before, balance_after: result.balance_after },
+  });
+
+  return res.json({ ok: true, ...result });
+}
+
+async function handleRefillUsageWallet(req, res) {
+  const role = await requireSuperAdmin(req, res);
+  if (!role) return;
+
+  const { walletId, amount, reason } = req.body || {};
+  if (!walletId) return res.status(400).json({ ok: false, error: "Missing walletId" });
+  if (!amount || amount <= 0) return res.status(400).json({ ok: false, error: "Positive amount required" });
+
+  const { manualRefill } = await import("../lib/usage/wallet.js");
+  const result = await manualRefill({ walletId, amount, reason: reason || "Manual refill by admin", adminPassword: "super" });
+
+  if (!result.success) return res.status(500).json({ ok: false, error: result.error });
+
+  await logAdminAction(role, "usage_manual_refill", {
+    targetType: "usage_wallet",
+    targetId: walletId,
+    module: "finance",
+    ipAddress: getClientIp(req),
+    details: { amount, balance_after: result.balance_after },
+  });
+
+  return res.json({ ok: true, ...result });
+}
+
+async function handlePauseUsageWallet(req, res) {
+  const role = await requireSuperAdmin(req, res);
+  if (!role) return;
+
+  const { walletId } = req.body || {};
+  if (!walletId) return res.status(400).json({ ok: false, error: "Missing walletId" });
+
+  const { setWalletStatus } = await import("../lib/usage/wallet.js");
+  const ok = await setWalletStatus({ walletId, status: "paused" });
+
+  if (!ok) return res.status(500).json({ ok: false, error: "Failed to pause wallet" });
+
+  await logAdminAction(role, "usage_wallet_paused", {
+    targetType: "usage_wallet",
+    targetId: walletId,
+    module: "finance",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.json({ ok: true });
+}
+
+async function handleRestoreUsageWallet(req, res) {
+  const role = await requireSuperAdmin(req, res);
+  if (!role) return;
+
+  const { walletId } = req.body || {};
+  if (!walletId) return res.status(400).json({ ok: false, error: "Missing walletId" });
+
+  const { setWalletStatus } = await import("../lib/usage/wallet.js");
+  const ok = await setWalletStatus({ walletId, status: "active" });
+
+  if (!ok) return res.status(500).json({ ok: false, error: "Failed to restore wallet" });
+
+  await logAdminAction(role, "usage_wallet_restored", {
+    targetType: "usage_wallet",
+    targetId: walletId,
+    module: "finance",
+    ipAddress: getClientIp(req),
+  });
+
+  return res.json({ ok: true });
+}
+
+async function handleExportUsageLedger(req, res) {
+  const role = await requireSuperAdmin(req, res);
+  if (!role) return;
+
+  const { walletId } = req.body || {};
+  const supabase = getSupabase();
+  let query = supabase
+    .from("usage_ledger")
+    .select("id, wallet_id, entry_type, amount, balance_before, balance_after, resource_type, request_id, module, session_id, provider, model, input_tokens, output_tokens, audio_seconds, image_count, estimated_cost, created_at")
+    .order("created_at", { ascending: false });
+
+  if (walletId) query = query.eq("wallet_id", walletId);
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ ok: false, error: error.message });
+
+  await logAdminAction(role, "usage_ledger_exported", {
+    targetType: "usage_ledger",
+    module: "finance",
+    ipAddress: getClientIp(req),
+    details: { count: (data || []).length, wallet_id: walletId || "all" },
+  });
+
+  return res.json({ ok: true, entries: data || [] });
 }

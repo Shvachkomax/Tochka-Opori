@@ -5,6 +5,7 @@ import { readModulePrompt, readCorePrompt } from "../lib/prompts.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
+import { debitCreditsForSession, setSessionVisibleAfterCode } from "../lib/usage/debit.js";
 
 function generateBodyCode() {
   const p1 = crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 4);
@@ -367,6 +368,7 @@ function calcBMI(heightCm, weightKg) {
 
 async function trySaveIntake(intake, bmi, careLevel, routerMeta, sessionCode, source = "self_signup", specialistId = null, specialistName = null) {
   try {
+    const crypto = await import("node:crypto");
     const { getSupabase } = await import("../lib/supabase.js");
     const supabase = getSupabase();
     const answers = { ...intake };
@@ -389,23 +391,42 @@ async function trySaveIntake(intake, bmi, careLevel, routerMeta, sessionCode, so
     };
     await supabase.from("body_intake_forms").insert(payload);
 
-    try {
-      const displayName = intake.display_name || null;
-      const goal = intake.goal || null;
-      await supabase.from("body_clients").upsert({
-        session_id: sessionCode || intake.session_id,
+    const displayName = intake.display_name || null;
+    const goal = intake.goal || null;
+
+    const { data: existingClient } = await supabase
+      .from("body_clients")
+      .select("anonymous_owner_id")
+      .eq("session_id", sessionCode || intake.session_id)
+      .maybeSingle();
+
+    if (existingClient && existingClient.anonymous_owner_id) {
+      await supabase.from("body_clients").update({
         display_name: displayName,
         source,
         specialist_id: specialistId,
         specialist_name: specialistName,
         goal,
         updated_at: new Date().toISOString(),
-      }, { onConflict: "session_id" });
-    } catch (clientErr) {
-      console.log("Body client upsert skipped:", clientErr.message);
+      }).eq("session_id", sessionCode || intake.session_id);
+      return true;
     }
+
+    await supabase.from("body_clients").insert({
+      session_id: sessionCode || intake.session_id,
+      anonymous_owner_id: crypto.randomUUID(),
+      display_name: displayName,
+      source,
+      specialist_id: specialistId,
+      specialist_name: specialistName,
+      goal,
+      status: "active",
+      updated_at: new Date().toISOString(),
+    });
+    return true;
   } catch (err) {
-    console.log("Body intake DB save skipped (table may not exist):", err.message);
+    console.log("Body intake DB save skipped:", err.message);
+    return false;
   }
 }
 
@@ -428,8 +449,11 @@ async function handleBodyIntakeAnalysis(req, res, intake) {
   // Generate continuation code
   const sessionCode = generateBodyCode();
 
-  // Try to save intake data (non-blocking)
-  trySaveIntake(intake, bmi, null, null, sessionCode, source, specialistId, specialistName);
+  // Save client record before AI — debit depends on canonical body_clients row
+  const clientSaved = await trySaveIntake(intake, bmi, null, null, sessionCode, source, specialistId, specialistName);
+  if (!clientSaved) {
+    return res.status(500).json({ ok: false, error: "Не удалось сохранить данные. Попробуйте позже." });
+  }
 
   const DISCLAIMER = "\n\nЭто не диагноз и не медицинское назначение.";
 
@@ -544,8 +568,22 @@ ${conversationStyle}
       };
     }
 
-    // Save intake with care recommendation (non-blocking)
-    trySaveIntake(intake, bmi, careLevel, result, sessionCode, source, specialistId, specialistName);
+    // Save intake with care recommendation — await to confirm code persistence
+    const updated = await trySaveIntake(intake, bmi, careLevel, result, sessionCode, source, specialistId, specialistName);
+
+    debitCreditsForSession({
+      sessionId: sessionCode,
+      module: "body",
+      resourceType: "body_intake_analyze",
+      requestId: `body-intake-${sessionCode}-${Date.now()}`,
+      provider: result.provider,
+      model: result.model_used,
+    });
+
+    // Only make wallet visible after code is confirmed saved
+    if (updated) {
+      setSessionVisibleAfterCode({ sessionId: sessionCode, module: "body" });
+    }
 
     return res.status(200).json({
       type: "intake_analysis",
@@ -624,8 +662,10 @@ async function handleDailyLogAnalysis(req, res) {
         .single();
 
       if (!existing) {
+        const { randomUUID } = await import("node:crypto");
         await supabase.from("body_clients").upsert({
           session_id,
+          anonymous_owner_id: randomUUID(),
           source: "self_signup",
           status: "active",
         }, { onConflict: "session_id" });
@@ -753,6 +793,15 @@ ${dayDesc || "Нет заполненных полей."}
       console.log("AI summary update skipped:", updateErr.message);
     }
 
+    debitCreditsForSession({
+      sessionId: session_id,
+      module: "body",
+      resourceType: "body_diary_ai_analysis",
+      requestId: `body-diary-ai-${session_id}-${Date.now()}`,
+      provider: result.provider,
+      model: result.model_used,
+    });
+
     return res.status(200).json({
       ok: true,
       session_id,
@@ -859,12 +908,23 @@ async function handlePlatePhotoAnalysis(req, res) {
     }
   }
 
+  const analyzedCount = results.filter(r => !r.error).length;
+  if (analyzedCount > 0) {
+    debitCreditsForSession({
+      sessionId: session_id,
+      module: "body",
+      resourceType: "plate_analysis",
+      requestId: `plate-${session_id}-${Date.now()}`,
+      imageCount: analyzedCount,
+    });
+  }
+
   return res.status(200).json({
     ok: true,
     session_id,
     results,
     total_photos: photos.length,
-    analyzed: results.filter(r => !r.error).length,
+    analyzed: analyzedCount,
   });
 }
 
@@ -1323,6 +1383,14 @@ ${antiRepeatBlock}
     }
 
     if (parsed.type === "questions" && Array.isArray(parsed.questions)) {
+      debitCreditsForSession({
+        sessionId: req.body.session_id,
+        module: activeModule,
+        resourceType: "support_analyze",
+        requestId: `analyze-questions-${req.body.session_id || "no-session"}-${Date.now()}`,
+        provider: result.provider,
+        model: modelUsed,
+      });
       return res.status(200).json({
         type: "questions",
         questions: parsed.questions.filter(Boolean).slice(0, 7),
@@ -1477,6 +1545,15 @@ ${antiRepeatBlock}
       care_repair: careRepairInfo,
       minimum_level: minimumLevel,
     };
+
+    debitCreditsForSession({
+      sessionId: req.body.session_id,
+      module: activeModule,
+      resourceType: "support_analyze",
+      requestId: `analyze-final-${req.body.session_id || "no-session"}-${Date.now()}`,
+      provider: result.provider,
+      model: modelUsed,
+    });
 
     return res.status(200).json({
       type: "final",

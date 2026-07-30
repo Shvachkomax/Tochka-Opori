@@ -104,6 +104,7 @@ export default function App() {
     }
     return "support";
   });
+  const [usageBalance, setUsageBalance] = useState(null);
 
   // Body intake state
   const [bodyIntakeStage, setBodyIntakeStage] = useState("idle"); // idle | filling | analyzing | result
@@ -1059,7 +1060,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           const tHeaders = { "Content-Type": "audio/webm" };
           if (token) tHeaders["Authorization"] = `Bearer ${token}`;
 
-          let response = await fetch("/api/transcribe", {
+          let response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=support`, {
             method: "POST",
             headers: tHeaders,
             body: audioBlob,
@@ -1069,7 +1070,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           if (response.status === 401 && token) {
             try { token = await getClientToken(mod, "transcribe"); } catch {}
             tHeaders["Authorization"] = `Bearer ${token}`;
-            response = await fetch("/api/transcribe", {
+            response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=support`, {
               method: "POST",
               headers: tHeaders,
               body: audioBlob,
@@ -1181,7 +1182,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           const tHeaders = { "Content-Type": "audio/webm" };
           if (token) tHeaders["Authorization"] = `Bearer ${token}`;
 
-          let response = await fetch("/api/transcribe", {
+          let response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=support`, {
             method: "POST",
             headers: tHeaders,
             body: audioBlob,
@@ -1190,7 +1191,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           if (response.status === 401 && token) {
             try { token = await getClientToken(mod, "transcribe"); } catch {}
             tHeaders["Authorization"] = `Bearer ${token}`;
-            response = await fetch("/api/transcribe", {
+            response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=support`, {
               method: "POST",
               headers: tHeaders,
               body: audioBlob,
@@ -1303,7 +1304,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           const tHeaders = { "Content-Type": "audio/webm" };
           if (token) tHeaders["Authorization"] = `Bearer ${token}`;
 
-          let response = await fetch("/api/transcribe", {
+          let response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=support`, {
             method: "POST",
             headers: tHeaders,
             body: audioBlob,
@@ -1312,7 +1313,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           if (response.status === 401 && token) {
             try { token = await getClientToken(mod, "transcribe"); } catch {}
             tHeaders["Authorization"] = `Bearer ${token}`;
-            response = await fetch("/api/transcribe", {
+            response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=support`, {
               method: "POST",
               headers: tHeaders,
               body: audioBlob,
@@ -1401,6 +1402,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           supportPlan,
           voiceObservations,
           module: mod,
+          session_id: sessionId || undefined,
         }),
       });
 
@@ -1509,6 +1511,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               const code = result.publicCode || publicCode || "";
               if (result.publicCode && !publicCode) {
                 setPublicCode(result.publicCode);
+              }
+              if (result.usage_balance && result.usage_balance.visible) {
+                setUsageBalance({ ...result.usage_balance, module: "support" });
               }
               if (result.message) showToast(result.message);
               // Save case review (local + Supabase)
@@ -7709,17 +7714,49 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </p>
 
             <div style={s.row} className="app-actions">
-              <button style={s.primary} onClick={() => {
+              <button style={s.primary} onClick={async () => {
                 if (activeModule === "body") {
                   setBodyIntakeStage("filling");
                 } else {
+                  try {
+                    setLoading(true);
+                    const r = await fetch("/api/start-session", { method: "POST", headers: { "Content-Type": "application/json" } });
+                    const d = await r.json();
+                    if (d.ok) {
+                      setSessionId(d.session_id);
+                      saveSupportSession(d.session_id, d.access_token);
+                    } else {
+                      console.warn("start-session failed:", d.error);
+                    }
+                  } catch (e) {
+                    console.warn("start-session error:", e.message);
+                  } finally {
+                    setLoading(false);
+                  }
                   setMode("text");
                 }
               }}>
                 {activeModule === "body" ? "Начать диалог" : "Начать разговор"}
               </button>
               {activeModule !== "body" && (
-                <button style={s.secondary} onClick={() => { setMode("voice"); }}>
+                <button style={s.secondary} onClick={async () => {
+                  try {
+                    setLoading(true);
+                    const r = await fetch("/api/start-session", { method: "POST", headers: { "Content-Type": "application/json" } });
+                    const d = await r.json();
+                    if (d.ok) {
+                      setSessionId(d.session_id);
+                      saveSupportSession(d.session_id, d.access_token);
+                    } else {
+                      console.warn("start-session failed:", d.error);
+                    }
+                  } catch (e) {
+                    console.warn("start-session error:", e.message);
+                  } finally {
+                    setLoading(false);
+                  }
+                  setMode("voice");
+                }}>
                   Рассказать голосом
                 </button>
               )}
@@ -8350,6 +8387,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     <span style={{ fontWeight: 900, fontSize: 18, color: "#2E2A25", letterSpacing: 1 }}>
                       {publicCode}
                     </span>
+                  </div>
+                )}
+
+                {usageBalance && usageBalance.visible && (
+                  <div style={{ padding: "8px 12px", background: "#f0fdf4", borderRadius: 8, marginBottom: 16, fontSize: 13, color: "#166534" }}>
+                    Доступный ресурс: {usageBalance.balance.toLocaleString("ru-RU")} кредитов<br />
+                    <span style={{ fontSize: 11, color: "#6b7280" }}>Тестовый баланс. Деньги не списываются.</span>
                   </div>
                 )}
 
@@ -9139,6 +9183,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         setPhase(Object.keys(savedAnswers).length > 0 ? "questions" : "input");
                       }
 
+                      if (data.usage_balance && data.usage_balance.visible) {
+                        setUsageBalance({ ...data.usage_balance, module: "support" });
+                      }
                       setIsContinuation(true);
                       setSessionModalOpen(false);
                       setSessionCodeInput("");
