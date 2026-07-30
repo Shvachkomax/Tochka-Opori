@@ -7,6 +7,10 @@ import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
 import { debitCreditsForSession, setSessionVisibleAfterCode } from "../lib/usage/debit.js";
 
+export const config = {
+  maxDuration: 120,
+};
+
 function generateBodyCode() {
   const p1 = crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 4);
   const p2 = crypto.randomBytes(3).toString("hex").toUpperCase().slice(0, 3);

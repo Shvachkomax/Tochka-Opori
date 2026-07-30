@@ -1597,7 +1597,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         throw new Error("Неизвестный тип ответа");
       }
     } catch (e) {
-      setError(e.message || "Ошибка");
+      const msg = e.message || "";
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("abort")) {
+        setError("Не удалось сформировать отчёт. Проверьте соединение и попробуйте ещё раз.");
+      } else {
+        setError("Не удалось сформировать отчёт. Попробуйте ещё раз.");
+      }
     } finally {
       setLoading(false);
     }
