@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { getSupabase } from "../lib/supabase.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
+import { requireClientToken } from "../lib/security/client-token.js";
 
 function generateSessionId() {
   return "sess_" + crypto.randomBytes(16).toString("base64url").slice(0, 32);
@@ -15,6 +16,9 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  const tokenCheck = requireClientToken(["analyze"])(req, res);
+  if (!tokenCheck) return;
 
   const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 30, prefix: "start-session:" });
   const limited = await limit(req, res);
@@ -55,7 +59,6 @@ export default async function handler(req, res) {
       ok: true,
       session_id: sessionId,
       access_token: accessToken,
-      anonymous_owner_id: anonymousOwnerId,
     });
   } catch (error) {
     console.error("start-session error:", error.message);

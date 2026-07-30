@@ -7717,29 +7717,29 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               <button style={s.primary} onClick={async () => {
                 if (activeModule === "body") {
                   setBodyIntakeStage("filling");
-                } else {
-                  try {
-                    setLoading(true);
-                    const r = await fetch("/api/start-session", { method: "POST", headers: { "Content-Type": "application/json" } });
-                    const d = await r.json();
-                    if (d.ok) {
-                      setSessionId(d.session_id);
-                      saveSupportSession(d.session_id, d.access_token);
-                    } else {
-                      console.warn("start-session failed:", d.error);
-                    }
-                  } catch (e) {
-                    console.warn("start-session error:", e.message);
-                  } finally {
-                    setLoading(false);
-                  }
-                  setMode("text");
+                  return;
                 }
+                if (loading || sessionId) return;
+                try {
+                  setLoading(true);
+                  const r = await fetch("/api/start-session", { method: "POST", headers: { "Content-Type": "application/json" } });
+                  const d = await r.json();
+                  if (d.ok) {
+                    setSessionId(d.session_id);
+                    saveSupportSession(d.session_id, d.access_token);
+                  }
+                } catch (e) {
+                  console.warn("start-session error:", e.message);
+                } finally {
+                  setLoading(false);
+                }
+                setMode("text");
               }}>
                 {activeModule === "body" ? "Начать диалог" : "Начать разговор"}
               </button>
               {activeModule !== "body" && (
                 <button style={s.secondary} onClick={async () => {
+                  if (loading || sessionId) return;
                   try {
                     setLoading(true);
                     const r = await fetch("/api/start-session", { method: "POST", headers: { "Content-Type": "application/json" } });
@@ -7747,8 +7747,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     if (d.ok) {
                       setSessionId(d.session_id);
                       saveSupportSession(d.session_id, d.access_token);
-                    } else {
-                      console.warn("start-session failed:", d.error);
                     }
                   } catch (e) {
                     console.warn("start-session error:", e.message);
