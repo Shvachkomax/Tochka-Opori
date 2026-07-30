@@ -7,7 +7,7 @@
   ],
   "functions": {
     "api/analyze.js": {
-      "maxDuration": 120
+      "maxDuration": 300
     },
     "api/transcribe.js": {
       "includeFiles": "node_modules/opusscript/build/**"

@@ -1367,6 +1367,10 @@ ${antiRepeatBlock}
   const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
 
   try {
+    const t0 = Date.now();
+    const sessionIdHash = session_id ? session_id.slice(-8) : "none";
+    console.log(`[timing] analyze_request_start session=${sessionIdHash} depth=${depth} continuation=${isContinuation}`);
+
     const result = await runTask(TASK_TYPES.PATIENT_DIALOG, {
       systemPrompt,
       userPrompt,
@@ -1374,6 +1378,9 @@ ${antiRepeatBlock}
       fallbackModel: MODEL_FALLBACK,
       reasoningEffort: REASONING_EFFORT,
     });
+
+    const t1 = Date.now();
+    console.log(`[timing] openai_request_complete session=${sessionIdHash} elapsed=${t1 - t0}ms`);
 
     const raw = result.raw;
     const parsed = result.parsed;
@@ -1574,6 +1581,9 @@ ${antiRepeatBlock}
     } catch (e) {
       console.error("[credits] support_analyze final debit failed:", e.message);
     }
+
+    const t2 = Date.now();
+    console.log(`[timing] response_sent session=${sessionIdHash} elapsed=${t2 - t0}ms`);
 
     return res.status(200).json({
       type: "final",
