@@ -7778,7 +7778,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   Рассказать голосом
                 </button>
               )}
-              {activeModule === "support" && getSupportSession().sessionId && (
+              {activeModule === "support" && (
                 <button
                   style={{ ...s.secondary, marginTop: 0 }}
                   onClick={() => setSessionModalOpen(true)}
