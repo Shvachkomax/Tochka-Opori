@@ -8231,13 +8231,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           {!(activeModule === "body" && (bodyIntakeStage !== "idle" || bodyDiaryOpen || bodyDiaryResult)) && (
           <section style={s.card} className="app-card">
             <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif" }}>
-              {activeModule === "body" ? "Готовы начать?" : "С чего начать?"}
+              {phase === "questions"
+                ? `Раунд уточнения ${dialogDepth}`
+                : activeModule === "body"
+                  ? "Готовы начать?"
+                  : "С чего начать?"}
             </div>
-            <div style={{ color: "#7A7268", fontSize: 14, marginTop: 6 }}>
-              {activeModule === "body"
-                ? "Заполните короткую анкету — это займёт 2 минуты."
-                : "Опишите состояние своими словами."}
-            </div>
+            {phase !== "questions" && (
+              <div style={{ color: "#7A7268", fontSize: 14, marginTop: 6 }}>
+                {activeModule === "body"
+                  ? "Заполните короткую анкету — это займёт 2 минуты."
+                  : "Опишите состояние своими словами."}
+              </div>
+            )}
 
             {activeModule === "body" && localStorage.getItem("body_referral_source") === "alena_client" && bodyIntakeStage === "idle" && (
               <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "#e8f0ea", border: "1px solid #c4d0c6" }}>
@@ -8327,9 +8333,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </>
               ) : phase === "questions" ? (
                 <>
-                  <div style={{ marginBottom: 16, color: "#7A7268" }}>
-                    Раунд уточнения {dialogDepth}
-                  </div>
                   {questions?.map((q, index) => (
                     <div key={index} style={s.questionCard}>
                       <div style={s.questionText}>
