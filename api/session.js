@@ -268,7 +268,6 @@ async function handleSave(req, res) {
       organization_id: organizationId,
       primary_expert_id: primaryExpertId,
       access_token: accessToken,
-      anonymous_owner_id: anonymousOwnerId,
       usage_balance: usageBalance,
     });
   } catch (error) {
@@ -517,30 +516,51 @@ async function handleGetCabinet(req, res) {
 
 async function handleGetReport(req, res) {
   try {
-    const { sessionId, access_token } = req.body || {};
+    const { sessionId, publicCode, access_token } = req.body || {};
 
-    if (!sessionId || typeof sessionId !== "string") {
-      return res.status(400).json({ ok: false, error: "Missing sessionId" });
-    }
-    if (!isValidSessionId(sessionId)) {
-      return res.status(400).json({ ok: false, error: "Invalid sessionId format" });
-    }
     if (!access_token) {
       return res.status(401).json({ ok: false, error: "Требуется код доступа." });
     }
 
-    let valid = await validateSessionAccess(sessionId, access_token);
+    const supabase = getSupabase();
+    let effectiveSessionId = sessionId;
+
+    if (publicCode) {
+      const normalized = publicCode.trim().toUpperCase();
+      const { data: resolved, error: resolvedError } = await supabase
+        .from("sessions")
+        .select("session_id, module")
+        .eq("public_code", normalized)
+        .maybeSingle();
+      if (resolvedError) {
+        console.error("handleGetReport: resolve publicCode error", resolvedError);
+        return res.status(500).json({ ok: false, error: "База данных временно недоступна." });
+      }
+      if (!resolved) {
+        return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+      }
+      if (resolved.module !== "support" && resolved.module !== "body") {
+        return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+      }
+      effectiveSessionId = resolved.session_id;
+    }
+
+    if (!effectiveSessionId || typeof effectiveSessionId !== "string" || !isValidSessionId(effectiveSessionId)) {
+      return res.status(400).json({ ok: false, error: "Missing sessionId or publicCode" });
+    }
+
+    let valid = await validateSessionAccess(effectiveSessionId, access_token);
     if (!valid) {
       // Owner-based fallback: token may belong to another session of the same owner (cabinet access).
-      const { data: target } = await getSupabase()
+      const { data: target } = await supabase
         .from("sessions")
         .select("anonymous_owner_id")
-        .eq("session_id", sessionId)
+        .eq("session_id", effectiveSessionId)
         .maybeSingle();
       if (!target?.anonymous_owner_id) {
         return res.status(404).json({ ok: false, error: "Сессия не найдена." });
       }
-      const { data: tokenSession } = await getSupabase()
+      const { data: tokenSession } = await supabase
         .from("sessions")
         .select("session_id, anonymous_owner_id, access_token_hash, legacy_access")
         .eq("access_token_hash", hashToken(access_token))
@@ -551,14 +571,14 @@ async function handleGetReport(req, res) {
       return res.status(403).json({ ok: false, error: "Неверный код доступа." });
     }
 
-    const { data, error } = await getSupabase()
+    const { data, error } = await supabase
       .from("sessions")
       .select(
         "session_id, module, public_code, patient_text, conversation_history, " +
         "user_report, doctor_report, support_plan, risk_level, json_data, " +
-        "organization_id, primary_expert_id, created_at, anonymous_owner_id"
+        "organization_id, primary_expert_id, created_at"
       )
-      .eq("session_id", sessionId)
+      .eq("session_id", effectiveSessionId)
       .maybeSingle();
 
     if (error) {
