@@ -1,8 +1,13 @@
+import crypto from "crypto";
 import { getSupabase } from "../lib/supabase.js";
 import { maskText, maskSensitiveData, getPrivacySafeMode } from "../lib/sanitize.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { validateSessionAccess, generateSessionAccessToken } from "../lib/security/access-token.js";
+
+function hashToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
 
 function isValidSessionId(id) {
   if (!id || typeof id !== "string") return false;
@@ -30,6 +35,10 @@ export default async function handler(req, res) {
         return await handleSave(req, res);
       case "load":
         return await handleLoad(req, res);
+      case "getCabinet":
+        return await handleGetCabinet(req, res);
+      case "getReport":
+        return await handleGetReport(req, res);
       case "updateSupportPlan":
         return await handleUpdateSupportPlan(req, res);
       case "save_conversation_pairs":
@@ -40,6 +49,8 @@ export default async function handler(req, res) {
         return await handleListBodyDailyLogs(req, res);
       case "generateAccessToken":
         return await handleGenerateAccessToken(req, res);
+      case "createFollowUpSession":
+        return await handleCreateFollowUpSession(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -376,6 +387,295 @@ async function handleLoad(req, res) {
       ok: false,
       error: error.message || "Ошибка при поиске сессии",
     });
+  }
+}
+
+function makeSessionSummary(session) {
+  // Privacy-safe one-sentence summary from user's own words.
+  // Avoids diagnoses and medical conclusions.
+  const input = (session.patient_text || "").trim();
+  if (!input) return "Обращение без текстового описания.";
+  // First sentence: up to first sentence terminator.
+  const firstSentence = input.split(/[.!?\n]/)[0].trim();
+  const limited = firstSentence.slice(0, 110);
+  const suffix = firstSentence.length > 110 ? "…" : "";
+  return `${limited}${suffix}`;
+}
+
+async function handleGetCabinet(req, res) {
+  try {
+    const { sessionId, publicCode, access_token } = req.body || {};
+
+    if (!access_token) {
+      return res.status(401).json({ ok: false, error: "Требуется код доступа." });
+    }
+
+    const supabase = getSupabase();
+    let effectiveSessionId = sessionId;
+
+    if (publicCode) {
+      const normalized = publicCode.trim().toUpperCase();
+      const { data: resolved, error: resolvedError } = await supabase
+        .from("sessions")
+        .select("session_id, module")
+        .eq("public_code", normalized)
+        .maybeSingle();
+      if (resolvedError) {
+        console.error("handleGetCabinet: resolve publicCode error", resolvedError);
+        return res.status(500).json({ ok: false, error: "База данных временно недоступна." });
+      }
+      if (!resolved) {
+        return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+      }
+      if (resolved.module !== "support" && resolved.module !== "body") {
+        return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+      }
+      effectiveSessionId = resolved.session_id;
+    }
+
+    if (!effectiveSessionId || typeof effectiveSessionId !== "string" || !isValidSessionId(effectiveSessionId)) {
+      return res.status(400).json({ ok: false, error: "Missing sessionId or publicCode" });
+    }
+
+    const valid = await validateSessionAccess(effectiveSessionId, access_token);
+    if (!valid) {
+      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
+    }
+
+    const { data: currentSession, error: currentError } = await supabase
+      .from("sessions")
+      .select("session_id, public_code, anonymous_owner_id, module, created_at, json_data")
+      .eq("session_id", effectiveSessionId)
+      .maybeSingle();
+
+    if (currentError) {
+      console.error("handleGetCabinet: SELECT error", currentError);
+      return res.status(500).json({ ok: false, error: "База данных временно недоступна." });
+    }
+    if (!currentSession) {
+      return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+    }
+
+    const ownerId = currentSession.anonymous_owner_id;
+    if (!ownerId) {
+      return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+    }
+
+    // All sessions for this owner (cabinet view, chronological desc).
+    const { data: sessions, error: sessionsError } = await supabase
+      .from("sessions")
+      .select("session_id, public_code, module, patient_text, created_at, json_data")
+      .eq("anonymous_owner_id", ownerId)
+      .eq("module", "support")
+      .order("created_at", { ascending: false });
+
+    if (sessionsError) {
+      console.error("handleGetCabinet: sessions list error", sessionsError);
+      return res.status(500).json({ ok: false, error: "База данных временно недоступна." });
+    }
+
+    const sessionList = (sessions || []).map((s, idx) => {
+      const json = s.json_data || {};
+      const isContinuation = !!(json.previousPatientReport || json.isContinuation);
+      return {
+        sessionId: s.session_id,
+        publicCode: s.public_code,
+        createdAt: s.created_at,
+        summary: makeSessionSummary(s),
+        status: isContinuation ? "followup" : "first_contact",
+        order: idx + 1,
+      };
+    });
+
+    // Latest session context needed for follow-up
+    const latest = sessions?.[0];
+    const latestJson = latest?.json_data || {};
+    const latestReport = latest ? {
+      user_report: latest.user_report || "",
+      doctor_report: latest.doctor_report || "",
+      previousPatientReport: latestJson.previousPatientReport || "",
+      previousDoctorReport: latestJson.previousDoctorReport || "",
+      homeTasks: latestJson.homeTasks || "",
+      resourceFactors: latestJson.resourceFactors || "",
+      supportPlan: latest.support_plan || null,
+      dialogDepth: latestJson.dialogDepth ?? 0,
+      conversationHistory: latest.conversation_history || [],
+    } : null;
+
+    return res.status(200).json({
+      ok: true,
+      public_code: currentSession.public_code,
+      session_id: currentSession.session_id,
+      sessions: sessionList,
+      latest_report: latestReport,
+    });
+  } catch (error) {
+    console.error("handleGetCabinet error", error);
+    return res.status(500).json({ ok: false, error: error.message || "Ошибка кабинета" });
+  }
+}
+
+async function handleGetReport(req, res) {
+  try {
+    const { sessionId, access_token } = req.body || {};
+
+    if (!sessionId || typeof sessionId !== "string") {
+      return res.status(400).json({ ok: false, error: "Missing sessionId" });
+    }
+    if (!isValidSessionId(sessionId)) {
+      return res.status(400).json({ ok: false, error: "Invalid sessionId format" });
+    }
+    if (!access_token) {
+      return res.status(401).json({ ok: false, error: "Требуется код доступа." });
+    }
+
+    let valid = await validateSessionAccess(sessionId, access_token);
+    if (!valid) {
+      // Owner-based fallback: token may belong to another session of the same owner (cabinet access).
+      const { data: target } = await getSupabase()
+        .from("sessions")
+        .select("anonymous_owner_id")
+        .eq("session_id", sessionId)
+        .maybeSingle();
+      if (!target?.anonymous_owner_id) {
+        return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+      }
+      const { data: tokenSession } = await getSupabase()
+        .from("sessions")
+        .select("session_id, anonymous_owner_id, access_token_hash, legacy_access")
+        .eq("access_token_hash", hashToken(access_token))
+        .maybeSingle();
+      valid = !!tokenSession && tokenSession.anonymous_owner_id === target.anonymous_owner_id;
+    }
+    if (!valid) {
+      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
+    }
+
+    const { data, error } = await getSupabase()
+      .from("sessions")
+      .select(
+        "session_id, module, public_code, patient_text, conversation_history, " +
+        "user_report, doctor_report, support_plan, risk_level, json_data, " +
+        "organization_id, primary_expert_id, created_at, anonymous_owner_id"
+      )
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("handleGetReport: SELECT error", error);
+      return res.status(500).json({ ok: false, error: "База данных временно недоступна." });
+    }
+    if (!data) {
+      return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+    }
+
+    const jsonData = data.json_data || {};
+    const pairs = jsonData.conversation_pairs || [];
+    const session = {
+      sessionId: data.session_id,
+      module: data.module || "support",
+      publicCode: data.public_code,
+      patient_input: data.patient_text,
+      conversationHistory: data.conversation_history,
+      conversationPairs: Array.isArray(pairs) ? pairs : [],
+      user_report: data.user_report,
+      doctor_report: data.doctor_report,
+      supportPlan: data.support_plan,
+      riskLevel: data.risk_level,
+      dialogDepth: jsonData.dialogDepth ?? 0,
+      previousPatientReport: jsonData.previousPatientReport || "",
+      previousDoctorReport: jsonData.previousDoctorReport || "",
+      homeTasks: jsonData.homeTasks || "",
+      resourceFactors: jsonData.resourceFactors || "",
+      questions: jsonData.questions || null,
+      answers: jsonData.answers || {},
+      createdAt: data.created_at,
+    };
+
+    return res.status(200).json({
+      ok: true,
+      session,
+    });
+  } catch (error) {
+    console.error("handleGetReport error", error);
+    return res.status(500).json({ ok: false, error: error.message || "Ошибка загрузки отчёта" });
+  }
+}
+
+async function handleCreateFollowUpSession(req, res) {
+  try {
+    const { previousSessionId, access_token } = req.body || {};
+
+    if (!previousSessionId || typeof previousSessionId !== "string") {
+      return res.status(400).json({ ok: false, error: "Missing previousSessionId" });
+    }
+    if (!isValidSessionId(previousSessionId)) {
+      return res.status(400).json({ ok: false, error: "Invalid previousSessionId format" });
+    }
+    if (!access_token) {
+      return res.status(401).json({ ok: false, error: "Требуется код доступа." });
+    }
+
+    const valid = await validateSessionAccess(previousSessionId, access_token);
+    if (!valid) {
+      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
+    }
+
+    const supabase = getSupabase();
+    const { data: parent, error: parentError } = await supabase
+      .from("sessions")
+      .select("anonymous_owner_id, module, public_code")
+      .eq("session_id", previousSessionId)
+      .maybeSingle();
+
+    if (parentError) {
+      console.error("handleCreateFollowUpSession: SELECT error", parentError);
+      return res.status(500).json({ ok: false, error: "База данных временно недоступна." });
+    }
+    if (!parent || !parent.anonymous_owner_id) {
+      return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+    }
+
+    const { generatePublicCode } = await import("../lib/publicCode.js");
+    const { randomUUID } = await import("node:crypto");
+
+    const newSessionId = randomUUID();
+    const newPublicCode = generatePublicCode();
+
+    const { error: insertError } = await supabase.from("sessions").insert({
+      session_id: newSessionId,
+      module: parent.module || "support",
+      anonymous_owner_id: parent.anonymous_owner_id,
+      public_code: newPublicCode,
+      patient_text: "",
+      conversation_history: [],
+      json_data: {
+        previousPublicCode: parent.public_code,
+        isContinuation: true,
+      },
+    });
+
+    if (insertError) {
+      console.error("handleCreateFollowUpSession: INSERT error", insertError);
+      return res.status(500).json({ ok: false, error: "Не удалось создать сессию продолжения." });
+    }
+
+    const newAccessToken = await generateSessionAccessToken(newSessionId);
+    if (!newAccessToken) {
+      console.error("handleCreateFollowUpSession: failed to generate token for", newSessionId);
+      return res.status(500).json({ ok: false, error: "Не удалось создать код доступа." });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      sessionId: newSessionId,
+      access_token: newAccessToken,
+      public_code: newPublicCode,
+      previous_session_id: previousSessionId,
+    });
+  } catch (error) {
+    console.error("handleCreateFollowUpSession error", error);
+    return res.status(500).json({ ok: false, error: error.message || "Ошибка создания сессии продолжения" });
   }
 }
 

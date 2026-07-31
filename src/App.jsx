@@ -99,6 +99,14 @@ export default function App() {
   const [showConsultPrep, setShowConsultPrep] = useState(false);
   const [showMessageToClose, setShowMessageToClose] = useState(false);
   const [messageText, setMessageText] = useState("");
+
+  // Support Cabinet MVP
+  const [supportCabinet, setSupportCabinet] = useState(null);
+  const [cabinetLoading, setCabinetLoading] = useState(false);
+  const [followUpAnswers, setFollowUpAnswers] = useState({});
+  const [reportSource, setReportSource] = useState(null); // "generated" | "cabinet"
+  const [justFinishedSession, setJustFinishedSession] = useState(false);
+
   const [activeModule, setActiveModule] = useState(() => {
     if (typeof window !== "undefined") {
       const host = window.location.hostname;
@@ -1030,6 +1038,192 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setCrisisShowHighRiskWarning(false);
   }
 
+  // Support Cabinet MVP helpers
+  async function loadSupportCabinet(enteredCode) {
+    const saved = getSupportSession();
+    const accessToken = saved.accessToken;
+    if (!accessToken) {
+      showToast("Сохранённый доступ не найден. Начните новый разговор.", "error");
+      return;
+    }
+    const body = enteredCode
+      ? { action: "getCabinet", publicCode: enteredCode, access_token: accessToken }
+      : { action: "getCabinet", sessionId: saved.sessionId, access_token: accessToken };
+    if (!enteredCode && !saved.sessionId) {
+      showToast("Сохранённый разговор не найден. Начните новый.", "error");
+      return;
+    }
+    setCabinetLoading(true);
+    setError("");
+    try {
+      const usageBody = enteredCode
+        ? { action: "getUsageBalance", publicCode: enteredCode, module: "support", access_token: accessToken }
+        : { action: "getUsageBalance", sessionId: saved.sessionId, module: "support", access_token: accessToken };
+      const [cabinetRes, usageRes] = await Promise.all([
+        fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+        fetch("/api/usage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(usageBody),
+        }),
+      ]);
+
+      const cabinetData = await cabinetRes.json();
+      const usageData = await usageRes.json();
+
+      if (!cabinetRes.ok || !cabinetData.ok) {
+        throw new Error(cabinetData.error || "Не удалось открыть кабинет");
+      }
+
+      setSupportCabinet({
+        ...cabinetData,
+        balance: usageData.ok && usageData.visible ? usageData : null,
+      });
+      setSessionId(cabinetData.session_id || saved.sessionId);
+      setPublicCode(cabinetData.public_code || enteredCode || saved.sessionId);
+      setPhase("cabinet");
+    } catch (e) {
+      showToast(e.message || "Не удалось открыть кабинет. Проверьте код доступа.", "error");
+    } finally {
+      setCabinetLoading(false);
+    }
+  }
+
+  async function openSupportReport(targetSessionId) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("Нужен код доступа к разговору.", "error");
+      return;
+    }
+    const sid = targetSessionId || saved.sessionId;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getReport", sessionId: sid, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Не удалось открыть отчёт");
+      }
+      const s = data.session;
+      setSessionId(s.sessionId || s.session_id);
+      setPublicCode(s.publicCode || s.public_code);
+      setText(s.patient_input || s.patient_text || "");
+      setConversationHistory(s.conversationHistory || s.conversation_history || []);
+      setDialogDepth(s.dialogDepth || 0);
+      setPreviousPatientReport(s.previousPatientReport || s.user_report || "");
+      setPreviousDoctorReport(s.previousDoctorReport || s.doctor_report || "");
+      setHomeTasks(s.homeTasks || "");
+      setResourceFactors(s.resourceFactors || "");
+      setResult(s.ai_result || s.result || `${s.user_report || ""}\n\n===DOCTOR_REPORT===\n\n${s.doctor_report || ""}`);
+      setReportSource("cabinet");
+      setJustFinishedSession(false);
+      if (supportCabinet?.balance) {
+        setUsageBalance({ ...supportCabinet.balance, module: "support" });
+      }
+      setActiveTab("user");
+      setPhase("report");
+    } catch (e) {
+      showToast(e.message || "Не удалось открыть отчёт", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function startSupportFollowUp() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("Нужен код доступа к разговору.", "error");
+      return;
+    }
+    const latest = supportCabinet?.sessions?.[0];
+    const latestReport = supportCabinet?.latest_report || {};
+    setSessionId(saved.sessionId);
+    setPublicCode(latest?.publicCode || supportCabinet?.public_code || saved.sessionId);
+    setIsContinuation(true);
+    setPreviousPatientReport(latestReport.user_report || "");
+    setPreviousDoctorReport(latestReport.doctor_report || "");
+    setHomeTasks(latestReport.homeTasks || "");
+    setResourceFactors(latestReport.resourceFactors || "");
+    setSupportPlan(latestReport.supportPlan || null);
+    setConversationHistory([]);
+    setDialogDepth(0);
+    setAnswers({});
+    setQuestions(null);
+    setResult(null);
+    setFollowUpAnswers({});
+    setPhase("followup");
+  }
+
+  async function submitFollowUp() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("Нужен код доступа к разговору.", "error");
+      return;
+    }
+    const answers = followUpAnswers;
+    const required = ["dynamics", "sleep_appetite", "new_concerns", "tried", "help_needed"];
+    const missing = required.filter((k) => !answers[k]?.trim());
+    if (missing.length > 0) {
+      showToast("Ответьте, пожалуйста, на все вопросы.", "error");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      // Create a new session for the follow-up, linked to the same owner/wallet
+      const createRes = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "createFollowUpSession",
+          previousSessionId: saved.sessionId,
+          access_token: saved.accessToken,
+        }),
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok || !createData.ok) {
+        throw new Error(createData.error || "Не удалось начать продолжение");
+      }
+
+      saveSupportSession(createData.sessionId, createData.access_token);
+      setSessionId(createData.sessionId);
+      setPublicCode(createData.public_code);
+      sessionRef.current = { sessionId: createData.sessionId, accessToken: createData.access_token };
+
+      const followUpText = [
+        `Стало легче, тяжелее или примерно так же: ${answers.dynamics}`,
+        `Что изменилось в сне, аппетите и обычных делах: ${answers.sleep_appetite}`,
+        `Появилось ли что-то новое, что особенно тревожит: ${answers.new_concerns}`,
+        `Что из предложенного удалось попробовать: ${answers.tried}`,
+        `Какая помощь сейчас была бы наиболее полезна: ${answers.help_needed}`,
+      ].join("\n\n");
+
+      setText(followUpText);
+      setConversationHistory([]);
+      setDialogDepth(0);
+      setAnswers({});
+      setQuestions(null);
+      setResult(null);
+      setReportSource("generated");
+      setJustFinishedSession(false);
+
+      // Continue via existing analyze flow
+      await submitRound();
+    } catch (e) {
+      showToast(e.message || "Не удалось начать продолжение", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function ensureStartSession() {
     if (sessionRef.current) {
       return sessionRef.current;
@@ -1498,6 +1692,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         if (data._debug) setDebugInfo(data._debug);
         if (data.care_recommendation) setCareRecommendation(data.care_recommendation);
         setActiveTab("user");
+        setReportSource("generated");
+        setJustFinishedSession(true);
         setPhase("report");
 
         const sid = sessionId || `session-${Date.now()}`;
@@ -1842,6 +2038,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setResourceFactors("");
     setDebugInfo(null);
     setCareRecommendation(null);
+    setSupportCabinet(null);
+    setCabinetLoading(false);
+    setFollowUpAnswers({});
+    setReportSource(null);
+    setJustFinishedSession(false);
     setBodyIntakeStage("idle");
     setBodyIntakeResult(null);
     try {
@@ -7764,6 +7965,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 : "Расскажите, что с вами происходит — голосом или текстом. Сервис поможет мягко разобрать состояние, заметить важные признаки и предложить понятный следующий шаг."}
             </p>
 
+            {phase === "input" && (
             <div style={{ ...s.row, flexWrap: "wrap", alignItems: "center" }} className="app-actions">
               {activeModule !== "body" && (
                 <button style={s.primary} onClick={async () => {
@@ -7781,12 +7983,25 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               {activeModule === "support" && (
                 <button
                   style={{ ...s.secondary, marginTop: 0 }}
-                  onClick={() => setSessionModalOpen(true)}
+                  onClick={() => {
+                    const saved = getSupportSession();
+                    if (saved.sessionId && saved.accessToken) {
+                      loadSupportCabinet();
+                    } else {
+                      setSessionModalOpen(true);
+                    }
+                  }}
                 >
-                  Продолжить разговор
+                  {(() => {
+                    const saved = getSupportSession();
+                    return saved.sessionId && saved.accessToken
+                      ? "Продолжить последний разговор"
+                      : "Продолжить разговор";
+                  })()}
                 </button>
               )}
             </div>
+            )}
 
             {activeModule === "body" && (
               <div style={{ marginTop: 16, padding: 16, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
@@ -7820,7 +8035,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
             )}
 
-            {showModuleSwitcher && (
+            {phase === "input" && showModuleSwitcher && (
             <div style={{ ...s.row, marginTop: 8, gap: 6 }} className="app-actions">
               <button
                 style={activeModule === "support" ? s.primary : s.secondary}
@@ -7839,19 +8054,21 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
 
 
-              {activeModule === "body" ? (
-              <p style={{ color: "#7A7268", fontSize: 13, marginTop: 24, lineHeight: 1.5 }}>
-                AI-компаньон помогает разобраться с режимом, питанием, активностью и самоконтролем. Не заменяет врача и не назначает лечение.
-              </p>
-            ) : (
-              <>
+            {phase === "input" && (
+              activeModule === "body" ? (
                 <p style={{ color: "#7A7268", fontSize: 13, marginTop: 24, lineHeight: 1.5 }}>
-                  Сервис работает в тестовом режиме, не ставит диагноз и не заменяет консультацию специалиста. Не указывайте персональные данные в тексте обращения.
+                  AI-компаньон помогает разобраться с режимом, питанием, активностью и самоконтролем. Не заменяет врача и не назначает лечение.
                 </p>
-                <p style={{ color: "#B85C4A", fontSize: 12, marginTop: 8, lineHeight: 1.4 }}>
-                  Если вы чувствуете, что можете причинить вред себе или другому человеку, либо вам нужна срочная психиатрическая помощь — немедленно обратитесь по телефону 112 (или в экстренные службы вашей страны) либо к ближайшему медицинскому учреждению.
-                </p>
-              </>
+              ) : (
+                <>
+                  <p style={{ color: "#7A7268", fontSize: 13, marginTop: 24, lineHeight: 1.5 }}>
+                    Сервис работает в тестовом режиме, не ставит диагноз и не заменяет консультацию специалиста. Не указывайте персональные данные в тексте обращения.
+                  </p>
+                  <p style={{ color: "#B85C4A", fontSize: 12, marginTop: 8, lineHeight: 1.4 }}>
+                    Если вы чувствуете, что можете причинить вред себе или другому человеку, либо вам нужна срочная психиатрическая помощь — немедленно обратитесь по телефону 112 (или в экстренные службы вашей страны) либо к ближайшему медицинскому учреждению.
+                  </p>
+                </>
+              )
             )}
           </section>
 
@@ -8212,7 +8429,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           )}
 
           {/* Default support card / body card before intake */}
-          {!(activeModule === "body" && (bodyIntakeStage !== "idle" || bodyDiaryOpen || bodyDiaryResult)) && (
+          {!(activeModule === "body" && (bodyIntakeStage !== "idle" || bodyDiaryOpen || bodyDiaryResult)) && phase !== "cabinet" && phase !== "followup" && (
           <section style={s.card} className="app-card">
             <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif" }}>
               {phase === "questions"
@@ -8395,7 +8612,47 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               <div style={s.result}>
                 <h2 style={{ marginTop: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 22 }}>Результат разбора</h2>
 
-                {publicCode && (
+                {publicCode && justFinishedSession && reportSource === "generated" && (
+                  <div style={{
+                    background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
+                    borderRadius: 16, padding: "18px", marginBottom: 16,
+                  }}>
+                    <div style={{ fontWeight: 700, fontSize: 16, color: "#2E2A25", marginBottom: 8 }}>
+                      Сохраните код разговора
+                    </div>
+                    <div style={{ color: "#5F7D6C", fontSize: 14, lineHeight: 1.5, marginBottom: 12 }}>
+                      Он понадобится, чтобы вернуться к этому разговору и продолжить наблюдение за состоянием.
+                    </div>
+                    <div style={{
+                      background: "#ffffff", border: "1px solid rgba(125,154,137,.25)",
+                      borderRadius: 12, padding: "12px 16px", marginBottom: 14,
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                    }}>
+                      <span style={{ fontWeight: 900, fontSize: 18, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace" }}>
+                        {publicCode}
+                      </span>
+                    </div>
+                    <div style={{ color: "#7A7268", fontSize: 13, lineHeight: 1.5, marginBottom: 16 }}>
+                      Вернитесь завтра или раньше, если состояние изменится. Мы уточним, что стало легче, что осталось прежним и нужна ли дополнительная помощь.
+                    </div>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <button
+                        style={{ ...s.secondary, flex: 1, minWidth: 140 }}
+                        onClick={() => { navigator.clipboard.writeText(publicCode); showToast("Код скопирован"); }}
+                      >
+                        Скопировать код
+                      </button>
+                      <button
+                        style={{ ...s.primary, flex: 1, minWidth: 160 }}
+                        onClick={() => { setJustFinishedSession(false); loadSupportCabinet(); }}
+                      >
+                        Перейти в личный кабинет
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {publicCode && !(justFinishedSession && reportSource === "generated") && (
                   <div style={{
                     background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
                     borderRadius: 16, padding: "12px 16px", marginBottom: 16,
@@ -9039,16 +9296,181 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 )}
 
-                <button
-                  style={{ ...s.secondary, width: "100%", marginTop: 20 }}
-                  onClick={handleReset}
-                >
-                  Начать заново
-                </button>
+                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                  {reportSource === "cabinet" && (
+                    <button
+                      style={{ ...s.secondary, flex: 1 }}
+                      onClick={() => { setPhase("cabinet"); setReportSource(null); }}
+                    >
+                      ← Назад в кабинет
+                    </button>
+                  )}
+                  <button
+                    style={{ ...s.secondary, flex: 1 }}
+                    onClick={handleReset}
+                  >
+                    Начать заново
+                  </button>
+                </div>
               </div>
             )}
           </section>
           ) /* ends !(body && intake not idle) guard */}
+
+          {/* Support Cabinet MVP */}
+          {phase === "cabinet" && supportCabinet && (
+            <section style={s.card} className="app-card">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
+                <h2 style={{ margin: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 24 }}>Ваши разговоры</h2>
+                <button
+                  style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
+                  onClick={() => { setPhase("input"); setSupportCabinet(null); }}
+                >
+                  На главную
+                </button>
+              </div>
+
+              <div style={{
+                background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
+                borderRadius: 16, padding: 18, marginBottom: 24,
+              }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>Код разговора</div>
+                    <div style={{ fontWeight: 900, fontSize: 20, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace" }}>
+                      {supportCabinet.public_code || publicCode}
+                    </div>
+                  </div>
+                  <div style={{ width: 1, height: 40, background: "rgba(125,154,137,.3)", flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>Баланс</div>
+                    <div style={{ fontWeight: 700, fontSize: 18, color: "#2E2A25" }}>
+                      {supportCabinet.balance?.visible
+                        ? `${supportCabinet.balance.balance.toLocaleString("ru-RU")} кредитов`
+                        : "—"}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#7A7268" }}>Тестовый баланс. Деньги не списываются.</div>
+                  </div>
+                </div>
+              </div>
+
+              {supportCabinet.sessions?.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Последнее обращение</div>
+                  {(() => {
+                    const latest = supportCabinet.sessions[0];
+                    const dateStr = latest.createdAt
+                      ? new Date(latest.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                      : "—";
+                    return (
+                      <div style={{
+                        background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
+                        borderRadius: 16, padding: 18,
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 16, color: "#2E2A25" }}>Обращение №{latest.order}</div>
+                            <div style={{ fontSize: 13, color: "#7A7268", marginTop: 2 }}>{dateStr}</div>
+                          </div>
+                          <div style={{
+                            fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 20,
+                            background: latest.status === "followup" ? "#EDE3D8" : "#E2EBE4",
+                            color: latest.status === "followup" ? "#8B6B4A" : "#5F7D6C",
+                          }}>
+                            {latest.status === "followup" ? "Продолжение" : "Первое обращение"}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 14, color: "#5F574F", lineHeight: 1.5, marginBottom: 16 }}>
+                          {latest.summary}
+                        </div>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          <button style={{ ...s.primary, flex: 1, minWidth: 140 }} onClick={startSupportFollowUp}>
+                            Продолжить разговор
+                          </button>
+                          <button style={{ ...s.secondary, flex: 1, minWidth: 140 }} onClick={() => openSupportReport(latest.sessionId)}>
+                            Открыть отчёт
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {supportCabinet.sessions?.length > 1 && (
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>История обращений</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {supportCabinet.sessions.slice(1).map((s) => {
+                      const dateStr = s.createdAt
+                        ? new Date(s.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                        : "—";
+                      return (
+                        <div key={s.sessionId} style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          flexWrap: "wrap", gap: 10,
+                          padding: 14, borderRadius: 12, background: "#ffffff",
+                          border: "1px solid rgba(46,42,37,.08)",
+                        }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: "#2E2A25" }}>Обращение №{s.order}</div>
+                            <div style={{ fontSize: 12, color: "#7A7268", marginTop: 2 }}>{dateStr}</div>
+                            <div style={{ fontSize: 13, color: "#5F574F", marginTop: 4, maxWidth: 400 }}>{s.summary}</div>
+                          </div>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => openSupportReport(s.sessionId)}>
+                            Открыть
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Support follow-up form */}
+          {phase === "followup" && (
+            <section style={s.card} className="app-card">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
+                <h2 style={{ margin: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 22 }}>Что изменилось с прошлого разговора?</h2>
+                <button
+                  style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
+                  onClick={() => setPhase("cabinet")}
+                >
+                  Назад
+                </button>
+              </div>
+
+              {[
+                { key: "dynamics", label: "1. Стало легче, тяжелее или примерно так же?", placeholder: "Например: стало немного легше, но к вечеру всё равно тревожно" },
+                { key: "sleep_appetite", label: "2. Что изменилось в сне, аппетите и обычных делах?", placeholder: "Например: стал лучше засыпать, аппетит вернулся" },
+                { key: "new_concerns", label: "3. Появилось ли что-то новое, что особенно тревожит?", placeholder: "Например: появились мысли, от которых трудно отвлечься" },
+                { key: "tried", label: "4. Что из предложенного удалось попробовать?", placeholder: "Например: попробовал дыхание 4-6, записывал сон" },
+                { key: "help_needed", label: "5. Какая помощь сейчас была бы наиболее полезна?", placeholder: "Например: хочу понять, стоит ли обратиться к психологу" },
+              ].map((q) => (
+                <div key={q.key} style={{ marginBottom: 16 }}>
+                  <label style={{ ...s.label2, fontWeight: 700, marginBottom: 8, display: "block" }}>{q.label}</label>
+                  <textarea
+                    style={s.answerInput}
+                    value={followUpAnswers[q.key] || ""}
+                    onChange={(e) => setFollowUpAnswers({ ...followUpAnswers, [q.key]: e.target.value })}
+                    placeholder={q.placeholder}
+                    rows={3}
+                  />
+                </div>
+              ))}
+
+              <button
+                style={s.wide}
+                onClick={submitFollowUp}
+                disabled={loading}
+              >
+                {loading ? "Начинаем разбор..." : "Продолжить разбор"}
+              </button>
+            </section>
+          )}
+
         </main>
 
         {crisisOpen && (
@@ -9146,70 +9568,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     setLoadingSession(true);
                     try {
                       const code = sessionCodeInput.trim();
-
-                      const loadBody = withAccessToken({ action: "load", publicCode: code }, code);
-                      let res = await fetch("/api/session", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(loadBody),
-                      });
-                      let data = await res.json();
-                      if (!res.ok || !data.ok) {
-                        throw new Error(data.error || "Сессия не найдена");
-                      }
-
-                      const s = data.session;
-                      setSessionId(s.sessionId || s.session_id);
-                      setPublicCode(s.publicCode || s.public_code);
-                      setText(s.patient_input || s.patient_text || "");
-                      setConversationHistory(s.conversationHistory || s.conversation_history || []);
-                      setDialogDepth(s.dialogDepth || 0);
-                      setPreviousPatientReport(s.user_report || s.previousPatientReport || "");
-                      setPreviousDoctorReport(s.doctor_report || s.previousDoctorReport || "");
-                      setHomeTasks(s.homeTasks || "");
-                      setResourceFactors(s.resourceFactors || "");
-                      if (s.module) {
-                        setActiveModule(s.module);
-                      }
-                      if (s.supportPlan) {
-                        setSupportPlan(s.supportPlan);
-                        const sa = s.supportPlan.patient_self_assessment;
-                        if (sa?.can_manage_without_specialist) {
-                          setCanManageWithoutSpecialist(sa.can_manage_without_specialist);
-                          setShowSelfAssessment(true);
-                          setShowSupportToolkit(true);
-                          if (s.supportPlan.specialist_request_intent) {
-                            setShowSpecialistIntent(true);
-                            setSpecialistIntentDone(true);
-                          }
-                        }
-                      }
-
-                      // Restore debug + care recommendation from json_data
-                      if (s.json_data?._debug) setDebugInfo(s.json_data._debug);
-                      if (s.json_data?.care_recommendation) setCareRecommendation(s.json_data.care_recommendation);
-
-                      // Restore questions/answers if present
-                      const savedAnswers = s.answers || {};
-                      const savedResult = s.ai_result || s.result || null;
-                      const hasResult = !!savedResult || !!s.user_report || !!s.doctor_report;
-
-                      if (hasResult) {
-                        setResult(savedResult || `${s.user_report || ""}\n\n===DOCTOR_REPORT===\n\n${s.doctor_report || ""}`);
-                        setPhase("report");
-                      } else {
-                        setResult(null);
-                        setAnswers(savedAnswers);
-                        setPhase(Object.keys(savedAnswers).length > 0 ? "questions" : "input");
-                      }
-
-                      if (data.usage_balance && data.usage_balance.visible) {
-                        setUsageBalance({ ...data.usage_balance, module: "support" });
-                      }
-                      setIsContinuation(true);
+                      await loadSupportCabinet(code);
                       setSessionModalOpen(false);
                       setSessionCodeInput("");
-                      if (data.message) showToast(data.message);
                     } catch (e) {
                       showToast(e.message || "Сессия не найдена. Проверьте код.", "error");
                     } finally {
