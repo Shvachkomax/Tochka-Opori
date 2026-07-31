@@ -12,6 +12,7 @@ import expertsHandler from "./api/experts.js";
 import adminHandler from "./api/admin.js";
 import crisisHandler from "./api/crisis.js";
 import councilHandler from "./api/council.js";
+import usageHandler from "./api/usage.js";
 
 const PORT = 3001;
 
@@ -78,6 +79,9 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     }
     if (nodeReq.url.startsWith("/api/council")) {
       return councilHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/usage")) {
+      return usageHandler(req, res);
     }
 
     nodeRes.writeHead(404, { "Content-Type": "application/json" });
