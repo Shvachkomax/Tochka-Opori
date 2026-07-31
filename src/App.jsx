@@ -7764,22 +7764,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 : "Расскажите, что с вами происходит — голосом или текстом. Сервис поможет мягко разобрать состояние, заметить важные признаки и предложить понятный следующий шаг."}
             </p>
 
-            <div style={s.row} className="app-actions">
-              <button style={s.primary} onClick={async () => {
-                if (activeModule === "body") {
-                  setBodyIntakeStage("filling");
-                  return;
-                }
-                try {
-                  await ensureStartSession();
-                } catch (e) {
-                  setError(e.message);
-                  return;
-                }
-                setMode("text");
-              }}>
-                {activeModule === "body" ? "Начать диалог" : "Начать разговор"}
-              </button>
+            <div style={{ ...s.row, flexWrap: "wrap" }} className="app-actions">
               {activeModule !== "body" && (
                 <button style={s.secondary} onClick={async () => {
                   try {
@@ -7791,6 +7776,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   setMode("voice");
                 }}>
                   Рассказать голосом
+                </button>
+              )}
+              {activeModule === "support" && getSupportSession().sessionId && (
+                <button
+                  style={{ ...s.secondary, marginTop: 0 }}
+                  onClick={() => setSessionModalOpen(true)}
+                >
+                  Продолжить разговор
                 </button>
               )}
             </div>
@@ -7844,16 +7837,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </div>
             )}
 
-            {activeModule === "support" && (
-            <div style={s.row} className="app-actions">
-              <button
-                style={{ ...s.secondary, marginTop: 8 }}
-                onClick={() => setSessionModalOpen(true)}
-              >
-                Вернуться к разговору
-              </button>
-            </div>
-            )}
+
 
               {activeModule === "body" ? (
               <p style={{ color: "#7A7268", fontSize: 13, marginTop: 24, lineHeight: 1.5 }}>
