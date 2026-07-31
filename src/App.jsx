@@ -7766,7 +7766,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
             <div style={{ ...s.row, flexWrap: "wrap" }} className="app-actions">
               {activeModule !== "body" && (
-                <button style={s.secondary} onClick={async () => {
+                <button style={s.primary} onClick={async () => {
                   try {
                     await ensureStartSession();
                   } catch (e) {
