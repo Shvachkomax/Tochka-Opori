@@ -78,26 +78,27 @@ npm run preview
 - Перед commit проверять `data/`, `.vercel/`, `.env*`, экспортированные JSON/JSONL/CSV и скачанные отчеты.
 - При работе с пользовательским текстом сохранять privacy-safe подход и маскирование контактов.
 
-## Текущий статус (Body module / health.tochka-opori.online)
+## Текущий статус (Anonymous Continuation Credential Pass)
 
 ### Что сделано
-- Host-based routing: health.tochka-opori.online → body, любой другой хост → support
-- Header/hero/alarm/voice адаптированы для health-домена
-- **BodyIntake**: полная анкета здоровья, изолированные красные флаги (healthRedFlags*), генерация кода `HEALTH-XXXX-XXX`, сохранение в localStorage
-- **body_clients таблица** (миграция 015): source (alena_client/self_signup/specialist_referral/test), specialist_id, specialist_name
-- **api/analyze.js**: trySaveIntake сохраняет source/specialist + upsert body_clients; handleDailyLogAnalysis для daily_log_submitted; **handlePlatePhotoAnalysis** для stage plate_photo_analysis
-- **api/admin.js**: multi-token RBAC (SUPER/SUPPORT/BODY_ADMIN_TOKEN), source-фильтр, слияние body_clients, soft delete/restore; daily log CRUD (listBodyDailyLogs, getBodyDailyLogDetail, deleteBodyDailyLog)
-- **App.jsx admin/body**: вкладки Анкеты / Дневники / Корзина; фильтр источника; читаемые карточки анкет + модалка с AI-разбором и планом на 7 дней; вкладка Дневники с поиском по session_id и модалка итога дня; **plate_analysis** отображается под фото тарелок
-- **BodyDiary.jsx**: форма дневника (вес, активность, тренировка, питание, сон, самочувствие, голосовой ввод, фото тарелок); **кнопка «Проанализировать тарелку»** с AI-оценкой состава (правило тарелки, без калорий)
-- **prompts/body/plate-analysis.md**: промпт для анализа состава тарелки по фото
-- **src/style.css**: добавлен @keyframes spin
-- Миграции 014 (deleted_at/deleted_by) и 015 (body_clients + source) применены; миграция 016 (body_daily_logs) создана, применена
-- Всё закоммичено и залито на Vercel
+- **Миграция 027** (`scripts/027-continuation-secrets.sql`): новая таблица `continuation_credentials` с разделением `lookup_code` (публичный) и `secret_hash` (HMAC-SHA256 с серверным перцем `CONTINUATION_SECRET_PEPPER`); unique `(owner_type, owner_id)`; индексы по `lookup_code` и владельцу; RLS включена.
+- **`lib/session/continuation-credential.js`**: генерация, парсинг, нормализация, форматирование и константное сравнение `secret`; поддержка `ТОЧКА-XXXX-XXXX-XXXX-XXXX-XXXX` (support) и `HEALTH-XXXX-XXX-XXXX-XXXX-XXXX` (body); распознавание устаревших коротких кодов.
+- **`lib/session/continuation-store.js`**: shared `getOrCreateContinuationCredential` и `rotateContinuationCredential` для `api/session.js` и `api/analyze.js`.
+- **`api/session.js`**: `handleSave` создаёт credential для canonical owner (`anonymous_case`) и возвращает `continuation_code` один раз; `exchangeContinuationCredential` — разбор комбинированного кода, rate-limit 5 попыток/15 мин на IP+lookup, блокировка после неудач, единое сообщение об ошибке, выдача нового `access_token` и кабинета; `regenerateContinuationCredential` — ротация кода из кабинета; `anonymous_owner_id` не возвращается и не логируется.
+- **`api/analyze.js`**: `handleBodyIntakeAnalysis` сохраняет `anonymous_owner_id` в `body_clients`, создаёт `anonymous_profile` credential и возвращает `continuation_code` + `access_token` на первичной анкете.
+- **`src/App.jsx`**: единый UI «Код продолжения» на финальном экране support; один input в модалке возврата; кабинет support с кнопкой «Создать новый код продолжения»; Health-анкета показывает и копирует полный continuation-код; единый стейт `continuationCode`, `continuationCodeInput`, `continuationCodeError`, `regeneratedCode`.
+- **`src/lib/sessionAccess.js`**: сохранение access_token и session_id для support и body; `withAccessToken` подкладывает токен в API-запросы.
+- **local-api-server.js**: `/api/usage` роут для локального dev.
+- **Сборка**: `npm run build` проходит; `node --check` для ключевых файлов проходит.
+- **Миграция 027 применена** в Supabase.
+- **CONTINUATION_SECRET_PEPPER** добавлен в Vercel Preview и Production (одинаковое значение) и в локальный `.env.local`.
+- **Post-migration validation**: таблицы, constraints, RPC-функции проверены; service role может создавать/читать credentials.
+- **E2E тесты**: Support save → exchange → regenerate → rotation; Health credential exchange; rate-limit и indistinguishability existing/non-existing lookup.
+- **Security scripts**: `scripts/test-continuation-rate-limit.js`, `scripts/validate-continuation-migration.js`, `scripts/e2e-continuation.js`.
 
 ### Что не сделано
-- Фото тарелок хранятся как base64 в JSONB (TODO: Supabase Storage)
-- Тестирование сценариев: повторный визит по коду, голосовой дневник, фото, анализ тарелки
+- Body-кабинет для пользователя: есть exchange endpoint, но UI кабинета здоровья не реализован (дневник привязан к session_id из localStorage).
 
 ### Следующий шаг
-Проверить /admin/body → Экспертные правки: создание, листинг, JSONL-выгрузка. Проверить сценарий: открыть анкету → «Экспертная правка» → заполнить → сохранить.
+1. Запросить подтверждение для деплоя Preview, затем Production.
 

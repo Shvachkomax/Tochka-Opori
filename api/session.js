@@ -4,9 +4,143 @@ import { maskText, maskSensitiveData, getPrivacySafeMode } from "../lib/sanitize
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { validateSessionAccess, generateSessionAccessToken } from "../lib/security/access-token.js";
+import {
+  parseContinuationCredential,
+  verifyContinuationSecret,
+  getOwnerType,
+  getContinuationAttemptKey,
+  isLegacyShortCode,
+  ContinuationConfigError,
+  SUPPORTED_MODULES,
+} from "../lib/session/continuation-credential.js";
+import {
+  getOrCreateContinuationCredential,
+  rotateContinuationCredential,
+} from "../lib/session/continuation-store.js";
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function getClientIp(req) {
+  return req.headers["x-forwarded-for"]?.split(",")[0]?.trim()
+    || req.headers["x-real-ip"]
+    || req.socket?.remoteAddress
+    || "unknown";
+}
+
+// Anonymous Continuation Credential Pass helpers
+async function buildCabinetSessions({ module, ownerId, supabase }) {
+  const table = module === "body" ? "body_clients" : "sessions";
+  const isBody = module === "body";
+
+  const selectCols = isBody
+    ? "session_id, display_name, created_at"
+    : "session_id, public_code, module, patient_text, created_at, json_data";
+
+  let query = supabase
+    .from(table)
+    .select(selectCols)
+    .eq("anonymous_owner_id", ownerId);
+
+  if (!isBody) {
+    query = query.eq("module", module);
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("buildCabinetSessions error", error);
+    return [];
+  }
+
+  return (data || []).map((s, idx) => {
+    if (isBody) {
+      return {
+        sessionId: s.session_id,
+        publicCode: s.session_id,
+        createdAt: s.created_at,
+        summary: s.display_name ? `Анкета здоровья: ${s.display_name}` : "Анкета здоровья",
+        status: "first_contact",
+        order: idx + 1,
+      };
+    }
+    const json = s.json_data || {};
+    const input = (s.patient_text || "").trim();
+    const summary = input
+      ? `${input.split(/[.!?\n]/)[0].trim().slice(0, 110)}${input.split(/[.!?\n]/)[0].trim().length > 110 ? "…" : ""}`
+      : "Обращение без текстового описания.";
+    return {
+      sessionId: s.session_id,
+      publicCode: s.public_code,
+      createdAt: s.created_at,
+      summary,
+      status: json.isContinuation || json.previousPatientReport ? "followup" : "first_contact",
+      order: idx + 1,
+    };
+  });
+}
+
+async function buildCabinetData({ module, ownerId, supabase }) {
+  const sessions = await buildCabinetSessions({ module, ownerId, supabase });
+  const latestSession = sessions[0];
+  let latestReport = null;
+
+  if (latestSession?.sessionId) {
+    const isBody = module === "body";
+    const table = isBody ? "body_intake_forms" : "sessions";
+    const selectCols = isBody
+      ? "session_id, answers, care_recommendation, bmi, created_at"
+      : "session_id, public_code, patient_text, user_report, doctor_report, support_plan, json_data, created_at";
+    const { data } = await supabase
+      .from(table)
+      .select(selectCols)
+      .eq("session_id", latestSession.sessionId)
+      .maybeSingle();
+    if (data) {
+      if (isBody) {
+        const answers = data.answers || {};
+        latestReport = {
+          sessionId: data.session_id,
+          publicCode: data.session_id,
+          userReport: `Анкета здоровья заполнена. ИМТ: ${data.bmi ?? "—"}. Цель: ${answers.goal || "—"}.`,
+          doctorReport: "",
+          supportPlan: data.care_recommendation || null,
+          homeTasks: "",
+          resourceFactors: "",
+          previousPatientReport: "",
+          previousDoctorReport: "",
+          dialogDepth: 0,
+          conversationHistory: [],
+        };
+      } else {
+        const json = data.json_data || {};
+        latestReport = {
+          sessionId: data.session_id,
+          publicCode: data.public_code,
+          userReport: data.user_report || "",
+          doctorReport: data.doctor_report || "",
+          supportPlan: data.support_plan || null,
+          homeTasks: json.homeTasks || "",
+          resourceFactors: json.resourceFactors || "",
+          previousPatientReport: json.previousPatientReport || "",
+          previousDoctorReport: json.previousDoctorReport || "",
+          dialogDepth: json.dialogDepth ?? 0,
+          conversationHistory: data.conversation_history || [],
+        };
+      }
+    }
+  }
+
+  return { sessions, latestReport };
+}
+
+async function getUsageBalanceForOwner({ module, ownerId }) {
+  const { getWallet, getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
+  const ownerType = getOwnerType(module);
+  const wallet = await getWallet({ ownerType, ownerId, module });
+  if (!wallet) return { ok: true, visible: false };
+  return await getUsageBalanceForClient({ walletId: wallet.id });
 }
 
 function isValidSessionId(id) {
@@ -51,6 +185,10 @@ export default async function handler(req, res) {
         return await handleGenerateAccessToken(req, res);
       case "createFollowUpSession":
         return await handleCreateFollowUpSession(req, res);
+      case "exchangeContinuationCredential":
+        return await handleExchangeContinuationCredential(req, res);
+      case "regenerateContinuationCredential":
+        return await handleRegenerateContinuationCredential(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -250,6 +388,29 @@ async function handleSave(req, res) {
       }
     }
 
+    // Create owner-level continuation credential on first completed report (cross-device access)
+    let continuationCode = null;
+    const moduleForCredential = sessionModule || "support";
+    if (moduleForCredential === "support" && anonymousOwnerId) {
+      try {
+        const { credential, secret, isNew } = await getOrCreateContinuationCredential({
+          module: moduleForCredential,
+          ownerId: anonymousOwnerId,
+          supabase,
+        });
+        if (credential && (isNew || secret)) {
+          continuationCode = isNew && secret ? `${credential.lookup_code}-${secret}` : null;
+        }
+      } catch (credErr) {
+        if (credErr instanceof ContinuationConfigError) {
+          console.error("handleSave: continuation credential config error", credErr.message);
+        } else {
+          console.error("handleSave: failed to get/create continuation credential", credErr);
+        }
+        // Don't fail the save; credential can be regenerated later.
+      }
+    }
+
     // Return wallet balance if visible
     let usageBalance = null;
     try {
@@ -265,6 +426,7 @@ async function handleSave(req, res) {
       message: "Сессия сохранена. Вы можете продолжить позже.",
       sessionId,
       publicCode,
+      continuation_code: continuationCode,
       organization_id: organizationId,
       primary_expert_id: primaryExpertId,
       access_token: accessToken,
@@ -959,5 +1121,195 @@ async function handleValidateInviteToken(req, res) {
     });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error.message || "Ошибка проверки токена" });
+  }
+}
+
+const EXCHANGE_RATE_LIMIT_ERROR = "Не удалось открыть разговор. Проверьте код продолжения.";
+const LEGACY_CODE_ERROR = "Этот код создан в ранней версии сервиса. Открыть данные без сохранённого доступа невозможно.";
+
+async function handleExchangeContinuationCredential(req, res) {
+  try {
+    const { module: reqModule, continuation_code } = req.body || {};
+
+    if (!SUPPORTED_MODULES.includes(reqModule)) {
+      return res.status(400).json({ ok: false, error: "Invalid module" });
+    }
+
+    const parsed = parseContinuationCredential(continuation_code);
+    if (!parsed) {
+      // Legacy short codes (ТОЧКА-XXXX-XXXX or HEALTH-XXXX-XXX) are never valid alone.
+      if (isLegacyShortCode(continuation_code)) {
+        return res.status(403).json({ ok: false, error: LEGACY_CODE_ERROR });
+      }
+      return res.status(401).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
+    }
+
+    if (parsed.module !== reqModule) {
+      return res.status(401).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
+    }
+
+    const supabase = getSupabase();
+
+    // Anti-abuse: high threshold per IP, independent of credential lock.
+    const abuseLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, prefix: "continuation_abuse:" });
+    const abuseLimited = await abuseLimit(req, res);
+    if (abuseLimited) return;
+
+    // Unified failure limiter keyed by IP + HMAC(lookup_code). It works identically
+    // whether the lookup_code exists in continuation_credentials or not, preventing
+    // enumeration of existing credentials.
+    const clientIp = getClientIp(req);
+    let attemptKey;
+    try {
+      attemptKey = getContinuationAttemptKey(clientIp, parsed.lookupCode);
+    } catch (pepperError) {
+      if (pepperError instanceof ContinuationConfigError) {
+        console.error("handleExchangeContinuationCredential: config error", pepperError.message);
+        return res.status(500).json({ ok: false, error: "Server configuration error" });
+      }
+      throw pepperError;
+    }
+
+    const now = new Date().toISOString();
+    const commonError = { status: 401, data: { ok: false, error: EXCHANGE_RATE_LIMIT_ERROR } };
+
+    // Check existing lock first (before touching the credential row).
+    const { data: existingAttempts } = await supabase
+      .from("continuation_failed_attempts")
+      .select("failed_attempt_count, locked_until")
+      .eq("attempt_key", attemptKey)
+      .maybeSingle();
+
+    if (existingAttempts?.locked_until && existingAttempts.locked_until > now) {
+      return res.status(429).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
+    }
+
+    const { data: credential } = await supabase
+      .from("continuation_credentials")
+      .select("id, module, owner_type, owner_id, lookup_code, secret_hash, secret_version, revoked_at, created_at")
+      .eq("lookup_code", parsed.lookupCode)
+      .maybeSingle();
+
+    const isValid = credential
+      && credential.module === reqModule
+      && !credential.revoked_at
+      && verifyContinuationSecret(parsed.secret, credential.secret_hash);
+
+    if (!isValid) {
+      // Atomically increment failures for this IP + lookup pair. The same RPC is used
+      // regardless of whether the credential exists, so the responses are identical.
+      const { data: incremented, error: incrementError } = await supabase.rpc(
+        "increment_continuation_failed_attempts",
+        { p_attempt_key: attemptKey }
+      );
+
+      if (incrementError) {
+        console.error("handleExchangeContinuationCredential: increment failed", incrementError);
+        return res.status(500).json({ ok: false, error: "Не удалось проверить данные. Попробуйте ещё раз." });
+      }
+
+      if (incremented?.[0]?.locked_until && incremented[0].locked_until > now) {
+        return res.status(429).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
+      }
+
+      return res.status(commonError.status).json(commonError.data);
+    }
+
+    // Success: clear failures for this IP + lookup pair, issue new access token.
+    await supabase.rpc("clear_continuation_failed_attempts", { p_attempt_key: attemptKey });
+
+    let targetQuery = supabase
+      .from(reqModule === "body" ? "body_clients" : "sessions")
+      .select("session_id")
+      .eq("anonymous_owner_id", credential.owner_id);
+
+    if (reqModule !== "body") {
+      targetQuery = targetQuery.eq("module", reqModule);
+    }
+
+    const { data: targetSession } = await targetQuery
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!targetSession?.session_id) {
+      return res.status(404).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
+    }
+
+    const newAccessToken = await generateSessionAccessToken(targetSession.session_id);
+    if (!newAccessToken) {
+      return res.status(500).json({ ok: false, error: "Не удалось создать код доступа. Попробуйте позже." });
+    }
+
+    const cabinet = await buildCabinetData({ module: reqModule, ownerId: credential.owner_id, supabase });
+    const usageBalance = await getUsageBalanceForOwner({ module: reqModule, ownerId: credential.owner_id });
+
+    return res.status(200).json({
+      ok: true,
+      session_id: targetSession.session_id,
+      access_token: newAccessToken,
+      module: reqModule,
+      public_code: cabinet.sessions?.[0]?.publicCode || null,
+      cabinet,
+      usage_balance: usageBalance,
+    });
+  } catch (error) {
+    if (error instanceof ContinuationConfigError) {
+      console.error("handleExchangeContinuationCredential: config error", error.message);
+      return res.status(500).json({ ok: false, error: "Server configuration error" });
+    }
+    console.error("handleExchangeContinuationCredential error", error);
+    return res.status(500).json({ ok: false, error: "Не удалось проверить данные. Попробуйте ещё раз." });
+  }
+}
+
+async function handleRegenerateContinuationCredential(req, res) {
+  try {
+    const { session_id, access_token, module: reqModule } = req.body || {};
+
+    if (!session_id || !access_token) {
+      return res.status(401).json({ ok: false, error: "Требуется код доступа." });
+    }
+
+    const valid = await validateSessionAccess(session_id, access_token);
+    if (!valid) {
+      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
+    }
+
+    const module = reqModule || "support";
+    if (!SUPPORTED_MODULES.includes(module)) {
+      return res.status(400).json({ ok: false, error: "Invalid module" });
+    }
+
+    const supabase = getSupabase();
+    const table = module === "body" ? "body_clients" : "sessions";
+    const { data: session } = await supabase
+      .from(table)
+      .select("anonymous_owner_id, public_code")
+      .eq("session_id", session_id)
+      .maybeSingle();
+
+    if (!session?.anonymous_owner_id) {
+      return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+    }
+
+    const { combinedCode } = await rotateContinuationCredential({
+      module,
+      ownerId: session.anonymous_owner_id,
+      supabase,
+    });
+
+    return res.status(200).json({
+      ok: true,
+      continuation_code: combinedCode,
+      message: "Старый код продолжения больше не действует.",
+    });
+  } catch (error) {
+    if (error instanceof ContinuationConfigError) {
+      console.error("handleRegenerateContinuationCredential: config error", error.message);
+      return res.status(500).json({ ok: false, error: "Server configuration error" });
+    }
+    console.error("handleRegenerateContinuationCredential error", error);
+    return res.status(500).json({ ok: false, error: "Не удалось создать новый код продолжения." });
   }
 }

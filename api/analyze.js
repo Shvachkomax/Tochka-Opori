@@ -6,6 +6,8 @@ import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
 import { debitCreditsForSession, setSessionVisibleAfterCode } from "../lib/usage/debit.js";
+import { getOrCreateContinuationCredential } from "../lib/session/continuation-store.js";
+import { generateSessionAccessToken } from "../lib/security/access-token.js";
 
 function generateBodyCode() {
   const p1 = crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 4);
@@ -367,6 +369,7 @@ function calcBMI(heightCm, weightKg) {
 }
 
 async function trySaveIntake(intake, bmi, careLevel, routerMeta, sessionCode, source = "self_signup", specialistId = null, specialistName = null) {
+  const targetSessionId = sessionCode || intake.session_id || null;
   try {
     const crypto = await import("node:crypto");
     const { getSupabase } = await import("../lib/supabase.js");
@@ -376,7 +379,7 @@ async function trySaveIntake(intake, bmi, careLevel, routerMeta, sessionCode, so
     const payload = {
       module: "body",
       version: "body-intake-v0.1",
-      session_id: sessionCode || intake.session_id || null,
+      session_id: targetSessionId,
       answers,
       bmi: bmi ?? null,
       care_recommendation: careLevel || null,
@@ -397,10 +400,12 @@ async function trySaveIntake(intake, bmi, careLevel, routerMeta, sessionCode, so
     const { data: existingClient } = await supabase
       .from("body_clients")
       .select("anonymous_owner_id")
-      .eq("session_id", sessionCode || intake.session_id)
+      .eq("session_id", targetSessionId)
       .maybeSingle();
 
-    if (existingClient && existingClient.anonymous_owner_id) {
+    let anonymousOwnerId = existingClient?.anonymous_owner_id;
+
+    if (anonymousOwnerId) {
       await supabase.from("body_clients").update({
         display_name: displayName,
         source,
@@ -408,25 +413,26 @@ async function trySaveIntake(intake, bmi, careLevel, routerMeta, sessionCode, so
         specialist_name: specialistName,
         goal,
         updated_at: new Date().toISOString(),
-      }).eq("session_id", sessionCode || intake.session_id);
-      return true;
+      }).eq("session_id", targetSessionId);
+    } else {
+      anonymousOwnerId = crypto.randomUUID();
+      await supabase.from("body_clients").insert({
+        session_id: targetSessionId,
+        anonymous_owner_id: anonymousOwnerId,
+        display_name: displayName,
+        source,
+        specialist_id: specialistId,
+        specialist_name: specialistName,
+        goal,
+        status: "active",
+        updated_at: new Date().toISOString(),
+      });
     }
 
-    await supabase.from("body_clients").insert({
-      session_id: sessionCode || intake.session_id,
-      anonymous_owner_id: crypto.randomUUID(),
-      display_name: displayName,
-      source,
-      specialist_id: specialistId,
-      specialist_name: specialistName,
-      goal,
-      status: "active",
-      updated_at: new Date().toISOString(),
-    });
-    return true;
+    return { success: true, anonymousOwnerId, sessionId: targetSessionId };
   } catch (err) {
     console.log("Body intake DB save skipped:", err.message);
-    return false;
+    return { success: false, anonymousOwnerId: null, sessionId: targetSessionId };
   }
 }
 
@@ -450,9 +456,28 @@ async function handleBodyIntakeAnalysis(req, res, intake) {
   const sessionCode = generateBodyCode();
 
   // Save client record before AI — debit depends on canonical body_clients row
-  const clientSaved = await trySaveIntake(intake, bmi, null, null, sessionCode, source, specialistId, specialistName);
-  if (!clientSaved) {
+  const saveResult = await trySaveIntake(intake, bmi, null, null, sessionCode, source, specialistId, specialistName);
+  if (!saveResult.success) {
     return res.status(500).json({ ok: false, error: "Не удалось сохранить данные. Попробуйте позже." });
+  }
+
+  // Create owner-level continuation credential on first completed intake.
+  let continuationCode = null;
+  let accessToken = null;
+  try {
+    const { getSupabase } = await import("../lib/supabase.js");
+    const supabase = getSupabase();
+    const credentialResult = await getOrCreateContinuationCredential({
+      module: "body",
+      ownerId: saveResult.anonymousOwnerId,
+      supabase,
+    });
+    if (credentialResult.isNew && credentialResult.combinedCode) {
+      continuationCode = credentialResult.combinedCode;
+    }
+    accessToken = await generateSessionAccessToken(sessionCode);
+  } catch (credErr) {
+    console.error("Body intake continuation credential creation failed:", credErr.message);
   }
 
   const DISCLAIMER = "\n\nЭто не диагноз и не медицинское назначение.";
@@ -535,6 +560,8 @@ ${conversationStyle}
       return res.status(200).json({
         ...BODY_FALLBACK_RESPONSE,
         session_id: sessionCode,
+        access_token: accessToken,
+        continuation_code: continuationCode,
         bmi,
         care_recommendation: redFlagCareLevel
           ? { ...BODY_FALLBACK_RESPONSE.care_recommendation, level: redFlagCareLevel }
@@ -569,7 +596,7 @@ ${conversationStyle}
     }
 
     // Save intake with care recommendation — await to confirm code persistence
-    const updated = await trySaveIntake(intake, bmi, careLevel, result, sessionCode, source, specialistId, specialistName);
+    const updated = (await trySaveIntake(intake, bmi, careLevel, result, sessionCode, source, specialistId, specialistName)).success;
 
     try {
       await debitCreditsForSession({
@@ -592,6 +619,8 @@ ${conversationStyle}
     return res.status(200).json({
       type: "intake_analysis",
       session_id: sessionCode,
+      access_token: accessToken,
+      continuation_code: continuationCode,
       user_report: parsed.user_report,
       body_plan: parsed.body_plan || BODY_FALLBACK_RESPONSE.body_plan,
       care_recommendation: safeCareRecommendation,
@@ -612,6 +641,8 @@ ${conversationStyle}
     return res.status(200).json({
       ...BODY_FALLBACK_RESPONSE,
       session_id: sessionCode,
+      access_token: accessToken,
+      continuation_code: continuationCode,
       bmi,
       care_recommendation: redFlagCareLevel
         ? { ...BODY_FALLBACK_RESPONSE.care_recommendation, level: redFlagCareLevel }
