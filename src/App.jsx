@@ -1216,7 +1216,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setJustFinishedSession(false);
 
       // Continue via existing analyze flow
-      await submitRound();
+      await submitRound(followUpText);
     } catch (e) {
       showToast(e.message || "Не удалось начать продолжение", "error");
     } finally {
@@ -1611,8 +1611,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }
 
-  async function submitRound() {
-    if (dialogDepth === 0 && text.trim().length < 10) {
+  async function submitRound(overrideText) {
+    const inputText = overrideText !== undefined ? overrideText : text;
+    if (dialogDepth === 0 && inputText.trim().length < 10) {
       setError("Напишите хотя бы 2–3 предложения.");
       return;
     }
@@ -1627,7 +1628,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text,
+          text: inputText,
           answers: dialogDepth === 0 ? {} : answers,
           conversationHistory,
           depth: dialogDepth,
@@ -1676,7 +1677,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         if (dialogDepth > 0 && sessionId) {
           const pairs = buildConversationPairs(
             [...conversationHistory, { role: "user", answers }],
-            { questions, answers, patient_input: text }
+            { questions, answers, patient_input: inputText }
           );
             if (pairs.length > 0) {
             const pairsBody = withAccessToken({ action: "save_conversation_pairs", sessionId, pairs }, sessionId);
@@ -1709,7 +1710,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           action: "save",
           sessionId: sid,
           module: activeModule,
-          patient_text: text,
+          patient_text: inputText,
           conversationHistory: finalHistory,
           user_report: data.report?.split("===DOCTOR_REPORT===")[0]?.replace("===USER_REPORT===", "").trim() || "",
           doctor_report: data.report?.split("===DOCTOR_REPORT===")[1]?.trim() || "",
@@ -1741,7 +1742,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 saveSupportSession(sid, result.access_token);
               }
               // Also persist conversation pairs for all rounds at final save
-              const finalPairs = buildConversationPairs(finalHistory, { questions, answers, patient_input: text });
+              const finalPairs = buildConversationPairs(finalHistory, { questions, answers, patient_input: inputText });
               if (finalPairs.length > 0) {
                 const pairsBody = withAccessToken({ action: "save_conversation_pairs", sessionId: sid, pairs: finalPairs }, sid);
                 fetch("/api/session", {
@@ -1764,7 +1765,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 module: activeModule,
                 createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
                 environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
-                patient_input: text, questions, answers,
+                patient_input: inputText, questions, answers,
                 ai_result: data.report || "", conversationHistory, dialogDepth,
                 previousPatientReport: previousPatientReport || "",
                 previousDoctorReport: previousDoctorReport || "",
