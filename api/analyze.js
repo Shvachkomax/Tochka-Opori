@@ -6,6 +6,7 @@ import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
 import { debitCreditsForSession, setSessionVisibleAfterCode } from "../lib/usage/debit.js";
+import { ensureWallet, setWalletVisible } from "../lib/usage/wallet.js";
 import { getOrCreateContinuationCredential } from "../lib/session/continuation-store.js";
 import { generateSessionAccessToken } from "../lib/security/access-token.js";
 
@@ -614,6 +615,14 @@ ${conversationStyle}
     // Only make wallet visible after code is confirmed saved
     if (updated) {
       setSessionVisibleAfterCode({ sessionId: sessionCode, module: "body" });
+      try {
+        const wallet = await ensureWallet({ ownerType: "anonymous_profile", ownerId: saveResult.anonymousOwnerId, module: "body" });
+        if (wallet) {
+          await setWalletVisible({ walletId: wallet.id });
+        }
+      } catch (walletErr) {
+        console.error("[wallet] body intake set visible failed:", walletErr.message);
+      }
     }
 
     return res.status(200).json({

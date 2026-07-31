@@ -97,7 +97,7 @@ npm run preview
 - **Security scripts**: `scripts/test-continuation-rate-limit.js`, `scripts/validate-continuation-migration.js`, `scripts/e2e-continuation.js`.
 
 ### Что не сделано
-- Body-кабинет для пользователя: есть exchange endpoint, но UI кабинета здоровья не реализован (дневник привязан к session_id из localStorage).
+- Body-кабинет для пользователя: нет отдельного UI кабинета, но дневник открывается по continuation-коду с сохранением профиля и wallet.
 
 ### Следующий шаг
 1. Запросить подтверждение для деплоя Preview, затем Production.

@@ -404,6 +404,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   // Body diary state
   const [bodyDiarySessionId, setBodyDiarySessionId] = useState(null);
+  const [bodyContinuationInput, setBodyContinuationInput] = useState("");
+  const [bodyContinuationError, setBodyContinuationError] = useState("");
   const [bodyDiaryOpen, setBodyDiaryOpen] = useState(false);
   const [bodyDiaryResult, setBodyDiaryResult] = useState(null);
   const [bodyDiaryHistory, setBodyDiaryHistory] = useState(null);
@@ -2023,6 +2025,32 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }).catch(() => {});
   }
 
+  async function continueBodyByCode() {
+    const code = bodyContinuationInput.trim();
+    if (!code) return;
+    setLoading(true);
+    setBodyContinuationError("");
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "exchangeContinuationCredential", module: "body", continuation_code: code }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Не удалось открыть профиль. Проверьте код продолжения.");
+      }
+      saveBodySession(data.session_id, data.access_token);
+      setBodyDiarySessionId(data.session_id);
+      setBodyDiaryOpen(true);
+      setBodyContinuationInput("");
+    } catch (e) {
+      setBodyContinuationError(e.message || "Не удалось открыть профиль. Проверьте код продолжения.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function loadBodyDiaryHistory() {
     setBodyDiaryHistoryLoading(true);
     const sid = bodyDiarySessionId || bodyIntakeResult?.session_id || localStorage.getItem("body_last_session_id");
@@ -2096,6 +2124,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setRegeneratedCode(null);
     setBodyIntakeStage("idle");
     setBodyIntakeResult(null);
+    setBodyContinuationInput("");
+    setBodyContinuationError("");
     try {
       localStorage.removeItem("body_last_session_id");
       localStorage.removeItem("body_last_result");
@@ -8062,9 +8092,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 <div style={{ display: "flex", gap: 8 }}>
                   <input
                     type="text"
-                    placeholder="HEALTH-XXXX-XXX"
-                    value={bodyDiarySessionId || ""}
-                    onChange={(e) => setBodyDiarySessionId(e.target.value.toUpperCase())}
+                    placeholder="HEALTH-XXXX-XXX-XXXX-XXXX-XXXX"
+                    value={bodyContinuationInput || ""}
+                    onChange={(e) => setBodyContinuationInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => e.key === "Enter" && continueBodyByCode()}
                     style={{
                       flex: 1, height: 44, padding: "0 14px", borderRadius: 12,
                       border: "1px solid #d8cec1", background: "#ffffff",
@@ -8073,16 +8104,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     }}
                   />
                   <button
-                    onClick={() => { if (bodyDiarySessionId) setBodyDiaryOpen(true); }}
+                    onClick={continueBodyByCode}
+                    disabled={loading || !bodyContinuationInput.trim()}
                     style={{
                       height: 44, padding: "0 18px", borderRadius: 12, border: 0,
-                      background: "#7D9A89", color: "#ffffff", fontWeight: 700,
-                      fontSize: 14, cursor: "pointer", whiteSpace: "nowrap",
+                      background: loading ? "#c4d0c6" : "#7D9A89", color: "#ffffff", fontWeight: 700,
+                      fontSize: 14, cursor: loading ? "not-allowed" : "pointer", whiteSpace: "nowrap",
                     }}
                   >
-                    Продолжить
+                    {loading ? "Открытие..." : "Продолжить"}
                   </button>
                 </div>
+                {bodyContinuationError && (
+                  <div style={{ color: "#B85C4A", fontSize: 13, marginTop: 8 }}>{bodyContinuationError}</div>
+                )}
               </div>
             )}
 

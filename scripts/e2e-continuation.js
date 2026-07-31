@@ -4,6 +4,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
+import { generateContinuationCredential, formatContinuationCredential } from "../lib/session/continuation-credential.js";
 
 function loadEnv(path) {
   try {
@@ -177,6 +178,9 @@ async function runHealthE2E() {
   const sessionId = `e2e-health-${Date.now()}`;
   const ownerId = crypto.randomUUID();
 
+  // Generate a proper body credential
+  const generated = generateContinuationCredential("body");
+
   // Insert a body credential directly (simulating first intake completion)
   const { data: credential, error: credError } = await supabase
     .from("continuation_credentials")
@@ -184,8 +188,8 @@ async function runHealthE2E() {
       module: "body",
       owner_type: "anonymous_profile",
       owner_id: ownerId,
-      lookup_code: `E2E-HEALTH-${Date.now()}`,
-      secret_hash: "deadbeef",
+      lookup_code: generated.lookupCode,
+      secret_hash: generated.secretHash,
       secret_version: 1,
     })
     .select("lookup_code")
@@ -200,6 +204,35 @@ async function runHealthE2E() {
     source: "self_signup",
     status: "active",
   });
+
+  // Ensure wallet exists for the owner so usage_balance can be returned
+  const { ensureWallet, setWalletVisible } = await import("../lib/usage/wallet.js");
+  const wallet = await ensureWallet({ ownerType: "anonymous_profile", ownerId, module: "body" });
+  assert(wallet, "wallet created for body owner");
+  await setWalletVisible({ walletId: wallet.id });
+
+  const fullCode = formatContinuationCredential("body", generated.lookupCode, generated.secret);
+
+  // Exchange body code with correct secret
+  const exchangeResult = await invokeSessionHandler({
+    action: "exchangeContinuationCredential",
+    module: "body",
+    continuation_code: fullCode,
+  });
+  assert(exchangeResult.status === 200, "correct body code returns 200");
+  assert(exchangeResult.body.ok === true, "correct body exchange returns ok");
+  assert(exchangeResult.body.session_id === sessionId, "exchange returns the same session_id");
+  assert(exchangeResult.body.access_token, "exchange returns new access_token");
+  assert(exchangeResult.body.usage_balance && exchangeResult.body.usage_balance.visible, "exchange returns usage_balance");
+  assert(!exchangeResult.body.anonymous_owner_id, "exchange does not leak anonymous_owner_id");
+
+  // Use returned access_token to fetch usage balance via handler
+  const usageHandler = (await import("../api/usage.js")).default;
+  const usageReq = mockReq({ action: "getUsageBalance", sessionId: exchangeResult.body.session_id, module: "body", access_token: exchangeResult.body.access_token });
+  const usageRes = mockRes();
+  await usageHandler(usageReq, usageRes);
+  const usageData = usageRes.body;
+  assert(usageData.ok && usageData.visible, "usage balance readable with new access_token");
 
   // Exchange body code (wrong secret)
   const wrongCodeResult = await invokeSessionHandler({

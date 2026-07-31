@@ -43,10 +43,14 @@ async function validateSessionOwnership(sessionId, module, accessToken) {
   if (module === "body") {
     const { data: client } = await supabase
       .from("body_clients")
-      .select("anonymous_owner_id")
+      .select("anonymous_owner_id, legacy_access")
       .eq("session_id", sessionId)
       .maybeSingle();
     if (!client || !client.anonymous_owner_id) return false;
+    if (!client.legacy_access && accessToken) {
+      const valid = await validateSessionAccess(sessionId, accessToken);
+      if (!valid) return false;
+    }
     return true;
   }
   return false;
