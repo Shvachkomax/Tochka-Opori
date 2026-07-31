@@ -7764,7 +7764,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 : "Расскажите, что с вами происходит — голосом или текстом. Сервис поможет мягко разобрать состояние, заметить важные признаки и предложить понятный следующий шаг."}
             </p>
 
-            <div style={{ ...s.row, flexWrap: "wrap" }} className="app-actions">
+            <div style={{ ...s.row, flexWrap: "wrap", alignItems: "center" }} className="app-actions">
               {activeModule !== "body" && (
                 <button style={s.primary} onClick={async () => {
                   try {
