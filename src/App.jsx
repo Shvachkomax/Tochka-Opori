@@ -1657,7 +1657,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 
   async function submitRound(overrideText) {
-    const inputText = overrideText !== undefined ? overrideText : text;
+    const inputText = typeof overrideText === "string" ? overrideText : text;
     if (dialogDepth === 0 && inputText.trim().length < 10) {
       setError("Напишите хотя бы 2–3 предложения.");
       return;
@@ -8610,7 +8610,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   />
                   <button
                     style={s.wide}
-                    onClick={isDedicatedSubdomain ? () => setBodyIntakeStage("filling") : submitRound}
+                    onClick={isDedicatedSubdomain ? () => setBodyIntakeStage("filling") : () => submitRound()}
                     disabled={loading}
                   >
                       {loading
@@ -8679,7 +8679,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   ))}
                   <button
                     style={s.wide}
-                    onClick={submitRound}
+                    onClick={() => submitRound()}
                     disabled={loading}
                   >
                     {loading
