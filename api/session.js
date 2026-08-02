@@ -192,6 +192,8 @@ export default async function handler(req, res) {
         return await handleRegenerateContinuationCredential(req, res);
       case "getReportStatus":
         return await handleGetReportStatus(req, res);
+      case "getBodyCabinet":
+        return await handleGetBodyCabinet(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -1376,5 +1378,88 @@ async function handleGetReportStatus(req, res) {
   } catch (error) {
     console.error("handleGetReportStatus error", error);
     return res.status(500).json({ ok: false, error: error.message || "Ошибка проверки статуса" });
+  }
+}
+
+async function handleGetBodyCabinet(req, res) {
+  try {
+    const { sessionId, accessToken } = req.body || {};
+    if (!sessionId || !accessToken) {
+      return res.status(400).json({ ok: false, error: "Missing sessionId or accessToken" });
+    }
+
+    const supabase = getSupabase();
+
+    const { data: session, error: sessionError } = await supabase
+      .from("body_clients")
+      .select("session_id, anonymous_owner_id, created_at, age, gender, height_cm, weight_kg, target_weight_kg, activity_level, sleep_hours, stress_level")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    if (sessionError || !session) {
+      return res.status(404).json({ ok: false, error: "Сессия не найдена" });
+    }
+
+    const { data: wallet } = await supabase
+      .from("usage_wallets")
+      .select("balance, total_used")
+      .eq("owner_id", session.anonymous_owner_id)
+      .eq("module", "body")
+      .maybeSingle();
+
+    const { data: todayLog } = await supabase
+      .from("body_daily_logs")
+      .select("*")
+      .eq("session_id", sessionId)
+      .eq("log_date", new Date().toISOString().slice(0, 10))
+      .maybeSingle();
+
+    const { data: recentLogs } = await supabase
+      .from("body_daily_logs")
+      .select("log_date, weight_kg, steps, workout_done, energy_level, mood_level, meals_count, plate_photos")
+      .eq("session_id", sessionId)
+      .order("log_date", { ascending: false })
+      .limit(30);
+
+    const { data: credential } = await supabase
+      .from("continuation_credentials")
+      .select("lookup_code")
+      .eq("owner_id", session.anonymous_owner_id)
+      .eq("owner_type", "anonymous_profile")
+      .eq("module", "body")
+      .eq("revoked_at", null)
+      .maybeSingle();
+
+    return res.status(200).json({
+      ok: true,
+      session_id: sessionId,
+      profile: {
+        age: session.age,
+        gender: session.gender,
+        height_cm: session.height_cm,
+        weight_kg: session.weight_kg,
+        target_weight_kg: session.target_weight_kg,
+        activity_level: session.activity_level,
+        sleep_hours: session.sleep_hours,
+        stress_level: session.stress_level,
+      },
+      wallet: wallet ? { balance: wallet.balance, total_used: wallet.total_used } : null,
+      today_log: todayLog || null,
+      history: (recentLogs || []).map((l) => ({
+        date: l.log_date,
+        weight_kg: l.weight_kg,
+        steps: l.steps,
+        workout_done: l.workout_done,
+        energy_level: l.energy_level,
+        mood_level: l.mood_level,
+        meals_count: l.meals_count,
+        has_photos: Array.isArray(l.plate_photos) && l.plate_photos.length > 0,
+      })),
+      has_credential: !!credential,
+      created_at: session.created_at,
+    });
+  } catch (error) {
+    console.error("handleGetBodyCabinet error", error);
+    return res.status(500).json({ ok: false, error: error.message || "Ошибка загрузки кабинета" });
   }
 }

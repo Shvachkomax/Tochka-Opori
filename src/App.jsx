@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, Component } from "react";
 import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback, buildConversationPairs } from "../lib/conversation.js";
 import BodyIntake from "./BodyIntake.jsx";
 import BodyDiary from "./BodyDiary.jsx";
+import HealthCabinet from "./HealthCabinet.jsx";
 import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
 import { saveBodySession, saveSupportSession, getBodySession, getSupportSession, clearBodySession, withAccessToken } from "./lib/sessionAccess.js";
 import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
@@ -127,6 +128,11 @@ export default function App() {
   const [bodyIntakeStage, setBodyIntakeStage] = useState("idle"); // idle | filling | analyzing | result
   const [bodyIntakeResult, setBodyIntakeResult] = useState(null);
   const [bodyIntakeStep, setBodyIntakeStep] = useState(0); // 0=summary, 1=code, 2=plan, 3=cta
+
+  // Body screen state machine
+  const [bodyScreen, setBodyScreen] = useState("landing"); // landing | intake | result | cabinet | diary_edit | diary_result
+  const [bodyCabinetData, setBodyCabinetData] = useState(null);
+  const [bodyCabinetLoading, setBodyCabinetLoading] = useState(false);
 
   // Support Toolkit state
   const [supportPlan, setSupportPlan] = useState(null);
@@ -369,6 +375,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         localStorage.setItem("body_specialist_name", "Алена Жукова");
       }
     } catch (e) {}
+  }, []);
+
+  // Auto-load body cabinet if session exists on mount
+  React.useEffect(() => {
+    if (activeModule === "body" && bodyScreen === "landing") {
+      const saved = getBodySession();
+      if (saved.sessionId && saved.accessToken) {
+        loadBodyCabinet();
+      }
+    }
   }, []);
 
   const [adminReqTab, setAdminReqTab] = useState("reviews");
@@ -1114,6 +1130,70 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }
 
+  async function loadBodyCabinet(enteredCode) {
+    const saved = getBodySession();
+    const accessToken = saved.accessToken;
+
+    setBodyCabinetLoading(true);
+    setBodyContinuationError("");
+    setError("");
+    try {
+      let cabinetData;
+      let effectiveSessionId;
+      let effectiveAccessToken;
+
+      if (accessToken && saved.sessionId) {
+        const body = { action: "getBodyCabinet", sessionId: saved.sessionId, accessToken };
+        const cabinetRes = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        cabinetData = await cabinetRes.json();
+        if (!cabinetRes.ok || !cabinetData.ok) {
+          throw new Error(cabinetData.error || "Не удалось открыть кабинет");
+        }
+        effectiveSessionId = saved.sessionId;
+        effectiveAccessToken = accessToken;
+      } else if (enteredCode) {
+        const exchangeRes = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "exchangeContinuationCredential", module: "body", continuation_code: enteredCode }),
+        });
+        const exchangeData = await exchangeRes.json();
+        if (!exchangeRes.ok || !exchangeData.ok) {
+          throw new Error(exchangeData.error || "Не удалось открыть профиль. Проверьте код продолжения.");
+        }
+        effectiveSessionId = exchangeData.session_id;
+        effectiveAccessToken = exchangeData.access_token;
+        saveBodySession(effectiveSessionId, effectiveAccessToken);
+
+        const cabinetRes = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "getBodyCabinet", sessionId: effectiveSessionId, accessToken: effectiveAccessToken }),
+        });
+        cabinetData = await cabinetRes.json();
+        if (!cabinetRes.ok || !cabinetData.ok) {
+          throw new Error(cabinetData.error || "Не удалось загрузить кабинет");
+        }
+      } else {
+        setBodyCabinetLoading(false);
+        return;
+      }
+
+      setBodyCabinetData(cabinetData);
+      setBodyDiarySessionId(effectiveSessionId);
+      setBodyScreen("cabinet");
+    } catch (e) {
+      setBodyContinuationError(e.message || "Не удалось открыть профиль. Проверьте код продолжения.");
+      showToast(e.message || "Не удалось открыть профиль.", "error");
+    } finally {
+      setBodyCabinetLoading(false);
+    }
+  }
+
   async function regenerateSupportContinuationCode() {
     const saved = getSupportSession();
     if (!saved.sessionId || !saved.accessToken) {
@@ -1133,6 +1213,32 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       }
       setRegeneratedCode(data.continuation_code);
       setContinuationCode(null);
+    } catch (e) {
+      showToast(e.message || "Не удалось создать новый код продолжения", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function regenerateBodyContinuationCode() {
+    const saved = getBodySession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("Нужен код доступа к профилю.", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "regenerateContinuationCredential", module: "body", session_id: saved.sessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Не удалось создать новый код продолжения");
+      }
+      // Reload cabinet to show new code
+      await loadBodyCabinet();
     } catch (e) {
       showToast(e.message || "Не удалось создать новый код продолжения", "error");
     } finally {
@@ -2077,6 +2183,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setBodyIntakeResult(response);
     setBodyIntakeStage("result");
     setBodyIntakeStep(0);
+    setBodyScreen("result");
     try {
       const sid = response?.session_id || "";
       localStorage.setItem("body_last_session_id", sid);
@@ -2103,27 +2210,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function continueBodyByCode() {
     const code = bodyContinuationInput.trim();
     if (!code) return;
-    setLoading(true);
-    setBodyContinuationError("");
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "exchangeContinuationCredential", module: "body", continuation_code: code }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Не удалось открыть профиль. Проверьте код продолжения.");
-      }
-      saveBodySession(data.session_id, data.access_token);
-      setBodyDiarySessionId(data.session_id);
-      setBodyDiaryOpen(true);
-      setBodyContinuationInput("");
-    } catch (e) {
-      setBodyContinuationError(e.message || "Не удалось открыть профиль. Проверьте код продолжения.");
-    } finally {
-      setLoading(false);
-    }
+    await loadBodyCabinet(code);
+    setBodyContinuationInput("");
   }
 
   async function loadBodyDiaryHistory() {
@@ -8469,6 +8557,22 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </section>
           )}
 
+          {/* Health Cabinet */}
+          {activeModule === "body" && bodyScreen === "cabinet" && bodyCabinetData && (
+            <HealthCabinet
+              sessionId={bodyDiarySessionId}
+              accessToken={getBodySession().accessToken}
+              profile={bodyCabinetData.profile}
+              wallet={bodyCabinetData.wallet}
+              todayLog={bodyCabinetData.today_log}
+              history={bodyCabinetData.history}
+              onNewDiary={() => { setBodyScreen("diary_edit"); setBodyDiaryOpen(true); }}
+              onViewDiary={(log) => { setBodyDiaryResult(log); setBodyScreen("diary_result"); }}
+              onLogout={() => { clearBodySession(); setBodyScreen("landing"); setBodyCabinetData(null); setBodyDiarySessionId(null); }}
+              onRotateCode={regenerateBodyContinuationCode}
+            />
+          )}
+
           {/* Body diary form */}
           {bodyDiaryOpen && bodyDiarySessionId && (
             <BodyDiary
@@ -8591,7 +8695,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           )}
 
           {/* Default support card / body card before intake */}
-          {!(activeModule === "body" && (bodyIntakeStage !== "idle" || bodyDiaryOpen || bodyDiaryResult)) && phase !== "cabinet" && phase !== "followup" && (
+          {!(activeModule === "body" && (bodyIntakeStage !== "idle" || bodyDiaryOpen || bodyDiaryResult || bodyScreen === "cabinet")) && phase !== "cabinet" && phase !== "followup" && (
           <section style={s.card} className="app-card">
             <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif" }}>
               {phase === "questions"
