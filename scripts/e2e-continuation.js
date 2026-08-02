@@ -245,6 +245,148 @@ async function runHealthE2E() {
   console.log("Health E2E passed");
 }
 
+async function runBodyRotationE2E() {
+  console.log("\n--- Body Rotation E2E ---");
+
+  const sessionId = `e2e-body-rot-${Date.now()}`;
+  const ownerId = crypto.randomUUID();
+
+  // Create credential and body_clients row
+  const generated = generateContinuationCredential("body");
+  const { data: credential } = await supabase
+    .from("continuation_credentials")
+    .insert({
+      module: "body",
+      owner_type: "anonymous_profile",
+      owner_id: ownerId,
+      lookup_code: generated.lookupCode,
+      secret_hash: generated.secretHash,
+      secret_version: 1,
+    })
+    .select("id, lookup_code")
+    .single();
+
+  assert(credential, "credential created");
+
+  await supabase.from("body_clients").insert({
+    session_id: sessionId,
+    anonymous_owner_id: ownerId,
+    source: "self_signup",
+    status: "active",
+  });
+
+  // Also create a sessions row so validateSessionAccess works
+  await supabase.from("sessions").insert({
+    session_id: sessionId,
+    module: "body",
+    anonymous_owner_id: ownerId,
+    public_code: `E2E-${Date.now()}`,
+    patient_text: "",
+    conversation_history: [],
+    json_data: {},
+    legacy_access: false,
+  });
+
+  // Generate access token for the session
+  const { generateSessionAccessToken } = await import("../lib/security/access-token.js");
+  const accessToken = await generateSessionAccessToken(sessionId, {
+    module: "body",
+    anonymousOwnerId: ownerId,
+    publicCode: `E2E-${Date.now()}`,
+  });
+  assert(accessToken, "access token generated");
+
+  // Ensure wallet
+  const { ensureWallet, setWalletVisible } = await import("../lib/usage/wallet.js");
+  const wallet = await ensureWallet({ ownerType: "anonymous_profile", ownerId, module: "body" });
+  assert(wallet, "wallet created");
+  await setWalletVisible({ walletId: wallet.id });
+
+  const oldCode = formatContinuationCredential("body", generated.lookupCode, generated.secret);
+
+  // A. Exchange old code → 200
+  const exchange1 = await invokeSessionHandler({
+    action: "exchangeContinuationCredential",
+    module: "body",
+    continuation_code: oldCode,
+  });
+  assert(exchange1.status === 200, "A: exchange old code → 200");
+
+  // B. Rotate with valid access token → 200
+  const rotateResult = await invokeSessionHandler({
+    action: "regenerateContinuationCredential",
+    module: "body",
+    session_id: sessionId,
+    access_token: accessToken,
+  });
+  assert(rotateResult.status === 200, "B: rotate → 200");
+  assert(rotateResult.body.continuation_code, "B: rotation returns continuation_code");
+
+  const newCode = rotateResult.body.continuation_code;
+
+  // C. Exchange old code → 401 (rejected)
+  const exchangeOld = await invokeSessionHandler({
+    action: "exchangeContinuationCredential",
+    module: "body",
+    continuation_code: oldCode,
+  });
+  assert(exchangeOld.status === 401, "C: old code rejected after rotation");
+
+  // D. Exchange new code → 200
+  const exchangeNew = await invokeSessionHandler({
+    action: "exchangeContinuationCredential",
+    module: "body",
+    continuation_code: newCode,
+  });
+  assert(exchangeNew.status === 200, "D: new code works after rotation");
+
+  // E. Owner fingerprint matches
+  assert(exchangeNew.body.session_id === sessionId, "E: same session_id returned");
+
+  // F. Credential count for owner = 1
+  const { count } = await supabase
+    .from("continuation_credentials")
+    .select("*", { count: "exact", head: true })
+    .eq("owner_type", "anonymous_profile")
+    .eq("owner_id", ownerId);
+  assert(count === 1, `F: exactly 1 credential for owner (got ${count})`);
+
+  // G. Balance unchanged (wallet was created with default balance)
+  const { data: walletAfter } = await supabase
+    .from("usage_wallets")
+    .select("balance")
+    .eq("owner_id", ownerId)
+    .eq("module", "body")
+    .maybeSingle();
+  assert(walletAfter?.balance === wallet.balance, "G: balance unchanged");
+
+  // H. Parallel rotation safety — second rotate should still produce exactly 1 credential
+  const rotate2 = await invokeSessionHandler({
+    action: "regenerateContinuationCredential",
+    module: "body",
+    session_id: sessionId,
+    access_token: accessToken,
+  });
+  assert(rotate2.status === 200, "H: second rotation succeeds");
+
+  const { count: countAfter2 } = await supabase
+    .from("continuation_credentials")
+    .select("*", { count: "exact", head: true })
+    .eq("owner_type", "anonymous_profile")
+    .eq("owner_id", ownerId);
+  assert(countAfter2 === 1, `H: still 1 credential after second rotation (got ${countAfter2})`);
+
+  // I. Third rotation's code works
+  const exchangeThird = await invokeSessionHandler({
+    action: "exchangeContinuationCredential",
+    module: "body",
+    continuation_code: rotate2.body.continuation_code,
+  });
+  assert(exchangeThird.status === 200, "I: third rotation code works");
+
+  console.log("Body Rotation E2E passed");
+}
+
 import crypto from "crypto";
 
 (async () => {
@@ -252,6 +394,7 @@ import crypto from "crypto";
   try {
     await runSupportE2E();
     await runHealthE2E();
+    await runBodyRotationE2E();
     console.log("\n=== All continuation E2E tests passed ===");
   } finally {
     await cleanup();

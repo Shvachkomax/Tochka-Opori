@@ -16,6 +16,7 @@ import {
 import {
   getOrCreateContinuationCredential,
   rotateContinuationCredential,
+  fingerprint,
 } from "../lib/session/continuation-store.js";
 import { createReportArtifacts, REPORT_STATUS } from "../lib/report/finalize.js";
 
@@ -1195,12 +1196,22 @@ async function handleExchangeContinuationCredential(req, res) {
       .eq("lookup_code", parsed.lookupCode)
       .maybeSingle();
 
-    const isValid = credential
+    const credentialFound = !!credential;
+    const secretValid = credential
       && credential.module === reqModule
       && !credential.revoked_at
       && verifyContinuationSecret(parsed.secret, credential.secret_hash);
 
-    if (!isValid) {
+    if (!secretValid) {
+      console.log("[exchange]", JSON.stringify({
+        action: "exchange",
+        lookup_fingerprint: fingerprint(parsed.lookupCode),
+        credential_id_fingerprint: credential ? fingerprint(credential.id) : "none",
+        credential_found: credentialFound,
+        secret_valid: false,
+        response_status: 401,
+      }));
+
       // Atomically increment failures for this IP + lookup pair. The same RPC is used
       // regardless of whether the credential exists, so the responses are identical.
       const { data: incremented, error: incrementError } = await supabase.rpc(
@@ -1259,6 +1270,18 @@ async function handleExchangeContinuationCredential(req, res) {
       return res.status(500).json({ ok: false, error: "Не удалось создать код доступа. Попробуйте позже." });
     }
 
+    console.log("[exchange]", JSON.stringify({
+      action: "exchange",
+      lookup_fingerprint: fingerprint(parsed.lookupCode),
+      credential_id_fingerprint: fingerprint(credential.id),
+      owner_fingerprint: fingerprint(credential.owner_id),
+      target_session_fingerprint: fingerprint(targetSession.session_id),
+      secret_version: credential.secret_version,
+      credential_found: true,
+      secret_valid: true,
+      response_status: 200,
+    }));
+
     return res.status(200).json({
       ok: true,
       session_id: targetSession.session_id,
@@ -1312,15 +1335,26 @@ async function handleRegenerateContinuationCredential(req, res) {
       return res.status(404).json({ ok: false, error: "Сессия не найдена." });
     }
 
-    const { combinedCode } = await rotateContinuationCredential({
+    const rotationResult = await rotateContinuationCredential({
       module,
       ownerId: session.anonymous_owner_id,
       supabase,
     });
 
+    console.log("[rotate]", JSON.stringify({
+      action: "rotate",
+      credential_id_fingerprint: rotationResult.credentialIdFingerprint,
+      owner_fingerprint: fingerprint(session.anonymous_owner_id),
+      old_lookup_fingerprint: rotationResult.oldLookupFingerprint,
+      new_lookup_fingerprint: rotationResult.newLookupFingerprint,
+      old_secret_version: (rotationResult.secretVersion || 1) - 1,
+      new_secret_version: rotationResult.secretVersion,
+      old_lookup_still_exists: false,
+    }));
+
     return res.status(200).json({
       ok: true,
-      continuation_code: combinedCode,
+      continuation_code: rotationResult.combinedCode,
       message: "Старый код продолжения больше не действует.",
     });
   } catch (error) {
