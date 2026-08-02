@@ -1666,6 +1666,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setLoading(true);
     setError("");
     setQuestions(null);
+    if (dialogDepth >= 3 && activeModule === "support") {
+      setLoadingMessage("Готовим отчёт…");
+      setTimeout(() => {
+        if (loading) setLoadingMessage("Подготовка занимает больше времени, чем обычно.");
+      }, 40000);
+    } else {
+      setLoadingMessage("");
+    }
 
     try {
       const mod = activeModule || "support";
@@ -1733,6 +1741,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             }).catch(() => {});
           }
         }
+      } else if (data.type === "processing") {
+        // Backend is still generating the report. Start polling.
+        const sid = sessionId || `session-${Date.now()}`;
+        if (!sessionId) setSessionId(sid);
+        setLoadingMessage("Отчёт ещё формируется. Подождите немного.");
+        await pollReportStatus(sid, (status) => finalizeReportFromStatus(status, inputText));
       } else if (data.type === "final") {
         setResult(data.report || "");
         if (data._debug) setDebugInfo(data._debug);
@@ -1745,113 +1759,170 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         const sid = sessionId || `session-${Date.now()}`;
         if (!sessionId) setSessionId(sid);
 
-        // Save session to Supabase (works on localhost and Vercel)
+        // Backend now saves the report durably. Use tokens/codes from the response.
+        if (data.public_code) setPublicCode(data.public_code);
+        if (data.access_token) saveSupportSession(sid, data.access_token);
+        if (data.continuation_code) setContinuationCode(data.continuation_code);
+
+        // Persist conversation pairs for all rounds (best-effort).
         const finalHistory = [
           ...conversationHistory,
           ...(dialogDepth > 0 ? [{ role: "user", answers }] : []),
         ];
+        const finalPairs = buildConversationPairs(finalHistory, { questions, answers, patient_input: inputText });
+        if (finalPairs.length > 0) {
+          const pairsBody = withAccessToken({ action: "save_conversation_pairs", sessionId: sid, pairs: finalPairs }, sid);
+          fetch("/api/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pairsBody),
+          }).catch(() => {});
+        }
 
-        const saveSessionBody = withAccessToken({
-          action: "save",
-          sessionId: sid,
+        // Save case review (local + Supabase)
+        const review = {
+          case_id: sid, sessionId: sid, publicCode: data.public_code || publicCode || "",
           module: activeModule,
-          patient_text: inputText,
-          conversationHistory: finalHistory,
-          user_report: data.report?.split("===DOCTOR_REPORT===")[0]?.replace("===USER_REPORT===", "").trim() || "",
-          doctor_report: data.report?.split("===DOCTOR_REPORT===")[1]?.trim() || "",
-          riskLevel: null,
-          supportPlan: supportPlan,
-          dialogDepth,
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+          environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
+          patient_input: inputText, questions, answers,
+          ai_result: data.report || "", conversationHistory, dialogDepth,
           previousPatientReport: previousPatientReport || "",
           previousDoctorReport: previousDoctorReport || "",
-          homeTasks: homeTasks || "",
-          resourceFactors: resourceFactors || "",
-          questions,
-          answers,
-          voiceObservations: voiceObservations || null,
-          _debug: data._debug || null,
-          care_recommendation: data.care_recommendation || null,
-          invite_token: inviteToken,
-        }, sid);
-
-        fetch("/api/session", {
+          homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
+          patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
+          doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
+          voice_observations: voiceObservations || null,
+          expert_id: expertData?.id || null,
+          expert_name: expertData?.name || null,
+          expert_role: expertData?.role || null,
+          expert_specialty: expertData?.specialty || null,
+        };
+        fetch("/api/reviews", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(saveSessionBody),
-        })
-          .then((r) => r.json())
-          .then((result) => {
-            if (result.ok) {
-              // Save access_token for future requests
-              if (result.access_token) {
-                saveSupportSession(sid, result.access_token);
-              }
-              // Also persist conversation pairs for all rounds at final save
-              const finalPairs = buildConversationPairs(finalHistory, { questions, answers, patient_input: inputText });
-              if (finalPairs.length > 0) {
-                const pairsBody = withAccessToken({ action: "save_conversation_pairs", sessionId: sid, pairs: finalPairs }, sid);
-                fetch("/api/session", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(pairsBody),
-                }).catch(() => {});
-              }
-              const code = result.publicCode || publicCode || "";
-              if (result.publicCode && !publicCode) {
-                setPublicCode(result.publicCode);
-              }
-              if (result.continuation_code) {
-                setContinuationCode(result.continuation_code);
-              }
-              if (result.usage_balance && result.usage_balance.visible) {
-                setUsageBalance({ ...result.usage_balance, module: "support" });
-              }
-              if (result.message) showToast(result.message);
-              // Save case review (local + Supabase)
-              const review = {
-                case_id: sid, sessionId: sid, publicCode: code,
-                module: activeModule,
-                createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-                environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
-                patient_input: inputText, questions, answers,
-                ai_result: data.report || "", conversationHistory, dialogDepth,
-                previousPatientReport: previousPatientReport || "",
-                previousDoctorReport: previousDoctorReport || "",
-                homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
-                patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
-                doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
-                voice_observations: voiceObservations || null,
-                expert_id: expertData?.id || null,
-                expert_name: expertData?.name || null,
-                expert_role: expertData?.role || null,
-                expert_specialty: expertData?.specialty || null,
-              };
-              fetch("/api/reviews", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "save", ...review }),
-              }).catch(() => {});
-            } else {
-              showToast(result.error || "Ошибка сохранения сессии", "error");
-            }
-          })
-          .catch(() => {
-            showToast("Не удалось сохранить сессию. Код продолжения может не сохраниться.", "error");
-          });
+          body: JSON.stringify({ action: "save", ...review }),
+        }).catch(() => {});
       } else {
         throw new Error("Неизвестный тип ответа");
       }
     } catch (e) {
       const msg = e.message || "";
       if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("abort")) {
-        setError("Не удалось сформировать отчёт. Проверьте соединение и попробуйте ещё раз.");
+        // Connection dropped — check backend status before giving up.
+        await attemptReportRecovery(sid || sessionId, inputText, data?.report);
       } else {
         setError("Не удалось сформировать отчёт. Попробуйте ещё раз.");
       }
     } finally {
       setLoading(false);
+      setLoadingMessage("");
     }
   }
+
+  async function getReportStatus(sessionId) {
+    const res = await fetch("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "getReportStatus", sessionId }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  }
+
+  async function pollReportStatus(sessionId, onReady) {
+    let attempts = 0;
+    const maxAttempts = 60; // ~60 seconds
+    while (attempts < maxAttempts) {
+      const status = await getReportStatus(sessionId);
+      if (!status) {
+        await new Promise((r) => setTimeout(r, 1000));
+        attempts += 1;
+        continue;
+      }
+      if (status.status === "ready" && status.type === "final") {
+        onReady(status);
+        return;
+      }
+      if (status.status === "failed") {
+        setError(status.message || "Не удалось сформировать отчёт. Попробуйте ещё раз.");
+        setLoading(false);
+        return;
+      }
+      // processing or not_started
+      await new Promise((r) => setTimeout(r, 1000));
+      attempts += 1;
+    }
+    setError("Отчёт ещё формируется. Попробуйте обновить страницу через минуту.");
+    setLoading(false);
+  }
+
+  async function attemptReportRecovery(sessionId, inputText, fallbackReport) {
+    if (!sessionId) {
+      setError("Не удалось сформировать отчёт. Проверьте соединение и попробуйте ещё раз.");
+      return;
+    }
+    setLoading(true);
+    setError("Соединение прервалось. Проверяем, сохранился ли отчёт…");
+    const status = await getReportStatus(sessionId);
+    if (!status) {
+      setError("Не удалось проверить статус отчёта. Попробуйте ещё раз.");
+      setLoading(false);
+      return;
+    }
+    if (status.status === "ready" && status.type === "final") {
+      finalizeReportFromStatus(status, inputText);
+      return;
+    }
+    if (status.status === "processing" || status.status === "not_started") {
+      setError("");
+      setLoadingMessage("Отчёт ещё формируется. Подождите немного.");
+      await pollReportStatus(sessionId, (readyStatus) => finalizeReportFromStatus(readyStatus, inputText));
+      return;
+    }
+    setError(status.message || "Не удалось сформировать отчёт. Попробуйте ещё раз.");
+    setLoading(false);
+  }
+
+  function finalizeReportFromStatus(status, inputText) {
+    setResult(status.report || "");
+    if (status.care_recommendation) setCareRecommendation(status.care_recommendation);
+    setActiveTab("user");
+    setReportSource("generated");
+    setJustFinishedSession(true);
+    setPhase("report");
+    if (status.public_code) setPublicCode(status.public_code);
+    if (status.access_token) saveSupportSession(status.session_id, status.access_token);
+    if (status.continuation_code) setContinuationCode(status.continuation_code);
+    setSessionId(status.session_id);
+    setLoading(false);
+    // Save review
+    const review = {
+      case_id: status.session_id, sessionId: status.session_id, publicCode: status.public_code || "",
+      module: activeModule,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
+      patient_input: inputText, questions, answers,
+      ai_result: status.report || "", conversationHistory, dialogDepth,
+      previousPatientReport: previousPatientReport || "",
+      previousDoctorReport: previousDoctorReport || "",
+      homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
+      patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
+      doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
+      voice_observations: voiceObservations || null,
+      expert_id: expertData?.id || null,
+      expert_name: expertData?.name || null,
+      expert_role: expertData?.role || null,
+      expert_specialty: expertData?.specialty || null,
+    };
+    fetch("/api/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save", ...review }),
+    }).catch(() => {});
+  }
+
+  const [loadingMessage, setLoadingMessage] = useState("");
 
   function fallbackQ() {
     return [
@@ -8614,7 +8685,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     disabled={loading}
                   >
                       {loading
-                      ? "Формируем вопросы..."
+                      ? loadingMessage || "Формируем вопросы..."
                       : isDedicatedSubdomain ? "Перейти к анкете" : "Начать разбор"}
                   </button>
                 </>
@@ -8683,7 +8754,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     disabled={loading}
                   >
                     {loading
-                      ? "Анализируем..."
+                      ? loadingMessage || "Анализируем..."
                       : dialogDepth < 3
                         ? "Продолжить уточнение"
                         : "Получить предварительный отчёт"}

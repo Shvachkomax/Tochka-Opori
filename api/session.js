@@ -17,6 +17,7 @@ import {
   getOrCreateContinuationCredential,
   rotateContinuationCredential,
 } from "../lib/session/continuation-store.js";
+import { createReportArtifacts, REPORT_STATUS } from "../lib/report/finalize.js";
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -189,6 +190,8 @@ export default async function handler(req, res) {
         return await handleExchangeContinuationCredential(req, res);
       case "regenerateContinuationCredential":
         return await handleRegenerateContinuationCredential(req, res);
+      case "getReportStatus":
+        return await handleGetReportStatus(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -1311,5 +1314,67 @@ async function handleRegenerateContinuationCredential(req, res) {
     }
     console.error("handleRegenerateContinuationCredential error", error);
     return res.status(500).json({ ok: false, error: "Не удалось создать новый код продолжения." });
+  }
+}
+
+async function handleGetReportStatus(req, res) {
+  try {
+    const { sessionId, reportRequestId } = req.body || {};
+    if (!sessionId || !isValidSessionId(sessionId)) {
+      return res.status(400).json({ ok: false, error: "Missing sessionId" });
+    }
+
+    const supabase = getSupabase();
+    const { data: session, error } = await supabase
+      .from("sessions")
+      .select("session_id, module, anonymous_owner_id, public_code, report_generation_status, report_request_id, user_report, doctor_report, care_recommendation, access_token_hash, json_data")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("handleGetReportStatus: SELECT error", error);
+      return res.status(500).json({ ok: false, error: "База данных временно недоступна." });
+    }
+    if (!session) {
+      return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+    }
+
+    const status = session.report_generation_status;
+    const response = {
+      ok: true,
+      session_id: session.session_id,
+      status: status || "not_started",
+      report_request_id: session.report_request_id || null,
+    };
+
+    if (status === REPORT_STATUS.READY) {
+      const artifacts = await createReportArtifacts({
+        supabase,
+        sessionId,
+        module: session.module || "support",
+        anonymousOwnerId: session.anonymous_owner_id,
+      });
+      const userPart = session.user_report || "";
+      const doctorPart = session.doctor_report || "";
+      const report = userPart.includes("===USER_REPORT===")
+        ? userPart
+        : `===USER_REPORT===\n\n${userPart}\n\n===DOCTOR_REPORT===\n\n${doctorPart}`;
+      response.type = "final";
+      response.report = report;
+      response.care_recommendation = session.care_recommendation || null;
+      response.public_code = session.public_code;
+      response.access_token = artifacts.accessToken;
+      response.continuation_code = artifacts.continuationCode;
+    } else if (status === REPORT_STATUS.PROCESSING) {
+      response.message = "Отчёт ещё формируется. Подождите немного.";
+    } else if (status === REPORT_STATUS.FAILED) {
+      response.message = "Не удалось сформировать отчёт. Попробуйте ещё раз.";
+      response.error_code = session.report_error_code || null;
+    }
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error("handleGetReportStatus error", error);
+    return res.status(500).json({ ok: false, error: error.message || "Ошибка проверки статуса" });
   }
 }
