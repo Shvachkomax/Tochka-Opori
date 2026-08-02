@@ -98,6 +98,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
   const [plateAnalysis, setPlateAnalysis] = useState([]);
   const [plateAnalysisLoading, setPlateAnalysisLoading] = useState(false);
   const [plateAnalysisError, setPlateAnalysisError] = useState("");
+  const plateAnalysisRequestRef = useRef(null);
   const [usageBalance, setUsageBalance] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -235,6 +236,8 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
   }
 
   async function analyzePlatePhotos() {
+    const requestId = `plate-${Date.now()}`;
+    plateAnalysisRequestRef.current = requestId;
     setPlateAnalysisLoading(true);
     setPlateAnalysisError("");
     try {
@@ -251,6 +254,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
           stage: "plate_photo_analysis",
           session_id: sessionId,
           photos: photos.map(p => p.dataUrl),
+          request_id: requestId,
         }),
       });
 
@@ -265,20 +269,36 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
             stage: "plate_photo_analysis",
             session_id: sessionId,
             photos: photos.map(p => p.dataUrl),
+            request_id: requestId,
           }),
         });
       }
 
+      if (plateAnalysisRequestRef.current !== requestId) return;
+
       const data = await res.json();
       if (data.ok && Array.isArray(data.results)) {
-        setPlateAnalysis(data.results);
+        const hasAnySuccess = data.results.some(r => !r.error);
+        if (hasAnySuccess) {
+          setPlateAnalysis(data.results);
+        } else {
+          const firstError = data.results.find(r => r.error);
+          setPlateAnalysisError(firstError?.error || "Не удалось проанализировать фото.");
+        }
+      } else if (res.status === 402) {
+        setPlateAnalysisError("Недостаточно средств для анализа.");
+      } else if (res.status === 401) {
+        setPlateAnalysisError("Сессия истекла. Войдите снова по коду продолжения.");
       } else {
         setPlateAnalysisError("Не удалось проанализировать фото.");
       }
     } catch {
+      if (plateAnalysisRequestRef.current !== requestId) return;
       setPlateAnalysisError("Ошибка при анализе фото. Попробуйте ещё раз.");
     } finally {
-      setPlateAnalysisLoading(false);
+      if (plateAnalysisRequestRef.current === requestId) {
+        setPlateAnalysisLoading(false);
+      }
     }
   }
 
@@ -661,7 +681,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
               🔍 Проанализировать тарелку
             </button>
           )}
-          {photos.length > 0 && plateAnalysis.length > 0 && (
+          {photos.length > 0 && plateAnalysis.length > 0 && !plateAnalysisLoading && (
             <button type="button" onClick={analyzePlatePhotos} style={{
               padding: "10px 18px", borderRadius: 12, border: "1px solid #d8cec1",
               background: "#ffffff", cursor: "pointer", fontSize: 14, color: "#2f2925",
@@ -674,7 +694,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
         {plateAnalysisLoading && (
           <div style={{ fontSize: 14, color: "#7D9A89", marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ display: "inline-block", width: 16, height: 16, border: "2px solid #7D9A89", borderRadius: "50%", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
-            Смотрим состав тарелки…
+            Анализируем фотографию…
           </div>
         )}
         {plateAnalysisError && (

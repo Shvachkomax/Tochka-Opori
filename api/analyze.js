@@ -1038,6 +1038,7 @@ async function handlePlatePhotoAnalysis(req, res) {
   const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
 
   const results = [];
+  const successfullyAnalyzed = [];
 
   for (let i = 0; i < photos.length; i++) {
     const photo = photos[i];
@@ -1048,7 +1049,18 @@ async function handlePlatePhotoAnalysis(req, res) {
       results.push({
         photo_index: i,
         photo_name: photoName,
-        error: "Не удалось обработать фото",
+        error: "Не удалось прочитать изображение. Попробуйте другое фото.",
+        confidence: "unclear",
+      });
+      continue;
+    }
+
+    const sizeCheck = dataUrl.length * 0.75;
+    if (sizeCheck > 10 * 1024 * 1024) {
+      results.push({
+        photo_index: i,
+        photo_name: photoName,
+        error: "Фото слишком большое. Выберите файл меньшего размера.",
         confidence: "unclear",
       });
       continue;
@@ -1073,7 +1085,7 @@ async function handlePlatePhotoAnalysis(req, res) {
       const parsed = result.parsed;
 
       if (parsed && parsed.plate_components) {
-        results.push({
+        const entry = {
           photo_index: i,
           photo_name: photoName,
           detected_foods: parsed.detected_foods || [],
@@ -1082,37 +1094,42 @@ async function handlePlatePhotoAnalysis(req, res) {
           what_is_missing: parsed.what_is_missing || [],
           gentle_suggestion: parsed.gentle_suggestion || "",
           confidence: parsed.confidence || "medium",
-        });
+        };
+        results.push(entry);
+        successfullyAnalyzed.push(entry);
       } else {
         results.push({
           photo_index: i,
           photo_name: photoName,
-          error: "Не удалось проанализировать состав",
-          balance_summary: "Не удалось определить состав тарелки по фото.",
+          error: "Не удалось прочитать изображение. Попробуйте другое фото.",
           confidence: "unclear",
         });
       }
     } catch (err) {
       console.error(`Plate photo ${i} analysis error:`, err.message);
+      const isRateLimit = /rate.?limit|429|quota/i.test(err.message);
+      const isModelUnavailable = /model.*unavailable|overloaded|5\d\d/i.test(err.message);
+      let errorMsg = "Сервис анализа временно недоступен. Попробуйте позже.";
+      if (isRateLimit) errorMsg = "Сервис анализа временно перегружен. Попробуйте позже.";
+      else if (isModelUnavailable) errorMsg = "Сервис анализа временно недоступен. Попробуйте позже.";
+
       results.push({
         photo_index: i,
         photo_name: photoName,
-        error: "Ошибка анализа",
-        balance_summary: "Не удалось обработать фото. Попробуйте ещё раз.",
+        error: errorMsg,
         confidence: "unclear",
       });
     }
   }
 
-  const analyzedCount = results.filter(r => !r.error).length;
-  if (analyzedCount > 0) {
+  if (successfullyAnalyzed.length > 0) {
     try {
       await debitCreditsForSession({
         sessionId: session_id,
         module: "body",
         resourceType: "plate_analysis",
         requestId: `plate-${session_id}-${Date.now()}`,
-        imageCount: analyzedCount,
+        imageCount: successfullyAnalyzed.length,
       });
     } catch (e) {
       console.error("[credits] plate_analysis debit failed:", e.message);
@@ -1124,7 +1141,7 @@ async function handlePlatePhotoAnalysis(req, res) {
     session_id,
     results,
     total_photos: photos.length,
-    analyzed: analyzedCount,
+    analyzed: successfullyAnalyzed.length,
   });
 }
 
