@@ -624,7 +624,11 @@ async function handleBodyIntakeAnalysis(req, res, intake) {
     if (credentialResult.isNew && credentialResult.combinedCode) {
       continuationCode = credentialResult.combinedCode;
     }
-    accessToken = await generateSessionAccessToken(sessionCode);
+    accessToken = await generateSessionAccessToken(sessionCode, {
+      module: "body",
+      anonymousOwnerId: saveResult.anonymousOwnerId,
+      publicCode: continuationCode,
+    });
   } catch (credErr) {
     console.error("Body intake continuation credential creation failed:", credErr.message);
   }

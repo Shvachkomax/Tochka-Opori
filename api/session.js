@@ -1241,13 +1241,17 @@ async function handleExchangeContinuationCredential(req, res) {
       return res.status(404).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
     }
 
-    const newAccessToken = await generateSessionAccessToken(targetSession.session_id);
+    const cabinet = await buildCabinetData({ module: reqModule, ownerId: credential.owner_id, supabase });
+    const usageBalance = await getUsageBalanceForOwner({ module: reqModule, ownerId: credential.owner_id });
+
+    const newAccessToken = await generateSessionAccessToken(targetSession.session_id, {
+      module: reqModule,
+      anonymousOwnerId: credential.owner_id,
+      publicCode: cabinet.sessions?.[0]?.publicCode || null,
+    });
     if (!newAccessToken) {
       return res.status(500).json({ ok: false, error: "Не удалось создать код доступа. Попробуйте позже." });
     }
-
-    const cabinet = await buildCabinetData({ module: reqModule, ownerId: credential.owner_id, supabase });
-    const usageBalance = await getUsageBalanceForOwner({ module: reqModule, ownerId: credential.owner_id });
 
     return res.status(200).json({
       ok: true,

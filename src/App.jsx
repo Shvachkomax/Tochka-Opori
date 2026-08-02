@@ -1425,6 +1425,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
     try {
       await ensureStartSession();
+      const currentSession = sessionRef.current;
+      if (!currentSession?.sessionId || !currentSession?.accessToken) {
+        setVoiceError("Сессия истекла. Войдите снова по коду продолжения.");
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const recorder = new MediaRecorder(stream);
@@ -1450,20 +1455,25 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           const mod = "support";
           let token;
           try { token = await getClientToken(mod, "transcribe"); } catch {}
-          const tHeaders = { "Content-Type": "audio/webm" };
+          const tHeaders = {
+            "Content-Type": "audio/webm",
+            "X-Session-Id": currentSession.sessionId,
+            "X-Module": "support",
+            "X-Access-Token": currentSession.accessToken,
+          };
           if (token) tHeaders["Authorization"] = `Bearer ${token}`;
 
-          let response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionRef.current?.sessionId || "")}&module=support`, {
+          let response = await fetch("/api/transcribe", {
             method: "POST",
             headers: tHeaders,
             body: audioBlob,
           });
 
-          // Retry once on 401
+          // Retry once on 401 (client token only)
           if (response.status === 401 && token) {
             try { token = await getClientToken(mod, "transcribe"); } catch {}
             tHeaders["Authorization"] = `Bearer ${token}`;
-            response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionRef.current?.sessionId || "")}&module=support`, {
+            response = await fetch("/api/transcribe", {
               method: "POST",
               headers: tHeaders,
               body: audioBlob,
@@ -1544,6 +1554,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
     try {
       await ensureStartSession();
+      const currentSession = sessionRef.current;
+      if (!currentSession?.sessionId || !currentSession?.accessToken) {
+        setVoiceError("Сессия истекла. Войдите снова по коду продолжения.");
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const recorder = new MediaRecorder(stream);
@@ -1573,10 +1588,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           const mod = "support";
           let token;
           try { token = await getClientToken(mod, "transcribe"); } catch {}
-          const tHeaders = { "Content-Type": "audio/webm" };
+          const tHeaders = {
+            "Content-Type": "audio/webm",
+            "X-Session-Id": currentSession.sessionId,
+            "X-Module": "support",
+            "X-Access-Token": currentSession.accessToken,
+          };
           if (token) tHeaders["Authorization"] = `Bearer ${token}`;
 
-          let response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionRef.current?.sessionId || "")}&module=support`, {
+          let response = await fetch("/api/transcribe", {
             method: "POST",
             headers: tHeaders,
             body: audioBlob,
@@ -1585,7 +1605,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           if (response.status === 401 && token) {
             try { token = await getClientToken(mod, "transcribe"); } catch {}
             tHeaders["Authorization"] = `Bearer ${token}`;
-            response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionRef.current?.sessionId || "")}&module=support`, {
+            response = await fetch("/api/transcribe", {
               method: "POST",
               headers: tHeaders,
               body: audioBlob,
@@ -1667,6 +1687,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
     try {
       await ensureStartSession().catch(() => {});
+      const currentSession = sessionRef.current;
+      if (!currentSession?.sessionId || !currentSession?.accessToken) {
+        setCrisisVoiceError("Сессия истекла. Войдите снова по коду продолжения.");
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const recorder = new MediaRecorder(stream);
@@ -1696,10 +1721,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           const mod = "support";
           let token;
           try { token = await getClientToken(mod, "transcribe"); } catch {}
-          const tHeaders = { "Content-Type": "audio/webm" };
+          const tHeaders = {
+            "Content-Type": "audio/webm",
+            "X-Session-Id": currentSession.sessionId,
+            "X-Module": "support",
+            "X-Access-Token": currentSession.accessToken,
+          };
           if (token) tHeaders["Authorization"] = `Bearer ${token}`;
 
-          let response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionRef.current?.sessionId || "")}&module=support`, {
+          let response = await fetch("/api/transcribe", {
             method: "POST",
             headers: tHeaders,
             body: audioBlob,
@@ -1708,7 +1738,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           if (response.status === 401 && token) {
             try { token = await getClientToken(mod, "transcribe"); } catch {}
             tHeaders["Authorization"] = `Bearer ${token}`;
-            response = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionRef.current?.sessionId || "")}&module=support`, {
+            response = await fetch("/api/transcribe", {
               method: "POST",
               headers: tHeaders,
               body: audioBlob,
@@ -2292,6 +2322,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setRegeneratedCode(null);
     setBodyIntakeStage("idle");
     setBodyIntakeResult(null);
+    setBodyScreen("landing");
+    setBodyCabinetData(null);
+    setBodyDiarySessionId(null);
     setBodyContinuationInput("");
     setBodyContinuationError("");
     try {
@@ -8300,7 +8333,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </button>
               <button
                 style={activeModule === "body" ? s.primary : s.secondary}
-                onClick={() => { setActiveModule("body"); setBodyIntakeStage("idle"); setBodyIntakeResult(null); }}
+                onClick={() => { setActiveModule("body"); setBodyIntakeStage("idle"); setBodyIntakeResult(null); setBodyScreen("landing"); }}
               >
                 Здоровье & Стройность
               </button>
@@ -8328,21 +8361,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           </section>
 
           {/* Body intake form */}
-          {activeModule === "body" && bodyIntakeStage === "filling" && (
+          {activeModule === "body" && bodyScreen === "intake" && (
             <BodyIntake onComplete={handleBodyIntakeComplete} />
           )}
 
-          {/* Body intake analyzing */}
-          {activeModule === "body" && bodyIntakeStage === "analyzing" && (
-            <section style={s.card} className="app-card">
-              <div style={{ textAlign: "center", padding: "60px 20px" }}>
-                <div style={{ fontSize: 18, color: "#665c52" }}>Анализируем ваши данные...</div>
-              </div>
-            </section>
-          )}
-
           {/* Body intake result — step-by-step flow */}
-          {activeModule === "body" && bodyIntakeStage === "result" && bodyIntakeResult && (
+          {activeModule === "body" && bodyScreen === "result" && bodyIntakeResult && (
             <section style={s.card} className="app-card">
 
               {/* Step 1: Summary */}
@@ -8481,26 +8505,23 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </>
               )}
 
-              {/* Step 4: CTA to diary */}
+              {/* Step 4: CTA to cabinet */}
               {bodyIntakeStep === 3 && (
                 <>
                   <div style={{ textAlign: "center", padding: "20px 0" }}>
                     <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 12, color: "#2f2925" }}>
-                      Готовы записать первый день?
+                      Готовы продолжить?
                     </div>
                     <div style={{ color: "#665c52", fontSize: 15, lineHeight: 1.6, marginBottom: 28 }}>
-                      Откройте дневник, чтобы начать наблюдение — записать вес, шаги, питание и самочувствие.
+                      В личном кабинете можно вести дневник, смотреть историю и управлять доступом.
                     </div>
-                    <button onClick={() => {
-                      const sid = bodyIntakeResult?.session_id;
-                      if (sid) { setBodyDiarySessionId(sid); setBodyDiaryOpen(true); }
-                    }} style={{
+                    <button onClick={() => { loadBodyCabinet(); }} style={{
                       width: "100%", height: 52, borderRadius: 16, border: 0,
                       background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", marginBottom: 12, fontFamily: "inherit",
                     }}>
-                      Начать дневник
+                      Перейти в личный кабинет
                     </button>
-                    <button onClick={() => { setBodyIntakeStage("idle"); setBodyIntakeResult(null); setMode(""); }} style={{
+                    <button onClick={() => { setBodyIntakeStage("idle"); setBodyIntakeResult(null); setBodyScreen("landing"); setMode(""); }} style={{
                       width: "100%", height: 48, borderRadius: 14, border: "1px solid #d8cec1",
                       background: "#ede7dc", color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
                     }}>
@@ -8571,7 +8592,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               wallet={bodyCabinetData.wallet}
               todayLog={bodyCabinetData.today_log}
               history={bodyCabinetData.history}
-              onNewDiary={() => { setBodyScreen("diary_edit"); setBodyDiarySessionId(bodyDiarySessionId); setBodyDiaryOpen(true); }}
+              onNewDiary={() => { setBodyScreen("diary_edit"); }}
               onViewDiary={(log) => { setBodyDiaryResult(log); setBodyScreen("diary_result"); }}
               onLogout={() => { clearBodySession(); setBodyScreen("landing"); setBodyCabinetData(null); setBodyDiarySessionId(null); }}
               onRotateCode={regenerateBodyContinuationCode}
@@ -8579,20 +8600,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           )}
 
           {/* Body diary form */}
-          {bodyDiaryOpen && bodyDiarySessionId && (
+          {activeModule === "body" && bodyScreen === "diary_edit" && bodyDiarySessionId && (
             <BodyDiary
               sessionId={bodyDiarySessionId}
-              onComplete={(result) => {
-                setBodyDiaryResult(result);
-                setBodyDiaryOpen(false);
+              onComplete={async (result) => {
+                await loadBodyCabinet();
                 showToast("Дневник сохранён", "success");
               }}
-              onCancel={() => setBodyDiaryOpen(false)}
+              onCancel={() => setBodyScreen("cabinet")}
             />
           )}
 
           {/* Body diary result */}
-          {bodyDiaryResult && !bodyDiaryOpen && (
+          {activeModule === "body" && bodyScreen === "diary_result" && bodyDiaryResult && (
             <section style={s.card} className="app-card">
               <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, color: "#2f2925" }}>
                 Итог дня
@@ -8611,23 +8631,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </div>
               )}
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button onClick={() => { setBodyDiaryOpen(true); }} style={{
+                <button onClick={() => { setBodyScreen("diary_edit"); }} style={{
                   padding: "12px 20px", borderRadius: 20, background: "#7D9A89",
                   color: "#fff", fontWeight: 700, border: 0, cursor: "pointer", flex: 1, minWidth: 160,
                 }}>
                   Записать ещё день
                 </button>
-                <button onClick={loadBodyDiaryHistory} style={{
-                  padding: "12px 20px", borderRadius: 20, background: "#ffffff",
-                  color: "#5f574f", fontWeight: 600, border: "1px solid #d8cec1", cursor: "pointer", flex: 1, minWidth: 160,
-                }}>
-                  {bodyDiaryHistoryLoading ? "Загрузка..." : "Мои прошлые дни"}
-                </button>
-                <button onClick={() => { setBodyDiaryResult(null); }} style={{
+                <button onClick={() => { setBodyScreen("cabinet"); }} style={{
                   padding: "12px 20px", borderRadius: 20, background: "#ede7dc",
                   color: "#2f2925", fontWeight: 600, border: "1px solid #d8cec1", cursor: "pointer",
                 }}>
-                  Закрыть
+                  В кабинет
                 </button>
               </div>
             </section>
@@ -8717,7 +8731,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
             )}
 
-            {activeModule === "body" && localStorage.getItem("body_referral_source") === "alena_client" && bodyIntakeStage === "idle" && (
+            {activeModule === "body" && localStorage.getItem("body_referral_source") === "alena_client" && bodyScreen === "landing" && (
               <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "#e8f0ea", border: "1px solid #c4d0c6" }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "#2f2925", marginBottom: 2 }}>
                   Вы заполняете анкету по направлению
@@ -8728,11 +8742,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
             )}
 
-            {activeModule === "body" && savedBodyResult && bodyIntakeStage === "idle" && (
+            {activeModule === "body" && savedBodyResult && bodyScreen === "landing" && (
               <div style={{ marginTop: 16 }}>
                 <button onClick={() => {
                   setBodyIntakeResult(savedBodyResult);
                   setBodyIntakeStage("result");
+                  setBodyScreen("result");
                   setBodyIntakeStep(0);
                 }} style={{
                   padding: "14px 22px", borderRadius: 20, background: "#7D9A89",
@@ -8795,7 +8810,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   />
                   <button
                     style={s.wide}
-                    onClick={isDedicatedSubdomain ? () => setBodyIntakeStage("filling") : () => submitRound()}
+                    onClick={isDedicatedSubdomain ? () => { setBodyIntakeStage("filling"); setBodyScreen("intake"); } : () => submitRound()}
                     disabled={loading}
                   >
                       {loading

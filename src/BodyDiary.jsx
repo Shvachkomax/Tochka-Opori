@@ -132,6 +132,14 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
   }, [sessionId]);
 
   const startRecording = useCallback(async () => {
+    setSubmitError("");
+
+    const saved = getBodySession();
+    if (saved.sessionId !== sessionId || !saved.accessToken) {
+      setSubmitError("Сессия истекла. Войдите снова по коду продолжения.");
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream);
@@ -145,12 +153,15 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
         try {
           let token;
           try { token = await getClientToken("body", "transcribe"); } catch {}
-          const tHeaders = { "Content-Type": "audio/webm" };
+          const tHeaders = {
+            "Content-Type": "audio/webm",
+            "X-Session-Id": sessionId,
+            "X-Module": "body",
+            "X-Access-Token": saved.accessToken,
+          };
           if (token) tHeaders["Authorization"] = `Bearer ${token}`;
 
-          const { accessToken } = getBodySession();
-          const accessTokenParam = accessToken ? `&access_token=${encodeURIComponent(accessToken)}` : "";
-          let res = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=body${accessTokenParam}`, {
+          let res = await fetch("/api/transcribe", {
             method: "POST",
             headers: tHeaders,
             body: blob,
@@ -159,7 +170,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
           if (res.status === 401 && token) {
             try { token = await getClientToken("body", "transcribe"); } catch {}
             tHeaders["Authorization"] = `Bearer ${token}`;
-            res = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=body${accessTokenParam}`, {
+            res = await fetch("/api/transcribe", {
               method: "POST",
               headers: tHeaders,
               body: blob,
@@ -170,7 +181,11 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
           const text = await res.text();
           try { data = JSON.parse(text); } catch { data = null; }
           if (!res.ok || !data || !data.text) {
-            setSubmitError("Не удалось расшифровать запись. Можно написать день текстом.");
+            if (res.status === 403) {
+              setSubmitError("Сессия истекла. Войдите снова по коду продолжения.");
+            } else {
+              setSubmitError("Не удалось расшифровать запись. Можно написать день текстом.");
+            }
             return;
           }
           setVoiceTranscript(data.text);
@@ -187,7 +202,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
     } catch (e) {
       console.error("Mic error:", e);
     }
-  }, []);
+  }, [sessionId]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {

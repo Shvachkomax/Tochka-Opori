@@ -26,33 +26,68 @@ async function readRequestBody(req) {
 
 async function validateSessionOwnership(sessionId, module, accessToken) {
   const supabase = getSupabase();
+  let check = {
+    module,
+    session_exists: false,
+    has_owner: false,
+    legacy_access: false,
+    access_token_present: !!accessToken,
+    validate_access_result: null,
+  };
+
   if (module === "support") {
     const { data: session } = await supabase
       .from("sessions")
       .select("session_id, anonymous_owner_id, legacy_access")
       .eq("session_id", sessionId)
       .maybeSingle();
-    if (!session || !session.anonymous_owner_id) return false;
-    // For continuations with access tokens
-    if (!session.legacy_access && accessToken) {
+    check.session_exists = !!session;
+    check.has_owner = !!session?.anonymous_owner_id;
+    check.legacy_access = !!session?.legacy_access;
+    if (!session || !session.anonymous_owner_id) {
+      console.log("[transcribe] session ownership check:", check);
+      return false;
+    }
+    if (!session.legacy_access) {
+      if (!accessToken) {
+        console.log("[transcribe] session ownership check:", check);
+        return false;
+      }
       const valid = await validateSessionAccess(session.session_id, accessToken);
+      check.validate_access_result = valid;
+      console.log("[transcribe] session ownership check:", check);
       if (!valid) return false;
     }
     return true;
   }
+
   if (module === "body") {
     const { data: client } = await supabase
       .from("body_clients")
       .select("anonymous_owner_id, legacy_access")
       .eq("session_id", sessionId)
       .maybeSingle();
-    if (!client || !client.anonymous_owner_id) return false;
-    if (!client.legacy_access && accessToken) {
+    check.session_exists = !!client;
+    check.has_owner = !!client?.anonymous_owner_id;
+    check.legacy_access = !!client?.legacy_access;
+    if (!client || !client.anonymous_owner_id) {
+      console.log("[transcribe] session ownership check:", check);
+      return false;
+    }
+    if (!client.legacy_access) {
+      if (!accessToken) {
+        console.log("[transcribe] session ownership check:", check);
+        return false;
+      }
       const valid = await validateSessionAccess(sessionId, accessToken);
+      check.validate_access_result = valid;
+      console.log("[transcribe] session ownership check:", check);
       if (!valid) return false;
     }
     return true;
   }
+
+  console.log("[transcribe] session ownership check:", check);
   return false;
 }
 
