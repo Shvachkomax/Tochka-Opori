@@ -98,6 +98,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
   const [plateAnalysis, setPlateAnalysis] = useState([]);
   const [plateAnalysisLoading, setPlateAnalysisLoading] = useState(false);
   const [plateAnalysisError, setPlateAnalysisError] = useState("");
+  const [heicWarning, setHeicWarning] = useState("");
   const plateAnalysisRequestRef = useRef(null);
   const [usageBalance, setUsageBalance] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -199,9 +200,15 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
 
   function handlePhotoUpload(e) {
     setPlateAnalysis([]);
+    setHeicWarning("");
     const files = Array.from(e.target.files || []);
+    const heicFiles = files.filter(f => /\.(heic|heif)$/i.test(f.name));
+    if (heicFiles.length > 0) {
+      setHeicWarning("Формат HEIC пока не поддерживается. Сохраните фотографию в формате JPG, PNG или WebP и загрузите ещё раз.");
+    }
+    const supportedFiles = files.filter(f => !/\.(heic|heif)$/i.test(f.name));
     const remaining = 6 - photos.length;
-    const toAdd = files.slice(0, remaining);
+    const toAdd = supportedFiles.slice(0, remaining);
     toAdd.forEach(file => {
       const reader = new FileReader();
       reader.onload = (ev) => {
@@ -700,6 +707,11 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
         {plateAnalysisError && (
           <div style={{ color: "#b5473f", fontSize: 13, marginTop: 10 }}>
             {plateAnalysisError}
+          </div>
+        )}
+        {heicWarning && (
+          <div style={{ color: "#b5473f", fontSize: 13, marginTop: 10 }}>
+            {heicWarning}
           </div>
         )}
         {plateAnalysis.length > 0 && (

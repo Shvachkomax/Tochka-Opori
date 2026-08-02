@@ -1055,6 +1055,16 @@ async function handlePlatePhotoAnalysis(req, res) {
       continue;
     }
 
+    if (/^data:image\/heic/i.test(dataUrl) || /^data:image\/heif/i.test(dataUrl)) {
+      results.push({
+        photo_index: i,
+        photo_name: photoName,
+        error: "Формат HEIC пока не поддерживается. Сохраните фотографию в формате JPG, PNG или WebP и загрузите ещё раз.",
+        confidence: "unclear",
+      });
+      continue;
+    }
+
     const sizeCheck = dataUrl.length * 0.75;
     if (sizeCheck > 10 * 1024 * 1024) {
       results.push({
