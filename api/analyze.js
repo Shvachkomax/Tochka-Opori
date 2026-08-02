@@ -1561,9 +1561,11 @@ ${antiRepeatBlock}
 
   // Final Report Reliability Pass: durable save and idempotency.
   // Check status before calling the model to avoid double AI calls and double debits.
+  let sessionLookupMs = 0;
   if (isFinalReport) {
     finalSupabase = getSupabase();
     finalReportRequestId = getStableReportRequestId(session_id, depth);
+    const tSessionLookup = Date.now();
     try {
       finalSession = await getOrCreateSessionForAnalyze({
         supabase: finalSupabase,
@@ -1578,6 +1580,7 @@ ${antiRepeatBlock}
       console.error("[analyze] getOrCreateSessionForAnalyze failed", err.message);
       return res.status(500).json({ error: "Не удалось подготовить сессию для отчёта." });
     }
+    sessionLookupMs = Date.now() - tSessionLookup;
 
     const statusCheck = await checkReportStatus(finalSupabase, session_id, finalReportRequestId);
     if (statusCheck.status === "ready") {
@@ -1829,6 +1832,7 @@ ${antiRepeatBlock}
       };
 
       // 1. Durable save first.
+      const tStep0 = Date.now();
       const saved = await saveFinalReportToSession({
         supabase,
         sessionId: session_id,
@@ -1840,6 +1844,7 @@ ${antiRepeatBlock}
         completedAt: new Date().toISOString(),
         extraJsonData,
       });
+      const saveReportMs = Date.now() - tStep0;
 
       if (!saved) {
         await setReportStatus(supabase, session_id, {
@@ -1854,14 +1859,17 @@ ${antiRepeatBlock}
       }
 
       // 2. Create access token and continuation credential AFTER save.
+      const tStep1 = Date.now();
       const artifacts = await createReportArtifacts({
         supabase,
         sessionId: session_id,
         module: activeModule,
         anonymousOwnerId: session.anonymous_owner_id,
       });
+      const credentialCreationMs = Date.now() - tStep1;
 
       // 3. Debit only after durable save.
+      const tStep2 = Date.now();
       const debitResult = await debitCreditsForSession({
         sessionId: session_id,
         module: activeModule,
@@ -1872,6 +1880,7 @@ ${antiRepeatBlock}
         inputTokens: result.input_tokens ?? null,
         outputTokens: result.output_tokens ?? null,
       });
+      const usageDebitMs = Date.now() - tStep2;
 
       if (!debitResult.charged) {
         console.error("[analyze] final report debit failed", debitResult);
@@ -1882,6 +1891,9 @@ ${antiRepeatBlock}
         stage: "response_sent",
         session: sessionIdHash,
         total_elapsed_ms: t2 - t0,
+        save_report_ms: saveReportMs,
+        credential_creation_ms: credentialCreationMs,
+        usage_debit_ms: usageDebitMs,
         report_request_id: reportRequestId,
         debit_charged: debitResult.charged,
       }));
@@ -1899,6 +1911,12 @@ ${antiRepeatBlock}
         accessToken: artifacts.accessToken,
         continuationCode: artifacts.continuationCode,
         debugInfo,
+        timing: {
+          session_lookup_ms: sessionLookupMs,
+          save_report_ms: saveReportMs,
+          credential_creation_ms: credentialCreationMs,
+          usage_debit_ms: usageDebitMs,
+        },
       });
       return res.status(200).json(responsePayload);
     }
