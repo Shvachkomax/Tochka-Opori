@@ -1811,6 +1811,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("abort")) {
         // Connection dropped — check backend status before giving up.
         await attemptReportRecovery(sid || sessionId, inputText, data?.report);
+      } else if (dialogDepth < 3 || activeModule !== "support") {
+        setError("Не удалось начать разбор. Попробуйте ещё раз.");
       } else {
         setError("Не удалось сформировать отчёт. Попробуйте ещё раз.");
       }
