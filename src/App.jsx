@@ -3439,7 +3439,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     ? window.location.pathname === "/admin/body" ? "body" : window.location.pathname === "/admin/council" ? "council" : "support"
     : "support");
   const isDedicatedSubdomain = typeof window !== "undefined" && (
-    window.location.hostname === "health.tochka-opori.online" || window.location.hostname.startsWith("health.")
+    window.location.hostname === "health.tochka-opori.online" || window.location.hostname.startsWith("health.") ||
+    new URLSearchParams(window.location.search).get("module") === "body"
   );
   const isDev = typeof window !== "undefined" && (
     window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || import.meta.env?.DEV
