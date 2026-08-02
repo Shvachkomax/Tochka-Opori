@@ -387,6 +387,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }, []);
 
+  // Clear body errors when screen changes
+  React.useEffect(() => {
+    setBodyContinuationError("");
+    setPlateAnalysisError("");
+  }, [bodyScreen]);
+
   const [adminReqTab, setAdminReqTab] = useState("reviews");
   const [adminRequests, setAdminRequests] = useState([]);
   const [adminReqFilter, setAdminReqFilter] = useState("pending");
@@ -8695,7 +8701,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           )}
 
           {/* Default support card / body card before intake */}
-          {!(activeModule === "body" && (bodyIntakeStage !== "idle" || bodyDiaryOpen || bodyDiaryResult || bodyScreen === "cabinet")) && phase !== "cabinet" && phase !== "followup" && (
+          {!(activeModule === "body" && bodyScreen !== "landing") && phase !== "cabinet" && phase !== "followup" && (
           <section style={s.card} className="app-card">
             <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif" }}>
               {phase === "questions"

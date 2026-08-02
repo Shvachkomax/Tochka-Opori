@@ -440,11 +440,6 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
 
       <h2 style={s.heading}>Дневник дня</h2>
       <p style={s.subheading}>Отметьте, как прошёл день. Не нужно идеально — нам важна честная картина.</p>
-      {sessionId && (
-        <div style={{ fontSize: 13, color: "#8d8378", marginBottom: 20, fontFamily: "monospace" }}>
-          Код: {sessionId}
-        </div>
-      )}
 
       {/* Date + body measurements */}
       <div style={s.section}>
