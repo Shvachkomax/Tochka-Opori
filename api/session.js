@@ -1298,12 +1298,16 @@ async function handleRegenerateContinuationCredential(req, res) {
 
     const supabase = getSupabase();
     const table = module === "body" ? "body_clients" : "sessions";
-    const { data: session } = await supabase
+    const { data: session, error: sessionError } = await supabase
       .from(table)
-      .select("anonymous_owner_id, public_code")
+      .select("anonymous_owner_id")
       .eq("session_id", session_id)
       .maybeSingle();
 
+    if (sessionError) {
+      console.error("[handleRegenerateContinuationCredential] session lookup failed:", sessionError.code, "module:", module);
+      return res.status(500).json({ ok: false, error: "Не удалось проверить сессию. Попробуйте позже." });
+    }
     if (!session?.anonymous_owner_id) {
       return res.status(404).json({ ok: false, error: "Сессия не найдена." });
     }
@@ -1324,7 +1328,7 @@ async function handleRegenerateContinuationCredential(req, res) {
       console.error("handleRegenerateContinuationCredential: config error", error.message);
       return res.status(500).json({ ok: false, error: "Server configuration error" });
     }
-    console.error("handleRegenerateContinuationCredential error", error);
+    console.error("handleRegenerateContinuationCredential error:", error.message);
     return res.status(500).json({ ok: false, error: "Не удалось создать новый код продолжения." });
   }
 }
