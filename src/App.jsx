@@ -8515,7 +8515,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     <div style={{ color: "#665c52", fontSize: 15, lineHeight: 1.6, marginBottom: 28 }}>
                       В личном кабинете можно вести дневник, смотреть историю и управлять доступом.
                     </div>
-                    <button onClick={() => { loadBodyCabinet(); }} style={{
+                    <button onClick={() => { loadBodyCabinet(bodyIntakeResult?.continuation_code); }} style={{
                       width: "100%", height: 52, borderRadius: 16, border: 0,
                       background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", marginBottom: 12, fontFamily: "inherit",
                     }}>

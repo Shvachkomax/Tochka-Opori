@@ -1223,8 +1223,9 @@ async function handleExchangeContinuationCredential(req, res) {
     // Success: clear failures for this IP + lookup pair, issue new access token.
     await supabase.rpc("clear_continuation_failed_attempts", { p_attempt_key: attemptKey });
 
+    const targetTable = reqModule === "body" ? "body_clients" : "sessions";
     let targetQuery = supabase
-      .from(reqModule === "body" ? "body_clients" : "sessions")
+      .from(targetTable)
       .select("session_id")
       .eq("anonymous_owner_id", credential.owner_id);
 
@@ -1232,12 +1233,17 @@ async function handleExchangeContinuationCredential(req, res) {
       targetQuery = targetQuery.eq("module", reqModule);
     }
 
-    const { data: targetSession } = await targetQuery
+    const { data: targetSession, error: targetError } = await targetQuery
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
+    if (targetError) {
+      console.error("[handleExchangeContinuationCredential] target query error:", targetError.code, "table:", targetTable);
+      return res.status(500).json({ ok: false, error: "Не удалось открыть профиль. Попробуйте позже." });
+    }
     if (!targetSession?.session_id) {
+      console.log("[handleExchangeContinuationCredential] target_session_found:", false, "owner_found:", true);
       return res.status(404).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
     }
 
@@ -1394,23 +1400,57 @@ async function handleGetBodyCabinet(req, res) {
 
     const supabase = getSupabase();
 
-    const { data: session, error: sessionError } = await supabase
+    // 1. Look up body_clients — only real columns
+    const { data: client, error: clientError } = await supabase
       .from("body_clients")
-      .select("session_id, anonymous_owner_id, created_at, age, gender, height_cm, weight_kg, target_weight_kg, activity_level, sleep_hours, stress_level")
+      .select("session_id, anonymous_owner_id, display_name, goal, created_at")
       .eq("session_id", sessionId)
       .maybeSingle();
 
-    if (sessionError || !session) {
+    if (clientError) {
+      console.error("[handleGetBodyCabinet] body_clients query error:", clientError.code, clientError.message);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить кабинет" });
+    }
+    if (!client) {
       return res.status(404).json({ ok: false, error: "Сессия не найдена" });
     }
 
+    // 2. Validate access token against sessions table
+    const valid = await validateSessionAccess(sessionId, accessToken);
+    if (!valid) {
+      return res.status(403).json({ ok: false, error: "Сессия истекла. Войдите снова по коду продолжения." });
+    }
+
+    // 3. Get profile from body_intake_forms (answers jsonb)
+    const { data: intakeForm } = await supabase
+      .from("body_intake_forms")
+      .select("answers, bmi, care_recommendation, created_at")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const answers = intakeForm?.answers || {};
+    const profile = {
+      age: answers.age || null,
+      gender: answers.sex || null,
+      height_cm: answers.height_cm || null,
+      weight_kg: answers.weight_kg || null,
+      target_weight_kg: answers.target_weight_kg || null,
+      activity_level: answers.work_activity_level || answers.daily_steps_estimate || null,
+      sleep_hours: answers.sleep_hours_estimate || null,
+      stress_level: answers.stress_level || null,
+    };
+
+    // 4. Wallet
     const { data: wallet } = await supabase
       .from("usage_wallets")
       .select("balance, total_used")
-      .eq("owner_id", session.anonymous_owner_id)
+      .eq("owner_id", client.anonymous_owner_id)
       .eq("module", "body")
       .maybeSingle();
 
+    // 5. Today's diary log
     const { data: todayLog } = await supabase
       .from("body_daily_logs")
       .select("*")
@@ -1418,6 +1458,7 @@ async function handleGetBodyCabinet(req, res) {
       .eq("log_date", new Date().toISOString().slice(0, 10))
       .maybeSingle();
 
+    // 6. Recent diary history
     const { data: recentLogs } = await supabase
       .from("body_daily_logs")
       .select("log_date, weight_kg, steps, workout_done, energy_level, mood_level, meals_count, plate_photos")
@@ -1425,10 +1466,11 @@ async function handleGetBodyCabinet(req, res) {
       .order("log_date", { ascending: false })
       .limit(30);
 
+    // 7. Credential existence (for code rotation UI)
     const { data: credential } = await supabase
       .from("continuation_credentials")
       .select("lookup_code")
-      .eq("owner_id", session.anonymous_owner_id)
+      .eq("owner_id", client.anonymous_owner_id)
       .eq("owner_type", "anonymous_profile")
       .eq("module", "body")
       .eq("revoked_at", null)
@@ -1437,16 +1479,7 @@ async function handleGetBodyCabinet(req, res) {
     return res.status(200).json({
       ok: true,
       session_id: sessionId,
-      profile: {
-        age: session.age,
-        gender: session.gender,
-        height_cm: session.height_cm,
-        weight_kg: session.weight_kg,
-        target_weight_kg: session.target_weight_kg,
-        activity_level: session.activity_level,
-        sleep_hours: session.sleep_hours,
-        stress_level: session.stress_level,
-      },
+      profile,
       wallet: wallet ? { balance: wallet.balance, total_used: wallet.total_used } : null,
       today_log: todayLog || null,
       history: (recentLogs || []).map((l) => ({
@@ -1460,7 +1493,7 @@ async function handleGetBodyCabinet(req, res) {
         has_photos: Array.isArray(l.plate_photos) && l.plate_photos.length > 0,
       })),
       has_credential: !!credential,
-      created_at: session.created_at,
+      created_at: client.created_at,
     });
   } catch (error) {
     console.error("handleGetBodyCabinet error", error);
