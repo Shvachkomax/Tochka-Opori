@@ -1431,10 +1431,15 @@ async function handleGetReportStatus(req, res) {
 
 async function handleGetBodyCabinet(req, res) {
   try {
-    const { sessionId, accessToken } = req.body || {};
+    const { sessionId, accessToken, clientToday } = req.body || {};
     if (!sessionId || !accessToken) {
       return res.status(400).json({ ok: false, error: "Missing sessionId or accessToken" });
     }
+
+    // Validate clientToday format (YYYY-MM-DD)
+    const today = (clientToday && /^\d{4}-\d{2}-\d{2}$/.test(clientToday))
+      ? clientToday
+      : new Date().toISOString().slice(0, 10);
 
     const supabase = getSupabase();
 
@@ -1461,11 +1466,16 @@ async function handleGetBodyCabinet(req, res) {
 
     const ownerId = client.anonymous_owner_id;
 
-    // 3. Get profile from body_intake_forms (answers jsonb) — latest across all owner sessions
-    const { data: ownerSessions } = await supabase
+    // 3. Get all session_ids for this owner
+    const { data: ownerSessions, error: ownerSessionsError } = await supabase
       .from("body_clients")
       .select("session_id")
       .eq("anonymous_owner_id", ownerId);
+
+    if (ownerSessionsError) {
+      console.error("[handleGetBodyCabinet] owner sessions query error:", ownerSessionsError.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить кабинет" });
+    }
 
     const ownerSessionIds = (ownerSessions || []).map(s => s.session_id);
 
@@ -1505,12 +1515,17 @@ async function handleGetBodyCabinet(req, res) {
 
     let allLogs = [];
     if (ownerSessionIds.length > 0) {
-      const { data: ownerLogs } = await supabase
+      const { data: ownerLogs, error: ownerLogsError } = await supabase
         .from("body_daily_logs")
         .select("session_id, log_date, weight_kg, waist_cm, steps, workout_done, workout_minutes, calories, meals_count, water_l, sleep_hours, sleep_quality, energy_level, mood_level, plate_photos, created_at, updated_at")
         .in("session_id", ownerSessionIds)
         .gte("log_date", ninetyDaysAgo)
         .order("log_date", { ascending: false });
+
+      if (ownerLogsError) {
+        console.error("[handleGetBodyCabinet] owner logs query error:", ownerLogsError.code, ownerLogsError.message);
+        return res.status(500).json({ ok: false, error: "Не удалось загрузить историю дневника" });
+      }
 
       allLogs = ownerLogs || [];
     }
@@ -1534,8 +1549,17 @@ async function handleGetBodyCabinet(req, res) {
       .sort((a, b) => b.log_date.localeCompare(a.log_date));
 
     // Today's log — search across all owner sessions
-    const today = new Date().toISOString().slice(0, 10);
     const todayLog = dedupedHistory.find(l => l.log_date === today) || null;
+
+    // Diagnostic log (privacy-safe)
+    console.log("[body_cabinet_history]", JSON.stringify({
+      action: "body_cabinet_history",
+      owner_fingerprint: fingerprint(ownerId),
+      session_count: ownerSessionIds.length,
+      raw_log_count: allLogs.length,
+      unique_day_count: dedupedHistory.length,
+      response_status: 200,
+    }));
 
     // 6. Credential existence (for code rotation UI)
     const { data: credential } = await supabase

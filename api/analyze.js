@@ -821,11 +821,23 @@ async function handleDailyLogAnalysis(req, res) {
   const { session_id, daily_log } = req.body || {};
 
   if (!session_id || !daily_log) {
-    return res.status(400).json({ error: "Missing session_id or daily_log" });
+    return res.status(400).json({ ok: false, saved: false, error: "Missing session_id or daily_log" });
   }
+
+  // Local date helper (avoids UTC offset issues near midnight)
+  function getLocalDateString() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  const logDate = daily_log.log_date || getLocalDateString();
 
   try {
     const { getSupabase } = await import("../lib/supabase.js");
+    const { fingerprint } = await import("../lib/session/continuation-store.js");
     const supabase = getSupabase();
 
     const ALLOWED_COLS = [
@@ -841,23 +853,67 @@ async function handleDailyLogAnalysis(req, res) {
       "day_text", "voice_transcript",
       "plate_photos", "plate_analysis",
     ];
-    const safeLog = { session_id, module: "body" };
+    const safeLog = { session_id, module: "body", log_date: logDate };
     for (const key of ALLOWED_COLS) {
       if (daily_log[key] !== undefined) {
         safeLog[key] = daily_log[key];
       }
     }
 
-    await supabase.from("body_daily_logs").insert(safeLog);
+    // Upsert: find existing row for this session_id + log_date, update or insert
+    const { data: existing, error: findError } = await supabase
+      .from("body_daily_logs")
+      .select("id")
+      .eq("session_id", session_id)
+      .eq("log_date", logDate)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
+    if (findError) {
+      console.error("[body-diary-save] find error:", findError.code, findError.message);
+      return res.status(500).json({ ok: false, saved: false, error: "Не удалось сохранить дневник. Попробуйте ещё раз." });
+    }
+
+    let savedLog;
+    if (existing) {
+      // Update existing row
+      const { data: updated, error: updateError } = await supabase
+        .from("body_daily_logs")
+        .update({ ...safeLog, updated_at: new Date().toISOString() })
+        .eq("id", existing.id)
+        .select("id, session_id, log_date, created_at, updated_at")
+        .single();
+
+      if (updateError || !updated) {
+        console.error("[body-diary-save] update error:", updateError?.code, updateError?.message);
+        return res.status(500).json({ ok: false, saved: false, error: "Не удалось сохранить дневник. Попробуйте ещё раз." });
+      }
+      savedLog = updated;
+    } else {
+      // Insert new row
+      const { data: inserted, error: insertError } = await supabase
+        .from("body_daily_logs")
+        .insert(safeLog)
+        .select("id, session_id, log_date, created_at, updated_at")
+        .single();
+
+      if (insertError || !inserted) {
+        console.error("[body-diary-save] insert error:", insertError?.code, insertError?.message);
+        return res.status(500).json({ ok: false, saved: false, error: "Не удалось сохранить дневник. Попробуйте ещё раз." });
+      }
+      savedLog = inserted;
+    }
+
+    // Ensure body_clients row exists
     try {
-      const { data: existing } = await supabase
+      const { data: existingClient } = await supabase
         .from("body_clients")
         .select("id")
         .eq("session_id", session_id)
-        .single();
+        .maybeSingle();
 
-      if (!existing) {
+      if (!existingClient) {
         const { randomUUID } = await import("node:crypto");
         await supabase.from("body_clients").upsert({
           session_id,
@@ -869,15 +925,13 @@ async function handleDailyLogAnalysis(req, res) {
     } catch (clientErr) {
       console.log("Body client check skipped:", clientErr.message);
     }
-  } catch (err) {
-    console.error("Daily log DB save error:", err.message);
-  }
 
-  try {
-    const conversationStyle = readCorePrompt("conversation-style.md") || "";
-    const diary = daily_log;
+    // Only now run AI analysis (after confirmed save)
+    try {
+      const conversationStyle = readCorePrompt("conversation-style.md") || "";
+      const diary = daily_log;
 
-    const systemPrompt = `
+      const systemPrompt = `
 Ты — доброжелательный ассистент модуля "Здоровье & Стройность". Пользователь заполнил дневник дня.
 
 Твоя задача: написать короткий итог дня (2–4 предложения) и один мягкий фокус на завтра.
@@ -909,116 +963,107 @@ async function handleDailyLogAnalysis(req, res) {
 ${conversationStyle}
 `;
 
-    const plateSummary = Array.isArray(diary.plate_analysis) && diary.plate_analysis.length > 0
-      ? diary.plate_analysis.map((p, i) => `Фото ${i + 1}: ${p.balance_summary || "—"}`).join("\n")
-      : null;
+      const plateSummary = Array.isArray(diary.plate_analysis) && diary.plate_analysis.length > 0
+        ? diary.plate_analysis.map((p, i) => `Фото ${i + 1}: ${p.balance_summary || "—"}`).join("\n")
+        : null;
 
-    const waterNote = diary.water_glasses_done != null
-      ? `Вода: выпито ${diary.water_glasses_done} стакана(ов) из ${diary.water_goal_glasses || 5}`
-      : null;
+      const waterNote = diary.water_glasses_done != null
+        ? `Вода: выпито ${diary.water_glasses_done} стакана(ов) из ${diary.water_goal_glasses || 5}`
+        : null;
 
-    const dayDesc = [
-      diary.steps ? `Шаги: ${diary.steps}` : null,
-      diary.activity_comment ? `Активность: ${diary.activity_comment}` : null,
-      diary.workout_done ? `Тренировка: ${diary.workout_type || "да"} ${diary.workout_minutes ? `(${diary.workout_minutes} мин)` : ""}` : "Тренировки не было",
-      diary.calories ? `Калории: ${diary.calories}` : null,
-      diary.breakfast ? `Завтрак: ${diary.breakfast}` : null,
-      diary.lunch ? `Обед: ${diary.lunch}` : null,
-      diary.dinner ? `Ужин: ${diary.dinner}` : null,
-      diary.snacks ? `Перекусы: ${diary.snacks}` : null,
-      diary.nutrition_comment ? `Комментарий питание: ${diary.nutrition_comment}` : null,
-      diary.overeating_level !== null && diary.overeating_level !== undefined ? `Переедание: ${diary.overeating_level}` : null,
-      diary.sweet_cravings ? `Тяга к сладкому: ${diary.sweet_cravings}` : null,
-      diary.water_l ? `Вода: ${diary.water_l} л` : null,
-      waterNote,
-      diary.sleep_hours ? `Сон: ${diary.sleep_hours} ч` : null,
-      diary.sleep_quality ? `Качество сна: ${diary.sleep_quality}` : null,
-      diary.energy_level ? `Энергия: ${diary.energy_level}/10` : null,
-      diary.mood_level ? `Настроение: ${diary.mood_level}/10` : null,
-      diary.day_text ? `Комментарий: ${diary.day_text}` : null,
-      plateSummary ? `Анализ тарелок:\n${plateSummary}` : null,
-    ].filter(Boolean).join("\n");
+      const dayDesc = [
+        diary.steps ? `Шаги: ${diary.steps}` : null,
+        diary.activity_comment ? `Активность: ${diary.activity_comment}` : null,
+        diary.workout_done ? `Тренировка: ${diary.workout_type || "да"} ${diary.workout_minutes ? `(${diary.workout_minutes} мин)` : ""}` : "Тренировки не было",
+        diary.calories ? `Калории: ${diary.calories}` : null,
+        diary.breakfast ? `Завтрак: ${diary.breakfast}` : null,
+        diary.lunch ? `Обед: ${diary.lunch}` : null,
+        diary.dinner ? `Ужин: ${diary.dinner}` : null,
+        diary.snacks ? `Перекусы: ${diary.snacks}` : null,
+        diary.nutrition_comment ? `Комментарий питание: ${diary.nutrition_comment}` : null,
+        diary.overeating_level !== null && diary.overeating_level !== undefined ? `Переедание: ${diary.overeating_level}` : null,
+        diary.sweet_cravings ? `Тяга к сладкому: ${diary.sweet_cravings}` : null,
+        diary.water_l ? `Вода: ${diary.water_l} л` : null,
+        waterNote,
+        diary.sleep_hours ? `Сон: ${diary.sleep_hours} ч` : null,
+        diary.sleep_quality ? `Качество сна: ${diary.sleep_quality}` : null,
+        diary.energy_level ? `Энергия: ${diary.energy_level}/10` : null,
+        diary.mood_level ? `Настроение: ${diary.mood_level}/10` : null,
+        diary.day_text ? `Комментарий: ${diary.day_text}` : null,
+        plateSummary ? `Анализ тарелок:\n${plateSummary}` : null,
+      ].filter(Boolean).join("\n");
 
-    const userPrompt = `Пользователь записал день в дневник здоровья.
+      const userPrompt = `Пользователь записал день в дневник здоровья.
 
 ${dayDesc || "Нет заполненных полей."}
 
 Напиши короткий итог дня и один мягкий фокус на завтра.`;
 
-    const MODEL = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
-    const FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
-    const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
+      const MODEL = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
+      const FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
+      const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
 
-    const result = await runTask(TASK_TYPES.BODY_INTAKE, {
-      systemPrompt,
-      userPrompt,
-      model: MODEL,
-      fallbackModel: FALLBACK,
-      reasoningEffort: REASONING_EFFORT,
-    });
+      const result = await runTask(TASK_TYPES.BODY_INTAKE, {
+        systemPrompt,
+        userPrompt,
+        model: MODEL,
+        fallbackModel: FALLBACK,
+        reasoningEffort: REASONING_EFFORT,
+      });
 
-    const parsed = result.parsed;
+      const parsed = result.parsed;
 
-    if (!parsed || !parsed.ai_day_summary) {
+      if (parsed && parsed.ai_day_summary) {
+        await supabase
+          .from("body_daily_logs")
+          .update({
+            ai_day_summary: parsed.ai_day_summary,
+            ai_focus_tomorrow: parsed.ai_focus_tomorrow,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", savedLog.id);
+      }
+
+      // Debit credits for AI analysis
+      try {
+        await debitCreditsForSession({
+          sessionId: session_id,
+          module: "body",
+          resourceType: "body_diary_ai_analysis",
+          requestId: `body-diary-ai-${session_id}-${Date.now()}`,
+          provider: result.provider,
+          model: result.model_used,
+        });
+      } catch (e) {
+        console.error("[credits] body_diary_ai_analysis debit failed:", e.message);
+      }
+
       return res.status(200).json({
         ok: true,
+        saved: true,
+        log_date: savedLog.log_date,
         session_id,
-        ai_day_summary: "Спасибо, день записан. Продолжайте наблюдение, завтра посмотрим динамику.",
-        ai_focus_tomorrow: "Обратите внимание на режим сна и питания.",
+        ai_day_summary: parsed?.ai_day_summary || "Спасибо, день записан. Продолжайте наблюдение.",
+        ai_focus_tomorrow: parsed?.ai_focus_tomorrow || "Постарайтесь сегодня лечь спать вовремя.",
         model_used: result.model_used,
-        fallback_used: true,
+        fallback_used: !!result.fallback_used,
+      });
+    } catch (aiError) {
+      // Save succeeded but AI failed — still return success with fallback text
+      console.error("[body-diary-save] AI analysis failed:", aiError.message);
+      return res.status(200).json({
+        ok: true,
+        saved: true,
+        analysis_ready: false,
+        log_date: savedLog.log_date,
+        session_id,
+        ai_day_summary: "Спасибо, день записан. Продолжайте наблюдение.",
+        ai_focus_tomorrow: "Постарайтесь сегодня лечь спать вовремя.",
       });
     }
-
-    try {
-      const { getSupabase } = await import("../lib/supabase.js");
-      const supabase = getSupabase();
-      await supabase
-        .from("body_daily_logs")
-        .update({
-          ai_day_summary: parsed.ai_day_summary,
-          ai_focus_tomorrow: parsed.ai_focus_tomorrow,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("session_id", session_id)
-        .eq("log_date", daily_log.log_date)
-        .is("ai_day_summary", null)
-        .order("created_at", { ascending: false })
-        .limit(1);
-    } catch (updateErr) {
-      console.log("AI summary update skipped:", updateErr.message);
-    }
-
-    try {
-      await debitCreditsForSession({
-        sessionId: session_id,
-        module: "body",
-        resourceType: "body_diary_ai_analysis",
-        requestId: `body-diary-ai-${session_id}-${Date.now()}`,
-        provider: result.provider,
-        model: result.model_used,
-      });
-    } catch (e) {
-      console.error("[credits] body_diary_ai_analysis debit failed:", e.message);
-    }
-
-    return res.status(200).json({
-      ok: true,
-      session_id,
-      ai_day_summary: parsed.ai_day_summary,
-      ai_focus_tomorrow: parsed.ai_focus_tomorrow,
-      model_used: result.model_used,
-      fallback_used: !!result.fallback_used,
-    });
-  } catch (error) {
-    console.error("Daily log AI error:", error.message);
-    return res.status(200).json({
-      ok: true,
-      session_id,
-      ai_day_summary: "Спасибо, день записан. Продолжайте наблюдение.",
-      ai_focus_tomorrow: "Постарайтесь сегодня лечь спать вовремя.",
-      used_fallback: true,
-    });
+  } catch (err) {
+    console.error("[body-diary-save] fatal error:", err.message);
+    return res.status(500).json({ ok: false, saved: false, error: "Не удалось сохранить дневник. Попробуйте ещё раз." });
   }
 }
 

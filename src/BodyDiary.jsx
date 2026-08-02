@@ -2,6 +2,14 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { getClientToken } from "./lib/clientToken.js";
 import { withAccessToken, getBodySession } from "./lib/sessionAccess.js";
 
+function getLocalDateString() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 const OVER_EATING = [
   { value: "none", label: "Нет" },
   { value: "slight", label: "Немного" },
@@ -65,7 +73,7 @@ function num(v) {
 }
 
 export default function BodyDiary({ sessionId, onComplete, onCancel }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateString();
   const [logDate, setLogDate] = useState(today);
   const [weightKg, setWeightKg] = useState("");
   const [waistCm, setWaistCm] = useState("");
@@ -399,13 +407,14 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
       }
 
       const data = await res.json();
-      if (res.status === 404 && data.error?.includes("Сессия не найдена")) {
-        setSubmitError("Сессия истекла. Войдите снова по коду продолжения.");
-      } else if (res.status === 401 || res.status === 403) {
-        setSubmitError("Сессия истекла. Войдите снова по коду продолжения.");
-      } else {
-        onComplete(data);
+      if (!res.ok || !data.ok || data.saved !== true) {
+        setSubmitError(
+          data.error || "Не удалось сохранить дневник. Попробуйте ещё раз."
+        );
+        setSubmitting(false);
+        return;
       }
+      onComplete(data);
     } catch (err) {
       console.error("Diary submit error:", err);
       setSubmitError("Не удалось сохранить дневник. Попробуйте ещё раз.");

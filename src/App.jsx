@@ -1148,7 +1148,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       let effectiveAccessToken;
 
       if (accessToken && saved.sessionId) {
-        const body = { action: "getBodyCabinet", sessionId: saved.sessionId, accessToken };
+        const d = new Date();
+        const clientToday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const body = { action: "getBodyCabinet", sessionId: saved.sessionId, accessToken, clientToday };
         const cabinetRes = await fetch("/api/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1174,10 +1176,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         effectiveAccessToken = exchangeData.access_token;
         saveBodySession(effectiveSessionId, effectiveAccessToken);
 
+        const d2 = new Date();
+        const clientToday2 = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
         const cabinetRes = await fetch("/api/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "getBodyCabinet", sessionId: effectiveSessionId, accessToken: effectiveAccessToken }),
+          body: JSON.stringify({ action: "getBodyCabinet", sessionId: effectiveSessionId, accessToken: effectiveAccessToken, clientToday: clientToday2 }),
         });
         cabinetData = await cabinetRes.json();
         if (!cabinetRes.ok || !cabinetData.ok) {
@@ -8601,7 +8605,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               sessionId={bodyDiarySessionId}
               onComplete={async (result) => {
                 await loadBodyCabinet();
-                showToast("Дневник сохранён", "success");
+                if (result?.ok && result?.saved) {
+                  showToast("Дневник сохранён", "success");
+                } else {
+                  showToast(result?.error || "Дневник сохранён без анализа", "success");
+                }
               }}
               onCancel={() => setBodyScreen("cabinet")}
             />
