@@ -8566,7 +8566,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               wallet={bodyCabinetData.wallet}
               todayLog={bodyCabinetData.today_log}
               history={bodyCabinetData.history}
-              onNewDiary={() => { setBodyScreen("diary_edit"); setBodyDiaryOpen(true); }}
+              onNewDiary={() => { setBodyScreen("diary_edit"); setBodyDiarySessionId(bodyDiarySessionId); setBodyDiaryOpen(true); }}
               onViewDiary={(log) => { setBodyDiaryResult(log); setBodyScreen("diary_result"); }}
               onLogout={() => { clearBodySession(); setBodyScreen("landing"); setBodyCabinetData(null); setBodyDiarySessionId(null); }}
               onRotateCode={regenerateBodyContinuationCode}

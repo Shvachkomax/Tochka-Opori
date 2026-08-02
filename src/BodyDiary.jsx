@@ -384,7 +384,13 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
       }
 
       const data = await res.json();
-      onComplete(data);
+      if (res.status === 404 && data.error?.includes("Сессия не найдена")) {
+        setSubmitError("Сессия истекла. Войдите снова по коду продолжения.");
+      } else if (res.status === 401 || res.status === 403) {
+        setSubmitError("Сессия истекла. Войдите снова по коду продолжения.");
+      } else {
+        onComplete(data);
+      }
     } catch (err) {
       console.error("Diary submit error:", err);
       setSubmitError("Не удалось сохранить дневник. Попробуйте ещё раз.");
@@ -475,9 +481,37 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
       {/* Workout */}
       <div style={s.section}>
         <div style={s.sectionTitle}>Тренировка</div>
-        <div style={{ display: "flex", gap: 10, marginBottom: workoutDone ? 16 : 0 }}>
-          {chip("Была", "yes", workoutDone ? "yes" : "", (v) => setWorkoutDone(v === "yes"))}
-          {chip("Не было", "no", !workoutDone ? "no" : "", (v) => setWorkoutDone(v !== "yes"))}
+        <div role="radiogroup" aria-label="Тренировка" style={{ display: "flex", gap: 0, marginBottom: workoutDone ? 16 : 0, borderRadius: 12, overflow: "hidden", border: "1px solid #d8cec1" }}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={workoutDone}
+            onClick={() => { setWorkoutDone(true); }}
+            style={{
+              flex: 1, padding: "10px 16px", border: 0, cursor: "pointer", fontSize: 14, fontWeight: 600,
+              background: workoutDone ? "#7D9A89" : "#f5f0e8",
+              color: workoutDone ? "#fff" : "#5f574f",
+              transition: "all 0.15s ease",
+            }}
+          >
+            {workoutDone && <span style={{ marginRight: 6 }}>✓</span>}
+            Была тренировка
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!workoutDone}
+            onClick={() => { setWorkoutDone(false); setWorkoutType(""); setWorkoutMinutes(""); setWorkoutIntensity(""); setWorkoutComment(""); }}
+            style={{
+              flex: 1, padding: "10px 16px", border: 0, borderLeft: "1px solid #d8cec1", cursor: "pointer", fontSize: 14, fontWeight: 600,
+              background: !workoutDone ? "#7D9A89" : "#f5f0e8",
+              color: !workoutDone ? "#fff" : "#5f574f",
+              transition: "all 0.15s ease",
+            }}
+          >
+            {!workoutDone && <span style={{ marginRight: 6 }}>✓</span>}
+            Тренировки не было
+          </button>
         </div>
         {workoutDone && (
           <>
