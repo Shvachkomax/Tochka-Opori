@@ -387,10 +387,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }, []);
 
-  // Clear body errors when screen changes
+  // Clear body continuation error when screen changes
   React.useEffect(() => {
     setBodyContinuationError("");
-    setPlateAnalysisError("");
   }, [bodyScreen]);
 
   const [adminReqTab, setAdminReqTab] = useState("reviews");
