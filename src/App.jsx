@@ -1228,27 +1228,18 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function regenerateBodyContinuationCode() {
     const saved = getBodySession();
     if (!saved.sessionId || !saved.accessToken) {
-      showToast("Нужен код доступа к профилю.", "error");
-      return;
+      throw new Error("Нужен код доступа к профилю.");
     }
-    setLoading(true);
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "regenerateContinuationCredential", module: "body", session_id: saved.sessionId, access_token: saved.accessToken }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Не удалось создать новый код продолжения");
-      }
-      // Reload cabinet to show new code
-      await loadBodyCabinet();
-    } catch (e) {
-      showToast(e.message || "Не удалось создать новый код продолжения", "error");
-    } finally {
-      setLoading(false);
+    const res = await fetch("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "regenerateContinuationCredential", module: "body", session_id: saved.sessionId, access_token: saved.accessToken }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || "Не удалось создать новый код продолжения");
     }
+    return data.continuation_code;
   }
 
   async function openSupportReport(targetSessionId) {
@@ -8286,7 +8277,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </div>
             )}
 
-            {activeModule === "body" && (
+            {activeModule === "body" && bodyScreen === "landing" && (
               <div style={{ marginTop: 16, padding: 16, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 8 }}>
                   Уже есть код продолжения?

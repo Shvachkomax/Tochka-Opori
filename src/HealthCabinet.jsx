@@ -15,28 +15,22 @@ export default function HealthCabinet({
   const [showRotateConfirm, setShowRotateConfirm] = useState(false);
   const [newCode, setNewCode] = useState(null);
   const [rotating, setRotating] = useState(false);
+  const [rotateError, setRotateError] = useState("");
   const [copied, setCopied] = useState(false);
 
   async function handleRotate() {
     setRotating(true);
+    setRotateError("");
     try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "regenerateContinuationCredential",
-          module: "body",
-          sessionId,
-          accessToken,
-        }),
-      });
-      const data = await res.json();
-      if (data.ok && data.continuation_code) {
-        setNewCode(data.continuation_code);
-        setShowRotateConfirm(false);
-      }
-    } catch {}
-    setRotating(false);
+      const code = await onRotateCode();
+      if (!code) throw new Error("Не удалось создать новый код");
+      setNewCode(code);
+      setShowRotateConfirm(false);
+    } catch (e) {
+      setRotateError(e.message || "Не удалось создать новый код продолжения");
+    } finally {
+      setRotating(false);
+    }
   }
 
   function copyCode() {
@@ -163,11 +157,14 @@ export default function HealthCabinet({
         {showRotateConfirm && (
           <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: "#fdf6ee", border: "1px solid #e8d5b8" }}>
             <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 8 }}>Старый код перестанет работать. Новый код будет показан один раз.</div>
+            {rotateError && (
+              <div style={{ fontSize: 13, color: "#b5473f", marginBottom: 8 }}>{rotateError}</div>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={handleRotate} disabled={rotating} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #7D9A89", background: "#7D9A89", color: "#fff", cursor: "pointer", fontSize: 13 }}>
+              <button onClick={handleRotate} disabled={rotating} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #7D9A89", background: "#7D9A89", color: "#fff", cursor: rotating ? "not-allowed" : "pointer", fontSize: 13, opacity: rotating ? 0.6 : 1 }}>
                 {rotating ? "Создаём..." : "Да, создать"}
               </button>
-              <button onClick={() => setShowRotateConfirm(false)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5f574f" }}>
+              <button onClick={() => { setShowRotateConfirm(false); setRotateError(""); }} disabled={rotating} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: rotating ? "not-allowed" : "pointer", fontSize: 13, color: "#5f574f" }}>
                 Отмена
               </button>
             </div>
