@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { getClientToken } from "./lib/clientToken.js";
+import { withAccessToken, getBodySession } from "./lib/sessionAccess.js";
 
 const OVER_EATING = [
   { value: "none", label: "Нет" },
@@ -119,7 +120,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
     fetch("/api/usage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getUsageBalance", sessionId, module: "body" }),
+      body: JSON.stringify(withAccessToken({ action: "getUsageBalance", sessionId, module: "body" }, sessionId)),
     })
       .then(r => r.json())
       .then(data => {
@@ -145,7 +146,9 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
           const tHeaders = { "Content-Type": "audio/webm" };
           if (token) tHeaders["Authorization"] = `Bearer ${token}`;
 
-          let res = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=body`, {
+          const { accessToken } = getBodySession();
+          const accessTokenParam = accessToken ? `&access_token=${encodeURIComponent(accessToken)}` : "";
+          let res = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=body${accessTokenParam}`, {
             method: "POST",
             headers: tHeaders,
             body: blob,
@@ -154,7 +157,7 @@ export default function BodyDiary({ sessionId, onComplete, onCancel }) {
           if (res.status === 401 && token) {
             try { token = await getClientToken("body", "transcribe"); } catch {}
             tHeaders["Authorization"] = `Bearer ${token}`;
-            res = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=body`, {
+            res = await fetch(`/api/transcribe?session_id=${encodeURIComponent(sessionId)}&module=body${accessTokenParam}`, {
               method: "POST",
               headers: tHeaders,
               body: blob,

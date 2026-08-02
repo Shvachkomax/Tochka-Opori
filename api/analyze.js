@@ -1,11 +1,27 @@
 import crypto from "node:crypto";
-import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
+import { runTask, TASK_TYPES, getActiveProvider } from "../lib/modelRouter.js";
+import { getSupabase } from "../lib/supabase.js";
 import { getModule, isValidModule, DEFAULT_MODULE } from "../lib/modules.js";
 import { readModulePrompt, readCorePrompt } from "../lib/prompts.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
 import { debitCreditsForSession, setSessionVisibleAfterCode } from "../lib/usage/debit.js";
+import { ensureWallet, setWalletVisible } from "../lib/usage/wallet.js";
+import { getOrCreateContinuationCredential } from "../lib/session/continuation-store.js";
+import { generateSessionAccessToken } from "../lib/security/access-token.js";
+import {
+  REPORT_STATUS,
+  getStableReportRequestId,
+  getOrCreateSessionForAnalyze,
+  checkReportStatus,
+  setReportStatus,
+  saveFinalReportToSession,
+  createReportArtifacts,
+  deterministicUserReportFix,
+  repairInvalidJson,
+  buildReportResponsePayload,
+} from "../lib/report/finalize.js";
 
 function generateBodyCode() {
   const p1 = crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 4);
@@ -199,6 +215,35 @@ const VALID_REASONS = [
   "red_flag_symptom",
 ];
 
+// Risk detection helpers: only flag a risk if the user is talking about themselves,
+// not about a third-party event (e.g., a suicide in their environment).
+const OWN_RISK_WORDS = ["я", "мне", "мной", "мо[йёе]", "мо[яю]", "себе", "собой", "собе", "хочу", "думаю", "планирую", "собираюсь", "покончу", "сделаю", "напишу"];
+const THIRD_PARTY_WORDS = ["он", "она", "оно", "его", "её", "ее", "им", "ей", "ему", "друг", "подруга", "знакомый", "знакомая", "родственник", "родственница", "мама", "папа", "мать", "отец", "брат", "сестра", "сын", "дочь", "муж", "жена", "парень", "девушка", "коллега", "начальник", "человек", "кто-то", "кое-кто", "врач", "сосед", "близкий"];
+
+function makeWordBoundaryRegex(words) {
+  return new RegExp(`(?<![\\p{L}\\p{N}_])(${words.join("|")})(?![\\p{L}\\p{N}_])`, "iu");
+}
+
+const OWN_RISK_PRONOUNS = makeWordBoundaryRegex(OWN_RISK_WORDS);
+const THIRD_PARTY_SUBJECTS = makeWordBoundaryRegex(THIRD_PARTY_WORDS);
+
+function isOwnRiskSentence(sentence, riskRegex) {
+  if (!riskRegex.test(sentence)) return false;
+  // Third-party mention near the risk term should not count as own risk.
+  if (THIRD_PARTY_SUBJECTS.test(sentence)) return false;
+  // Require a first-person indicator in the same sentence.
+  return OWN_RISK_PRONOUNS.test(sentence);
+}
+
+function hasOwnRiskPattern(text, pattern) {
+  if (!text) return false;
+  const sentences = text.split(/[.!?\n]+/).filter(Boolean);
+  for (const sentence of sentences) {
+    if (isOwnRiskSentence(sentence, pattern)) return true;
+  }
+  return false;
+}
+
 function deriveMinimumCareLevel({
   riskLevel, suicidalIntent, suicidalPlan, selfHarmRisk,
   psychosisRedFlags, maniaRedFlags, riskToOthers,
@@ -232,6 +277,112 @@ function deriveMinimumCareLevel({
     return "professional_contact";
   }
   return "self_support";
+}
+
+function programmaticCareFix({
+  careRec,
+  minimumLevel,
+  hasSuicidalIntent,
+  hasSuicidalPlan,
+  hasPsychosis,
+  hasMania,
+  hasRiskToOthers,
+  hasSevereDistress,
+  hasFunctionalImpairment,
+  hasSomaticSymptoms,
+  hasTraumaticUncertainty,
+  hasSleepDisruption,
+  hasSubstanceUse,
+  hasSelfHarm,
+}) {
+  const levelOrder = {
+    self_support: 0,
+    self_care: 0,
+    professional_contact: 1,
+    medical_consultation: 1,
+    urgent_help: 2,
+  };
+
+  if (!careRec || typeof careRec !== "object") {
+    careRec = { level: minimumLevel, specialist_types: [], reasons: [], interim_support: [], urgent_triggers: [] };
+  }
+
+  if (levelOrder[careRec.level] < levelOrder[minimumLevel]) {
+    careRec.level = minimumLevel;
+  }
+
+  if (careRec.level === "urgent_help") {
+    careRec.timeframe = "today";
+  } else if (careRec.level === "professional_contact" || careRec.level === "medical_consultation") {
+    if (careRec.timeframe !== "today" && careRec.timeframe !== "within_days") {
+      careRec.timeframe = "within_days";
+    }
+  } else if (!careRec.timeframe) {
+    careRec.timeframe = "within_weeks";
+  }
+
+  if (!Array.isArray(careRec.specialist_types)) careRec.specialist_types = [];
+  if (!Array.isArray(careRec.reasons)) careRec.reasons = [];
+  if (!Array.isArray(careRec.interim_support)) careRec.interim_support = [];
+  if (!Array.isArray(careRec.urgent_triggers)) careRec.urgent_triggers = [];
+
+  // Filter invalid values.
+  careRec.specialist_types = careRec.specialist_types.filter(st => VALID_SPECIALIST_TYPES.includes(st));
+  careRec.reasons = careRec.reasons.filter(r => VALID_REASONS.includes(r));
+  if (careRec.level !== "urgent_help") {
+    careRec.urgent_triggers = [];
+  }
+
+  // Populate reasons / specialist types based on detected signals.
+  if (hasSuicidalIntent || hasSuicidalPlan) {
+    careRec.reasons.push("suicidal_thoughts");
+    if (!careRec.specialist_types.includes("emergency_service")) careRec.specialist_types.push("emergency_service");
+  }
+  if (hasPsychosis) {
+    careRec.reasons.push("psychosis_red_flags");
+    if (!careRec.specialist_types.includes("psychiatrist")) careRec.specialist_types.push("psychiatrist");
+  }
+  if (hasMania) {
+    careRec.reasons.push("mania_red_flags");
+    if (!careRec.specialist_types.includes("psychiatrist")) careRec.specialist_types.push("psychiatrist");
+  }
+  if (hasSevereDistress) careRec.reasons.push("severe_distress");
+  if (hasFunctionalImpairment) careRec.reasons.push("functional_impairment");
+  if (hasSomaticSymptoms) {
+    careRec.reasons.push("somatic_symptoms");
+    if (!careRec.specialist_types.includes("general_physician") && !careRec.specialist_types.includes("emergency_service")) {
+      careRec.specialist_types.push("general_physician");
+    }
+  }
+  if (hasTraumaticUncertainty) careRec.reasons.push("traumatic_uncertainty");
+  if (hasSleepDisruption) careRec.reasons.push("sleep_disruption");
+  if (hasSubstanceUse) {
+    careRec.reasons.push("substance_use");
+    if (!careRec.specialist_types.includes("clinical_psychologist")) careRec.specialist_types.push("clinical_psychologist");
+  }
+  if (hasSelfHarm) {
+    careRec.reasons.push("self_harm_risk");
+    careRec.level = "urgent_help";
+    careRec.timeframe = "today";
+  }
+  if (hasRiskToOthers) {
+    careRec.reasons.push("risk_to_others");
+    careRec.level = "urgent_help";
+    careRec.timeframe = "today";
+  }
+
+  careRec.specialist_types = [...new Set(careRec.specialist_types)];
+  careRec.reasons = [...new Set(careRec.reasons)];
+
+  if ((careRec.level === "self_support" || careRec.level === "self_care") && careRec.reasons.length === 0) {
+    careRec.interim_support = ["вернуться к разговору, если состояние изменится"];
+  }
+
+  if (careRec.level === "urgent_help" && careRec.urgent_triggers.length === 0) {
+    careRec.urgent_triggers = ["see_recommendations"];
+  }
+
+  return careRec;
 }
 
 function checkCareRecommendation(cr, conversationText) {
@@ -367,6 +518,7 @@ function calcBMI(heightCm, weightKg) {
 }
 
 async function trySaveIntake(intake, bmi, careLevel, routerMeta, sessionCode, source = "self_signup", specialistId = null, specialistName = null) {
+  const targetSessionId = sessionCode || intake.session_id || null;
   try {
     const crypto = await import("node:crypto");
     const { getSupabase } = await import("../lib/supabase.js");
@@ -376,7 +528,7 @@ async function trySaveIntake(intake, bmi, careLevel, routerMeta, sessionCode, so
     const payload = {
       module: "body",
       version: "body-intake-v0.1",
-      session_id: sessionCode || intake.session_id || null,
+      session_id: targetSessionId,
       answers,
       bmi: bmi ?? null,
       care_recommendation: careLevel || null,
@@ -397,10 +549,12 @@ async function trySaveIntake(intake, bmi, careLevel, routerMeta, sessionCode, so
     const { data: existingClient } = await supabase
       .from("body_clients")
       .select("anonymous_owner_id")
-      .eq("session_id", sessionCode || intake.session_id)
+      .eq("session_id", targetSessionId)
       .maybeSingle();
 
-    if (existingClient && existingClient.anonymous_owner_id) {
+    let anonymousOwnerId = existingClient?.anonymous_owner_id;
+
+    if (anonymousOwnerId) {
       await supabase.from("body_clients").update({
         display_name: displayName,
         source,
@@ -408,25 +562,26 @@ async function trySaveIntake(intake, bmi, careLevel, routerMeta, sessionCode, so
         specialist_name: specialistName,
         goal,
         updated_at: new Date().toISOString(),
-      }).eq("session_id", sessionCode || intake.session_id);
-      return true;
+      }).eq("session_id", targetSessionId);
+    } else {
+      anonymousOwnerId = crypto.randomUUID();
+      await supabase.from("body_clients").insert({
+        session_id: targetSessionId,
+        anonymous_owner_id: anonymousOwnerId,
+        display_name: displayName,
+        source,
+        specialist_id: specialistId,
+        specialist_name: specialistName,
+        goal,
+        status: "active",
+        updated_at: new Date().toISOString(),
+      });
     }
 
-    await supabase.from("body_clients").insert({
-      session_id: sessionCode || intake.session_id,
-      anonymous_owner_id: crypto.randomUUID(),
-      display_name: displayName,
-      source,
-      specialist_id: specialistId,
-      specialist_name: specialistName,
-      goal,
-      status: "active",
-      updated_at: new Date().toISOString(),
-    });
-    return true;
+    return { success: true, anonymousOwnerId, sessionId: targetSessionId };
   } catch (err) {
     console.log("Body intake DB save skipped:", err.message);
-    return false;
+    return { success: false, anonymousOwnerId: null, sessionId: targetSessionId };
   }
 }
 
@@ -450,9 +605,28 @@ async function handleBodyIntakeAnalysis(req, res, intake) {
   const sessionCode = generateBodyCode();
 
   // Save client record before AI — debit depends on canonical body_clients row
-  const clientSaved = await trySaveIntake(intake, bmi, null, null, sessionCode, source, specialistId, specialistName);
-  if (!clientSaved) {
+  const saveResult = await trySaveIntake(intake, bmi, null, null, sessionCode, source, specialistId, specialistName);
+  if (!saveResult.success) {
     return res.status(500).json({ ok: false, error: "Не удалось сохранить данные. Попробуйте позже." });
+  }
+
+  // Create owner-level continuation credential on first completed intake.
+  let continuationCode = null;
+  let accessToken = null;
+  try {
+    const { getSupabase } = await import("../lib/supabase.js");
+    const supabase = getSupabase();
+    const credentialResult = await getOrCreateContinuationCredential({
+      module: "body",
+      ownerId: saveResult.anonymousOwnerId,
+      supabase,
+    });
+    if (credentialResult.isNew && credentialResult.combinedCode) {
+      continuationCode = credentialResult.combinedCode;
+    }
+    accessToken = await generateSessionAccessToken(sessionCode);
+  } catch (credErr) {
+    console.error("Body intake continuation credential creation failed:", credErr.message);
   }
 
   const DISCLAIMER = "\n\nЭто не диагноз и не медицинское назначение.";
@@ -535,6 +709,8 @@ ${conversationStyle}
       return res.status(200).json({
         ...BODY_FALLBACK_RESPONSE,
         session_id: sessionCode,
+        access_token: accessToken,
+        continuation_code: continuationCode,
         bmi,
         care_recommendation: redFlagCareLevel
           ? { ...BODY_FALLBACK_RESPONSE.care_recommendation, level: redFlagCareLevel }
@@ -569,7 +745,7 @@ ${conversationStyle}
     }
 
     // Save intake with care recommendation — await to confirm code persistence
-    const updated = await trySaveIntake(intake, bmi, careLevel, result, sessionCode, source, specialistId, specialistName);
+    const updated = (await trySaveIntake(intake, bmi, careLevel, result, sessionCode, source, specialistId, specialistName)).success;
 
     try {
       await debitCreditsForSession({
@@ -587,11 +763,21 @@ ${conversationStyle}
     // Only make wallet visible after code is confirmed saved
     if (updated) {
       setSessionVisibleAfterCode({ sessionId: sessionCode, module: "body" });
+      try {
+        const wallet = await ensureWallet({ ownerType: "anonymous_profile", ownerId: saveResult.anonymousOwnerId, module: "body" });
+        if (wallet) {
+          await setWalletVisible({ walletId: wallet.id });
+        }
+      } catch (walletErr) {
+        console.error("[wallet] body intake set visible failed:", walletErr.message);
+      }
     }
 
     return res.status(200).json({
       type: "intake_analysis",
       session_id: sessionCode,
+      access_token: accessToken,
+      continuation_code: continuationCode,
       user_report: parsed.user_report,
       body_plan: parsed.body_plan || BODY_FALLBACK_RESPONSE.body_plan,
       care_recommendation: safeCareRecommendation,
@@ -612,6 +798,8 @@ ${conversationStyle}
     return res.status(200).json({
       ...BODY_FALLBACK_RESPONSE,
       session_id: sessionCode,
+      access_token: accessToken,
+      continuation_code: continuationCode,
       bmi,
       care_recommendation: redFlagCareLevel
         ? { ...BODY_FALLBACK_RESPONSE.care_recommendation, level: redFlagCareLevel }
@@ -1366,6 +1554,73 @@ ${antiRepeatBlock}
   const MODEL_FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
   const REASONING_EFFORT = process.env.OPENAI_REASONING_EFFORT || process.env.AI_REASONING_EFFORT || "medium";
 
+  const isFinalReport = activeModule === "support" && depth >= 3;
+  let finalSession = null;
+  let finalReportRequestId = null;
+  let finalSupabase = null;
+
+  // Final Report Reliability Pass: durable save and idempotency.
+  // Check status before calling the model to avoid double AI calls and double debits.
+  let sessionLookupMs = 0;
+  if (isFinalReport) {
+    finalSupabase = getSupabase();
+    finalReportRequestId = getStableReportRequestId(session_id, depth);
+    const tSessionLookup = Date.now();
+    try {
+      finalSession = await getOrCreateSessionForAnalyze({
+        supabase: finalSupabase,
+        sessionId: session_id,
+        module: activeModule,
+        patientText: text,
+        conversationHistory: convHistory,
+        dialogDepth: depth,
+        inviteToken: req.body.invite_token || null,
+      });
+    } catch (err) {
+      console.error("[analyze] getOrCreateSessionForAnalyze failed", err.message);
+      return res.status(500).json({ error: "Не удалось подготовить сессию для отчёта." });
+    }
+    sessionLookupMs = Date.now() - tSessionLookup;
+
+    const statusCheck = await checkReportStatus(finalSupabase, session_id, finalReportRequestId);
+    if (statusCheck.status === "ready") {
+      const artifacts = await createReportArtifacts({
+        supabase: finalSupabase,
+        sessionId: session_id,
+        module: activeModule,
+        anonymousOwnerId: finalSession.anonymous_owner_id,
+      });
+      const cachedPayload = buildReportResponsePayload({
+        userReport: statusCheck.data.user_report,
+        doctorReport: statusCheck.data.doctor_report,
+        careRecommendation: statusCheck.data.care_recommendation,
+        modelUsed: MODEL_TRIAGE,
+        fallbackUsed: false,
+        provider: getActiveProvider(),
+        taskType: TASK_TYPES.PATIENT_DIALOG,
+        requestDuration: 0,
+        publicCode: statusCheck.data.public_code,
+        accessToken: artifacts.accessToken,
+        continuationCode: artifacts.continuationCode,
+        debugInfo: { cached: true, report_request_id: finalReportRequestId },
+      });
+      return res.status(200).json(cachedPayload);
+    }
+    if (statusCheck.status === "processing") {
+      return res.status(202).json({
+        type: "processing",
+        message: "Отчёт ещё формируется. Подождите немного.",
+        report_request_id: finalReportRequestId,
+      });
+    }
+
+    await setReportStatus(finalSupabase, session_id, {
+      status: REPORT_STATUS.PROCESSING,
+      requestId: finalReportRequestId,
+      startedAt: new Date().toISOString(),
+    });
+  }
+
   try {
     const t0 = Date.now();
     const sessionIdHash = session_id ? session_id.slice(-8) : "none";
@@ -1390,6 +1645,7 @@ ${antiRepeatBlock}
       model: MODEL_TRIAGE,
       fallbackModel: MODEL_FALLBACK,
       reasoningEffort: REASONING_EFFORT,
+      finalReport: activeModule === "support" && depth >= 3,
     });
 
     const t1 = Date.now();
@@ -1412,13 +1668,6 @@ ${antiRepeatBlock}
         return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: modelUsed, fallback_used: fallbackUsed, module: activeModule });
       }
       return res.status(200).json({ type: "final", user_report: fallbackFinal, doctor_report: "", model_used: modelUsed, fallback_used: fallbackUsed, module: activeModule });
-    }
-
-    if (!parsed) {
-      if (depth === 0) {
-        return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: modelUsed, fallback_used: fallbackUsed, module: activeModule });
-      }
-      return res.status(200).json({ type: "final", user_report: raw, doctor_report: "", model_used: modelUsed, fallback_used: fallbackUsed, module: activeModule });
     }
 
     if (parsed.type === "questions" && Array.isArray(parsed.questions)) {
@@ -1446,44 +1695,250 @@ ${antiRepeatBlock}
       });
     }
 
+    // =================== FINAL REPORT RELIABILITY PASS ===================
+    // Only support module uses this durable finalization flow.
+    // Status check and session creation were already done before the model call.
+    if (isFinalReport) {
+      const supabase = finalSupabase;
+      const reportRequestId = finalReportRequestId;
+      const session = finalSession;
+
+      let userPart = parsed?.user_report || "";
+      let doctorPart = parsed?.doctor_report || "";
+      let careRec = parsed?.care_recommendation || null;
+      let modelUsedFinal = modelUsed;
+      let fallbackUsedFinal = fallbackUsed;
+      let repairInfo = { repairAttempted: false };
+
+      // Allow ONE AI repair call only for JSON parse / schema failure.
+      if (!parsed) {
+        const repairResult = await repairInvalidJson({
+          rawResponse: raw,
+          systemPrompt,
+          userPrompt,
+          model: MODEL_TRIAGE,
+          fallbackModel: MODEL_FALLBACK,
+          reasoningEffort: REASONING_EFFORT,
+        });
+        repairInfo = {
+          repairAttempted: true,
+          repairSucceeded: !!repairResult.parsed,
+          repairFailed: !repairResult.parsed,
+        };
+        if (repairResult.parsed) {
+          userPart = repairResult.parsed.user_report || "";
+          doctorPart = repairResult.parsed.doctor_report || "";
+          careRec = repairResult.parsed.care_recommendation || null;
+          modelUsedFinal = repairResult.model_used || modelUsed;
+          fallbackUsedFinal = repairResult.fallback_used || fallbackUsed;
+        } else {
+          await setReportStatus(supabase, session_id, {
+            status: REPORT_STATUS.FAILED,
+            requestId: reportRequestId,
+            errorCode: "json_parse_failed",
+          });
+          return res.status(500).json({
+            error: "Не удалось распознать отчёт. Попробуйте ещё раз позже.",
+            report_request_id: reportRequestId,
+          });
+        }
+      }
+
+      // Deterministic style fix (no AI call).
+      userPart = deterministicUserReportFix(userPart);
+
+      // --- Care recommendation: backend minimum level override ---
+      const fullConversation = (historyText || "") + " " + (text || "");
+      const hasSuicidalIntent = hasOwnRiskPattern(fullConversation, /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu);
+      const hasSuicidalPlan = hasOwnRiskPattern(fullConversation, /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/iu);
+      const hasPsychosis = hasOwnRiskPattern(fullConversation, /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/iu);
+      const hasMania = hasOwnRiskPattern(fullConversation, /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/iu);
+      const hasRiskToOthers = hasOwnRiskPattern(fullConversation, /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/iu);
+      const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/iu.test(fullConversation);
+      const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/iu.test(fullConversation);
+      const hasSomaticSymptoms = /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/iu.test(fullConversation);
+      const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/iu.test(fullConversation);
+      const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/iu.test(fullConversation);
+      const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/iu.test(fullConversation);
+      const hasSelfHarm = hasOwnRiskPattern(fullConversation, /реж.*себ|самоповреж|причин.*себе.*вред/iu);
+
+      const minimumLevel = deriveMinimumCareLevel({
+        riskLevel: null,
+        suicidalIntent: hasSuicidalIntent,
+        suicidalPlan: hasSuicidalPlan,
+        selfHarmRisk: hasSelfHarm,
+        psychosisRedFlags: hasPsychosis,
+        maniaRedFlags: hasMania,
+        riskToOthers: hasRiskToOthers,
+        functionalImpairment: hasFunctionalImpairment,
+        severeDistress: hasSevereDistress,
+        somaticSymptoms: hasSomaticSymptoms,
+        traumaticUncertainty: hasTraumaticUncertainty,
+        sleepDisruption: hasSleepDisruption,
+        substanceUse: hasSubstanceUse,
+      }, activeModule);
+
+      careRec = programmaticCareFix({
+        careRec,
+        minimumLevel,
+        hasSuicidalIntent,
+        hasSuicidalPlan,
+        hasPsychosis,
+        hasMania,
+        hasRiskToOthers,
+        hasSevereDistress,
+        hasFunctionalImpairment,
+        hasSomaticSymptoms,
+        hasTraumaticUncertainty,
+        hasSleepDisruption,
+        hasSubstanceUse,
+        hasSelfHarm,
+      });
+
+      // Final fallback for user_report if empty.
+      if (!userPart) {
+        userPart = "Нам не удалось сформулировать итог разговора достаточно точно. Ваш диалог сохранён, и к нему можно вернуться позже по коду доступа.";
+      }
+
+      // Quality check is logged but not blocking — deterministic style fix already applied.
+      const qualityCheck = checkReportQuality(userPart, text, historyText);
+      if (!qualityCheck.pass) {
+        console.log("[analyze] user report quality issues after deterministic fix:", qualityCheck.violations.join("; "));
+      }
+
+      const debugInfo = {
+        raw_model_response: raw,
+        parsed_user_report: userPart,
+        parsed_doctor_report: doctorPart,
+        care_recommendation: careRec,
+        prompt_version: PROMPT_VERSION,
+        quality_check: qualityCheck,
+        repair: repairInfo,
+        minimum_level: minimumLevel,
+        report_request_id: reportRequestId,
+      };
+
+      const extraJsonData = {
+        dialogDepth: depth,
+        previousPatientReport: req.body.previousPatientReport || "",
+        previousDoctorReport: req.body.previousDoctorReport || "",
+        homeTasks: req.body.homeTasks || "",
+        resourceFactors: req.body.resourceFactors || "",
+        questions: req.body.questions || null,
+        answers: req.body.answers || {},
+        voiceObservations: req.body.voiceObservations || null,
+        _debug: debugInfo,
+        care_recommendation: careRec,
+      };
+
+      // 1. Durable save first.
+      const tStep0 = Date.now();
+      const saved = await saveFinalReportToSession({
+        supabase,
+        sessionId: session_id,
+        userReport: userPart,
+        doctorReport: doctorPart,
+        careRecommendation: careRec,
+        reportRequestId,
+        status: REPORT_STATUS.READY,
+        completedAt: new Date().toISOString(),
+        extraJsonData,
+      });
+      const saveReportMs = Date.now() - tStep0;
+
+      if (!saved) {
+        await setReportStatus(supabase, session_id, {
+          status: REPORT_STATUS.FAILED,
+          requestId: reportRequestId,
+          errorCode: "save_failed",
+        });
+        return res.status(500).json({
+          error: "Не удалось сохранить готовый отчёт. Попробуйте ещё раз позже.",
+          report_request_id: reportRequestId,
+        });
+      }
+
+      // 2. Create access token and continuation credential AFTER save.
+      const tStep1 = Date.now();
+      const artifacts = await createReportArtifacts({
+        supabase,
+        sessionId: session_id,
+        module: activeModule,
+        anonymousOwnerId: session.anonymous_owner_id,
+      });
+      const credentialCreationMs = Date.now() - tStep1;
+
+      // 3. Debit only after durable save.
+      const tStep2 = Date.now();
+      const debitResult = await debitCreditsForSession({
+        sessionId: session_id,
+        module: activeModule,
+        resourceType: "support_analyze",
+        requestId: reportRequestId,
+        provider: result.provider,
+        model: modelUsedFinal,
+        inputTokens: result.input_tokens ?? null,
+        outputTokens: result.output_tokens ?? null,
+      });
+      const usageDebitMs = Date.now() - tStep2;
+
+      if (!debitResult.charged) {
+        console.error("[analyze] final report debit failed", debitResult);
+      }
+
+      const t2 = Date.now();
+      console.log(JSON.stringify({
+        stage: "response_sent",
+        session: sessionIdHash,
+        total_elapsed_ms: t2 - t0,
+        save_report_ms: saveReportMs,
+        credential_creation_ms: credentialCreationMs,
+        usage_debit_ms: usageDebitMs,
+        report_request_id: reportRequestId,
+        debit_charged: debitResult.charged,
+      }));
+
+      const responsePayload = buildReportResponsePayload({
+        userReport: userPart,
+        doctorReport: doctorPart,
+        careRecommendation: careRec,
+        modelUsed: modelUsedFinal,
+        fallbackUsed: fallbackUsedFinal,
+        provider: result.provider,
+        taskType: result.task_type,
+        requestDuration: result.request_duration,
+        publicCode: session.public_code,
+        accessToken: artifacts.accessToken,
+        continuationCode: artifacts.continuationCode,
+        debugInfo,
+        timing: {
+          session_lookup_ms: sessionLookupMs,
+          save_report_ms: saveReportMs,
+          credential_creation_ms: credentialCreationMs,
+          usage_debit_ms: usageDebitMs,
+        },
+      });
+      return res.status(200).json(responsePayload);
+    }
+
+    // Non-durable fallback for non-support or early-depth final reports.
     let userPart = parsed.user_report || "";
     const doctorPart = parsed.doctor_report || "";
     let careRec = parsed.care_recommendation || null;
-
-    // Quality check and repair for user_report
-    let qualityCheck = { pass: true, violations: [] };
-    let repairInfo = { repairAttempted: false };
-
-    if (userPart) {
-      qualityCheck = checkReportQuality(userPart, text, historyText);
-      if (!qualityCheck.pass) {
-        console.log("User report quality check failed:", qualityCheck.violations.join("; "));
-        const repairResult = await repairUserReport(
-          raw, userPart, doctorPart, qualityCheck.violations, text, historyText
-        );
-        repairInfo = repairResult;
-        if (repairResult.repaired) {
-          userPart = repairResult.repaired;
-        }
-      }
-    }
-
-    // --- Care recommendation: backend minimum level override ---
-    // Detect signals from conversation
+    userPart = deterministicUserReportFix(userPart);
     const fullConversation = (historyText || "") + " " + (text || "");
-    const hasSuicidalIntent = /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/i.test(fullConversation);
-    const hasSuicidalPlan = /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/i.test(fullConversation);
-    const hasPsychosis = /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/i.test(fullConversation);
-    const hasMania = /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/i.test(fullConversation);
-    const hasRiskToOthers = /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/i.test(fullConversation);
-    const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/i.test(fullConversation);
-    const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/i.test(fullConversation);
-    const hasSomaticSymptoms = /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/i.test(fullConversation);
-    const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/i.test(fullConversation);
-    const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/i.test(fullConversation);
-    const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/i.test(fullConversation);
-    const hasSelfHarm = /реж.*себ|самоповреж|причин.*себе.*вред/i.test(fullConversation);
-
+    const hasSuicidalIntent = hasOwnRiskPattern(fullConversation, /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu);
+    const hasSuicidalPlan = hasOwnRiskPattern(fullConversation, /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/iu);
+    const hasPsychosis = hasOwnRiskPattern(fullConversation, /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/iu);
+    const hasMania = hasOwnRiskPattern(fullConversation, /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/iu);
+    const hasRiskToOthers = hasOwnRiskPattern(fullConversation, /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/iu);
+    const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/iu.test(fullConversation);
+    const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/iu.test(fullConversation);
+    const hasSomaticSymptoms = /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/iu.test(fullConversation);
+    const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/iu.test(fullConversation);
+    const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/iu.test(fullConversation);
+    const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/iu.test(fullConversation);
+    const hasSelfHarm = hasOwnRiskPattern(fullConversation, /реж.*себ|самоповреж|причин.*себе.*вред/iu);
     const minimumLevel = deriveMinimumCareLevel({
       riskLevel: null,
       suicidalIntent: hasSuicidalIntent,
@@ -1499,116 +1954,28 @@ ${antiRepeatBlock}
       sleepDisruption: hasSleepDisruption,
       substanceUse: hasSubstanceUse,
     }, activeModule);
-
-    // Validate and enforce care_recommendation
-    let careRepairInfo = { repairAttempted: false };
-    let careCheck = { pass: true, violations: [] };
-
-    if (careRec) {
-      careCheck = checkCareRecommendation(careRec, fullConversation);
-      // Backend override: model cannot set below minimum
-      const levelOrder = { "self_support": 0, "professional_contact": 1, "self_care": 0, "medical_consultation": 1, "urgent_help": 2 };
-      if (levelOrder[careRec.level] < levelOrder[minimumLevel]) {
-        careRec.level = minimumLevel;
-        careCheck.violations.push(`overridden to ${minimumLevel} (model set lower)`);
-        careCheck.pass = careCheck.violations.length === 0;
-      }
-      // Ensure timeframe consistency
-      if (careRec.level === "urgent_help" && careRec.timeframe !== "today") {
-        careRec.timeframe = "today";
-      }
-      if (careRec.level === "professional_contact" && careRec.timeframe !== "within_days" && careRec.timeframe !== "today") {
-        careRec.timeframe = "within_days";
-      }
-      if (!careCheck.pass) {
-        console.log("Care recommendation check failed:", careCheck.violations.join("; "));
-        const repairResult = await repairCareRecommendation(text, historyText, careRec, careCheck.violations);
-        careRepairInfo = repairResult;
-        if (repairResult.repaired) {
-          careRec = repairResult.repaired;
-          const recheck = checkCareRecommendation(careRec, fullConversation);
-          if (!recheck.pass) {
-            careCheck = recheck;
-          }
-        }
-      }
-    }
-
-    // If no careRec from model or repair failed, derive from minimum level
-    if (!careRec) {
-      careRec = {
-        level: minimumLevel,
-        timeframe: minimumLevel === "urgent_help" ? "today" : (minimumLevel === "professional_contact" || minimumLevel === "medical_consultation") ? "within_days" : "within_weeks",
-        specialist_types: [],
-        reasons: [],
-        interim_support: [],
-        urgent_triggers: minimumLevel === "urgent_help" ? ["see_recommendations"] : [],
-      };
-      // Populate based on detected signals
-      if (hasSuicidalIntent || hasSuicidalPlan) { careRec.reasons.push("suicidal_thoughts"); careRec.specialist_types.push("emergency_service"); }
-      if (hasPsychosis) { careRec.reasons.push("psychosis_red_flags"); careRec.specialist_types.push("psychiatrist"); }
-      if (hasMania) { careRec.reasons.push("mania_red_flags"); careRec.specialist_types.push("psychiatrist"); }
-      if (hasSevereDistress) careRec.reasons.push("severe_distress");
-      if (hasFunctionalImpairment) careRec.reasons.push("functional_impairment");
-      if (hasSomaticSymptoms) { careRec.reasons.push("somatic_symptoms"); if (!careRec.specialist_types.includes("general_physician")) careRec.specialist_types.push("general_physician"); }
-      if (hasTraumaticUncertainty) careRec.reasons.push("traumatic_uncertainty");
-      if (hasSleepDisruption) careRec.reasons.push("sleep_disruption");
-      if (hasSubstanceUse) { careRec.reasons.push("substance_use"); if (!careRec.specialist_types.includes("clinical_psychologist")) careRec.specialist_types.push("clinical_psychologist"); }
-      if (hasSelfHarm) { careRec.reasons.push("self_harm_risk"); careRec.level = "urgent_help"; careRec.timeframe = "today"; }
-      if (hasRiskToOthers) { careRec.reasons.push("risk_to_others"); careRec.level = "urgent_help"; careRec.timeframe = "today"; }
-      // Deduplicate
-      careRec.specialist_types = [...new Set(careRec.specialist_types)];
-      careRec.reasons = [...new Set(careRec.reasons)];
-      if ((careRec.level === "self_support" || careRec.level === "self_care") && !careRec.reasons.length) {
-        careRec.reasons = [];
-        careRec.interim_support = ["вернуться к разговору, если состояние изменится"];
-      }
-    }
-
-    // Final fallback for user_report if quality check still fails
+    careRec = programmaticCareFix({
+      careRec,
+      minimumLevel,
+      hasSuicidalIntent,
+      hasSuicidalPlan,
+      hasPsychosis,
+      hasMania,
+      hasRiskToOthers,
+      hasSevereDistress,
+      hasFunctionalImpairment,
+      hasSomaticSymptoms,
+      hasTraumaticUncertainty,
+      hasSleepDisruption,
+      hasSubstanceUse,
+      hasSelfHarm,
+    });
     if (!userPart) {
       userPart = "Нам не удалось сформулировать итог разговора достаточно точно. Ваш диалог сохранён, и к нему можно вернуться позже по коду доступа.";
     }
-
     const report = userPart.includes("===USER_REPORT===")
       ? userPart
       : `===USER_REPORT===\n\n${userPart}\n\n===DOCTOR_REPORT===\n\n${doctorPart}`;
-
-    const debugInfo = {
-      raw_model_response: raw,
-      parsed_user_report: userPart,
-      parsed_doctor_report: doctorPart,
-      care_recommendation: careRec,
-      prompt_version: PROMPT_VERSION,
-      quality_check: {
-        pass: qualityCheck.pass,
-        violations: qualityCheck.violations,
-      },
-      repair: repairInfo,
-      care_repair: careRepairInfo,
-      minimum_level: minimumLevel,
-    };
-
-    try {
-      await debitCreditsForSession({
-        sessionId: req.body.session_id,
-        module: activeModule,
-        resourceType: "support_analyze",
-        requestId: `analyze-final-${req.body.session_id || "no-session"}-${Date.now()}`,
-        provider: result.provider,
-        model: modelUsed,
-      });
-    } catch (e) {
-      console.error("[credits] support_analyze final debit failed:", e.message);
-    }
-
-    const t2 = Date.now();
-    console.log(JSON.stringify({
-      stage: "response_sent",
-      session: sessionIdHash,
-      total_elapsed_ms: t2 - t0,
-    }));
-
     return res.status(200).json({
       type: "final",
       report,
@@ -1619,7 +1986,6 @@ ${antiRepeatBlock}
       request_duration: result.request_duration,
       module: activeModule,
       care_recommendation: careRec,
-      _debug: debugInfo,
     });
   } catch (error) {
     console.error("Analyze error:", error.message);

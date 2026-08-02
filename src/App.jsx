@@ -84,8 +84,13 @@ export default function App() {
   const [dialogDepth, setDialogDepth] = useState(0);
 
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
-  const [sessionCodeInput, setSessionCodeInput] = useState("");
   const [loadingSession, setLoadingSession] = useState(false);
+
+  // Anonymous Continuation Credential Pass
+  const [continuationCode, setContinuationCode] = useState(null);
+  const [continuationCodeInput, setContinuationCodeInput] = useState("");
+  const [continuationCodeError, setContinuationCodeError] = useState("");
+  const [regeneratedCode, setRegeneratedCode] = useState(null);
   const [sessionData, setSessionData] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [publicCode, setPublicCode] = useState(null);
@@ -399,6 +404,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   // Body diary state
   const [bodyDiarySessionId, setBodyDiarySessionId] = useState(null);
+  const [bodyContinuationInput, setBodyContinuationInput] = useState("");
+  const [bodyContinuationError, setBodyContinuationError] = useState("");
   const [bodyDiaryOpen, setBodyDiaryOpen] = useState(false);
   const [bodyDiaryResult, setBodyDiaryResult] = useState(null);
   const [bodyDiaryHistory, setBodyDiaryHistory] = useState(null);
@@ -1042,54 +1049,92 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function loadSupportCabinet(enteredCode) {
     const saved = getSupportSession();
     const accessToken = saved.accessToken;
-    if (!accessToken) {
-      showToast("Сохранённый доступ не найден. Начните новый разговор.", "error");
-      return;
-    }
-    const body = enteredCode
-      ? { action: "getCabinet", publicCode: enteredCode, access_token: accessToken }
-      : { action: "getCabinet", sessionId: saved.sessionId, access_token: accessToken };
-    if (!enteredCode && !saved.sessionId) {
-      showToast("Сохранённый разговор не найден. Начните новый.", "error");
-      return;
-    }
+
     setCabinetLoading(true);
+    setContinuationCodeError("");
     setError("");
     try {
-      const usageBody = enteredCode
-        ? { action: "getUsageBalance", publicCode: enteredCode, module: "support", access_token: accessToken }
-        : { action: "getUsageBalance", sessionId: saved.sessionId, module: "support", access_token: accessToken };
-      const [cabinetRes, usageRes] = await Promise.all([
-        fetch("/api/session", {
+      let cabinetData;
+      let usageData;
+      let effectiveSessionId;
+      let effectiveAccessToken;
+
+      if (accessToken && saved.sessionId) {
+        // Same device: use stored access token.
+        const body = { action: "getCabinet", sessionId: saved.sessionId, access_token: accessToken };
+        const usageBody = { action: "getUsageBalance", sessionId: saved.sessionId, module: "support", access_token: accessToken };
+        const [cabinetRes, usageRes] = await Promise.all([
+          fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+          fetch("/api/usage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(usageBody) }),
+        ]);
+        cabinetData = await cabinetRes.json();
+        usageData = await usageRes.json();
+        if (!cabinetRes.ok || !cabinetData.ok) {
+          throw new Error(cabinetData.error || "Не удалось открыть кабинет");
+        }
+        effectiveSessionId = cabinetData.session_id || saved.sessionId;
+        effectiveAccessToken = accessToken;
+      } else if (enteredCode) {
+        // Cross-device: exchange continuation code for access token.
+        const exchangeRes = await fetch("/api/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        }),
-        fetch("/api/usage", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(usageBody),
-        }),
-      ]);
-
-      const cabinetData = await cabinetRes.json();
-      const usageData = await usageRes.json();
-
-      if (!cabinetRes.ok || !cabinetData.ok) {
-        throw new Error(cabinetData.error || "Не удалось открыть кабинет");
+          body: JSON.stringify({ action: "exchangeContinuationCredential", module: "support", continuation_code: enteredCode }),
+        });
+        const exchangeData = await exchangeRes.json();
+        if (!exchangeRes.ok || !exchangeData.ok) {
+          throw new Error(exchangeData.error || "Не удалось открыть разговор. Проверьте код продолжения.");
+        }
+        cabinetData = exchangeData.cabinet;
+        usageData = exchangeData.usage_balance;
+        effectiveSessionId = exchangeData.session_id;
+        effectiveAccessToken = exchangeData.access_token;
+        saveSupportSession(effectiveSessionId, effectiveAccessToken);
+      } else {
+        // No stored token and no code: show modal.
+        setSessionModalOpen(true);
+        setCabinetLoading(false);
+        return;
       }
 
       setSupportCabinet({
         ...cabinetData,
         balance: usageData.ok && usageData.visible ? usageData : null,
       });
-      setSessionId(cabinetData.session_id || saved.sessionId);
+      setSessionId(effectiveSessionId);
       setPublicCode(cabinetData.public_code || enteredCode || saved.sessionId);
       setPhase("cabinet");
     } catch (e) {
-      showToast(e.message || "Не удалось открыть кабинет. Проверьте код доступа.", "error");
+      setContinuationCodeError(e.message || "Не удалось открыть разговор. Проверьте код продолжения.");
+      showToast(e.message || "Не удалось открыть разговор. Проверьте код продолжения.", "error");
     } finally {
       setCabinetLoading(false);
+    }
+  }
+
+  async function regenerateSupportContinuationCode() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("Нужен код доступа к разговору.", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "regenerateContinuationCredential", module: "support", session_id: saved.sessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Не удалось создать новый код продолжения");
+      }
+      setRegeneratedCode(data.continuation_code);
+      setContinuationCode(null);
+    } catch (e) {
+      showToast(e.message || "Не удалось создать новый код продолжения", "error");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -1612,7 +1657,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 
   async function submitRound(overrideText) {
-    const inputText = overrideText !== undefined ? overrideText : text;
+    const inputText = typeof overrideText === "string" ? overrideText : text;
     if (dialogDepth === 0 && inputText.trim().length < 10) {
       setError("Напишите хотя бы 2–3 предложения.");
       return;
@@ -1621,6 +1666,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setLoading(true);
     setError("");
     setQuestions(null);
+    if (dialogDepth >= 3 && activeModule === "support") {
+      setLoadingMessage("Готовим отчёт…");
+      setTimeout(() => {
+        if (loading) setLoadingMessage("Подготовка занимает больше времени, чем обычно.");
+      }, 40000);
+    } else {
+      setLoadingMessage("");
+    }
 
     try {
       const mod = activeModule || "support";
@@ -1688,6 +1741,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             }).catch(() => {});
           }
         }
+      } else if (data.type === "processing") {
+        // Backend is still generating the report. Start polling.
+        const sid = sessionId || `session-${Date.now()}`;
+        if (!sessionId) setSessionId(sid);
+        setLoadingMessage("Отчёт ещё формируется. Подождите немного.");
+        await pollReportStatus(sid, (status) => finalizeReportFromStatus(status, inputText));
       } else if (data.type === "final") {
         setResult(data.report || "");
         if (data._debug) setDebugInfo(data._debug);
@@ -1700,110 +1759,170 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         const sid = sessionId || `session-${Date.now()}`;
         if (!sessionId) setSessionId(sid);
 
-        // Save session to Supabase (works on localhost and Vercel)
+        // Backend now saves the report durably. Use tokens/codes from the response.
+        if (data.public_code) setPublicCode(data.public_code);
+        if (data.access_token) saveSupportSession(sid, data.access_token);
+        if (data.continuation_code) setContinuationCode(data.continuation_code);
+
+        // Persist conversation pairs for all rounds (best-effort).
         const finalHistory = [
           ...conversationHistory,
           ...(dialogDepth > 0 ? [{ role: "user", answers }] : []),
         ];
+        const finalPairs = buildConversationPairs(finalHistory, { questions, answers, patient_input: inputText });
+        if (finalPairs.length > 0) {
+          const pairsBody = withAccessToken({ action: "save_conversation_pairs", sessionId: sid, pairs: finalPairs }, sid);
+          fetch("/api/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pairsBody),
+          }).catch(() => {});
+        }
 
-        const saveSessionBody = withAccessToken({
-          action: "save",
-          sessionId: sid,
+        // Save case review (local + Supabase)
+        const review = {
+          case_id: sid, sessionId: sid, publicCode: data.public_code || publicCode || "",
           module: activeModule,
-          patient_text: inputText,
-          conversationHistory: finalHistory,
-          user_report: data.report?.split("===DOCTOR_REPORT===")[0]?.replace("===USER_REPORT===", "").trim() || "",
-          doctor_report: data.report?.split("===DOCTOR_REPORT===")[1]?.trim() || "",
-          riskLevel: null,
-          supportPlan: supportPlan,
-          dialogDepth,
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+          environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
+          patient_input: inputText, questions, answers,
+          ai_result: data.report || "", conversationHistory, dialogDepth,
           previousPatientReport: previousPatientReport || "",
           previousDoctorReport: previousDoctorReport || "",
-          homeTasks: homeTasks || "",
-          resourceFactors: resourceFactors || "",
-          questions,
-          answers,
-          voiceObservations: voiceObservations || null,
-          _debug: data._debug || null,
-          care_recommendation: data.care_recommendation || null,
-          invite_token: inviteToken,
-        }, sid);
-
-        fetch("/api/session", {
+          homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
+          patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
+          doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
+          voice_observations: voiceObservations || null,
+          expert_id: expertData?.id || null,
+          expert_name: expertData?.name || null,
+          expert_role: expertData?.role || null,
+          expert_specialty: expertData?.specialty || null,
+        };
+        fetch("/api/reviews", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(saveSessionBody),
-        })
-          .then((r) => r.json())
-          .then((result) => {
-            if (result.ok) {
-              // Save access_token for future requests
-              if (result.access_token) {
-                saveSupportSession(sid, result.access_token);
-              }
-              // Also persist conversation pairs for all rounds at final save
-              const finalPairs = buildConversationPairs(finalHistory, { questions, answers, patient_input: inputText });
-              if (finalPairs.length > 0) {
-                const pairsBody = withAccessToken({ action: "save_conversation_pairs", sessionId: sid, pairs: finalPairs }, sid);
-                fetch("/api/session", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(pairsBody),
-                }).catch(() => {});
-              }
-              const code = result.publicCode || publicCode || "";
-              if (result.publicCode && !publicCode) {
-                setPublicCode(result.publicCode);
-              }
-              if (result.usage_balance && result.usage_balance.visible) {
-                setUsageBalance({ ...result.usage_balance, module: "support" });
-              }
-              if (result.message) showToast(result.message);
-              // Save case review (local + Supabase)
-              const review = {
-                case_id: sid, sessionId: sid, publicCode: code,
-                module: activeModule,
-                createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-                environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
-                patient_input: inputText, questions, answers,
-                ai_result: data.report || "", conversationHistory, dialogDepth,
-                previousPatientReport: previousPatientReport || "",
-                previousDoctorReport: previousDoctorReport || "",
-                homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
-                patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
-                doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
-                voice_observations: voiceObservations || null,
-                expert_id: expertData?.id || null,
-                expert_name: expertData?.name || null,
-                expert_role: expertData?.role || null,
-                expert_specialty: expertData?.specialty || null,
-              };
-              fetch("/api/reviews", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "save", ...review }),
-              }).catch(() => {});
-            } else {
-              showToast(result.error || "Ошибка сохранения сессии", "error");
-            }
-          })
-          .catch(() => {
-            showToast("Не удалось сохранить сессию. Код продолжения может не сохраниться.", "error");
-          });
+          body: JSON.stringify({ action: "save", ...review }),
+        }).catch(() => {});
       } else {
         throw new Error("Неизвестный тип ответа");
       }
     } catch (e) {
       const msg = e.message || "";
       if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("abort")) {
-        setError("Не удалось сформировать отчёт. Проверьте соединение и попробуйте ещё раз.");
+        // Connection dropped — check backend status before giving up.
+        await attemptReportRecovery(sid || sessionId, inputText, data?.report);
       } else {
         setError("Не удалось сформировать отчёт. Попробуйте ещё раз.");
       }
     } finally {
       setLoading(false);
+      setLoadingMessage("");
     }
   }
+
+  async function getReportStatus(sessionId) {
+    const res = await fetch("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "getReportStatus", sessionId }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  }
+
+  async function pollReportStatus(sessionId, onReady) {
+    let attempts = 0;
+    const maxAttempts = 60; // ~60 seconds
+    while (attempts < maxAttempts) {
+      const status = await getReportStatus(sessionId);
+      if (!status) {
+        await new Promise((r) => setTimeout(r, 1000));
+        attempts += 1;
+        continue;
+      }
+      if (status.status === "ready" && status.type === "final") {
+        onReady(status);
+        return;
+      }
+      if (status.status === "failed") {
+        setError(status.message || "Не удалось сформировать отчёт. Попробуйте ещё раз.");
+        setLoading(false);
+        return;
+      }
+      // processing or not_started
+      await new Promise((r) => setTimeout(r, 1000));
+      attempts += 1;
+    }
+    setError("Отчёт ещё формируется. Попробуйте обновить страницу через минуту.");
+    setLoading(false);
+  }
+
+  async function attemptReportRecovery(sessionId, inputText, fallbackReport) {
+    if (!sessionId) {
+      setError("Не удалось сформировать отчёт. Проверьте соединение и попробуйте ещё раз.");
+      return;
+    }
+    setLoading(true);
+    setError("Соединение прервалось. Проверяем, сохранился ли отчёт…");
+    const status = await getReportStatus(sessionId);
+    if (!status) {
+      setError("Не удалось проверить статус отчёта. Попробуйте ещё раз.");
+      setLoading(false);
+      return;
+    }
+    if (status.status === "ready" && status.type === "final") {
+      finalizeReportFromStatus(status, inputText);
+      return;
+    }
+    if (status.status === "processing" || status.status === "not_started") {
+      setError("");
+      setLoadingMessage("Отчёт ещё формируется. Подождите немного.");
+      await pollReportStatus(sessionId, (readyStatus) => finalizeReportFromStatus(readyStatus, inputText));
+      return;
+    }
+    setError(status.message || "Не удалось сформировать отчёт. Попробуйте ещё раз.");
+    setLoading(false);
+  }
+
+  function finalizeReportFromStatus(status, inputText) {
+    setResult(status.report || "");
+    if (status.care_recommendation) setCareRecommendation(status.care_recommendation);
+    setActiveTab("user");
+    setReportSource("generated");
+    setJustFinishedSession(true);
+    setPhase("report");
+    if (status.public_code) setPublicCode(status.public_code);
+    if (status.access_token) saveSupportSession(status.session_id, status.access_token);
+    if (status.continuation_code) setContinuationCode(status.continuation_code);
+    setSessionId(status.session_id);
+    setLoading(false);
+    // Save review
+    const review = {
+      case_id: status.session_id, sessionId: status.session_id, publicCode: status.public_code || "",
+      module: activeModule,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
+      patient_input: inputText, questions, answers,
+      ai_result: status.report || "", conversationHistory, dialogDepth,
+      previousPatientReport: previousPatientReport || "",
+      previousDoctorReport: previousDoctorReport || "",
+      homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
+      patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
+      doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
+      voice_observations: voiceObservations || null,
+      expert_id: expertData?.id || null,
+      expert_name: expertData?.name || null,
+      expert_role: expertData?.role || null,
+      expert_specialty: expertData?.specialty || null,
+    };
+    fetch("/api/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save", ...review }),
+    }).catch(() => {});
+  }
+
+  const [loadingMessage, setLoadingMessage] = useState("");
 
   function fallbackQ() {
     return [
@@ -1959,22 +2078,48 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       localStorage.setItem("body_last_session_id", sid);
       localStorage.setItem("body_last_result", JSON.stringify(response));
       localStorage.setItem("body_last_created_at", new Date().toISOString());
-      if (sid) {
-        const stored = getBodySession();
-        if (!stored.accessToken && response?.access_token) {
-          saveBodySession(sid, response.access_token);
-        }
+      if (response?.continuation_code) {
+        setContinuationCode(response.continuation_code);
+      }
+      if (sid && response?.access_token) {
+        saveBodySession(sid, response.access_token);
       }
     } catch (e) {}
   }
 
   function copyBodyCode() {
-    const code = bodyIntakeResult?.session_id || localStorage.getItem("body_last_session_id");
+    const code = bodyIntakeResult?.continuation_code || continuationCode || bodyIntakeResult?.session_id || localStorage.getItem("body_last_session_id");
     if (!code) return;
     navigator.clipboard.writeText(code).then(() => {
       setBodyCodeCopied(true);
       setTimeout(() => setBodyCodeCopied(false), 2500);
     }).catch(() => {});
+  }
+
+  async function continueBodyByCode() {
+    const code = bodyContinuationInput.trim();
+    if (!code) return;
+    setLoading(true);
+    setBodyContinuationError("");
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "exchangeContinuationCredential", module: "body", continuation_code: code }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Не удалось открыть профиль. Проверьте код продолжения.");
+      }
+      saveBodySession(data.session_id, data.access_token);
+      setBodyDiarySessionId(data.session_id);
+      setBodyDiaryOpen(true);
+      setBodyContinuationInput("");
+    } catch (e) {
+      setBodyContinuationError(e.message || "Не удалось открыть профиль. Проверьте код продолжения.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function loadBodyDiaryHistory() {
@@ -2044,8 +2189,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setFollowUpAnswers({});
     setReportSource(null);
     setJustFinishedSession(false);
+    setContinuationCode(null);
+    setContinuationCodeInput("");
+    setContinuationCodeError("");
+    setRegeneratedCode(null);
     setBodyIntakeStage("idle");
     setBodyIntakeResult(null);
+    setBodyContinuationInput("");
+    setBodyContinuationError("");
     try {
       localStorage.removeItem("body_last_session_id");
       localStorage.removeItem("body_last_result");
@@ -8012,9 +8163,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 <div style={{ display: "flex", gap: 8 }}>
                   <input
                     type="text"
-                    placeholder="HEALTH-XXXX-XXX"
-                    value={bodyDiarySessionId || ""}
-                    onChange={(e) => setBodyDiarySessionId(e.target.value.toUpperCase())}
+                    placeholder="HEALTH-XXXX-XXX-XXXX-XXXX-XXXX"
+                    value={bodyContinuationInput || ""}
+                    onChange={(e) => setBodyContinuationInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => e.key === "Enter" && continueBodyByCode()}
                     style={{
                       flex: 1, height: 44, padding: "0 14px", borderRadius: 12,
                       border: "1px solid #d8cec1", background: "#ffffff",
@@ -8023,16 +8175,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     }}
                   />
                   <button
-                    onClick={() => { if (bodyDiarySessionId) setBodyDiaryOpen(true); }}
+                    onClick={continueBodyByCode}
+                    disabled={loading || !bodyContinuationInput.trim()}
                     style={{
                       height: 44, padding: "0 18px", borderRadius: 12, border: 0,
-                      background: "#7D9A89", color: "#ffffff", fontWeight: 700,
-                      fontSize: 14, cursor: "pointer", whiteSpace: "nowrap",
+                      background: loading ? "#c4d0c6" : "#7D9A89", color: "#ffffff", fontWeight: 700,
+                      fontSize: 14, cursor: loading ? "not-allowed" : "pointer", whiteSpace: "nowrap",
                     }}
                   >
-                    Продолжить
+                    {loading ? "Открытие..." : "Продолжить"}
                   </button>
                 </div>
+                {bodyContinuationError && (
+                  <div style={{ color: "#B85C4A", fontSize: 13, marginTop: 8 }}>{bodyContinuationError}</div>
+                )}
               </div>
             )}
 
@@ -8129,21 +8285,21 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </>
               )}
 
-              {/* Step 2: Session code */}
-              {bodyIntakeStep === 1 && bodyIntakeResult.session_id && (
+              {/* Step 2: Continuation code */}
+              {bodyIntakeStep === 1 && (bodyIntakeResult.continuation_code || bodyIntakeResult.session_id) && (
                 <>
                   <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16, color: "#2f2925" }}>
                     Ваш код продолжения
                   </div>
                   <div style={{ color: "#665c52", fontSize: 14, marginBottom: 16, lineHeight: 1.6 }}>
-                    Сохраните этот код. По нему можно вернуться к плану, дневнику и истории записей.
+                    Сохраните этот код. Он открывает ваш профиль, план и дневник на любом устройстве.
                   </div>
                   <div style={{
                     textAlign: "center", padding: 24, borderRadius: 16, background: "#f6f0e7",
                     border: "1px solid #d8cec1", marginBottom: 20,
                   }}>
-                    <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "0.08em", color: "#2f2925", fontFamily: "monospace", marginBottom: 12 }}>
-                      {bodyIntakeResult.session_id}
+                    <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "0.06em", color: "#2f2925", fontFamily: "monospace", marginBottom: 12, wordBreak: "break-all" }}>
+                      {bodyIntakeResult.continuation_code || bodyIntakeResult.session_id}
                     </div>
                     <button onClick={copyBodyCode} style={{
                       padding: "10px 24px", borderRadius: 12, border: 0,
@@ -8525,11 +8681,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   />
                   <button
                     style={s.wide}
-                    onClick={isDedicatedSubdomain ? () => setBodyIntakeStage("filling") : submitRound}
+                    onClick={isDedicatedSubdomain ? () => setBodyIntakeStage("filling") : () => submitRound()}
                     disabled={loading}
                   >
                       {loading
-                      ? "Формируем вопросы..."
+                      ? loadingMessage || "Формируем вопросы..."
                       : isDedicatedSubdomain ? "Перейти к анкете" : "Начать разбор"}
                   </button>
                 </>
@@ -8594,11 +8750,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   ))}
                   <button
                     style={s.wide}
-                    onClick={submitRound}
+                    onClick={() => submitRound()}
                     disabled={loading}
                   >
                     {loading
-                      ? "Анализируем..."
+                      ? loadingMessage || "Анализируем..."
                       : dialogDepth < 3
                         ? "Продолжить уточнение"
                         : "Получить предварительный отчёт"}
@@ -8613,33 +8769,30 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               <div style={s.result}>
                 <h2 style={{ marginTop: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 22 }}>Результат разбора</h2>
 
-                {publicCode && justFinishedSession && reportSource === "generated" && (
+                {continuationCode && justFinishedSession && reportSource === "generated" && (
                   <div style={{
                     background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
                     borderRadius: 16, padding: "18px", marginBottom: 16,
                   }}>
                     <div style={{ fontWeight: 700, fontSize: 16, color: "#2E2A25", marginBottom: 8 }}>
-                      Сохраните код разговора
+                      Сохраните код продолжения
                     </div>
                     <div style={{ color: "#5F7D6C", fontSize: 14, lineHeight: 1.5, marginBottom: 12 }}>
-                      Он понадобится, чтобы вернуться к этому разговору и продолжить наблюдение за состоянием.
+                      Он понадобится, чтобы вернуться к этому разговору на другом устройстве или после очистки браузера.
                     </div>
                     <div style={{
                       background: "#ffffff", border: "1px solid rgba(125,154,137,.25)",
                       borderRadius: 12, padding: "12px 16px", marginBottom: 14,
                       display: "flex", justifyContent: "space-between", alignItems: "center",
                     }}>
-                      <span style={{ fontWeight: 900, fontSize: 18, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace" }}>
-                        {publicCode}
+                      <span style={{ fontWeight: 900, fontSize: 16, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace", wordBreak: "break-all" }}>
+                        {continuationCode}
                       </span>
-                    </div>
-                    <div style={{ color: "#7A7268", fontSize: 13, lineHeight: 1.5, marginBottom: 16 }}>
-                      Вернитесь завтра или раньше, если состояние изменится. Мы уточним, что стало легче, что осталось прежним и нужна ли дополнительная помощь.
                     </div>
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                       <button
                         style={{ ...s.secondary, flex: 1, minWidth: 140 }}
-                        onClick={() => { navigator.clipboard.writeText(publicCode); showToast("Код скопирован"); }}
+                        onClick={() => { navigator.clipboard.writeText(continuationCode); showToast("Код скопирован"); }}
                       >
                         Скопировать код
                       </button>
@@ -9353,6 +9506,32 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     <div style={{ fontSize: 12, color: "#7A7268" }}>Тестовый баланс. Деньги не списываются.</div>
                   </div>
                 </div>
+
+                {regeneratedCode && (
+                  <div style={{ marginTop: 16, padding: 14, background: "#ffffff", borderRadius: 12, border: "1px solid rgba(125,154,137,.25)" }}>
+                    <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 6 }}>Новый код продолжения (сохраните его, старый больше не действует)</div>
+                    <div style={{ fontWeight: 900, fontSize: 16, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace", wordBreak: "break-all" }}>
+                      {regeneratedCode}
+                    </div>
+                    <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+                      <button style={{ ...s.secondary, fontSize: 13 }} onClick={() => { navigator.clipboard.writeText(regeneratedCode); showToast("Код скопирован"); }}>
+                        Скопировать
+                      </button>
+                      <button style={{ ...s.secondary, fontSize: 13 }} onClick={() => setRegeneratedCode(null)}>
+                        Скрыть
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ marginTop: 16 }}>
+                  <button
+                    style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
+                    onClick={regenerateSupportContinuationCode}
+                  >
+                    Создать новый код продолжения
+                  </button>
+                </div>
               </div>
 
               {supportCabinet.sessions?.length > 0 && (
@@ -9551,35 +9730,45 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               <div style={s.modalTitle}>Вернуться к разговору</div>
 
               <p style={{ color: "#7A7268", lineHeight: 1.6, marginBottom: 20 }}>
-                Если вы уже начинали разговор, введите код вида ТОЧКА-XXXX-XXXX. Мы восстановим прошлую сессию и продолжим с того места, где вы остановились.
+                Введите единый код продолжения вида ТОЧКА-XXXX-XXXX-XXXX-XXXX-XXXX. Он откроет все ваши разговоры на этом устройстве.
               </p>
 
               <input
                 style={s.crisisInput}
-                value={sessionCodeInput}
-                onChange={(e) => setSessionCodeInput(e.target.value.toUpperCase())}
+                value={continuationCodeInput}
+                onChange={(e) => setContinuationCodeInput(e.target.value.toUpperCase())}
                 placeholder="Код продолжения"
               />
+
+              {continuationCodeError && (
+                <div style={s.error}>{continuationCodeError}</div>
+              )}
 
               <div style={s.crisisActions}>
                 <button
                   style={s.wide}
-                  disabled={loadingSession || sessionCodeInput.trim().length < 5}
+                  disabled={loadingSession || continuationCodeInput.trim().length < 5}
                   onClick={async () => {
                     setLoadingSession(true);
                     try {
-                      const code = sessionCodeInput.trim();
+                      const code = continuationCodeInput.trim();
                       await loadSupportCabinet(code);
                       setSessionModalOpen(false);
-                      setSessionCodeInput("");
+                      setContinuationCodeInput("");
                     } catch (e) {
-                      showToast(e.message || "Сессия не найдена. Проверьте код.", "error");
+                      // Error is already shown in the modal.
                     } finally {
                       setLoadingSession(false);
                     }
                   }}
                 >
                   {loadingSession ? "Поиск..." : "Продолжить по коду"}
+                </button>
+                <button
+                  style={{ ...s.secondary, width: "100%" }}
+                  onClick={() => setSessionModalOpen(false)}
+                >
+                  Отмена
                 </button>
               </div>
             </div>

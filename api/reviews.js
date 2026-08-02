@@ -1798,7 +1798,7 @@ async function handleGenerateQualityInsight(req, res) {
     }
 
     if (!result || !result.parsed) {
-      console.log("Quality insight AI returned unparseable response", { raw: result?.raw?.slice(0, 200) });
+      console.log("Quality insight AI returned unparseable response");
       return res.status(500).json({
         ok: false,
         error: "AI вернул невалидный ответ. Кейсы не отмечены как проанализированные. Попробуйте снова.",
