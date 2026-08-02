@@ -1459,56 +1459,89 @@ async function handleGetBodyCabinet(req, res) {
       return res.status(403).json({ ok: false, error: "Сессия истекла. Войдите снова по коду продолжения." });
     }
 
-    // 3. Get profile from body_intake_forms (answers jsonb)
-    const { data: intakeForm } = await supabase
-      .from("body_intake_forms")
-      .select("answers, bmi, care_recommendation, created_at")
-      .eq("session_id", sessionId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const ownerId = client.anonymous_owner_id;
 
-    const answers = intakeForm?.answers || {};
-    const profile = {
-      age: answers.age || null,
-      gender: answers.sex || null,
-      height_cm: answers.height_cm || null,
-      weight_kg: answers.weight_kg || null,
-      target_weight_kg: answers.target_weight_kg || null,
-      activity_level: answers.work_activity_level || answers.daily_steps_estimate || null,
-      sleep_hours: answers.sleep_hours_estimate || null,
-      stress_level: answers.stress_level || null,
-    };
+    // 3. Get profile from body_intake_forms (answers jsonb) — latest across all owner sessions
+    const { data: ownerSessions } = await supabase
+      .from("body_clients")
+      .select("session_id")
+      .eq("anonymous_owner_id", ownerId);
+
+    const ownerSessionIds = (ownerSessions || []).map(s => s.session_id);
+
+    let profile = {};
+    if (ownerSessionIds.length > 0) {
+      const { data: latestIntake } = await supabase
+        .from("body_intake_forms")
+        .select("answers, bmi, care_recommendation, created_at")
+        .in("session_id", ownerSessionIds)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const answers = latestIntake?.answers || {};
+      profile = {
+        age: answers.age || null,
+        gender: answers.sex || null,
+        height_cm: answers.height_cm || null,
+        weight_kg: answers.weight_kg || null,
+        target_weight_kg: answers.target_weight_kg || null,
+        activity_level: answers.work_activity_level || null,
+        sleep_hours: answers.sleep_hours_estimate || null,
+        stress_level: answers.stress_level || null,
+      };
+    }
 
     // 4. Wallet
     const { data: wallet } = await supabase
       .from("usage_wallets")
       .select("balance, total_used")
-      .eq("owner_id", client.anonymous_owner_id)
+      .eq("owner_id", ownerId)
       .eq("module", "body")
       .maybeSingle();
 
-    // 5. Today's diary log
-    const { data: todayLog } = await supabase
-      .from("body_daily_logs")
-      .select("*")
-      .eq("session_id", sessionId)
-      .eq("log_date", new Date().toISOString().slice(0, 10))
-      .maybeSingle();
+    // 5. Owner-level diary history (all sessions, last 90 days, deduplicated by date)
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    // 6. Recent diary history
-    const { data: recentLogs } = await supabase
-      .from("body_daily_logs")
-      .select("log_date, weight_kg, steps, workout_done, energy_level, mood_level, meals_count, plate_photos")
-      .eq("session_id", sessionId)
-      .order("log_date", { ascending: false })
-      .limit(30);
+    let allLogs = [];
+    if (ownerSessionIds.length > 0) {
+      const { data: ownerLogs } = await supabase
+        .from("body_daily_logs")
+        .select("session_id, log_date, weight_kg, waist_cm, steps, workout_done, workout_minutes, calories, meals_count, water_l, sleep_hours, sleep_quality, energy_level, mood_level, plate_photos, created_at, updated_at")
+        .in("session_id", ownerSessionIds)
+        .gte("log_date", ninetyDaysAgo)
+        .order("log_date", { ascending: false });
 
-    // 7. Credential existence (for code rotation UI)
+      allLogs = ownerLogs || [];
+    }
+
+    // Deduplicate by date: keep the latest entry per date (by updated_at or created_at)
+    const byDate = new Map();
+    for (const log of allLogs) {
+      const existing = byDate.get(log.log_date);
+      if (!existing) {
+        byDate.set(log.log_date, log);
+      } else {
+        const logTime = log.updated_at || log.created_at || "";
+        const existingTime = existing.updated_at || existing.created_at || "";
+        if (logTime > existingTime) {
+          byDate.set(log.log_date, log);
+        }
+      }
+    }
+
+    const dedupedHistory = Array.from(byDate.values())
+      .sort((a, b) => b.log_date.localeCompare(a.log_date));
+
+    // Today's log — search across all owner sessions
+    const today = new Date().toISOString().slice(0, 10);
+    const todayLog = dedupedHistory.find(l => l.log_date === today) || null;
+
+    // 6. Credential existence (for code rotation UI)
     const { data: credential } = await supabase
       .from("continuation_credentials")
       .select("lookup_code")
-      .eq("owner_id", client.anonymous_owner_id)
+      .eq("owner_id", ownerId)
       .eq("owner_type", "anonymous_profile")
       .eq("module", "body")
       .eq("revoked_at", null)
@@ -1520,14 +1553,20 @@ async function handleGetBodyCabinet(req, res) {
       profile,
       wallet: wallet ? { balance: wallet.balance, total_used: wallet.total_used } : null,
       today_log: todayLog || null,
-      history: (recentLogs || []).map((l) => ({
+      history: dedupedHistory.map((l) => ({
         date: l.log_date,
         weight_kg: l.weight_kg,
+        waist_cm: l.waist_cm,
         steps: l.steps,
         workout_done: l.workout_done,
+        workout_minutes: l.workout_minutes,
+        calories: l.calories,
+        meals_count: l.meals_count,
+        water_l: l.water_l,
+        sleep_hours: l.sleep_hours,
+        sleep_quality: l.sleep_quality,
         energy_level: l.energy_level,
         mood_level: l.mood_level,
-        meals_count: l.meals_count,
         has_photos: Array.isArray(l.plate_photos) && l.plate_photos.length > 0,
       })),
       has_credential: !!credential,
