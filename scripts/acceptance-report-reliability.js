@@ -472,6 +472,86 @@ async function runTestD() {
   console.log("  D passed");
 }
 
+function createMockSupabaseForSaveFailure(failSessionId) {
+  const chainFailure = {
+    eq: () => Promise.resolve({ data: null, error: { message: "Simulated save failure", code: "23505" } }),
+  };
+  return {
+    from: (table) => {
+      if (table !== "sessions") {
+        return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }) };
+      }
+      return {
+        select: (cols) => ({
+          eq: (_col, val) => ({
+            maybeSingle: () => {
+              if (val === failSessionId) return Promise.resolve({ data: { json_data: {} }, error: null });
+              return Promise.resolve({ data: null, error: null });
+            },
+          }),
+        }),
+        update: (_data) => chainFailure,
+      };
+    },
+  };
+}
+
+async function runTestE() {
+  console.log("\n=== E. Save failure via mock Supabase (no runtime test hook) ===");
+  const sessionId = `acc-e-${Date.now()}`;
+  const requestId = getStableReportRequestId(sessionId, 3);
+
+  const { saveFinalReportToSession, REPORT_STATUS } = await import("../lib/report/finalize.js");
+
+  const mockSupabase = createMockSupabaseForSaveFailure(sessionId);
+  const saved = await saveFinalReportToSession({
+    supabase: mockSupabase,
+    sessionId,
+    userReport: "Test report",
+    doctorReport: "Test doctor report",
+    careRecommendation: { level: "self_support", timeframe: "within_weeks", specialist_types: [], reasons: [], interim_support: [], urgent_triggers: [] },
+    reportRequestId: requestId,
+    status: REPORT_STATUS.READY,
+    completedAt: new Date().toISOString(),
+    extraJsonData: null,
+  });
+
+  assert(saved === false, "E: saveFinalReportToSession returns false on DB error");
+
+  const { setReportStatus } = await import("../lib/report/finalize.js");
+  const statusMock = {
+    from: (table) => ({
+      update: (data) => ({
+        eq: () => {
+          statusMock._lastUpdate = data;
+          return Promise.resolve({ error: null });
+        },
+      }),
+    }),
+    _lastUpdate: null,
+  };
+  await setReportStatus(statusMock, sessionId, {
+    status: REPORT_STATUS.FAILED,
+    requestId,
+    errorCode: "save_failed",
+  });
+  assert(statusMock._lastUpdate?.report_generation_status === "failed", "E: status set to failed");
+  assert(statusMock._lastUpdate?.report_error_code === "save_failed", "E: error code set to save_failed");
+
+  const session = await getSession(sessionId);
+  if (session) {
+    assert(!session.user_report, "E: no user_report in DB");
+    assert(!session.doctor_report, "E: no doctor_report in DB");
+  }
+
+  const ledger = await getLedgerForSession(sessionId);
+  const finalDebits = ledger.filter((e) => e.entry_type === "usage_debit" && e.request_id === requestId);
+  assert(finalDebits.length === 0, `E: no debit, got ${finalDebits.length}`);
+
+  results.tests.E = { status: "PASS", requestId };
+  console.log("  E passed");
+}
+
 async function inspectAffectedSession() {
   console.log("\n=== 3. Affected test session: sess__zJR2NQsXR65BT7zDHjQPg ===");
   const sessionId = "sess__zJR2NQsXR65BT7zDHjQPg";
@@ -564,6 +644,7 @@ async function runAll() {
   await runTestB();
   await runTestC();
   await runTestD();
+  await runTestE();
   await inspectAffectedSession();
   await runChecks();
 
