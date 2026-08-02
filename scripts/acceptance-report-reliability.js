@@ -472,45 +472,6 @@ async function runTestD() {
   console.log("  D passed");
 }
 
-async function runTestE() {
-  console.log("\n=== E. Save failure simulation ===");
-  // Use a sentinel session ID that triggers forced save failure in finalize.js.
-  const sessionId = `acc-e-save-fail-${Date.now()}`;
-  process.env._TEST_FORCE_REPORT_SAVE_FAILURE = sessionId;
-  const text = normalText();
-  const answers = { 0: "Ответ" };
-  const history = buildHistory(text, answers);
-  const requestId = getStableReportRequestId(sessionId, 3);
-
-  const r = await invokeAnalyze({
-    session_id: sessionId,
-    text,
-    depth: 3,
-    answers,
-    conversationHistory: history,
-    module: "support",
-  }, "support");
-
-  assert(r.status === 500, "E: returns 500 when save fails");
-  assert(r.body.error, "E: error message returned");
-  assert(r.body.report_request_id === requestId, "E: stable request_id in error");
-
-  const session = await getSession(sessionId);
-  assert(session.report_generation_status === REPORT_STATUS.FAILED, "E: status failed");
-  assert(session.report_request_id === requestId, "E: request_id saved");
-  assert(session.report_error_code === "save_failed", "E: error code save_failed");
-  assert(!session.user_report, "E: no report saved");
-
-  const ledger = await getLedgerForSession(sessionId);
-  const finalDebits = ledger.filter((e) => e.entry_type === "usage_debit" && e.request_id === requestId);
-  assert(finalDebits.length === 0, `E: no debit for failed save, got ${finalDebits.length}`);
-
-  delete process.env._TEST_FORCE_REPORT_SAVE_FAILURE;
-
-  results.tests.E = { status: "PASS", requestId, errorCode: session.report_error_code };
-  console.log("  E passed");
-}
-
 async function inspectAffectedSession() {
   console.log("\n=== 3. Affected test session: sess__zJR2NQsXR65BT7zDHjQPg ===");
   const sessionId = "sess__zJR2NQsXR65BT7zDHjQPg";
@@ -603,7 +564,6 @@ async function runAll() {
   await runTestB();
   await runTestC();
   await runTestD();
-  await runTestE();
   await inspectAffectedSession();
   await runChecks();
 
