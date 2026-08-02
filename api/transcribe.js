@@ -64,26 +64,25 @@ async function validateSessionOwnership(sessionId, module, accessToken) {
   if (module === "body") {
     const { data: client } = await supabase
       .from("body_clients")
-      .select("anonymous_owner_id, legacy_access")
+      .select("anonymous_owner_id")
       .eq("session_id", sessionId)
       .maybeSingle();
     check.session_exists = !!client;
     check.has_owner = !!client?.anonymous_owner_id;
-    check.legacy_access = !!client?.legacy_access;
     if (!client || !client.anonymous_owner_id) {
       console.log("[transcribe] session ownership check:", check);
       return false;
     }
-    if (!client.legacy_access) {
-      if (!accessToken) {
-        console.log("[transcribe] session ownership check:", check);
-        return false;
-      }
-      const valid = await validateSessionAccess(sessionId, accessToken);
-      check.validate_access_result = valid;
+    // Body sessions are always non-legacy; token is mandatory.
+    if (!accessToken) {
+      check.access_token_present = false;
       console.log("[transcribe] session ownership check:", check);
-      if (!valid) return false;
+      return false;
     }
+    const valid = await validateSessionAccess(sessionId, accessToken);
+    check.validate_access_result = valid;
+    console.log("[transcribe] session ownership check:", check);
+    if (!valid) return false;
     return true;
   }
 
