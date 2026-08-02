@@ -116,6 +116,8 @@ export default function App() {
     if (typeof window !== "undefined") {
       const host = window.location.hostname;
       if (host === "health.tochka-opori.online" || host.startsWith("health.")) return "body";
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("module") === "body") return "body";
     }
     return "support";
   });
