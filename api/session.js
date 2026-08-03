@@ -2389,12 +2389,17 @@ async function handleGetBodyAiChat(req, res) {
 }
 
 async function handleSendBodyAiMessage(req, res) {
+  const startTime = Date.now();
   try {
     const { session_id, access_token, message_text } = req.body || {};
+    console.log("[chat] step=1 received:", { has_session: !!session_id, has_token: !!access_token, msg_len: message_text?.length || 0 });
+
     const owner = await resolveBodyOwner(session_id, access_token);
     if (!owner) {
+      console.log("[chat] step=2 resolveBodyOwner FAILED");
       return res.status(401).json({ ok: false, error: "Требуется авторизация." });
     }
+    console.log("[chat] step=2 owner resolved");
 
     if (!message_text || typeof message_text !== "string") {
       return res.status(400).json({ ok: false, error: "Missing message_text." });
@@ -2409,7 +2414,7 @@ async function handleSendBodyAiMessage(req, res) {
 
     // Save user message
     const userMsgId = crypto.randomUUID();
-    await supabase.from("body_ai_chat").insert({
+    const { error: userInsertErr } = await supabase.from("body_ai_chat").insert({
       id: userMsgId,
       owner_type: "anonymous_profile",
       owner_id: owner.ownerId,
@@ -2418,22 +2423,38 @@ async function handleSendBodyAiMessage(req, res) {
       message_text: trimmed,
       created_at: new Date().toISOString(),
     });
+    if (userInsertErr) {
+      console.error("[chat] step=3 user message insert FAILED:", userInsertErr.code, userInsertErr.message);
+    } else {
+      console.log("[chat] step=3 user message saved");
+    }
 
     // Build context snapshot
-    const context = await buildAiChatContext({ supabase, ownerId: owner.ownerId });
-
-    console.log("[sendBodyAiMessage]", JSON.stringify({
-      action: "sendBodyAiMessage",
-      logs_count: context.recent_daily_logs?.length || 0,
-      insights_count: context.active_insights?.length || 0,
-      has_weekly: !!context.weekly_summary,
-      chat_messages_count: context.recent_chat_messages?.length || 0,
-    }));
+    let context;
+    try {
+      context = await buildAiChatContext({ supabase, ownerId: owner.ownerId });
+      console.log("[chat] step=4 context built:", {
+        logs: context.recent_daily_logs?.length || 0,
+        insights: context.active_insights?.length || 0,
+        weekly: !!context.weekly_summary,
+        chat: context.recent_chat_messages?.length || 0,
+      });
+    } catch (ctxErr) {
+      console.error("[chat] step=4 context build FAILED:", ctxErr.message);
+      context = {};
+    }
 
     // Read prompt
-    const { readModulePrompt, readCorePrompt } = await import("../lib/prompts.js");
-    const chatPrompt = readModulePrompt("body", "ai-chat.md") || "";
-    const conversationStyle = readCorePrompt("conversation-style.md") || "";
+    let chatPrompt = "";
+    let conversationStyle = "";
+    try {
+      const { readModulePrompt, readCorePrompt } = await import("../lib/prompts.js");
+      chatPrompt = readModulePrompt("body", "ai-chat.md") || "";
+      conversationStyle = readCorePrompt("conversation-style.md") || "";
+      console.log("[chat] step=5 prompts loaded:", { chat_prompt_len: chatPrompt.length, style_len: conversationStyle.length });
+    } catch (promptErr) {
+      console.error("[chat] step=5 prompt load FAILED:", promptErr.message);
+    }
 
     const systemPrompt = `${chatPrompt}\n\n${conversationStyle}\n\nКонтекст пользователя:\n${JSON.stringify(context, null, 2)}`;
     const userPrompt = trimmed;
@@ -2444,6 +2465,7 @@ async function handleSendBodyAiMessage(req, res) {
 
     let result;
     try {
+      console.log("[chat] step=6 calling AI:", { model: MODEL, fallback: FALLBACK });
       result = await runTask(TASK_TYPES.BODY_INTAKE, {
         systemPrompt,
         userPrompt,
@@ -2451,16 +2473,18 @@ async function handleSendBodyAiMessage(req, res) {
         fallbackModel: FALLBACK,
         reasoningEffort: REASONING_EFFORT,
       });
+      console.log("[chat] step=6 AI returned:", {
+        has_parsed: !!result.parsed,
+        has_answer: !!result.parsed?.answer,
+        raw_len: result.raw?.length || 0,
+        model_used: result.model_used,
+        duration_ms: Date.now() - startTime,
+      });
     } catch (aiErr) {
-      console.error("[sendBodyAiMessage] AI call failed:", aiErr.message);
-      // Return friendly error, don't save failed AI response
+      console.error("[chat] step=6 AI call FAILED:", aiErr.message, "duration:", Date.now() - startTime, "ms");
       return res.status(200).json({
         ok: true,
-        message: {
-          role: "assistant",
-          answer: "Не удалось ответить сейчас. Попробуйте позже.",
-          confidence: "low",
-        },
+        message: { role: "assistant", answer: "Не удалось ответить сейчас. Попробуйте позже.", confidence: "low" },
         credits_charged: 0,
       });
     }
@@ -2482,18 +2506,20 @@ async function handleSendBodyAiMessage(req, res) {
       aiQuestion = parsed.question_for_specialist || null;
       aiSafety = parsed.safety_note || null;
       aiConfidence = parsed.confidence || "medium";
+      console.log("[chat] step=7 using parsed JSON answer");
     } else if (raw) {
-      // Fallback: use raw text as answer
       aiAnswer = raw.slice(0, 2000);
       aiConfidence = "low";
+      console.log("[chat] step=7 using raw text fallback, len:", raw.length);
     } else {
       aiAnswer = "Не удалось получить ответ. Попробуйте переформулировать вопрос.";
       aiConfidence = "low";
+      console.log("[chat] step=7 no answer available");
     }
 
-    // Save successful response
+    // Save assistant response
     const assistantMsgId = crypto.randomUUID();
-    await supabase.from("body_ai_chat").insert({
+    const { error: assistantInsertErr } = await supabase.from("body_ai_chat").insert({
       id: assistantMsgId,
       owner_type: "anonymous_profile",
       owner_id: owner.ownerId,
@@ -2510,6 +2536,11 @@ async function handleSendBodyAiMessage(req, res) {
       model_used: result.model_used,
       created_at: new Date().toISOString(),
     });
+    if (assistantInsertErr) {
+      console.error("[chat] step=8 assistant insert FAILED:", assistantInsertErr.code);
+    } else {
+      console.log("[chat] step=8 assistant saved, total_duration:", Date.now() - startTime, "ms");
+    }
 
     return res.status(200).json({
       ok: true,

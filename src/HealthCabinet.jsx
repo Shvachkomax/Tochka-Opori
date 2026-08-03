@@ -241,6 +241,7 @@ export default function HealthCabinet({
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatDebug, setChatDebug] = useState("");
 
   const SUGGESTED_PROMPTS = [
     "Что видно по моей неделе?",
@@ -275,6 +276,7 @@ export default function HealthCabinet({
     setChatInput("");
     setChatError("");
     setChatLoading(true);
+    setChatDebug("sending...");
 
     // Add user message optimistically
     const userMsg = { id: "temp-" + Date.now(), role: "user", message_text: msg, created_at: new Date().toISOString() };
@@ -285,22 +287,33 @@ export default function HealthCabinet({
       try { token = await getClientToken("body", "session"); } catch {}
       const hdrs = { "Content-Type": "application/json" };
       if (token) hdrs["Authorization"] = `Bearer ${token}`;
+      setChatDebug("api " + "request...");
       const res = await fetch("/api/session", {
         method: "POST",
         headers: hdrs,
         body: JSON.stringify({ action: "sendBodyAiMessage", session_id: sessionId, access_token: accessToken, message_text: msg }),
       });
       const data = await res.json();
+      setChatDebug("api " + res.status + " ok=" + data.ok);
       if (!res.ok || !data.ok) {
         throw new Error(data.error || "Не удалось ответить.");
       }
+      // Build assistant message from API response
+      const assistantMsg = data.message || {
+        role: "assistant",
+        answer: data.answer || "Не удалось получить ответ.",
+        confidence: "low",
+        created_at: new Date().toISOString(),
+      };
       // Replace temp user message with real one, add assistant response
       setChatMessages(prev => {
         const withoutTemp = prev.filter(m => m.id !== userMsg.id);
-        return [...withoutTemp, { ...userMsg, id: "user-" + Date.now() }, data.message];
+        return [...withoutTemp, { ...userMsg, id: "user-" + Date.now() }, assistantMsg];
       });
+      setChatDebug("done");
     } catch (e) {
       setChatError(e.message || "Ошибка.");
+      setChatDebug("error: " + e.message);
       setChatMessages(prev => prev.filter(m => m.id !== userMsg.id));
     } finally {
       setChatLoading(false);
@@ -852,6 +865,11 @@ export default function HealthCabinet({
                 {chatLoading ? "…" : "Отправить"}
               </button>
             </div>
+            {chatDebug && (
+              <div style={{ fontSize: 11, color: "#8a7e72", marginTop: 4, fontFamily: "monospace" }}>
+                status: {chatDebug}
+              </div>
+            )}
           </div>
         )}
       </div>
