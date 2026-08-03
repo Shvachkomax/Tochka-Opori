@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { getClientToken } from "./lib/clientToken.js";
 
 const ACTIVITY_LABELS = {
   sedentary: "Малоподвижный",
@@ -128,6 +129,28 @@ export default function HealthCabinet({
   const [historyDays, setHistoryDays] = useState(30);
   const [chartDays, setChartDays] = useState(30);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [plateHistory, setPlateHistory] = useState(null);
+  const [plateHistoryDays, setPlateHistoryDays] = useState(7);
+
+  // Fetch plate history on mount and when period changes
+  useEffect(() => {
+    async function loadPlateHistory() {
+      try {
+        let token;
+        try { token = await getClientToken("body", "session"); } catch {}
+        const hdrs = { "Content-Type": "application/json" };
+        if (token) hdrs["Authorization"] = `Bearer ${token}`;
+        const res = await fetch("/api/session", {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({ action: "getBodyPlateHistory", session_id: sessionId, access_token: accessToken, period_days: plateHistoryDays }),
+        });
+        const data = await res.json();
+        if (data.ok) setPlateHistory(data);
+      } catch {}
+    }
+    if (sessionId && accessToken) loadPlateHistory();
+  }, [sessionId, accessToken, plateHistoryDays]);
 
   async function handleRotate() {
     setRotating(true);
@@ -383,6 +406,72 @@ export default function HealthCabinet({
           </div>
         )}
       </div>
+
+      {/* Plate Nutrition by Photos */}
+      {plateHistory && plateHistory.aggregates && plateHistory.aggregates.total_photos > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#2f2925" }}>Питание по фото</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[7, 30].map(d => (
+                <button key={d} onClick={() => setPlateHistoryDays(d)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #d8cec1", background: plateHistoryDays === d ? "#7D9A89" : "#fff", color: plateHistoryDays === d ? "#fff" : "#5f574f", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+                  {d} дн
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+            <div style={{ padding: "10px 14px", borderRadius: 10, background: "#faf6ef", border: "1px solid #e8e2d8", fontSize: 13 }}>
+              <span style={{ color: "#8a7e72" }}>Фото: </span>
+              <span style={{ fontWeight: 600 }}>{plateHistory.aggregates.total_photos}</span>
+            </div>
+            <div style={{ padding: "10px 14px", borderRadius: 10, background: "#faf6ef", border: "1px solid #e8e2d8", fontSize: 13 }}>
+              <span style={{ color: "#8a7e72" }}>Дней с фото: </span>
+              <span style={{ fontWeight: 600 }}>{plateHistory.aggregates.days_with_photos}</span>
+            </div>
+          </div>
+
+          {/* Frequent observations */}
+          <div style={{ padding: 12, borderRadius: 10, background: "#faf6ef", border: "1px solid #e8e2d8", marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Частые наблюдения</div>
+            {plateHistory.aggregates.protein_low + plateHistory.aggregates.protein_missing > 0 && (
+              <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 4 }}>🔸 Мало белка: {plateHistory.aggregates.protein_low + plateHistory.aggregates.protein_missing} раз</div>
+            )}
+            {plateHistory.aggregates.vegetables_low + plateHistory.aggregates.vegetables_missing > 0 && (
+              <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 4 }}>🔸 Мало овощей: {plateHistory.aggregates.vegetables_low + plateHistory.aggregates.vegetables_missing} раз</div>
+            )}
+            {plateHistory.aggregates.carbohydrates_excess > 0 && (
+              <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 4 }}>🔸 Много углеводов: {plateHistory.aggregates.carbohydrates_excess} раз</div>
+            )}
+            {plateHistory.aggregates.frequent_missing.length > 0 && plateHistory.aggregates.frequent_missing.slice(0, 3).map((m, i) => (
+              <div key={i} style={{ fontSize: 13, color: "#8a7e72", marginBottom: 2 }}>• Часто не хватает: {m.item} ({m.count})</div>
+            ))}
+            {plateHistory.aggregates.protein_low + plateHistory.aggregates.protein_missing === 0 &&
+             plateHistory.aggregates.vegetables_low + plateHistory.aggregates.vegetables_missing === 0 &&
+             plateHistory.aggregates.carbohydrates_excess === 0 && (
+              <div style={{ fontSize: 13, color: "#7D9A89" }}>✅ Баланс в норме</div>
+            )}
+          </div>
+
+          {/* Recent photos */}
+          {plateHistory.entries && plateHistory.entries.length > 0 && (
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Последние фото</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {plateHistory.entries.slice(0, 6).map((entry, i) => (
+                  <div key={i} style={{ padding: "8px 12px", borderRadius: 8, background: "#faf6ef", border: "1px solid #e8e2d8", fontSize: 12 }}>
+                    <span style={{ fontWeight: 600, color: "#2f2925" }}>
+                      {new Date(entry.log_date + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                    </span>
+                    {entry.balance_summary && <span style={{ color: "#5f574f", marginLeft: 8 }}>— {entry.balance_summary}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Profile */}
       {profile && Object.keys(profile).length > 0 && (

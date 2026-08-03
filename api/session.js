@@ -223,6 +223,10 @@ export default async function handler(req, res) {
         return await handleSaveBodyOnboarding(req, res);
       case "getBodyDiaryDay":
         return await handleGetBodyDiaryDay(req, res);
+      case "savePlateHistory":
+        return await handleSavePlateHistory(req, res);
+      case "getBodyPlateHistory":
+        return await handleGetBodyPlateHistory(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -1851,5 +1855,185 @@ async function handleGetBodyDiaryDay(req, res) {
   } catch (error) {
     console.error("handleGetBodyDiaryDay error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка загрузки дневника." });
+  }
+}
+
+// ============================================================
+// Body Plate History
+// ============================================================
+
+async function handleSavePlateHistory(req, res) {
+  try {
+    const { session_id, access_token, daily_log_id, log_date, plate_results } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!daily_log_id || !log_date || !Array.isArray(plate_results)) {
+      return res.status(400).json({ ok: false, error: "Missing daily_log_id, log_date, or plate_results." });
+    }
+
+    const supabase = getSupabase();
+    const now = new Date().toISOString();
+    let savedCount = 0;
+
+    for (const result of plate_results) {
+      if (result.error) continue; // Skip failed analyses
+
+      const photoIndex = result.photo_index ?? 0;
+      const fingerprint = `${daily_log_id}:${photoIndex}`;
+
+      const payload = {
+        owner_type: "anonymous_profile",
+        owner_id: owner.ownerId,
+        session_id,
+        daily_log_id,
+        log_date,
+        photo_ref: fingerprint,
+        photo_index: photoIndex,
+        meal_type: result.meal_type || null,
+        detected_foods: result.detected_foods || null,
+        plate_components: result.plate_components || null,
+        vegetables_assessment: result.plate_components?.vegetables != null ? (result.plate_components.vegetables >= 40 ? "enough" : result.plate_components.vegetables > 0 ? "low" : "missing") : null,
+        protein_assessment: result.plate_components?.protein != null ? (result.plate_components.protein >= 20 ? "enough" : result.plate_components.protein > 0 ? "low" : "missing") : null,
+        carbohydrate_assessment: result.plate_components?.carbohydrates != null ? (result.plate_components.carbohydrates <= 35 ? "enough" : result.plate_components.carbohydrates > 50 ? "excess" : "ok") : null,
+        balance_summary: result.balance_summary || null,
+        what_is_missing: result.what_is_missing || null,
+        gentle_suggestion: result.gentle_suggestion || null,
+        confidence: result.confidence || null,
+        model_used: result.model_used || null,
+        prompt_version: result.prompt_version || null,
+        updated_at: now,
+      };
+
+      // Upsert by owner_id + daily_log_id + photo_index
+      const { data: existing } = await supabase
+        .from("body_plate_history")
+        .select("id")
+        .eq("owner_id", owner.ownerId)
+        .eq("daily_log_id", daily_log_id)
+        .eq("photo_index", photoIndex)
+        .maybeSingle();
+
+      if (existing) {
+        const { error: updateError } = await supabase
+          .from("body_plate_history")
+          .update(payload)
+          .eq("id", existing.id);
+        if (updateError) {
+          console.error("[savePlateHistory] update error:", updateError.code, "photo:", photoIndex);
+        } else {
+          savedCount++;
+        }
+      } else {
+        const { error: insertError } = await supabase
+          .from("body_plate_history")
+          .insert(payload);
+        if (insertError) {
+          console.error("[savePlateHistory] insert error:", insertError.code, "photo:", photoIndex);
+        } else {
+          savedCount++;
+        }
+      }
+    }
+
+    return res.status(200).json({ ok: true, saved: savedCount });
+  } catch (error) {
+    console.error("handleSavePlateHistory error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сохранения истории тарелок." });
+  }
+}
+
+async function handleGetBodyPlateHistory(req, res) {
+  try {
+    const { session_id, access_token, period_days } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const days = period_days === 30 ? 30 : 7;
+    const sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const supabase = getSupabase();
+
+    const { data: history, error: historyError } = await supabase
+      .from("body_plate_history")
+      .select("id, log_date, photo_index, meal_type, detected_foods, plate_components, vegetables_assessment, protein_assessment, carbohydrate_assessment, balance_summary, what_is_missing, gentle_suggestion, confidence, created_at")
+      .eq("owner_id", owner.ownerId)
+      .gte("log_date", sinceDate)
+      .order("log_date", { ascending: false })
+      .order("photo_index", { ascending: true });
+
+    if (historyError) {
+      console.error("[getBodyPlateHistory] query error:", historyError.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить историю." });
+    }
+
+    const entries = history || [];
+
+    // Compute aggregates
+    const uniqueDays = new Set(entries.map(e => e.log_date));
+    const totalPhotos = entries.length;
+    const daysWithPhotos = uniqueDays.size;
+
+    let proteinEnough = 0, proteinLow = 0, proteinMissing = 0;
+    let vegEnough = 0, vegLow = 0, vegMissing = 0;
+    let carbEnough = 0, carbExcess = 0;
+    const missingCounts = {};
+    let confidenceSum = 0, confidenceCount = 0;
+
+    for (const e of entries) {
+      if (e.protein_assessment === "enough") proteinEnough++;
+      else if (e.protein_assessment === "low") proteinLow++;
+      else if (e.protein_assessment === "missing") proteinMissing++;
+
+      if (e.vegetables_assessment === "enough") vegEnough++;
+      else if (e.vegetables_assessment === "low") vegLow++;
+      else if (e.vegetables_assessment === "missing") vegMissing++;
+
+      if (e.carbohydrate_assessment === "enough") carbEnough++;
+      else if (e.carbohydrate_assessment === "excess") carbExcess++;
+
+      if (Array.isArray(e.what_is_missing)) {
+        for (const item of e.what_is_missing) {
+          missingCounts[item] = (missingCounts[item] || 0) + 1;
+        }
+      }
+
+      if (e.confidence != null) {
+        confidenceSum += Number(e.confidence);
+        confidenceCount++;
+      }
+    }
+
+    const frequentMissing = Object.entries(missingCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([item, count]) => ({ item, count }));
+
+    return res.status(200).json({
+      ok: true,
+      period_days: days,
+      aggregates: {
+        total_photos: totalPhotos,
+        days_with_photos: daysWithPhotos,
+        protein_enough: proteinEnough,
+        protein_low: proteinLow,
+        protein_missing: proteinMissing,
+        vegetables_enough: vegEnough,
+        vegetables_low: vegLow,
+        vegetables_missing: vegMissing,
+        carbohydrates_enough: carbEnough,
+        carbohydrates_excess: carbExcess,
+        frequent_missing: frequentMissing,
+        average_confidence: confidenceCount > 0 ? Math.round((confidenceSum / confidenceCount) * 100) / 100 : null,
+      },
+      entries: entries.slice(0, 20), // Last 20 for display
+    });
+  } catch (error) {
+    console.error("handleGetBodyPlateHistory error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки истории тарелок." });
   }
 }

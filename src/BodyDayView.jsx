@@ -140,23 +140,36 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
               <img key={i} src={photo} alt={`Тарелка ${i + 1}`} style={{ width: 120, height: 120, objectFit: "cover", borderRadius: 8, border: "1px solid #e8e2d8" }} />
             ))}
           </div>
-          {/* Plate analysis results */}
-          {day.plate_analysis && day.plate_analysis.length > 0 && day.plate_analysis.map((a, i) => (
-            <div key={i} style={{ padding: 12, borderRadius: 10, background: "#faf6ef", marginBottom: 8, fontSize: 13 }}>
-              <div style={{ fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>{a.photo_name || `Фото ${i + 1}`}</div>
-              {a.error ? (
-                <div style={{ color: "#b5473f" }}>{a.error}</div>
-              ) : (
-                <>
-                  {a.balance_summary && <div style={{ color: "#5f574f" }}>{a.balance_summary}</div>}
-                  {a.what_is_missing && a.what_is_missing.length > 0 && (
-                    <div style={{ color: "#8a7e72", marginTop: 4 }}>Чего не хватает: {a.what_is_missing.join(", ")}</div>
-                  )}
-                  {a.gentle_suggestion && <div style={{ color: "#7D9A89", marginTop: 4, fontStyle: "italic" }}>{a.gentle_suggestion}</div>}
-                </>
-              )}
-            </div>
-          ))}
+          {/* Use plate_history if available, fallback to plate_analysis */}
+          {plateHistory && plateHistory.length > 0 ? (
+            plateHistory.map((a, i) => (
+              <div key={i} style={{ padding: 12, borderRadius: 10, background: "#faf6ef", marginBottom: 8, fontSize: 13 }}>
+                <div style={{ fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Фото {a.photo_index + 1}</div>
+                {a.balance_summary && <div style={{ color: "#5f574f" }}>{a.balance_summary}</div>}
+                {a.what_is_missing && a.what_is_missing.length > 0 && (
+                  <div style={{ color: "#8a7e72", marginTop: 4 }}>Чего не хватает: {a.what_is_missing.join(", ")}</div>
+                )}
+                {a.gentle_suggestion && <div style={{ color: "#7D9A89", marginTop: 4, fontStyle: "italic" }}>{a.gentle_suggestion}</div>}
+              </div>
+            ))
+          ) : day.plate_analysis && day.plate_analysis.length > 0 ? (
+            day.plate_analysis.map((a, i) => (
+              <div key={i} style={{ padding: 12, borderRadius: 10, background: "#faf6ef", marginBottom: 8, fontSize: 13 }}>
+                <div style={{ fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>{a.photo_name || `Фото ${i + 1}`}</div>
+                {a.error ? (
+                  <div style={{ color: "#b5473f" }}>{a.error}</div>
+                ) : (
+                  <>
+                    {a.balance_summary && <div style={{ color: "#5f574f" }}>{a.balance_summary}</div>}
+                    {a.what_is_missing && a.what_is_missing.length > 0 && (
+                      <div style={{ color: "#8a7e72", marginTop: 4 }}>Чего не хватает: {a.what_is_missing.join(", ")}</div>
+                    )}
+                    {a.gentle_suggestion && <div style={{ color: "#7D9A89", marginTop: 4, fontStyle: "italic" }}>{a.gentle_suggestion}</div>}
+                  </>
+                )}
+              </div>
+            ))
+          ) : null}
         </div>
       )}
 

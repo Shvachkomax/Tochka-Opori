@@ -926,6 +926,62 @@ async function handleDailyLogAnalysis(req, res) {
       console.log("Body client check skipped:", clientErr.message);
     }
 
+    // Save plate history (structured per-photo observations)
+    if (savedLog.id && Array.isArray(daily_log.plate_analysis) && daily_log.plate_analysis.length > 0) {
+      try {
+        const { fingerprint: fpFn } = await import("../lib/session/continuation-store.js");
+        // Resolve owner_id from body_clients
+        const { data: ownerClient } = await supabase
+          .from("body_clients")
+          .select("anonymous_owner_id")
+          .eq("session_id", session_id)
+          .maybeSingle();
+        const ownerId = ownerClient?.anonymous_owner_id;
+        if (ownerId) {
+          const now = new Date().toISOString();
+          for (const result of daily_log.plate_analysis) {
+            if (result.error) continue;
+            const photoIndex = result.photo_index ?? 0;
+            const platePayload = {
+              owner_type: "anonymous_profile",
+              owner_id: ownerId,
+              session_id,
+              daily_log_id: savedLog.id,
+              log_date: logDate,
+              photo_ref: `${savedLog.id}:${photoIndex}`,
+              photo_index: photoIndex,
+              meal_type: result.meal_type || null,
+              detected_foods: result.detected_foods || null,
+              plate_components: result.plate_components || null,
+              vegetables_assessment: result.plate_components?.vegetables != null ? (result.plate_components.vegetables >= 40 ? "enough" : result.plate_components.vegetables > 0 ? "low" : "missing") : null,
+              protein_assessment: result.plate_components?.protein != null ? (result.plate_components.protein >= 20 ? "enough" : result.plate_components.protein > 0 ? "low" : "missing") : null,
+              carbohydrate_assessment: result.plate_components?.carbohydrates != null ? (result.plate_components.carbohydrates <= 35 ? "enough" : result.plate_components.carbohydrates > 50 ? "excess" : "ok") : null,
+              balance_summary: result.balance_summary || null,
+              what_is_missing: result.what_is_missing || null,
+              gentle_suggestion: result.gentle_suggestion || null,
+              confidence: result.confidence || null,
+              updated_at: now,
+            };
+            // Upsert by owner_id + daily_log_id + photo_index
+            const { data: existingPlate } = await supabase
+              .from("body_plate_history")
+              .select("id")
+              .eq("owner_id", ownerId)
+              .eq("daily_log_id", savedLog.id)
+              .eq("photo_index", photoIndex)
+              .maybeSingle();
+            if (existingPlate) {
+              await supabase.from("body_plate_history").update(platePayload).eq("id", existingPlate.id);
+            } else {
+              await supabase.from("body_plate_history").insert(platePayload);
+            }
+          }
+        }
+      } catch (plateErr) {
+        console.error("[body-diary-save] plate history save skipped:", plateErr.message);
+      }
+    }
+
     // Only now run AI analysis (after confirmed save)
     try {
       const conversationStyle = readCorePrompt("conversation-style.md") || "";
@@ -1041,6 +1097,7 @@ ${dayDesc || "Нет заполненных полей."}
       return res.status(200).json({
         ok: true,
         saved: true,
+        daily_log_id: savedLog.id,
         log_date: savedLog.log_date,
         session_id,
         ai_day_summary: parsed?.ai_day_summary || "Спасибо, день записан. Продолжайте наблюдение.",
@@ -1054,6 +1111,7 @@ ${dayDesc || "Нет заполненных полей."}
       return res.status(200).json({
         ok: true,
         saved: true,
+        daily_log_id: savedLog.id,
         analysis_ready: false,
         log_date: savedLog.log_date,
         session_id,
