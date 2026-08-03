@@ -2422,6 +2422,14 @@ async function handleSendBodyAiMessage(req, res) {
     // Build context snapshot
     const context = await buildAiChatContext({ supabase, ownerId: owner.ownerId });
 
+    console.log("[sendBodyAiMessage]", JSON.stringify({
+      action: "sendBodyAiMessage",
+      logs_count: context.recent_daily_logs?.length || 0,
+      insights_count: context.active_insights?.length || 0,
+      has_weekly: !!context.weekly_summary,
+      chat_messages_count: context.recent_chat_messages?.length || 0,
+    }));
+
     // Read prompt
     const { readModulePrompt, readCorePrompt } = await import("../lib/prompts.js");
     const chatPrompt = readModulePrompt("body", "ai-chat.md") || "";
@@ -2434,31 +2442,18 @@ async function handleSendBodyAiMessage(req, res) {
     const FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
     const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
 
-    const result = await runTask(TASK_TYPES.BODY_INTAKE, {
-      systemPrompt,
-      userPrompt,
-      model: MODEL,
-      fallbackModel: FALLBACK,
-      reasoningEffort: REASONING_EFFORT,
-    });
-
-    const parsed = result.parsed;
-    const requestId = `chat-${owner.ownerId}-${Date.now()}`;
-
-    if (!parsed || !parsed.answer) {
-      // Save failed response
-      await supabase.from("body_ai_chat").insert({
-        owner_type: "anonymous_profile",
-        owner_id: owner.ownerId,
-        session_id,
-        role: "assistant",
-        message_text: "Не удалось ответить. Попробуйте позже.",
-        ai_response: { answer: "Не удалось ответить. Попробуйте позже.", confidence: "low" },
-        request_id: requestId,
-        model_used: result.model_used,
-        created_at: new Date().toISOString(),
+    let result;
+    try {
+      result = await runTask(TASK_TYPES.BODY_INTAKE, {
+        systemPrompt,
+        userPrompt,
+        model: MODEL,
+        fallbackModel: FALLBACK,
+        reasoningEffort: REASONING_EFFORT,
       });
-
+    } catch (aiErr) {
+      console.error("[sendBodyAiMessage] AI call failed:", aiErr.message);
+      // Return friendly error, don't save failed AI response
       return res.status(200).json({
         ok: true,
         message: {
@@ -2470,6 +2465,32 @@ async function handleSendBodyAiMessage(req, res) {
       });
     }
 
+    const parsed = result.parsed;
+    const raw = result.raw || "";
+    const requestId = `chat-${owner.ownerId}-${Date.now()}`;
+
+    // Build response: prefer parsed JSON, fallback to raw text
+    let aiAnswer;
+    let aiSmallStep = null;
+    let aiQuestion = null;
+    let aiSafety = null;
+    let aiConfidence = "medium";
+
+    if (parsed && parsed.answer) {
+      aiAnswer = parsed.answer;
+      aiSmallStep = parsed.small_next_step || null;
+      aiQuestion = parsed.question_for_specialist || null;
+      aiSafety = parsed.safety_note || null;
+      aiConfidence = parsed.confidence || "medium";
+    } else if (raw) {
+      // Fallback: use raw text as answer
+      aiAnswer = raw.slice(0, 2000);
+      aiConfidence = "low";
+    } else {
+      aiAnswer = "Не удалось получить ответ. Попробуйте переформулировать вопрос.";
+      aiConfidence = "low";
+    }
+
     // Save successful response
     const assistantMsgId = crypto.randomUUID();
     await supabase.from("body_ai_chat").insert({
@@ -2478,8 +2499,8 @@ async function handleSendBodyAiMessage(req, res) {
       owner_id: owner.ownerId,
       session_id,
       role: "assistant",
-      message_text: parsed.answer,
-      ai_response: parsed,
+      message_text: aiAnswer,
+      ai_response: { answer: aiAnswer, small_next_step: aiSmallStep, question_for_specialist: aiQuestion, safety_note: aiSafety, confidence: aiConfidence },
       context_snapshot: {
         logs_count: context.recent_daily_logs?.length || 0,
         insights_count: context.active_insights?.length || 0,
@@ -2495,11 +2516,11 @@ async function handleSendBodyAiMessage(req, res) {
       message: {
         id: assistantMsgId,
         role: "assistant",
-        answer: parsed.answer,
-        small_next_step: parsed.small_next_step || null,
-        question_for_specialist: parsed.question_for_specialist || null,
-        safety_note: parsed.safety_note || null,
-        confidence: parsed.confidence || "medium",
+        answer: aiAnswer,
+        small_next_step: aiSmallStep,
+        question_for_specialist: aiQuestion,
+        safety_note: aiSafety,
+        confidence: aiConfidence,
         created_at: new Date().toISOString(),
       },
       credits_charged: 1,
