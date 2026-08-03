@@ -145,8 +145,8 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
 
       const onboarding = {
         intro_completed: true,
-        activity_tracker_used: trackerUsed,
-        activity_tracker_name: trackerUsed === "other" ? trackerName : trackerUsed === "none" ? null : trackerUsed,
+        activity_tracker_used: trackerUsed != null && trackerUsed !== "none",
+        activity_tracker_name: trackerUsed === "other" ? trackerName : (trackerUsed && trackerUsed !== "none" ? trackerUsed : null),
         tracked_metrics: trackedMetrics,
         calorie_tracking_mode: calorieMode,
         calorie_tracking_app: calorieApp || null,
