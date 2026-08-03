@@ -1189,8 +1189,8 @@ async function handleValidateInviteToken(req, res) {
   }
 }
 
-const EXCHANGE_RATE_LIMIT_ERROR = "Не удалось открыть разговор. Проверьте код продолжения.";
-const LEGACY_CODE_ERROR = "Этот код создан в ранней версии сервиса. Открыть данные без сохранённого доступа невозможно.";
+const EXCHANGE_RATE_LIMIT_ERROR = "Не удалось открыть запись. Проверьте код продолжения.";
+const LEGACY_CODE_ERROR = "Этот код был создан в старой тестовой версии. Создайте новый код или обратитесь к специалисту.";
 
 async function handleExchangeContinuationCredential(req, res) {
   try {
@@ -1256,12 +1256,18 @@ async function handleExchangeContinuationCredential(req, res) {
       .maybeSingle();
 
     const credentialFound = !!credential;
+    const isRevoked = credential && credential.revoked_at;
     const secretValid = credential
       && credential.module === reqModule
       && !credential.revoked_at
       && verifyContinuationSecret(parsed.secret, credential.secret_hash);
 
     if (!secretValid) {
+      // Specific error for revoked credentials
+      if (credentialFound && isRevoked) {
+        return res.status(401).json({ ok: false, error: "Этот код был заменён новым. Используйте актуальный код продолжения." });
+      }
+
       console.log("[exchange]", JSON.stringify({
         action: "exchange",
         lookup_fingerprint: fingerprint(parsed.lookupCode),
@@ -1314,7 +1320,7 @@ async function handleExchangeContinuationCredential(req, res) {
     }
     if (!targetSession?.session_id) {
       console.log("[handleExchangeContinuationCredential] target_session_found:", false, "owner_found:", true);
-      return res.status(404).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
+      return res.status(404).json({ ok: false, error: "Не удалось найти запись для этого кода. Обратитесь к специалисту." });
     }
 
     const cabinet = await buildCabinetData({ module: reqModule, ownerId: credential.owner_id, supabase });
