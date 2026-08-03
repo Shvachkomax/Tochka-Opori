@@ -47,8 +47,22 @@ async function resolveBodyOwner(sessionId, accessToken) {
     .select("anonymous_owner_id")
     .eq("session_id", sessionId)
     .maybeSingle();
-  if (clientError || !client?.anonymous_owner_id) {
+  if (clientError || !client) {
     return null;
+  }
+  // If anonymous_owner_id is missing (legacy row), generate and persist one
+  if (!client.anonymous_owner_id) {
+    const { randomUUID } = await import("node:crypto");
+    const newOwnerId = randomUUID();
+    const { error: updateError } = await supabase
+      .from("body_clients")
+      .update({ anonymous_owner_id: newOwnerId })
+      .eq("session_id", sessionId);
+    if (updateError) {
+      console.error("[resolveBodyOwner] failed to assign owner:", updateError.code);
+      return null;
+    }
+    return { ownerId: newOwnerId, sessionId };
   }
   return { ownerId: client.anonymous_owner_id, sessionId };
 }
