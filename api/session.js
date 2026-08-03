@@ -19,6 +19,7 @@ import {
   fingerprint,
 } from "../lib/session/continuation-store.js";
 import { createReportArtifacts, REPORT_STATUS } from "../lib/report/finalize.js";
+import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -245,6 +246,10 @@ export default async function handler(req, res) {
         return await handleGetBodyInsights(req, res);
       case "dismissBodyInsight":
         return await handleDismissBodyInsight(req, res);
+      case "getBodyWeeklySummary":
+        return await handleGetBodyWeeklySummary(req, res);
+      case "generateBodyWeeklySummary":
+        return await handleGenerateBodyWeeklySummary(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -2118,5 +2123,227 @@ async function handleDismissBodyInsight(req, res) {
   } catch (error) {
     console.error("handleDismissBodyInsight error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка скрытия наблюдения." });
+  }
+}
+
+// ============================================================
+// Body Weekly Summary
+// ============================================================
+
+function getLocalDateString() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+async function handleGetBodyWeeklySummary(req, res) {
+  try {
+    const { session_id, access_token, period_start, period_end } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!period_start || !period_end) {
+      return res.status(400).json({ ok: false, error: "Missing period_start or period_end." });
+    }
+
+    const supabase = getSupabase();
+    const { data: summary, error } = await supabase
+      .from("body_weekly_summaries")
+      .select("*")
+      .eq("owner_type", "anonymous_profile")
+      .eq("owner_id", owner.ownerId)
+      .eq("summary_type", "weekly")
+      .eq("period_start", period_start)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[getBodyWeeklySummary] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить итог." });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      summary: summary || null,
+      cached: !!summary,
+    });
+  } catch (error) {
+    console.error("handleGetBodyWeeklySummary error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки итога недели." });
+  }
+}
+
+async function handleGenerateBodyWeeklySummary(req, res) {
+  try {
+    const { session_id, access_token, period_start, period_end, force } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!period_start || !period_end) {
+      return res.status(400).json({ ok: false, error: "Missing period_start or period_end." });
+    }
+
+    const supabase = getSupabase();
+
+    // Check cache
+    if (!force) {
+      const { data: cached } = await supabase
+        .from("body_weekly_summaries")
+        .select("*")
+        .eq("owner_type", "anonymous_profile")
+        .eq("owner_id", owner.ownerId)
+        .eq("summary_type", "weekly")
+        .eq("period_start", period_start)
+        .maybeSingle();
+
+      if (cached) {
+        return res.status(200).json({ ok: true, summary: cached, cached: true, credits_charged: 0 });
+      }
+    }
+
+    // Gather data for the period
+    const { data: ownerSessions } = await supabase
+      .from("body_clients")
+      .select("session_id")
+      .eq("anonymous_owner_id", owner.ownerId);
+    const ownerSessionIds = (ownerSessions || []).map(s => s.session_id);
+
+    let dailyLogs = [];
+    if (ownerSessionIds.length > 0) {
+      const { data: logs } = await supabase
+        .from("body_daily_logs")
+        .select("log_date, weight_kg, waist_cm, steps, workout_done, workout_type, workout_minutes, meals_count, overeating_level, sweet_cravings, water_l, sleep_hours, sleep_quality, energy_level, mood_level, ai_positive_observation, ai_pattern_observation, ai_focus_tomorrow")
+        .in("session_id", ownerSessionIds)
+        .gte("log_date", period_start)
+        .lte("log_date", period_end)
+        .order("log_date", { ascending: true });
+      dailyLogs = logs || [];
+    }
+
+    if (dailyLogs.length === 0) {
+      return res.status(200).json({ ok: true, summary: null, cached: false, reason: "no_logs" });
+    }
+
+    // Plate aggregates
+    const { data: plateEntries } = await supabase
+      .from("body_plate_history")
+      .select("log_date, protein_assessment, vegetables_assessment, carbohydrate_assessment, what_is_missing")
+      .eq("owner_id", owner.ownerId)
+      .gte("log_date", period_start)
+      .lte("log_date", period_end);
+
+    const plates = plateEntries || [];
+    const plateAggregates = {
+      total_photos: plates.length,
+      days_with_photos: new Set(plates.map(p => p.log_date)).size,
+      protein_present_count: plates.filter(p => p.protein_assessment === "enough").length,
+      vegetables_present_count: plates.filter(p => p.vegetables_assessment === "enough").length,
+      complex_carbs_present_count: plates.filter(p => p.carbohydrate_assessment === "enough").length,
+      frequent_missing: (() => {
+        const counts = {};
+        for (const p of plates) {
+          if (Array.isArray(p.what_is_missing)) {
+            for (const item of p.what_is_missing) {
+              counts[item] = (counts[item] || 0) + 1;
+            }
+          }
+        }
+        return Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, 5).map(([item]) => item);
+      })(),
+    };
+
+    // Active insights
+    const { data: insights } = await supabase
+      .from("body_insights")
+      .select("title, insight_text, priority")
+      .eq("owner_id", owner.ownerId)
+      .eq("status", "active")
+      .order("priority", { ascending: true })
+      .limit(3);
+
+    // Onboarding preferences
+    const { data: onboarding } = await supabase
+      .from("body_onboarding")
+      .select("activity_tracker_used, support_style, priority_metrics")
+      .eq("owner_id", owner.ownerId)
+      .maybeSingle();
+
+    const context = {
+      period: { start: period_start, end: period_end, days_count: 7, logs_count: dailyLogs.length },
+      daily_logs: dailyLogs,
+      plate_aggregates: plateAggregates,
+      active_insights: (insights || []).map(i => ({ title: i.title, text: i.insight_text, priority: i.priority })),
+      onboarding_preferences: {
+        tracker_enabled: onboarding?.activity_tracker_used || false,
+        support_style: onboarding?.support_style || "gentle",
+        priority_metrics: onboarding?.priority_metrics || [],
+      },
+    };
+
+    // Read prompt
+    const { readModulePrompt } = await import("../lib/prompts.js");
+    const weeklyPrompt = readModulePrompt("body", "weekly-summary.md") || "";
+    const { readCorePrompt } = await import("../lib/prompts.js");
+    const conversationStyle = readCorePrompt("conversation-style.md") || "";
+
+    const systemPrompt = `${weeklyPrompt}\n\n${conversationStyle}`;
+    const userPrompt = `Сформируй недельный итог на основе данных:\n\n${JSON.stringify(context, null, 2)}`;
+
+    const MODEL = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
+    const FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
+    const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
+
+    const result = await runTask(TASK_TYPES.BODY_INTAKE, {
+      systemPrompt,
+      userPrompt,
+      model: MODEL,
+      fallbackModel: FALLBACK,
+      reasoningEffort: REASONING_EFFORT,
+    });
+
+    const parsed = result.parsed;
+    if (!parsed || !parsed.period_summary) {
+      return res.status(500).json({ ok: false, error: "Не удалось сформировать итог недели. Попробуйте позже." });
+    }
+
+    // Save to DB
+    const requestId = `weekly-${owner.ownerId}-${period_start}-${Date.now()}`;
+    const { error: insertError } = await supabase
+      .from("body_weekly_summaries")
+      .insert({
+        owner_type: "anonymous_profile",
+        owner_id: owner.ownerId,
+        summary_type: "weekly",
+        period_start,
+        period_end,
+        source_days: dailyLogs.length,
+        source_plate_count: plates.length,
+        summary_json: parsed,
+        user_summary: parsed.period_summary,
+        focus_next_period: parsed.next_week_focus,
+        model_used: result.model_used,
+        request_id: requestId,
+        generation_status: "ready",
+      });
+
+    if (insertError) {
+      console.error("[generateBodyWeeklySummary] insert error:", insertError.code);
+      return res.status(500).json({ ok: false, error: "Не удалось сохранить итог. Попробуйте позже." });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      summary: { summary_json: parsed, user_summary: parsed.period_summary, period_start, period_end },
+      cached: false,
+      credits_charged: 2,
+    });
+  } catch (error) {
+    console.error("handleGenerateBodyWeeklySummary error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка формирования итога недели." });
   }
 }
