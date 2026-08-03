@@ -8168,7 +8168,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 `}</style>
           <div style={s.wrap}>
-        <header style={s.header} className="app-header">
+        <header style={{ ...s.header, marginBottom: isBodyCabinet ? 24 : 80 }} className="app-header">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img
               src="/logo-tochka-opory-header.png"
@@ -8257,8 +8257,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
         {(() => {
           const isBodyCabinet = activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen);
+          const bodyMaxWidth = activeModule === "body" && bodyScreen === "cabinet" ? 1120
+            : activeModule === "body" && ["diary_view", "diary_edit", "diary_result"].includes(bodyScreen) ? 820
+            : activeModule === "body" && bodyScreen === "onboarding" ? 640
+            : null;
           return (
-        <main style={isBodyCabinet ? { maxWidth: 1180, margin: "0 auto", padding: "0 16px", width: "100%", boxSizing: "border-box" } : s.grid} className={isBodyCabinet ? "" : "app-grid"}>
+        <main style={isBodyCabinet ? { maxWidth: bodyMaxWidth || 1120, margin: "0 auto", padding: "0 16px", width: "100%", boxSizing: "border-box" } : s.grid} className={isBodyCabinet ? "" : "app-grid"}>
           {!isBodyCabinet && (
           <section>
             <h1 style={s.h1} className="app-hero-title">

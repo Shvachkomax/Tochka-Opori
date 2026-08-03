@@ -64,7 +64,7 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto", padding: "20px 16px" }}>
+    <div style={{ maxWidth: 780, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" }}>
       <button onClick={onBack} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5f574f", marginBottom: 16 }}>
         ← Назад в кабинет
       </button>

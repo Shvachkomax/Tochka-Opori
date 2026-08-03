@@ -44,7 +44,7 @@ const WORKOUT_INTENSITY = [
 ];
 
 const s = {
-  form: { maxWidth: 680, margin: "0 auto", padding: "0 24px 60px", width: "100%", boxSizing: "border-box" },
+  form: { maxWidth: 780, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" },
   heading: { fontSize: 28, fontWeight: 800, marginBottom: 8, letterSpacing: "-0.03em", color: "#2f2925" },
   subheading: { color: "#665c52", fontSize: 15, lineHeight: 1.5, marginBottom: 28 },
   section: { marginBottom: 28, padding: 20, borderRadius: 16, background: "#faf6ef", border: "1px solid #e8e2d8" },

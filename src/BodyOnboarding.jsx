@@ -173,7 +173,7 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
   }
 
   const s = {
-    page: { maxWidth: 600, margin: "0 auto", padding: "20px 16px" },
+    page: { maxWidth: 640, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" },
     h2: { fontSize: 22, fontWeight: 700, color: "#2f2925", marginBottom: 8, fontFamily: "Georgia, serif" },
     p: { color: "#665c52", fontSize: 15, lineHeight: 1.6, marginBottom: 16 },
     section: { padding: 20, borderRadius: 16, background: "#faf6ef", border: "1px solid #e8e2d8", marginBottom: 20 },
