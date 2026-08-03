@@ -250,6 +250,10 @@ export default async function handler(req, res) {
         return await handleGetBodyWeeklySummary(req, res);
       case "generateBodyWeeklySummary":
         return await handleGenerateBodyWeeklySummary(req, res);
+      case "getBodyAiChat":
+        return await handleGetBodyAiChat(req, res);
+      case "sendBodyAiMessage":
+        return await handleSendBodyAiMessage(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -2346,4 +2350,284 @@ async function handleGenerateBodyWeeklySummary(req, res) {
     console.error("handleGenerateBodyWeeklySummary error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка формирования итога недели." });
   }
+}
+
+// ============================================================
+// Body AI Chat
+// ============================================================
+
+async function handleGetBodyAiChat(req, res) {
+  try {
+    const { session_id, access_token, limit } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+    const msgLimit = Math.min(limit || 20, 50);
+
+    const { data: messages, error } = await supabase
+      .from("body_ai_chat")
+      .select("id, role, message_text, ai_response, created_at, model_used, request_id")
+      .eq("owner_id", owner.ownerId)
+      .order("created_at", { ascending: false })
+      .limit(msgLimit);
+
+    if (error) {
+      console.error("[getBodyAiChat] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить историю чата." });
+    }
+
+    // Return in chronological order
+    const sorted = (messages || []).reverse();
+    return res.status(200).json({ ok: true, messages: sorted });
+  } catch (error) {
+    console.error("handleGetBodyAiChat error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки чата." });
+  }
+}
+
+async function handleSendBodyAiMessage(req, res) {
+  try {
+    const { session_id, access_token, message_text } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!message_text || typeof message_text !== "string") {
+      return res.status(400).json({ ok: false, error: "Missing message_text." });
+    }
+
+    const trimmed = message_text.trim();
+    if (trimmed.length > 3000) {
+      return res.status(400).json({ ok: false, error: "Слишком длинный вопрос. Сократите, пожалуйста." });
+    }
+
+    const supabase = getSupabase();
+
+    // Save user message
+    const userMsgId = crypto.randomUUID();
+    await supabase.from("body_ai_chat").insert({
+      id: userMsgId,
+      owner_type: "anonymous_profile",
+      owner_id: owner.ownerId,
+      session_id,
+      role: "user",
+      message_text: trimmed,
+      created_at: new Date().toISOString(),
+    });
+
+    // Build context snapshot
+    const context = await buildAiChatContext({ supabase, ownerId: owner.ownerId });
+
+    // Read prompt
+    const { readModulePrompt, readCorePrompt } = await import("../lib/prompts.js");
+    const chatPrompt = readModulePrompt("body", "ai-chat.md") || "";
+    const conversationStyle = readCorePrompt("conversation-style.md") || "";
+
+    const systemPrompt = `${chatPrompt}\n\n${conversationStyle}\n\nКонтекст пользователя:\n${JSON.stringify(context, null, 2)}`;
+    const userPrompt = trimmed;
+
+    const MODEL = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
+    const FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
+    const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
+
+    const result = await runTask(TASK_TYPES.BODY_INTAKE, {
+      systemPrompt,
+      userPrompt,
+      model: MODEL,
+      fallbackModel: FALLBACK,
+      reasoningEffort: REASONING_EFFORT,
+    });
+
+    const parsed = result.parsed;
+    const requestId = `chat-${owner.ownerId}-${Date.now()}`;
+
+    if (!parsed || !parsed.answer) {
+      // Save failed response
+      await supabase.from("body_ai_chat").insert({
+        owner_type: "anonymous_profile",
+        owner_id: owner.ownerId,
+        session_id,
+        role: "assistant",
+        message_text: "Не удалось ответить. Попробуйте позже.",
+        ai_response: { answer: "Не удалось ответить. Попробуйте позже.", confidence: "low" },
+        request_id: requestId,
+        model_used: result.model_used,
+        created_at: new Date().toISOString(),
+      });
+
+      return res.status(200).json({
+        ok: true,
+        message: {
+          role: "assistant",
+          answer: "Не удалось ответить сейчас. Попробуйте позже.",
+          confidence: "low",
+        },
+        credits_charged: 0,
+      });
+    }
+
+    // Save successful response
+    const assistantMsgId = crypto.randomUUID();
+    await supabase.from("body_ai_chat").insert({
+      id: assistantMsgId,
+      owner_type: "anonymous_profile",
+      owner_id: owner.ownerId,
+      session_id,
+      role: "assistant",
+      message_text: parsed.answer,
+      ai_response: parsed,
+      context_snapshot: {
+        logs_count: context.recent_daily_logs?.length || 0,
+        insights_count: context.active_insights?.length || 0,
+        has_weekly: !!context.weekly_summary,
+      },
+      request_id: requestId,
+      model_used: result.model_used,
+      created_at: new Date().toISOString(),
+    });
+
+    return res.status(200).json({
+      ok: true,
+      message: {
+        id: assistantMsgId,
+        role: "assistant",
+        answer: parsed.answer,
+        small_next_step: parsed.small_next_step || null,
+        question_for_specialist: parsed.question_for_specialist || null,
+        safety_note: parsed.safety_note || null,
+        confidence: parsed.confidence || "medium",
+        created_at: new Date().toISOString(),
+      },
+      credits_charged: 1,
+    });
+  } catch (error) {
+    console.error("handleSendBodyAiMessage error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка отправки сообщения." });
+  }
+}
+
+async function buildAiChatContext({ supabase, ownerId }) {
+  const context = {};
+
+  // Profile
+  try {
+    const { data: latestIntake } = await supabase
+      .from("body_intake_forms")
+      .select("answers, bmi, care_recommendation")
+      .in("session_id", (await supabase.from("body_clients").select("session_id").eq("anonymous_owner_id", ownerId)).data?.map(s => s.session_id) || ["__none__"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latestIntake) {
+      context.profile = {
+        goal: latestIntake.answers?.goal || null,
+        bmi: latestIntake.bmi || null,
+        care_recommendation: latestIntake.care_recommendation || null,
+      };
+    }
+  } catch {}
+
+  // Onboarding preferences
+  try {
+    const { data: onboarding } = await supabase
+      .from("body_onboarding")
+      .select("activity_tracker_used, support_style, priority_metrics")
+      .eq("owner_id", ownerId)
+      .maybeSingle();
+    if (onboarding) {
+      context.onboarding_preferences = {
+        tracker_enabled: onboarding.activity_tracker_used || false,
+        support_style: onboarding.support_style || "gentle",
+        priority_metrics: onboarding.priority_metrics || [],
+      };
+    }
+  } catch {}
+
+  // Recent daily logs (max 7)
+  try {
+    const ownerSessionIds = (await supabase.from("body_clients").select("session_id").eq("anonymous_owner_id", ownerId)).data?.map(s => s.session_id) || [];
+    if (ownerSessionIds.length > 0) {
+      const { data: logs } = await supabase
+        .from("body_daily_logs")
+        .select("log_date, weight_kg, steps, workout_done, workout_minutes, meals_count, sleep_hours, sleep_quality, energy_level, mood_level, ai_positive_observation, ai_pattern_observation")
+        .in("session_id", ownerSessionIds)
+        .order("log_date", { ascending: false })
+        .limit(7);
+      context.recent_daily_logs = logs || [];
+    }
+  } catch {}
+
+  // Plate aggregates (30 days)
+  try {
+    const sinceDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const { data: plates } = await supabase
+      .from("body_plate_history")
+      .select("protein_assessment, vegetables_assessment, carbohydrate_assessment, what_is_missing")
+      .eq("owner_id", ownerId)
+      .gte("log_date", sinceDate);
+    const p = plates || [];
+    const missingCounts = {};
+    for (const entry of p) {
+      if (Array.isArray(entry.what_is_missing)) {
+        for (const item of entry.what_is_missing) {
+          missingCounts[item] = (missingCounts[item] || 0) + 1;
+        }
+      }
+    }
+    context.plate_aggregates_30d = {
+      total_photos: p.length,
+      protein_present: p.filter(e => e.protein_assessment === "enough").length,
+      vegetables_present: p.filter(e => e.vegetables_assessment === "enough").length,
+      frequent_missing: Object.entries(missingCounts).sort(([, a], [, b]) => b - a).slice(0, 5).map(([item]) => item),
+    };
+  } catch {}
+
+  // Active insights (max 3)
+  try {
+    const { data: insights } = await supabase
+      .from("body_insights")
+      .select("title, insight_text, priority")
+      .eq("owner_id", ownerId)
+      .eq("status", "active")
+      .order("priority", { ascending: true })
+      .limit(3);
+    context.active_insights = (insights || []).map(i => ({ title: i.title, text: i.insight_text }));
+  } catch {}
+
+  // Weekly summary (latest cached)
+  try {
+    const { data: weekly } = await supabase
+      .from("body_weekly_summaries")
+      .select("period_start, period_end, user_summary, summary_json")
+      .eq("owner_id", ownerId)
+      .eq("summary_type", "weekly")
+      .order("period_start", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (weekly) {
+      context.weekly_summary = {
+        period: `${weekly.period_start} — ${weekly.period_end}`,
+        summary: weekly.user_summary,
+        positive_changes: weekly.summary_json?.positive_changes || [],
+        patterns: weekly.summary_json?.patterns || [],
+      };
+    }
+  } catch {}
+
+  // Recent chat messages (max 5)
+  try {
+    const { data: recentChat } = await supabase
+      .from("body_ai_chat")
+      .select("role, message_text")
+      .eq("owner_id", ownerId)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    context.recent_chat_messages = (recentChat || []).reverse();
+  } catch {}
+
+  return context;
 }
