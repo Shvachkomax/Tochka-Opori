@@ -131,6 +131,7 @@ export default function HealthCabinet({
   const [accessOpen, setAccessOpen] = useState(false);
   const [plateHistory, setPlateHistory] = useState(null);
   const [plateHistoryDays, setPlateHistoryDays] = useState(7);
+  const [insights, setInsights] = useState([]);
 
   // Fetch plate history on mount and when period changes
   useEffect(() => {
@@ -151,6 +152,41 @@ export default function HealthCabinet({
     }
     if (sessionId && accessToken) loadPlateHistory();
   }, [sessionId, accessToken, plateHistoryDays]);
+
+  // Fetch insights on mount
+  useEffect(() => {
+    async function loadInsights() {
+      try {
+        let token;
+        try { token = await getClientToken("body", "session"); } catch {}
+        const hdrs = { "Content-Type": "application/json" };
+        if (token) hdrs["Authorization"] = `Bearer ${token}`;
+        const res = await fetch("/api/session", {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({ action: "getBodyInsights", session_id: sessionId, access_token: accessToken }),
+        });
+        const data = await res.json();
+        if (data.ok) setInsights(data.insights || []);
+      } catch {}
+    }
+    if (sessionId && accessToken) loadInsights();
+  }, [sessionId, accessToken]);
+
+  async function dismissInsight(insightId) {
+    try {
+      let token;
+      try { token = await getClientToken("body", "session"); } catch {}
+      const hdrs = { "Content-Type": "application/json" };
+      if (token) hdrs["Authorization"] = `Bearer ${token}`;
+      await fetch("/api/session", {
+        method: "POST",
+        headers: hdrs,
+        body: JSON.stringify({ action: "dismissBodyInsight", session_id: sessionId, access_token: accessToken, insight_id: insightId }),
+      });
+      setInsights(prev => prev.filter(i => i.id !== insightId));
+    } catch {}
+  }
 
   async function handleRotate() {
     setRotating(true);
@@ -470,6 +506,31 @@ export default function HealthCabinet({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Insights */}
+      {insights.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: "#2f2925", marginBottom: 12 }}>Наблюдения</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {insights.map((insight) => (
+              <div key={insight.id} style={{ padding: "12px 16px", borderRadius: 12, background: "#faf6ef", border: "1px solid #e8e2d8" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{insight.title}</div>
+                  <button onClick={() => dismissInsight(insight.id)} style={{ padding: "2px 8px", borderRadius: 6, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 11, color: "#8a7e72", whiteSpace: "nowrap" }}>
+                    Скрыть
+                  </button>
+                </div>
+                <div style={{ fontSize: 13, color: "#5f574f", lineHeight: 1.5 }}>{insight.insight_text}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {insights.length === 0 && (
+        <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, background: "#faf6ef", border: "1px solid #e8e2d8", textAlign: "center", color: "#8a7e72", fontSize: 14 }}>
+          Пока мало данных для устойчивых наблюдений. Заполните дневник несколько дней подряд.
         </div>
       )}
 

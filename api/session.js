@@ -241,6 +241,10 @@ export default async function handler(req, res) {
         return await handleSavePlateHistory(req, res);
       case "getBodyPlateHistory":
         return await handleGetBodyPlateHistory(req, res);
+      case "getBodyInsights":
+        return await handleGetBodyInsights(req, res);
+      case "dismissBodyInsight":
+        return await handleDismissBodyInsight(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -2049,5 +2053,70 @@ async function handleGetBodyPlateHistory(req, res) {
   } catch (error) {
     console.error("handleGetBodyPlateHistory error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка загрузки истории тарелок." });
+  }
+}
+
+// ============================================================
+// Body Insights
+// ============================================================
+
+async function handleGetBodyInsights(req, res) {
+  try {
+    const { session_id, access_token } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+    const { data: insights, error } = await supabase
+      .from("body_insights")
+      .select("id, insight_type, insight_date, title, insight_text, priority, status, created_at")
+      .eq("owner_id", owner.ownerId)
+      .eq("status", "active")
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(3);
+
+    if (error) {
+      console.error("[getBodyInsights] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить наблюдения." });
+    }
+
+    return res.status(200).json({ ok: true, insights: insights || [] });
+  } catch (error) {
+    console.error("handleGetBodyInsights error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки наблюдений." });
+  }
+}
+
+async function handleDismissBodyInsight(req, res) {
+  try {
+    const { session_id, access_token, insight_id } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!insight_id) {
+      return res.status(400).json({ ok: false, error: "Missing insight_id." });
+    }
+
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from("body_insights")
+      .update({ status: "dismissed", updated_at: new Date().toISOString() })
+      .eq("id", insight_id)
+      .eq("owner_id", owner.ownerId);
+
+    if (error) {
+      console.error("[dismissBodyInsight] update error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось скрыть наблюдение." });
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error("handleDismissBodyInsight error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка скрытия наблюдения." });
   }
 }

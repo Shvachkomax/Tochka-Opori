@@ -990,7 +990,7 @@ async function handleDailyLogAnalysis(req, res) {
       const systemPrompt = `
 Ты — доброжелательный ассистент модуля "Здоровье & Стройность". Пользователь заполнил дневник дня.
 
-Твоя задача: написать короткий итог дня (2–4 предложения) и один мягкий фокус на завтра.
+Твоя задача: написать структурированный итог дня.
 
 ПРАВИЛА:
 - Не стыдить, не ругать
@@ -999,22 +999,42 @@ async function handleDailyLogAnalysis(req, res) {
 - Не давать жесткие нормы калорий
 - Не ставить диагноз
 - Отвечать только на русском языке
+- Если данных мало — честно писать, что вывод предварительный
 - Если есть явные признаки: боль в груди, обморок, кровь в стуле, сильное головокружение, резкое ухудшение — написать "Лучше не продолжать программу сейчас и обратиться за медицинской помощью"
-- Верни JSON с полями: ai_day_summary (текст итога дня), ai_focus_tomorrow (один мягкий фокус на завтра)
+
+Верни JSON строго с полями:
+{
+  "ai_day_summary": "2-4 предложения общий итог дня",
+  "ai_positive_observation": "одно конкретное что получилось сегодня (шаги, регулярность, выбор еды и т.д.)",
+  "ai_pattern_observation": "одно наблюдение или повторяющийся паттерн (мало овощей, нерегулярное питание и т.д.), если данных достаточно; иначе null",
+  "ai_focus_tomorrow": "один мягкий фокус на завтра",
+  "ai_question_for_user": "один открытый вопрос для рефлексии"
+}
+
+### ai_positive_observation:
+Заметь одно конкретное достижение или положительный момент дня.
+Примеры: «Вы вышли на прогулку, хотя не планировали», «Белок был в каждом приёме пищи», «Заполнили дневник — это уже важно для понимания привычек».
+
+### ai_pattern_observation:
+Если данных за 3+ дня — заметь повторяющийся паттерн.
+Примеры: «На последних фото овощей было мало», «Три дня подряд сон меньше 6 часов», «Энергия выше в дни с тренировкой».
+Если данных мало — верни null.
+
+### ai_question_for_user:
+Открытый вопрос для рефлексии, без подвоха.
+Примеры: «Что помогает вам добавлять овощи к обеду?», «Как вы себя чувствуете после прогулки?», «Что мешает лечь спать раньше?»
 
 ### Анализ шагов:
-- Если шагов меньше 5000: «Сегодня шагов маловато для вашей цели. Завтра можно поставить мягкую цель — выйти хотя бы на 5000 или добавить короткую прогулку.»
-- Если 5000+: «Хорошая база по активности — это уже помогает расходу энергии.»
-- Не делать жестких требований.
+- Меньше 5000: мягко предложить прогулку
+- 5000+: отметить как хорошую базу
 
 ### Анализ тренировки:
-- Если тренировки не было: не ругать, предложить короткую реалистичную активность.
-- Если была: отметить как плюс, учитывать тип и длительность.
+- Не было: не ругать, предложить реалистичную активность
+- Была: отметить как плюс
 
-### Анализ питания и энергии:
-- Если переедания нет, но энергия/настроение низкие — не писать автоматически «всё хорошо».
-- Предположить, что дело может быть в составе тарелки, нерегулярности питания, недостатке белка/сложных углеводов/клетчатки.
-- Формулировка: «Переедания вы не отметили — это хороший знак. Но энергия и настроение низкие. Тут важно посмотреть не только размер порций, но и состав: хватает ли белка, сложных углеводов и овощей. Фото тарелок помогут увидеть это точнее.»
+### Анализ питания:
+- Переедания нет, но энергия/настроение низкие — предположить связь с составом тарелки
+- Фото тарелок помогут увидеть точнее
 
 ${conversationStyle}
 `;
@@ -1070,14 +1090,29 @@ ${dayDesc || "Нет заполненных полей."}
       const parsed = result.parsed;
 
       if (parsed && parsed.ai_day_summary) {
+        const updatePayload = {
+          ai_day_summary: parsed.ai_day_summary,
+          ai_focus_tomorrow: parsed.ai_focus_tomorrow,
+          ai_positive_observation: parsed.ai_positive_observation || null,
+          ai_pattern_observation: parsed.ai_pattern_observation || null,
+          ai_question_for_user: parsed.ai_question_for_user || null,
+          ai_analysis_status: "success",
+          ai_analysis_request_id: `body-diary-ai-${session_id}-${Date.now()}`,
+          ai_analysis_model: result.model_used,
+          daily_log_version: 2,
+          updated_at: new Date().toISOString(),
+        };
         await supabase
           .from("body_daily_logs")
-          .update({
-            ai_day_summary: parsed.ai_day_summary,
-            ai_focus_tomorrow: parsed.ai_focus_tomorrow,
-            updated_at: new Date().toISOString(),
-          })
+          .update(updatePayload)
           .eq("id", savedLog.id);
+
+        // Generate insights (after confirmed save + AI success)
+        try {
+          await generateBodyInsights({ supabase, ownerId: ownerClient?.anonymous_owner_id, session_id, logDate });
+        } catch (insightErr) {
+          console.error("[body-diary-save] insight generation skipped:", insightErr.message);
+        }
       }
 
       // Debit credits for AI analysis
@@ -1101,7 +1136,11 @@ ${dayDesc || "Нет заполненных полей."}
         log_date: savedLog.log_date,
         session_id,
         ai_day_summary: parsed?.ai_day_summary || "Спасибо, день записан. Продолжайте наблюдение.",
+        ai_positive_observation: parsed?.ai_positive_observation || null,
+        ai_pattern_observation: parsed?.ai_pattern_observation || null,
         ai_focus_tomorrow: parsed?.ai_focus_tomorrow || "Постарайтесь сегодня лечь спать вовремя.",
+        ai_question_for_user: parsed?.ai_question_for_user || null,
+        ai_analysis_status: "success",
         model_used: result.model_used,
         fallback_used: !!result.fallback_used,
       });
@@ -2136,5 +2175,103 @@ ${antiRepeatBlock}
       return res.status(200).json({ type: "questions", questions: fallbackQuestions, model_used: MODEL_TRIAGE, fallback_used: true, care_recommendation: fallbackCareRec, module: activeModule });
     }
     return res.status(200).json({ type: "final", report: fallbackFinal, model_used: MODEL_TRIAGE, fallback_used: true, care_recommendation: fallbackCareRec, module: activeModule });
+  }
+}
+
+// ============================================================
+// Body Insights Generation
+// ============================================================
+
+async function generateBodyInsights({ supabase, ownerId, session_id, logDate }) {
+  if (!ownerId) return;
+
+  const { fingerprint } = await import("../lib/session/continuation-store.js");
+
+  // Get recent daily logs for this owner
+  const { data: ownerSessions } = await supabase
+    .from("body_clients")
+    .select("session_id")
+    .eq("anonymous_owner_id", ownerId);
+  const ownerSessionIds = (ownerSessions || []).map(s => s.session_id);
+  if (ownerSessionIds.length === 0) return;
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const { data: recentLogs } = await supabase
+    .from("body_daily_logs")
+    .select("log_date, steps, sleep_hours, energy_level, workout_done, plate_photos, overeating_level")
+    .in("session_id", ownerSessionIds)
+    .gte("log_date", sevenDaysAgo)
+    .order("log_date", { ascending: false });
+
+  const logs = recentLogs || [];
+  if (logs.length < 2) return; // Need at least 2 days for patterns
+
+  const insights = [];
+
+  // Insight: low steps pattern
+  const lowStepDays = logs.filter(l => l.steps != null && l.steps < 5000);
+  if (lowStepDays.length >= 3) {
+    const fp = `low_steps:7d:${fingerprint(ownerId)}`;
+    insights.push({
+      insight_type: "activity_pattern",
+      insight_date: logDate,
+      title: "Мало шагов",
+      insight_text: `За последние ${logs.length} дней ${lowStepDays.length} раз шагов было меньше 5000. Прогулки помогают расходу энергии и настроению.`,
+      priority: "normal",
+      fingerprint: fp,
+      source_kind: "daily_logs",
+    });
+  }
+
+  // Insight: poor sleep pattern
+  const poorSleepDays = logs.filter(l => l.sleep_hours != null && l.sleep_hours < 6);
+  if (poorSleepDays.length >= 3) {
+    const fp = `poor_sleep:7d:${fingerprint(ownerId)}`;
+    insights.push({
+      insight_type: "sleep_pattern",
+      insight_date: logDate,
+      title: "Мало сна",
+      insight_text: `${poorSleepDays.length} из ${logs.length} дней сон был меньше 6 часов. Это может влиять на энергию и аппетит.`,
+      priority: "normal",
+      fingerprint: fp,
+      source_kind: "daily_logs",
+    });
+  }
+
+  // Insight: no photos
+  const daysWithoutPhotos = logs.filter(l => !l.plate_photos || l.plate_photos.length === 0);
+  if (logs.length >= 3 && daysWithoutPhotos.length === logs.length) {
+    const fp = `no_photos:7d:${fingerprint(ownerId)}`;
+    insights.push({
+      insight_type: "nutrition_pattern",
+      insight_date: logDate,
+      title: "Нет фото питания",
+      insight_text: `Фото тарелок помогают точнее оценить состав. Загружайте хотя бы одно фото в день.`,
+      priority: "low",
+      fingerprint: fp,
+      source_kind: "plate_history",
+    });
+  }
+
+  // Save insights (upsert by fingerprint)
+  for (const insight of insights) {
+    const payload = {
+      owner_type: "anonymous_profile",
+      owner_id: ownerId,
+      status: "active",
+      updated_at: new Date().toISOString(),
+      ...insight,
+    };
+
+    const { data: existing } = await supabase
+      .from("body_insights")
+      .select("id")
+      .eq("owner_id", ownerId)
+      .eq("fingerprint", insight.fingerprint)
+      .maybeSingle();
+
+    if (!existing) {
+      await supabase.from("body_insights").insert(payload);
+    }
   }
 }
