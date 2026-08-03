@@ -31,6 +31,28 @@ function getClientIp(req) {
     || "unknown";
 }
 
+// Resolve body owner from session_id + access_token.
+// Returns { ownerId, sessionId } or throws with appropriate HTTP status.
+async function resolveBodyOwner(sessionId, accessToken) {
+  if (!sessionId || !accessToken) {
+    return null;
+  }
+  const valid = await validateSessionAccess(sessionId, accessToken);
+  if (!valid) {
+    return null;
+  }
+  const supabase = getSupabase();
+  const { data: client, error: clientError } = await supabase
+    .from("body_clients")
+    .select("anonymous_owner_id")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+  if (clientError || !client?.anonymous_owner_id) {
+    return null;
+  }
+  return { ownerId: client.anonymous_owner_id, sessionId };
+}
+
 // Anonymous Continuation Credential Pass helpers
 async function buildCabinetSessions({ module, ownerId, supabase }) {
   const table = module === "body" ? "body_clients" : "sessions";
@@ -195,6 +217,10 @@ export default async function handler(req, res) {
         return await handleGetReportStatus(req, res);
       case "getBodyCabinet":
         return await handleGetBodyCabinet(req, res);
+      case "getBodyOnboarding":
+        return await handleGetBodyOnboarding(req, res);
+      case "saveBodyOnboarding":
+        return await handleSaveBodyOnboarding(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -1599,5 +1625,123 @@ async function handleGetBodyCabinet(req, res) {
   } catch (error) {
     console.error("handleGetBodyCabinet error", error);
     return res.status(500).json({ ok: false, error: error.message || "Ошибка загрузки кабинета" });
+  }
+}
+
+// ============================================================
+// Body Onboarding
+// ============================================================
+
+async function handleGetBodyOnboarding(req, res) {
+  try {
+    const { session_id, access_token } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("body_onboarding")
+      .select("*")
+      .eq("owner_type", "anonymous_profile")
+      .eq("owner_id", owner.ownerId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[getBodyOnboarding] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить настройки." });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      onboarding: data || {
+        intro_completed: false,
+        activity_tracker_used: null,
+        activity_tracker_name: null,
+        tracked_metrics: [],
+        calorie_tracking_mode: null,
+        data_entry_preference: null,
+        priority_metrics: [],
+        support_style: null,
+      },
+    });
+  } catch (error) {
+    console.error("handleGetBodyOnboarding error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки настроек." });
+  }
+}
+
+async function handleSaveBodyOnboarding(req, res) {
+  try {
+    const { session_id, access_token, onboarding } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!onboarding || typeof onboarding !== "object") {
+      return res.status(400).json({ ok: false, error: "Missing onboarding data." });
+    }
+
+    const supabase = getSupabase();
+    const now = new Date().toISOString();
+
+    const ALLOWED_FIELDS = [
+      "intro_completed", "intro_completed_at",
+      "activity_tracker_used", "activity_tracker_name", "activity_tracker_other",
+      "tracked_metrics",
+      "calorie_tracking_mode", "calorie_tracking_app", "calorie_tracking_other",
+      "data_entry_preference", "priority_metrics", "support_style",
+    ];
+
+    const payload = { owner_type: "anonymous_profile", owner_id: owner.ownerId, updated_at: now };
+    for (const key of ALLOWED_FIELDS) {
+      if (onboarding[key] !== undefined) {
+        payload[key] = onboarding[key];
+      }
+    }
+    if (payload.intro_completed && !payload.intro_completed_at) {
+      payload.intro_completed_at = now;
+    }
+
+    // Upsert
+    const { data: existing } = await supabase
+      .from("body_onboarding")
+      .select("id")
+      .eq("owner_type", "anonymous_profile")
+      .eq("owner_id", owner.ownerId)
+      .maybeSingle();
+
+    let result;
+    if (existing) {
+      const { data: updated, error: updateError } = await supabase
+        .from("body_onboarding")
+        .update(payload)
+        .eq("id", existing.id)
+        .select("*")
+        .single();
+      if (updateError) {
+        console.error("[saveBodyOnboarding] update error:", updateError.code);
+        return res.status(500).json({ ok: false, error: "Не удалось сохранить настройки." });
+      }
+      result = updated;
+    } else {
+      const { data: inserted, error: insertError } = await supabase
+        .from("body_onboarding")
+        .insert(payload)
+        .select("*")
+        .single();
+      if (insertError) {
+        console.error("[saveBodyOnboarding] insert error:", insertError.code);
+        return res.status(500).json({ ok: false, error: "Не удалось сохранить настройки." });
+      }
+      result = inserted;
+    }
+
+    return res.status(200).json({ ok: true, onboarding: result });
+  } catch (error) {
+    console.error("handleSaveBodyOnboarding error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сохранения настроек." });
   }
 }

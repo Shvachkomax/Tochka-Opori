@@ -3,6 +3,7 @@ import { normalizeConversationHistory, normalizeSessionDetails, extractUserRepor
 import BodyIntake from "./BodyIntake.jsx";
 import BodyDiary from "./BodyDiary.jsx";
 import HealthCabinet from "./HealthCabinet.jsx";
+import BodyOnboarding from "./BodyOnboarding.jsx";
 import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
 import { saveBodySession, saveSupportSession, getBodySession, getSupportSession, clearBodySession, withAccessToken } from "./lib/sessionAccess.js";
 import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
@@ -1194,7 +1195,27 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
       setBodyCabinetData(cabinetData);
       setBodyDiarySessionId(effectiveSessionId);
-      setBodyScreen("cabinet");
+
+      // Check if onboarding is needed
+      try {
+        let token;
+        try { token = await getClientToken("body", "session"); } catch {}
+        const hdrs = { "Content-Type": "application/json" };
+        if (token) hdrs["Authorization"] = `Bearer ${token}`;
+        const onbRes = await fetch("/api/session", {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({ action: "getBodyOnboarding", session_id: effectiveSessionId, access_token: effectiveAccessToken }),
+        });
+        const onbData = await onbRes.json();
+        if (onbData.ok && !onbData.onboarding?.intro_completed) {
+          setBodyScreen("onboarding");
+        } else {
+          setBodyScreen("cabinet");
+        }
+      } catch {
+        setBodyScreen("cabinet");
+      }
     } catch (e) {
       setBodyContinuationError(e.message || "Не удалось открыть профиль. Проверьте код продолжения.");
       showToast(e.message || "Не удалось открыть профиль.", "error");
@@ -8596,6 +8617,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               onViewDiary={(log) => { setBodyDiaryResult(log); setBodyScreen("diary_result"); }}
               onLogout={() => { clearBodySession(); setBodyScreen("landing"); setBodyCabinetData(null); setBodyDiarySessionId(null); }}
               onRotateCode={regenerateBodyContinuationCode}
+            />
+          )}
+
+          {/* Body onboarding */}
+          {activeModule === "body" && bodyScreen === "onboarding" && (
+            <BodyOnboarding
+              onComplete={() => setBodyScreen("cabinet")}
+              onSkip={() => setBodyScreen("cabinet")}
             />
           )}
 
