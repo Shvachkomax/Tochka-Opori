@@ -4,6 +4,7 @@ import BodyIntake from "./BodyIntake.jsx";
 import BodyDiary from "./BodyDiary.jsx";
 import HealthCabinet from "./HealthCabinet.jsx";
 import BodyOnboarding from "./BodyOnboarding.jsx";
+import BodyDayView from "./BodyDayView.jsx";
 import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
 import { saveBodySession, saveSupportSession, getBodySession, getSupportSession, clearBodySession, withAccessToken } from "./lib/sessionAccess.js";
 import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
@@ -432,6 +433,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [bodyContinuationError, setBodyContinuationError] = useState("");
   const [bodyDiaryOpen, setBodyDiaryOpen] = useState(false);
   const [bodyDiaryResult, setBodyDiaryResult] = useState(null);
+  const [bodyDiaryDayData, setBodyDiaryDayData] = useState(null);
   const [bodyDiaryHistory, setBodyDiaryHistory] = useState(null);
   const [bodyDiaryHistoryOpen, setBodyDiaryHistoryOpen] = useState(false);
   const [bodyDiaryHistoryLoading, setBodyDiaryHistoryLoading] = useState(false);
@@ -8613,8 +8615,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               wallet={bodyCabinetData.wallet}
               todayLog={bodyCabinetData.today_log}
               history={bodyCabinetData.history}
-              onNewDiary={() => { setBodyScreen("diary_edit"); }}
-              onViewDiary={(log) => { setBodyDiaryResult(log); setBodyScreen("diary_result"); }}
+              onNewDiary={() => { setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }}
+              onViewDiary={(log) => { setBodyDiaryDayData(log); setBodyScreen("diary_view"); }}
               onLogout={() => { clearBodySession(); setBodyScreen("landing"); setBodyCabinetData(null); setBodyDiarySessionId(null); }}
               onRotateCode={regenerateBodyContinuationCode}
             />
@@ -8628,19 +8630,30 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             />
           )}
 
+          {/* Body diary view (read-only past day) */}
+          {activeModule === "body" && bodyScreen === "diary_view" && bodyDiaryDayData && (
+            <BodyDayView
+              logDate={bodyDiaryDayData.date || bodyDiaryDayData.log_date}
+              onEdit={(day) => { setBodyDiaryDayData(day); setBodyScreen("diary_edit"); }}
+              onBack={() => setBodyScreen("cabinet")}
+            />
+          )}
+
           {/* Body diary form */}
           {activeModule === "body" && bodyScreen === "diary_edit" && bodyDiarySessionId && (
             <BodyDiary
               sessionId={bodyDiarySessionId}
+              dayData={bodyDiaryDayData}
               onComplete={async (result) => {
                 await loadBodyCabinet();
+                setBodyDiaryDayData(null);
                 if (result?.ok && result?.saved) {
                   showToast("Дневник сохранён", "success");
                 } else {
                   showToast(result?.error || "Дневник сохранён без анализа", "success");
                 }
               }}
-              onCancel={() => setBodyScreen("cabinet")}
+              onCancel={() => { setBodyDiaryDayData(null); setBodyScreen("cabinet"); }}
             />
           )}
 

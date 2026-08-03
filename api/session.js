@@ -221,6 +221,8 @@ export default async function handler(req, res) {
         return await handleGetBodyOnboarding(req, res);
       case "saveBodyOnboarding":
         return await handleSaveBodyOnboarding(req, res);
+      case "getBodyDiaryDay":
+        return await handleGetBodyDiaryDay(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -1743,5 +1745,111 @@ async function handleSaveBodyOnboarding(req, res) {
   } catch (error) {
     console.error("handleSaveBodyOnboarding error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка сохранения настроек." });
+  }
+}
+
+// ============================================================
+// Body Diary Day View
+// ============================================================
+
+async function handleGetBodyDiaryDay(req, res) {
+  try {
+    const { session_id, access_token, log_date } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!log_date || !/^\d{4}-\d{2}-\d{2}$/.test(log_date)) {
+      return res.status(400).json({ ok: false, error: "Invalid log_date format." });
+    }
+
+    const supabase = getSupabase();
+
+    // Find all body sessions for this owner
+    const { data: ownerSessions } = await supabase
+      .from("body_clients")
+      .select("session_id")
+      .eq("anonymous_owner_id", owner.ownerId);
+
+    const ownerSessionIds = (ownerSessions || []).map(s => s.session_id);
+
+    if (ownerSessionIds.length === 0) {
+      return res.status(404).json({ ok: false, error: "Дневник не найден." });
+    }
+
+    // Find the diary day across all owner sessions
+    const { data: dayLog, error: dayError } = await supabase
+      .from("body_daily_logs")
+      .select("*")
+      .in("session_id", ownerSessionIds)
+      .eq("log_date", log_date)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (dayError) {
+      console.error("[getBodyDiaryDay] query error:", dayError.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить дневник." });
+    }
+    if (!dayLog) {
+      return res.status(404).json({ ok: false, error: "Запись за эту дату не найдена." });
+    }
+
+    // Get plate history for this day
+    const { data: plateHistory } = await supabase
+      .from("body_plate_history")
+      .select("id, meal_type, photo_index, detected_foods, plate_components, vegetables_assessment, protein_assessment, carbohydrate_assessment, balance_summary, what_is_missing, gentle_suggestion, confidence, created_at")
+      .eq("owner_id", owner.ownerId)
+      .eq("log_date", log_date)
+      .order("created_at", { ascending: true });
+
+    return res.status(200).json({
+      ok: true,
+      day: {
+        id: dayLog.id,
+        session_id: dayLog.session_id,
+        log_date: dayLog.log_date,
+        weight_kg: dayLog.weight_kg,
+        waist_cm: dayLog.waist_cm,
+        steps: dayLog.steps,
+        activity_comment: dayLog.activity_comment,
+        workout_done: dayLog.workout_done,
+        workout_type: dayLog.workout_type,
+        workout_minutes: dayLog.workout_minutes,
+        workout_intensity: dayLog.workout_intensity,
+        workout_comment: dayLog.workout_comment,
+        calories: dayLog.calories,
+        meals_count: dayLog.meals_count,
+        breakfast: dayLog.breakfast,
+        lunch: dayLog.lunch,
+        dinner: dayLog.dinner,
+        snacks: dayLog.snacks,
+        nutrition_comment: dayLog.nutrition_comment,
+        overeating_level: dayLog.overeating_level,
+        sweet_cravings: dayLog.sweet_cravings,
+        water_l: dayLog.water_l,
+        sleep_hours: dayLog.sleep_hours,
+        sleep_quality: dayLog.sleep_quality,
+        energy_level: dayLog.energy_level,
+        mood_level: dayLog.mood_level,
+        day_text: dayLog.day_text,
+        voice_transcript: dayLog.voice_transcript,
+        plate_photos: dayLog.plate_photos,
+        plate_analysis: dayLog.plate_analysis,
+        ai_day_summary: dayLog.ai_day_summary,
+        ai_focus_tomorrow: dayLog.ai_focus_tomorrow,
+        ai_positive_observation: dayLog.ai_positive_observation,
+        ai_pattern_observation: dayLog.ai_pattern_observation,
+        ai_question_for_user: dayLog.ai_question_for_user,
+        daily_log_version: dayLog.daily_log_version,
+        created_at: dayLog.created_at,
+        updated_at: dayLog.updated_at,
+      },
+      plate_history: plateHistory || [],
+    });
+  } catch (error) {
+    console.error("handleGetBodyDiaryDay error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки дневника." });
   }
 }

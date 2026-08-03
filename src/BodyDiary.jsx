@@ -72,38 +72,38 @@ function num(v) {
   return isNaN(n) ? null : n;
 }
 
-export default function BodyDiary({ sessionId, onComplete, onCancel }) {
+export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) {
   const today = getLocalDateString();
-  const [logDate, setLogDate] = useState(today);
-  const [weightKg, setWeightKg] = useState("");
-  const [waistCm, setWaistCm] = useState("");
-  const [steps, setSteps] = useState("");
-  const [activityComment, setActivityComment] = useState("");
-  const [workoutDone, setWorkoutDone] = useState(false);
-  const [workoutType, setWorkoutType] = useState("");
-  const [workoutMinutes, setWorkoutMinutes] = useState("");
-  const [workoutIntensity, setWorkoutIntensity] = useState("");
-  const [workoutComment, setWorkoutComment] = useState("");
-  const [calories, setCalories] = useState("");
-  const [mealsCount, setMealsCount] = useState("");
-  const [breakfast, setBreakfast] = useState("");
-  const [lunch, setLunch] = useState("");
-  const [dinner, setDinner] = useState("");
-  const [snacks, setSnacks] = useState("");
-  const [nutritionComment, setNutritionComment] = useState("");
-  const [overeatingLevel, setOvereatingLevel] = useState("");
-  const [sweetCravings, setSweetCravings] = useState("");
-  const [waterL, setWaterL] = useState("");
+  const [logDate, setLogDate] = useState(dayData?.log_date || today);
+  const [weightKg, setWeightKg] = useState(dayData?.weight_kg ?? "");
+  const [waistCm, setWaistCm] = useState(dayData?.waist_cm ?? "");
+  const [steps, setSteps] = useState(dayData?.steps ?? "");
+  const [activityComment, setActivityComment] = useState(dayData?.activity_comment || "");
+  const [workoutDone, setWorkoutDone] = useState(dayData?.workout_done || false);
+  const [workoutType, setWorkoutType] = useState(dayData?.workout_type || "");
+  const [workoutMinutes, setWorkoutMinutes] = useState(dayData?.workout_minutes ?? "");
+  const [workoutIntensity, setWorkoutIntensity] = useState(dayData?.workout_intensity || "");
+  const [workoutComment, setWorkoutComment] = useState(dayData?.workout_comment || "");
+  const [calories, setCalories] = useState(dayData?.calories ?? "");
+  const [mealsCount, setMealsCount] = useState(dayData?.meals_count ?? "");
+  const [breakfast, setBreakfast] = useState(dayData?.breakfast || "");
+  const [lunch, setLunch] = useState(dayData?.lunch || "");
+  const [dinner, setDinner] = useState(dayData?.dinner || "");
+  const [snacks, setSnacks] = useState(dayData?.snacks || "");
+  const [nutritionComment, setNutritionComment] = useState(dayData?.nutrition_comment || "");
+  const [overeatingLevel, setOvereatingLevel] = useState(dayData?.overeating_level || "");
+  const [sweetCravings, setSweetCravings] = useState(dayData?.sweet_cravings || "");
+  const [waterL, setWaterL] = useState(dayData?.water_l ?? "");
   const [waterGlassesDone, setWaterGlassesDone] = useState(0);
   const [waterGoalGlasses, setWaterGoalGlasses] = useState(5);
-  const [sleepHours, setSleepHours] = useState("");
-  const [sleepQuality, setSleepQuality] = useState("");
-  const [energyLevel, setEnergyLevel] = useState(5);
-  const [moodLevel, setMoodLevel] = useState(5);
-  const [dayText, setDayText] = useState("");
-  const [voiceTranscript, setVoiceTranscript] = useState("");
-  const [photos, setPhotos] = useState([]); // array of { dataUrl, name }
-  const [plateAnalysis, setPlateAnalysis] = useState([]);
+  const [sleepHours, setSleepHours] = useState(dayData?.sleep_hours ?? "");
+  const [sleepQuality, setSleepQuality] = useState(dayData?.sleep_quality || "");
+  const [energyLevel, setEnergyLevel] = useState(dayData?.energy_level ?? 5);
+  const [moodLevel, setMoodLevel] = useState(dayData?.mood_level ?? 5);
+  const [dayText, setDayText] = useState(dayData?.day_text || "");
+  const [voiceTranscript, setVoiceTranscript] = useState(dayData?.voice_transcript || "");
+  const [photos, setPhotos] = useState(dayData?.plate_photos?.map((p, i) => ({ dataUrl: p, name: `Фото ${i + 1}` })) || []);
+  const [plateAnalysis, setPlateAnalysis] = useState(dayData?.plate_analysis || []);
   const [plateAnalysisLoading, setPlateAnalysisLoading] = useState(false);
   const [plateAnalysisError, setPlateAnalysisError] = useState("");
   const [heicWarning, setHeicWarning] = useState("");
