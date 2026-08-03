@@ -810,16 +810,16 @@ export default function HealthCabinet({
                     ) : (
                       <div>
                         <div style={{ display: "inline-block", padding: "8px 14px", borderRadius: 12, background: "#f0f5f1", color: "#2f2925", fontSize: 14, maxWidth: "80%", lineHeight: 1.5 }}>
-                          {msg.ai_response?.answer || msg.message_text}
+                          {msg.answer || msg.ai_response?.answer || msg.message_text}
                         </div>
-                        {msg.ai_response?.small_next_step && (
-                          <div style={{ fontSize: 12, color: "#7D9A89", marginTop: 4, marginLeft: 8 }}>→ {msg.ai_response.small_next_step}</div>
+                        {(msg.small_next_step || msg.ai_response?.small_next_step) && (
+                          <div style={{ fontSize: 12, color: "#7D9A89", marginTop: 4, marginLeft: 8 }}>→ {msg.small_next_step || msg.ai_response?.small_next_step}</div>
                         )}
-                        {msg.ai_response?.question_for_specialist && (
-                          <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 4, marginLeft: 8, fontStyle: "italic" }}>💬 {msg.ai_response.question_for_specialist}</div>
+                        {(msg.question_for_specialist || msg.ai_response?.question_for_specialist) && (
+                          <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 4, marginLeft: 8, fontStyle: "italic" }}>💬 {msg.question_for_specialist || msg.ai_response?.question_for_specialist}</div>
                         )}
-                        {msg.ai_response?.safety_note && (
-                          <div style={{ fontSize: 12, color: "#b5473f", marginTop: 4, marginLeft: 8, padding: "4px 8px", borderRadius: 6, background: "#fdf2f2" }}>⚠ {msg.ai_response.safety_note}</div>
+                        {(msg.safety_note || msg.ai_response?.safety_note) && (
+                          <div style={{ fontSize: 12, color: "#b5473f", marginTop: 4, marginLeft: 8, padding: "4px 8px", borderRadius: 6, background: "#fdf2f2" }}>⚠ {msg.safety_note || msg.ai_response?.safety_note}</div>
                         )}
                       </div>
                     )}
