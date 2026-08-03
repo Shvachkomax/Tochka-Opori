@@ -8168,7 +8168,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 `}</style>
           <div style={s.wrap}>
-        <header style={{ ...s.header, marginBottom: isBodyCabinet ? 24 : 80 }} className="app-header">
+        <header style={{ ...s.header, marginBottom: activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen) ? 24 : 80 }} className="app-header">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img
               src="/logo-tochka-opory-header.png"
