@@ -865,7 +865,7 @@ export default function HealthCabinet({
                 {chatLoading ? "…" : "Отправить"}
               </button>
             </div>
-            {chatDebug && (
+            {chatDebug && import.meta.env?.DEV && (
               <div style={{ fontSize: 11, color: "#8a7e72", marginTop: 4, fontFamily: "monospace" }}>
                 status: {chatDebug}
               </div>
