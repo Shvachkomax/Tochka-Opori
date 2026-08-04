@@ -562,6 +562,10 @@ export default function HealthCabinet({
           </div>
         </div>
 
+        <button onClick={onNewDiary} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, border: "1px solid #7D9A89", background: "#fff", color: "#5f8b7a", fontWeight: 600, fontSize: 14, cursor: "pointer", marginBottom: 12, fontFamily: "inherit" }}>
+          Заполнить новый день
+        </button>
+
         {displayHistory.length === 0 ? (
           <div style={{ padding: "20px 16px", borderRadius: 12, background: "#faf6ef", border: "1px solid #e8e2d8", textAlign: "center", color: "#8a7e72", fontSize: 14 }}>
             Записей пока нет. Начните с первого дня.

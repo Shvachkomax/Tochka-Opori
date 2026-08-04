@@ -265,6 +265,23 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 
   const [toast, setToast] = useState({ message: "", type: "", key: 0 });
+  const toastTimerRef = useRef(null);
+
+  // Auto-dismiss toast after 3 seconds
+  useEffect(() => {
+    if (toast.message) {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => {
+        setToast({ message: "", type: "", key: 0 });
+      }, 3000);
+    }
+    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
+  }, [toast.key]);
+
+  function clearToast() {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message: "", type: "", key: 0 });
+  }
 
   // Admin panel state
   const [adminPassword, setAdminPassword] = useState("");
@@ -8619,8 +8636,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               wallet={bodyCabinetData.wallet}
               todayLog={bodyCabinetData.today_log}
               history={bodyCabinetData.history}
-              onNewDiary={() => { setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }}
-              onViewDiary={(log) => { setBodyDiaryDayData(log); setBodyScreen("diary_view"); }}
+              onNewDiary={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }}
+              onViewDiary={(log) => { clearToast(); setBodyDiaryDayData(log); setBodyScreen("diary_view"); }}
               onLogout={() => { clearBodySession(); setBodyScreen("landing"); setBodyCabinetData(null); setBodyDiarySessionId(null); }}
               onRotateCode={regenerateBodyContinuationCode}
             />
@@ -8657,7 +8674,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   showToast(result?.error || "Дневник сохранён без анализа", "success");
                 }
               }}
-              onCancel={() => { setBodyDiaryDayData(null); setBodyScreen("cabinet"); }}
+              onCancel={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("cabinet"); }}
             />
           )}
 
@@ -8681,13 +8698,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </div>
               )}
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button onClick={() => { setBodyScreen("diary_edit"); }} style={{
+                <button onClick={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }} style={{
                   padding: "12px 20px", borderRadius: 20, background: "#7D9A89",
                   color: "#fff", fontWeight: 700, border: 0, cursor: "pointer", flex: 1, minWidth: 160,
                 }}>
                   Записать ещё день
                 </button>
-                <button onClick={() => { setBodyScreen("cabinet"); }} style={{
+                <button onClick={() => { clearToast(); setBodyScreen("cabinet"); }} style={{
                   padding: "12px 20px", borderRadius: 20, background: "#ede7dc",
                   color: "#2f2925", fontWeight: 600, border: "1px solid #d8cec1", cursor: "pointer",
                 }}>
