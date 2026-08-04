@@ -85,6 +85,9 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
   const [workoutIntensity, setWorkoutIntensity] = useState(dayData?.workout_intensity || "");
   const [workoutComment, setWorkoutComment] = useState(dayData?.workout_comment || "");
   const [calories, setCalories] = useState(dayData?.calories ?? "");
+  const [calorieIntakeSource, setCalorieIntakeSource] = useState(dayData?.calorie_intake_source || "");
+  const [activityCalories, setActivityCalories] = useState(dayData?.activity_calories ?? "");
+  const [activityCaloriesSource, setActivityCaloriesSource] = useState(dayData?.activity_calories_source || "");
   const [mealsCount, setMealsCount] = useState(dayData?.meals_count ?? "");
   const [breakfast, setBreakfast] = useState(dayData?.breakfast || "");
   const [lunch, setLunch] = useState(dayData?.lunch || "");
@@ -355,6 +358,9 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       workout_intensity: workoutDone ? workoutIntensity || null : null,
       workout_comment: workoutDone ? workoutComment || null : null,
       calories: num(calories),
+      calorie_intake_source: calorieIntakeSource || null,
+      activity_calories: num(activityCalories),
+      activity_calories_source: activityCaloriesSource || null,
       meals_count: num(mealsCount),
       breakfast: breakfast || null,
       lunch: lunch || null,
@@ -570,8 +576,20 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
         </div>
         <div style={s.row2}>
           <div style={s.field}>
-            <label style={s.label}>Калории <span style={s.optional}>(необязательно)</span></label>
-            <input style={s.input} type="number" placeholder="—" value={calories} onChange={e => setCalories(e.target.value)} />
+            <label style={s.label}>Калории за день <span style={s.optional}>(по данным приложения)</span></label>
+            <input style={s.input} type="number" placeholder="Например, 1850" value={calories} onChange={e => setCalories(e.target.value)} />
+            <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 4 }}>Lifesum, FatSecret, YAZIO или другое</div>
+          </div>
+          <div style={s.field}>
+            <label style={s.label}>Затраченные калории <span style={s.optional}>(по данным приложения)</span></label>
+            <input style={s.input} type="number" placeholder="Например, 420" value={activityCalories} onChange={e => setActivityCalories(e.target.value)} />
+            <input style={{ ...s.input, marginTop: 6 }} placeholder="Источник (Apple Fitness, Garmin...)" value={activityCaloriesSource} onChange={e => setActivityCaloriesSource(e.target.value)} />
+          </div>
+        </div>
+        <div style={s.row2}>
+          <div style={s.field}>
+            <label style={s.label}>Источник калорий питания</label>
+            <input style={s.input} placeholder="Lifesum, FatSecret, YAZIO..." value={calorieIntakeSource} onChange={e => setCalorieIntakeSource(e.target.value)} />
           </div>
           <div style={s.field}>
             <label style={s.label}>Кол-во приёмов пищи</label>

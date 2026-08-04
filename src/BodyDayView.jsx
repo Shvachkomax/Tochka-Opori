@@ -65,12 +65,13 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
 
   return (
     <div style={{ maxWidth: 780, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" }}>
-      <button onClick={onBack} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5f574f", marginBottom: 16 }}>
-        ← Назад в кабинет
-      </button>
-
-      <div style={{ fontSize: 22, fontWeight: 700, color: "#2f2925", marginBottom: 4, fontFamily: "Georgia, serif" }}>
-        {new Date(day.log_date + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+      <div style={{ marginBottom: 16 }}>
+        <button onClick={onBack} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5f574f", marginBottom: 8 }}>
+          ← Назад в кабинет
+        </button>
+        <div onClick={onBack} style={{ fontSize: 22, fontWeight: 700, color: "#2f2925", fontFamily: "Georgia, serif", cursor: "pointer" }}>
+          {new Date(day.log_date + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+        </div>
       </div>
 
       {/* Parameters */}
@@ -78,9 +79,15 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
         <div style={{ fontSize: 15, fontWeight: 600, color: "#2f2925", marginBottom: 10 }}>Параметры</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {field("Вес", day.weight_kg, "кг")}
+          {day.weight_change != null && (
+            <div style={{ fontSize: 13, color: day.weight_change <= 0 ? "#7D9A89" : "#e8a857" }}>
+              {day.weight_change === 0 ? "без заметного изменения" : `${day.weight_change > 0 ? "+" : ""}${day.weight_change.toFixed(1)} кг к прошлой записи`}
+            </div>
+          )}
           {field("Талия", day.waist_cm, "см")}
           {field("Шаги", day.steps?.toLocaleString())}
-          {field("Калории", day.calories, "ккал")}
+          {field("Калории", day.calories, `ккал${day.calorie_intake_source ? ` (${day.calorie_intake_source})` : ""}`)}
+          {field("Затраченные калории", day.activity_calories, `ккал${day.activity_calories_source ? ` (${day.activity_calories_source})` : ""}`)}
           {field("Вода", day.water_l, "л")}
           {field("Приёмы пищи", day.meals_count)}
           {field("Сон", day.sleep_hours, "ч")}
@@ -89,6 +96,36 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
           {field("Настроение", day.mood_level, "/10")}
         </div>
       </div>
+
+      {/* Calorie Balance */}
+      {day.calories != null && day.activity_calories != null && (
+        <div style={{ padding: 14, borderRadius: 12, background: "#f0f5f1", border: "1px solid #c4d0c6", marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 6 }}>Итог дня</div>
+          <div style={{ fontSize: 13, color: "#5f574f", lineHeight: 1.5 }}>
+            По введённым данным: питание — {day.calories} ккал{day.calorie_intake_source ? ` (${day.calorie_intake_source})` : ""}, активность — {day.activity_calories} ккал{day.activity_calories_source ? ` (${day.activity_calories_source})` : ""}. Это не полный расчёт энергозатрат, но помогает видеть динамику дня.
+          </div>
+        </div>
+      )}
+
+      {/* Progress Praise */}
+      {(() => {
+        const positives = [];
+        if (day.steps && day.steps >= 5000) positives.push("Хорошая база по активности — это помогает расходу энергии.");
+        if (day.workout_done) positives.push("Есть движение: сегодня отмечена тренировка — это формирует устойчивую привычку.");
+        if (day.plate_photos && day.plate_photos.length > 0) positives.push("Вы добавили фото еды — это помогает видеть состав тарелки точнее.");
+        if (day.sleep_hours && day.sleep_hours >= 7) positives.push("Сон достаточный — это важно для восстановления и аппетита.");
+        if (day.water_l && day.water_l >= 1.5) positives.push("Водный баланс в норме.");
+        if (day.weight_change != null && day.weight_change < 0) positives.push("Вес чуть снизился — главное, продолжаем смотреть на динамику спокойно.");
+        if (positives.length === 0) return null;
+        return (
+          <div style={{ padding: 14, borderRadius: 12, background: "#f0f5f1", border: "1px solid #c4d0c6", marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 6 }}>Что получилось</div>
+            {positives.slice(0, 2).map((p, i) => (
+              <div key={i} style={{ fontSize: 13, color: "#7D9A89", marginBottom: 4 }}>🟢 {p}</div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Workout */}
       {day.workout_done && (

@@ -1833,6 +1833,23 @@ async function handleGetBodyDiaryDay(req, res) {
       return res.status(404).json({ ok: false, error: "Запись за эту дату не найдена." });
     }
 
+    // Calculate weight change from previous day
+    let weightChange = null;
+    if (dayLog.weight_kg != null) {
+      const { data: prevLog } = await supabase
+        .from("body_daily_logs")
+        .select("weight_kg")
+        .in("session_id", ownerSessionIds)
+        .lt("log_date", log_date)
+        .not("weight_kg", "is", null)
+        .order("log_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (prevLog?.weight_kg != null) {
+        weightChange = Math.round((dayLog.weight_kg - prevLog.weight_kg) * 10) / 10;
+      }
+    }
+
     // Get plate history for this day
     const { data: plateHistory } = await supabase
       .from("body_plate_history")
@@ -1857,6 +1874,9 @@ async function handleGetBodyDiaryDay(req, res) {
         workout_intensity: dayLog.workout_intensity,
         workout_comment: dayLog.workout_comment,
         calories: dayLog.calories,
+        activity_calories: dayLog.activity_calories,
+        activity_calories_source: dayLog.activity_calories_source,
+        calorie_intake_source: dayLog.calorie_intake_source,
         meals_count: dayLog.meals_count,
         breakfast: dayLog.breakfast,
         lunch: dayLog.lunch,
@@ -1880,6 +1900,7 @@ async function handleGetBodyDiaryDay(req, res) {
         ai_pattern_observation: dayLog.ai_pattern_observation,
         ai_question_for_user: dayLog.ai_question_for_user,
         daily_log_version: dayLog.daily_log_version,
+        weight_change: weightChange,
         created_at: dayLog.created_at,
         updated_at: dayLog.updated_at,
       },
