@@ -114,6 +114,55 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
   const [usageBalance, setUsageBalance] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [showIntakeSourceEdit, setShowIntakeSourceEdit] = useState(!!dayData?.calorie_intake_source);
+  const [showActivitySourceEdit, setShowActivitySourceEdit] = useState(!!dayData?.activity_calories_source);
+
+  // Auto-fill calorie sources from onboarding/last diary for new entries
+  useEffect(() => {
+    if (dayData) return; // Don't auto-fill when editing existing day
+    async function loadSources() {
+      try {
+        let token;
+        try { token = await getClientToken("body", "session"); } catch {}
+        const hdrs = { "Content-Type": "application/json" };
+        if (token) hdrs["Authorization"] = `Bearer ${token}`;
+
+        // 1. Try onboarding preferences
+        const onbRes = await fetch("/api/session", {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({ action: "getBodyOnboarding", session_id: sessionId, access_token: accessToken }),
+        });
+        const onbData = await onbRes.json();
+        if (onbData.ok && onbData.onboarding) {
+          const onb = onbData.onboarding;
+          if (onb.calorie_tracking_app && !calorieIntakeSource) {
+            setCalorieIntakeSource(onb.calorie_tracking_app);
+          }
+          if (onb.activity_tracker_name && !activityCaloriesSource) {
+            setActivityCaloriesSource(onb.activity_tracker_name);
+          }
+        }
+
+        // 2. Fallback: last diary with source
+        if (!calorieIntakeSource || !activityCaloriesSource) {
+          const cabRes = await fetch("/api/session", {
+            method: "POST",
+            headers: hdrs,
+            body: JSON.stringify({ action: "getBodyCabinet", sessionId, accessToken, clientToday: getLocalDateString() }),
+          });
+          const cabData = await cabRes.json();
+          if (cabData.ok && cabData.history?.length > 0) {
+            const lastWithIntake = cabData.history.find(h => h.calorie_intake_source);
+            const lastWithActivity = cabData.history.find(h => h.activity_calories_source);
+            if (lastWithIntake && !calorieIntakeSource) setCalorieIntakeSource(lastWithIntake.calorie_intake_source);
+            if (lastWithActivity && !activityCaloriesSource) setActivityCaloriesSource(lastWithActivity.activity_calories_source);
+          }
+        }
+      } catch {}
+    }
+    loadSources();
+  }, [sessionId, accessToken, dayData]);
 
   // Voice recording
   const [recording, setRecording] = useState(false);
@@ -576,25 +625,52 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
         </div>
         <div style={s.row2}>
           <div style={s.field}>
-            <label style={s.label}>Калории за день <span style={s.optional}>(по данным приложения)</span></label>
+            <label style={s.label}>
+              Калории за день
+              {calorieIntakeSource && <span style={s.optional}> · {calorieIntakeSource}</span>}
+              {!calorieIntakeSource && <span style={s.optional}> · по данным приложения</span>}
+            </label>
             <input style={s.input} type="number" placeholder="Например, 1850" value={calories} onChange={e => setCalories(e.target.value)} />
-            <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 4 }}>Lifesum, FatSecret, YAZIO или другое</div>
+            <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 4 }}>
+              {!showIntakeSourceEdit ? (
+                <span onClick={() => setShowIntakeSourceEdit(true)} style={{ cursor: "pointer", textDecoration: "underline" }}>Изменить источник</span>
+              ) : (
+                <select value={calorieIntakeSource} onChange={e => { setCalorieIntakeSource(e.target.value); setShowIntakeSourceEdit(false); }} style={{ padding: "2px 6px", borderRadius: 6, border: "1px solid #d8cec1", fontSize: 12, background: "#fff" }}>
+                  <option value="">Не указан</option>
+                  <option value="Lifesum">Lifesum</option>
+                  <option value="FatSecret">FatSecret</option>
+                  <option value="YAZIO">YAZIO</option>
+                  <option value="Другое">Другое</option>
+                </select>
+              )}
+            </div>
           </div>
           <div style={s.field}>
-            <label style={s.label}>Затраченные калории <span style={s.optional}>(по данным приложения)</span></label>
+            <label style={s.label}>
+              Затраченные калории
+              {activityCaloriesSource && <span style={s.optional}> · {activityCaloriesSource}</span>}
+              {!activityCaloriesSource && <span style={s.optional}> · по данным фитнес-приложения</span>}
+            </label>
             <input style={s.input} type="number" placeholder="Например, 420" value={activityCalories} onChange={e => setActivityCalories(e.target.value)} />
-            <input style={{ ...s.input, marginTop: 6 }} placeholder="Источник (Apple Fitness, Garmin...)" value={activityCaloriesSource} onChange={e => setActivityCaloriesSource(e.target.value)} />
+            <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 4 }}>
+              {!showActivitySourceEdit ? (
+                <span onClick={() => setShowActivitySourceEdit(true)} style={{ cursor: "pointer", textDecoration: "underline" }}>Изменить источник</span>
+              ) : (
+                <select value={activityCaloriesSource} onChange={e => { setActivityCaloriesSource(e.target.value); setShowActivitySourceEdit(false); }} style={{ padding: "2px 6px", borderRadius: 6, border: "1px solid #d8cec1", fontSize: 12, background: "#fff" }}>
+                  <option value="">Не указан</option>
+                  <option value="Apple Fitness">Apple Fitness</option>
+                  <option value="Google Fit">Google Fit</option>
+                  <option value="Garmin">Garmin</option>
+                  <option value="Samsung Health">Samsung Health</option>
+                  <option value="Другое">Другое</option>
+                </select>
+              )}
+            </div>
           </div>
         </div>
-        <div style={s.row2}>
-          <div style={s.field}>
-            <label style={s.label}>Источник калорий питания</label>
-            <input style={s.input} placeholder="Lifesum, FatSecret, YAZIO..." value={calorieIntakeSource} onChange={e => setCalorieIntakeSource(e.target.value)} />
-          </div>
-          <div style={s.field}>
-            <label style={s.label}>Кол-во приёмов пищи</label>
-            <input style={s.input} type="number" min="1" max="10" placeholder="3" value={mealsCount} onChange={e => setMealsCount(e.target.value)} />
-          </div>
+        <div style={s.field}>
+          <label style={s.label}>Кол-во приёмов пищи</label>
+          <input style={s.input} type="number" min="1" max="10" placeholder="3" value={mealsCount} onChange={e => setMealsCount(e.target.value)} />
         </div>
         <div style={s.field}>
           <label style={s.label}>Завтрак</label>
