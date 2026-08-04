@@ -122,6 +122,8 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
     if (dayData) return; // Don't auto-fill when editing existing day
     async function loadSources() {
       try {
+        const saved = getBodySession();
+        if (!saved.sessionId || !saved.accessToken) return;
         let token;
         try { token = await getClientToken("body", "session"); } catch {}
         const hdrs = { "Content-Type": "application/json" };
@@ -131,7 +133,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
         const onbRes = await fetch("/api/session", {
           method: "POST",
           headers: hdrs,
-          body: JSON.stringify({ action: "getBodyOnboarding", session_id: sessionId, access_token: accessToken }),
+          body: JSON.stringify({ action: "getBodyOnboarding", session_id: sessionId, access_token: saved.accessToken }),
         });
         const onbData = await onbRes.json();
         if (onbData.ok && onbData.onboarding) {
@@ -149,7 +151,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
           const cabRes = await fetch("/api/session", {
             method: "POST",
             headers: hdrs,
-            body: JSON.stringify({ action: "getBodyCabinet", sessionId, accessToken, clientToday: getLocalDateString() }),
+            body: JSON.stringify({ action: "getBodyCabinet", sessionId: saved.sessionId, accessToken: saved.accessToken, clientToday: getLocalDateString() }),
           });
           const cabData = await cabRes.json();
           if (cabData.ok && cabData.history?.length > 0) {
@@ -162,7 +164,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       } catch {}
     }
     loadSources();
-  }, [sessionId, accessToken, dayData]);
+  }, [sessionId, dayData]);
 
   // Voice recording
   const [recording, setRecording] = useState(false);
