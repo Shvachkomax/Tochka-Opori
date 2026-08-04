@@ -2200,10 +2200,32 @@ async function handleGetBodyWeeklySummary(req, res) {
       return res.status(500).json({ ok: false, error: "Не удалось загрузить итог." });
     }
 
+    // Detect stale: compare source_snapshot with current logs
+    let isStale = false;
+    if (summary?.source_snapshot) {
+      const ownerSessionIds = (await supabase
+        .from("body_clients").select("session_id").eq("anonymous_owner_id", owner.ownerId)
+      ).data?.map(s => s.session_id) || [];
+
+      if (ownerSessionIds.length > 0) {
+        const { count: currentLogsCount } = await supabase
+          .from("body_daily_logs")
+          .select("*", { count: "exact", head: true })
+          .in("session_id", ownerSessionIds)
+          .gte("log_date", period_start)
+          .lte("log_date", period_end);
+
+        if ((currentLogsCount || 0) > (summary.source_snapshot.logs_count || 0)) {
+          isStale = true;
+        }
+      }
+    }
+
     return res.status(200).json({
       ok: true,
       summary: summary || null,
       cached: !!summary,
+      stale: isStale,
     });
   } catch (error) {
     console.error("handleGetBodyWeeklySummary error:", error.message);
@@ -2348,6 +2370,11 @@ async function handleGenerateBodyWeeklySummary(req, res) {
 
     // Save to DB
     const requestId = `weekly-${owner.ownerId}-${period_start}-${Date.now()}`;
+    const sourceSnapshot = {
+      logs_count: dailyLogs.length,
+      latest_log_updated_at: dailyLogs.length > 0 ? dailyLogs[dailyLogs.length - 1].log_date : null,
+      generated_at: new Date().toISOString(),
+    };
     const { error: insertError } = await supabase
       .from("body_weekly_summaries")
       .insert({
@@ -2358,6 +2385,7 @@ async function handleGenerateBodyWeeklySummary(req, res) {
         period_end,
         source_days: dailyLogs.length,
         source_plate_count: plates.length,
+        source_snapshot: sourceSnapshot,
         summary_json: parsed,
         user_summary: parsed.period_summary,
         focus_next_period: parsed.next_week_focus,

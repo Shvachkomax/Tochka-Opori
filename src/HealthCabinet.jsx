@@ -183,6 +183,7 @@ export default function HealthCabinet({
 
   // Weekly summary
   const [weeklySummary, setWeeklySummary] = useState(null);
+  const [weeklyStale, setWeeklyStale] = useState(false);
   const [weeklyLoading, setWeeklyLoading] = useState(false);
   const [weeklyError, setWeeklyError] = useState("");
 
@@ -204,7 +205,10 @@ export default function HealthCabinet({
           body: JSON.stringify({ action: "getBodyWeeklySummary", session_id: sessionId, access_token: accessToken, period_start: weekStart, period_end: weekEnd }),
         });
         const data = await res.json();
-        if (data.ok && data.summary) setWeeklySummary(data.summary);
+        if (data.ok && data.summary) {
+          setWeeklySummary(data.summary);
+          setWeeklyStale(!!data.stale);
+        }
       } catch {}
     }
     if (sessionId && accessToken) loadWeekly();
@@ -227,7 +231,10 @@ export default function HealthCabinet({
       if (!res.ok || !data.ok) {
         throw new Error(data.error || "Не удалось сформировать итог.");
       }
-      if (data.summary) setWeeklySummary(data.summary);
+      if (data.summary) {
+        setWeeklySummary(data.summary);
+        setWeeklyStale(false);
+      }
     } catch (e) {
       setWeeklyError(e.message || "Ошибка формирования итога.");
     } finally {
@@ -712,8 +719,21 @@ export default function HealthCabinet({
         )}
 
         {weeklySummary && weeklySummary.summary_json && (
-          <div style={{ padding: 16, borderRadius: 12, background: "#f0f5f1", border: "1px solid #c4d0c6" }}>
-            <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>Сохранённый итог недели</div>
+          <div style={{ padding: 16, borderRadius: 12, background: weeklyStale ? "#fdf6ee" : "#f0f5f1", border: `1px solid ${weeklyStale ? "#e8d5b8" : "#c4d0c6"}` }}>
+            {weeklyStale ? (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#e8a857", marginBottom: 4 }}>Итог недели нужно обновить</div>
+                <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 8 }}>После прошлого итога появились новые записи дневника. Обновите итог, чтобы он учитывал последние дни.</div>
+                {weeklySummary.source_days != null && (
+                  <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>Предыдущий итог был создан на основе {weeklySummary.source_days} {weeklySummary.source_days === 1 ? "записи" : "записей"}.</div>
+                )}
+                <button onClick={generateWeekly} disabled={weeklyLoading} style={{ width: "100%", padding: "8px 16px", borderRadius: 8, border: 0, background: "#7D9A89", color: "#fff", fontWeight: 600, fontSize: 13, cursor: weeklyLoading ? "not-allowed" : "pointer", opacity: weeklyLoading ? 0.6 : 1 }}>
+                  {weeklyLoading ? "Обновляем..." : "Обновить итог недели"}
+                </button>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>Сохранённый итог недели</div>
+            )}
 
             {weeklySummary.summary_json.period_summary && (
               <div style={{ fontSize: 14, color: "#5f574f", lineHeight: 1.6, marginBottom: 12 }}>{weeklySummary.summary_json.period_summary}</div>
