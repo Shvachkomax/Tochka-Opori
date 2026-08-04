@@ -1876,6 +1876,7 @@ async function handleGetBodyDiaryDay(req, res) {
         workout_minutes: dayLog.workout_minutes,
         workout_intensity: dayLog.workout_intensity,
         workout_comment: dayLog.workout_comment,
+        workout_entries: dayLog.workout_entries || null,
         calories: dayLog.calories,
         activity_calories: dayLog.activity_calories,
         activity_calories_source: dayLog.activity_calories_source,

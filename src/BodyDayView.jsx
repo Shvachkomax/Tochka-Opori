@@ -130,12 +130,31 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
       {/* Workout */}
       {day.workout_done && (
         <div style={{ padding: 16, borderRadius: 12, border: "1px solid #e8e2d8", marginBottom: 16 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Тренировка</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            {field("Тип", day.workout_type)}
-            {field("Длительность", day.workout_minutes, "мин")}
-            {field("Интенсивность", day.workout_intensity)}
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>
+            {day.workout_entries && day.workout_entries.length > 1
+              ? `Тренировки (${day.workout_entries.length})`
+              : "Тренировка"}
           </div>
+          {day.workout_entries && day.workout_entries.length > 0 ? (
+            day.workout_entries.map((w, i) => (
+              <div key={i} style={{ padding: "10px 12px", borderRadius: 8, background: "#faf6ef", border: "1px solid #e8e2d8", marginBottom: 8, fontSize: 13 }}>
+                <div style={{ fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Тренировка {i + 1}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                  {w.type && <div style={{ color: "#5f574f" }}>Тип: {w.type}</div>}
+                  {w.minutes && <div style={{ color: "#5f574f" }}>Длительность: {w.minutes} мин</div>}
+                  {w.intensity && <div style={{ color: "#5f574f" }}>Интенсивность: {w.intensity}</div>}
+                  {w.activity_calories && <div style={{ color: "#5f574f" }}>Калории: {w.activity_calories} ккал{w.activity_calories_source ? ` (${w.activity_calories_source})` : ""}</div>}
+                </div>
+                {w.comment && <div style={{ color: "#8a7e72", marginTop: 4 }}>{w.comment}</div>}
+              </div>
+            ))
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {field("Тип", day.workout_type)}
+              {field("Длительность", day.workout_minutes, "мин")}
+              {field("Интенсивность", day.workout_intensity)}
+            </div>
+          )}
           {day.workout_comment && <div style={{ fontSize: 14, color: "#5f574f", marginTop: 8 }}>{day.workout_comment}</div>}
         </div>
       )}

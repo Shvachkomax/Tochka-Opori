@@ -845,6 +845,7 @@ async function handleDailyLogAnalysis(req, res) {
       "weight_kg", "waist_cm",
       "steps", "activity_comment",
       "workout_done", "workout_type", "workout_minutes", "workout_intensity", "workout_comment",
+      "workout_entries",
       "calories", "activity_calories", "activity_calories_source", "calorie_intake_source",
       "meals_count", "breakfast", "lunch", "dinner", "snacks", "nutrition_comment",
       "overeating_level", "sweet_cravings",
@@ -858,6 +859,20 @@ async function handleDailyLogAnalysis(req, res) {
     for (const key of ALLOWED_COLS) {
       if (daily_log[key] !== undefined) {
         safeLog[key] = daily_log[key];
+      }
+    }
+
+    // Backward compatibility: compute aggregate fields from workout_entries
+    if (Array.isArray(safeLog.workout_entries) && safeLog.workout_entries.length > 0) {
+      const entries = safeLog.workout_entries;
+      safeLog.workout_done = true;
+      safeLog.workout_minutes = entries.reduce((sum, e) => sum + (e.minutes || 0), 0);
+      safeLog.activity_calories = entries.reduce((sum, e) => sum + (e.activity_calories || 0), 0);
+      safeLog.workout_type = entries[0].type || null;
+      safeLog.workout_intensity = entries[0].intensity || null;
+      safeLog.workout_comment = entries.map(e => e.comment).filter(Boolean).join("; ") || null;
+      if (entries[0].activity_calories_source) {
+        safeLog.activity_calories_source = entries[0].activity_calories_source;
       }
     }
 

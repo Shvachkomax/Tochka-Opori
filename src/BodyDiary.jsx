@@ -84,6 +84,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
   const [workoutMinutes, setWorkoutMinutes] = useState(dayData?.workout_minutes ?? "");
   const [workoutIntensity, setWorkoutIntensity] = useState(dayData?.workout_intensity || "");
   const [workoutComment, setWorkoutComment] = useState(dayData?.workout_comment || "");
+  const [workoutEntries, setWorkoutEntries] = useState(dayData?.workout_entries || []);
   const [calories, setCalories] = useState(dayData?.calories ?? "");
   const [calorieIntakeSource, setCalorieIntakeSource] = useState(dayData?.calorie_intake_source || "");
   const [activityCalories, setActivityCalories] = useState(dayData?.activity_calories ?? "");
@@ -178,6 +179,17 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
+
+  // Workout entries helpers
+  function addWorkoutEntry() {
+    setWorkoutEntries(prev => [...prev, { type: "", minutes: "", intensity: "", activity_calories: "", activity_calories_source: activityCaloriesSource || "", comment: "" }]);
+  }
+  function updateWorkoutEntry(idx, field, value) {
+    setWorkoutEntries(prev => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));
+  }
+  function removeWorkoutEntry(idx) {
+    setWorkoutEntries(prev => prev.filter((_, i) => i !== idx));
+  }
 
   useEffect(() => {
     if (!sessionId) return;
@@ -408,6 +420,14 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       workout_minutes: workoutDone ? num(workoutMinutes) : null,
       workout_intensity: workoutDone ? workoutIntensity || null : null,
       workout_comment: workoutDone ? workoutComment || null : null,
+      workout_entries: workoutEntries.length > 0 ? workoutEntries.map(e => ({
+        type: e.type || null,
+        minutes: num(e.minutes),
+        intensity: e.intensity || null,
+        activity_calories: num(e.activity_calories),
+        activity_calories_source: e.activity_calories_source || null,
+        comment: e.comment || null,
+      })) : null,
       calories: num(calories),
       calorie_intake_source: calorieIntakeSource || null,
       activity_calories: num(activityCalories),
@@ -591,30 +611,86 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
         </div>
         {workoutDone && (
           <>
-            <div style={s.field}>
-              <label style={s.label}>Тип тренировки</label>
-              <select style={s.select} value={workoutType} onChange={e => setWorkoutType(e.target.value)}>
-                <option value="" disabled>Выберите...</option>
-                {WORKOUT_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div style={s.row2}>
-              <div style={s.field}>
-                <label style={s.label}>Длительность, минут</label>
-                <input style={s.input} type="number" placeholder="30" value={workoutMinutes} onChange={e => setWorkoutMinutes(e.target.value)} />
+            {/* First workout (main) */}
+            <div style={{ padding: 12, borderRadius: 10, background: "#faf6ef", border: "1px solid #e8e2d8", marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Тренировка 1</div>
+              <div style={s.row2}>
+                <div style={s.field}>
+                  <label style={s.label}>Тип</label>
+                  <select style={s.select} value={workoutType} onChange={e => setWorkoutType(e.target.value)}>
+                    <option value="" disabled>Выберите...</option>
+                    {WORKOUT_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div style={s.field}>
+                  <label style={s.label}>Длительность, мин</label>
+                  <input style={s.input} type="number" placeholder="30" value={workoutMinutes} onChange={e => setWorkoutMinutes(e.target.value)} />
+                </div>
+              </div>
+              <div style={s.row2}>
+                <div style={s.field}>
+                  <label style={s.label}>Интенсивность</label>
+                  <select style={s.select} value={workoutIntensity} onChange={e => setWorkoutIntensity(e.target.value)}>
+                    <option value="" disabled>Выберите...</option>
+                    {WORKOUT_INTENSITY.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div style={s.field}>
+                  <label style={s.label}>Калории</label>
+                  <input style={s.input} type="number" placeholder="—" value={activityCalories} onChange={e => setActivityCalories(e.target.value)} />
+                </div>
               </div>
               <div style={s.field}>
-                <label style={s.label}>Интенсивность</label>
-                <select style={s.select} value={workoutIntensity} onChange={e => setWorkoutIntensity(e.target.value)}>
-                  <option value="" disabled>Выберите...</option>
-                  {WORKOUT_INTENSITY.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <label style={s.label}>Комментарий <span style={s.optional}>(необязательно)</span></label>
+                <textarea style={s.textarea} placeholder="Самочувствие, что делали..." value={workoutComment} onChange={e => setWorkoutComment(e.target.value)} />
               </div>
             </div>
-            <div style={s.field}>
-              <label style={s.label}>Комментарий <span style={s.optional}>(необязательно)</span></label>
-              <textarea style={s.textarea} placeholder="Самочувствие во время тренировки, что делали..." value={workoutComment} onChange={e => setWorkoutComment(e.target.value)} />
-            </div>
+
+            {/* Additional workouts */}
+            {workoutEntries.map((entry, idx) => (
+              <div key={idx} style={{ padding: 12, borderRadius: 10, background: "#faf6ef", border: "1px solid #e8e2d8", marginBottom: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925" }}>Тренировка {idx + 2}</div>
+                  <button onClick={() => removeWorkoutEntry(idx)} style={{ padding: "2px 8px", borderRadius: 6, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 11, color: "#b5473f" }}>
+                    Убрать
+                  </button>
+                </div>
+                <div style={s.row2}>
+                  <div style={s.field}>
+                    <label style={s.label}>Тип</label>
+                    <select style={s.select} value={entry.type} onChange={e => updateWorkoutEntry(idx, "type", e.target.value)}>
+                      <option value="" disabled>Выберите...</option>
+                      {WORKOUT_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={s.field}>
+                    <label style={s.label}>Длительность, мин</label>
+                    <input style={s.input} type="number" placeholder="30" value={entry.minutes} onChange={e => updateWorkoutEntry(idx, "minutes", e.target.value)} />
+                  </div>
+                </div>
+                <div style={s.row2}>
+                  <div style={s.field}>
+                    <label style={s.label}>Интенсивность</label>
+                    <select style={s.select} value={entry.intensity} onChange={e => updateWorkoutEntry(idx, "intensity", e.target.value)}>
+                      <option value="" disabled>Выберите...</option>
+                      {WORKOUT_INTENSITY.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={s.field}>
+                    <label style={s.label}>Калории</label>
+                    <input style={s.input} type="number" placeholder="—" value={entry.activity_calories} onChange={e => updateWorkoutEntry(idx, "activity_calories", e.target.value)} />
+                  </div>
+                </div>
+                <div style={s.field}>
+                  <label style={s.label}>Комментарий</label>
+                  <input style={s.input} placeholder="Кратко" value={entry.comment} onChange={e => updateWorkoutEntry(idx, "comment", e.target.value)} />
+                </div>
+              </div>
+            ))}
+
+            <button onClick={addWorkoutEntry} style={{ width: "100%", padding: "8px 16px", borderRadius: 8, border: "1px dashed #d8cec1", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5f8b7a", fontWeight: 600, marginTop: 4 }}>
+              + Добавить тренировку
+            </button>
           </>
         )}
       </div>
