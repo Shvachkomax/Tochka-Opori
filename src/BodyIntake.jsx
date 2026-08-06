@@ -31,8 +31,7 @@ const FIELD_LABELS = {
 const SEX_OPTIONS = [
   { value: "male", label: "Мужской" },
   { value: "female", label: "Женский" },
-  { value: "other", label: "Другой" },
-  { value: "prefer_not", label: "Не хочу указывать" },
+  { value: "prefer_not_to_say", label: "Не хочу указывать" },
 ];
 
 const GOAL_OPTIONS = [

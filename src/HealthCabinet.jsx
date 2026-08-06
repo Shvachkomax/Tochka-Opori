@@ -17,7 +17,7 @@ const ACTIVITY_LABELS = {
   very_active: "Очень высокая активность",
 };
 
-const GENDER_LABELS = { male: "Мужской", female: "Женский" };
+const GENDER_LABELS = { male: "Мужской", female: "Женский", prefer_not_to_say: "Не хочу указывать", other: "Не хочу указывать", prefer_not: "Не хочу указывать" };
 
 const SLEEP_QUALITY_LABELS = {
   good: "Хорошее",

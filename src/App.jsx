@@ -5564,7 +5564,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       return (
                         <Section title="Информация о клиенте">
                           <Field label="Имя / псевдоним" value={a.display_name || c.display_name || "—"} />
-                          <Field label="Пол" value={{ male: "Мужской", female: "Женский", other: "Другой", prefer_not: "Не указан" }[a.sex] || a.sex || "—"} />
+                          <Field label="Пол" value={{ male: "Мужской", female: "Женский", prefer_not_to_say: "Не хочу указывать", other: "Не хочу указывать", prefer_not: "Не хочу указывать" }[a.sex] || "Не указан"} />
                           <Field label="Возраст" value={a.age || "—"} />
                           <Field label="Цель" value={a.goal === "custom" ? a.goal_custom : ({
                             improve_wellbeing: "Улучшить самочувствие",
