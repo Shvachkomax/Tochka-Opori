@@ -6,6 +6,7 @@ import HealthCabinet from "./HealthCabinet.jsx";
 import BodyOnboarding from "./BodyOnboarding.jsx";
 import BodyDayView from "./BodyDayView.jsx";
 import BodyHealthContext from "./BodyHealthContext.jsx";
+import BodyServiceRequests from "./BodyServiceRequests.jsx";
 import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
 import { saveBodySession, saveSupportSession, getBodySession, getSupportSession, clearBodySession, withAccessToken } from "./lib/sessionAccess.js";
 import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
@@ -8349,9 +8350,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         )}
 
         {(() => {
-          const isBodyCabinet = activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding", "health_context"].includes(bodyScreen);
+          const isBodyCabinet = activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding", "health_context", "service_requests"].includes(bodyScreen);
           const bodyMaxWidth = activeModule === "body" && bodyScreen === "cabinet" ? 1120
-            : activeModule === "body" && ["diary_view", "diary_edit", "diary_result", "health_context"].includes(bodyScreen) ? 820
+            : activeModule === "body" && ["diary_view", "diary_edit", "diary_result", "health_context", "service_requests"].includes(bodyScreen) ? 820
             : activeModule === "body" && bodyScreen === "onboarding" ? 640
             : null;
           return (
@@ -8717,6 +8718,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               onLogout={() => { clearBodySession(); setBodyScreen("landing"); setBodyCabinetData(null); setBodyDiarySessionId(null); }}
               onRotateCode={regenerateBodyContinuationCode}
               onOpenHealthContext={() => { clearToast(); setBodyScreen("health_context"); }}
+              onOpenServiceRequests={() => { clearToast(); setBodyScreen("service_requests"); }}
             />
           )}
 
@@ -8733,6 +8735,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             <BodyHealthContext
               onComplete={() => { clearToast(); setBodyScreen("cabinet"); }}
               onCancel={() => { clearToast(); setBodyScreen("cabinet"); }}
+            />
+          )}
+
+          {/* Body service requests */}
+          {activeModule === "body" && bodyScreen === "service_requests" && (
+            <BodyServiceRequests
+              onBack={() => setBodyScreen("cabinet")}
             />
           )}
 

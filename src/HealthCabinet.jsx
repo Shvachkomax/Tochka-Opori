@@ -129,6 +129,7 @@ export default function HealthCabinet({
   onLogout,
   onRotateCode,
   onOpenHealthContext,
+  onOpenServiceRequests,
 }) {
   const [showRotateConfirm, setShowRotateConfirm] = useState(false);
   const [newCode, setNewCode] = useState(null);
@@ -951,6 +952,17 @@ export default function HealthCabinet({
         </div>
         <button onClick={onOpenHealthContext} style={{ width: "100%", padding: "8px 16px", borderRadius: 8, border: "1px solid #7D9A89", background: "#fff", color: "#5f8b7a", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
           Заполнить / обновить
+        </button>
+      </div>
+
+      {/* Service Requests */}
+      <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, border: "1px solid #e8e2d8", background: "#faf6ef" }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Связаться со специалистом</div>
+        <div style={{ fontSize: 13, color: "#8a7e72", marginBottom: 10 }}>
+          Отправьте вопрос или запросите консультацию
+        </div>
+        <button onClick={onOpenServiceRequests} style={{ width: "100%", padding: "8px 16px", borderRadius: 8, border: "1px solid #7D9A89", background: "#fff", color: "#5f8b7a", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+          Открыть
         </button>
       </div>
 

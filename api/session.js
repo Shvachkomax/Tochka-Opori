@@ -258,6 +258,14 @@ export default async function handler(req, res) {
         return await handleGetBodyHealthContext(req, res);
       case "saveBodyHealthContext":
         return await handleSaveBodyHealthContext(req, res);
+      case "createBodyServiceRequest":
+        return await handleCreateBodyServiceRequest(req, res);
+      case "getBodyServiceRequests":
+        return await handleGetBodyServiceRequests(req, res);
+      case "getBodyServiceRequest":
+        return await handleGetBodyServiceRequest(req, res);
+      case "cancelBodyServiceRequest":
+        return await handleCancelBodyServiceRequest(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -2870,5 +2878,246 @@ async function handleSaveBodyHealthContext(req, res) {
   } catch (error) {
     console.error("handleSaveBodyHealthContext error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка сохранения контекста здоровья." });
+  }
+}
+
+// ============================================================
+// Service Requests
+// ============================================================
+
+const REQUEST_TYPE_CONFIG = {
+  text_question: { label: "Онлайн-вопрос", meeting_format: "text", sla_hours: 24, reserved_credits: 300 },
+  phone_call: { label: "Телефонный звонок", meeting_format: "phone", sla_hours: 24, reserved_credits: 700 },
+  video_call: { label: "Видеоконсультация", meeting_format: "video", sla_hours: 48, reserved_credits: 1500 },
+  offline_visit: { label: "Очная консультация", meeting_format: "offline", sla_hours: 48, reserved_credits: 0, pricing_note: "Стоимость и время уточнит специалист" },
+  diary_review: { label: "Разбор дневника", meeting_format: "text", sla_hours: 24, reserved_credits: 500 },
+  labs_medications_review: { label: "Разбор анализов и препаратов", meeting_format: "text", sla_hours: 24, reserved_credits: 700 },
+  other: { label: "Другой запрос", meeting_format: "text", sla_hours: 24, reserved_credits: 300 },
+};
+
+async function handleCreateBodyServiceRequest(req, res) {
+  try {
+    const { session_id, access_token, request_type, message, context_options, client_contact } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!message || typeof message !== "string" || message.trim().length < 2) {
+      return res.status(400).json({ ok: false, error: "Укажите сообщение." });
+    }
+    if (message.length > 3000) {
+      return res.status(400).json({ ok: false, error: "Слишком длинное сообщение (максимум 3000 символов)." });
+    }
+
+    const config = REQUEST_TYPE_CONFIG[request_type];
+    if (!config) {
+      return res.status(400).json({ ok: false, error: "Неверный тип запроса." });
+    }
+
+    const supabase = getSupabase();
+
+    // Resolve specialist from body_clients
+    const { data: client } = await supabase
+      .from("body_clients")
+      .select("specialist_id, specialist_name, source")
+      .eq("session_id", session_id)
+      .maybeSingle();
+
+    let specialistId = client?.specialist_id || null;
+    let specialistName = client?.specialist_name || null;
+    if (!specialistId && client?.source === "alena_client") {
+      specialistId = "alena_zhukova";
+      specialistName = "Алена Жукова";
+    }
+    if (!specialistName) specialistName = "Специалист";
+
+    // Build safe context snapshot
+    const contextSnapshot = {
+      include_recent_diary: !!context_options?.include_recent_diary,
+      include_plate_history: !!context_options?.include_plate_history,
+      include_weekly_summary: !!context_options?.include_weekly_summary,
+      include_health_context: !!context_options?.include_health_context,
+    };
+
+    // Enrich with counts
+    const ownerSessionIds = (await supabase
+      .from("body_clients").select("session_id").eq("anonymous_owner_id", owner.ownerId)
+    ).data?.map(s => s.session_id) || [];
+
+    if (contextSnapshot.include_recent_diary && ownerSessionIds.length > 0) {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const { count } = await supabase
+        .from("body_daily_logs").select("*", { count: "exact", head: true })
+        .in("session_id", ownerSessionIds).gte("log_date", sevenDaysAgo);
+      contextSnapshot.diary_days_count = count || 0;
+    }
+
+    if (contextSnapshot.include_health_context) {
+      const { data: hc } = await supabase
+        .from("body_health_contexts")
+        .select("health_conditions, medications, supplements, lab_notes")
+        .eq("owner_id", owner.ownerId).eq("module", "body").maybeSingle();
+      if (hc) {
+        contextSnapshot.health_context_summary = {
+          conditions_count: (hc.health_conditions || []).length,
+          medications_count: (hc.medications || []).length,
+          supplements_count: (hc.supplements || []).length,
+          has_recent_labs: !!hc.lab_notes?.has_recent_labs,
+        };
+      }
+    }
+
+    const now = new Date().toISOString();
+    const dueAt = config.sla_hours
+      ? new Date(Date.now() + config.sla_hours * 60 * 60 * 1000).toISOString()
+      : null;
+
+    const { data: inserted, error: insertError } = await supabase
+      .from("service_requests")
+      .insert({
+        module: "body",
+        owner_type: "anonymous_profile",
+        owner_id: owner.ownerId,
+        session_id,
+        specialist_id: specialistId,
+        specialist_name: specialistName,
+        request_type,
+        meeting_format: config.meeting_format,
+        title: config.label,
+        message: message.trim(),
+        status: "submitted",
+        priority: "normal",
+        sla_hours: config.sla_hours,
+        due_at: dueAt,
+        reserved_credits: config.reserved_credits,
+        pricing_note: config.pricing_note || null,
+        context_snapshot: contextSnapshot,
+        client_contact: client_contact || {},
+        created_at: now,
+        updated_at: now,
+      })
+      .select("id, request_type, status, reserved_credits, due_at, created_at")
+      .single();
+
+    if (insertError) {
+      console.error("[createBodyServiceRequest] insert error:", insertError.code);
+      return res.status(500).json({ ok: false, error: "Не удалось отправить запрос." });
+    }
+
+    return res.status(200).json({ ok: true, request: inserted });
+  } catch (error) {
+    console.error("handleCreateBodyServiceRequest error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка отправки запроса." });
+  }
+}
+
+async function handleGetBodyServiceRequests(req, res) {
+  try {
+    const { session_id, access_token } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+    const { data: requests, error } = await supabase
+      .from("service_requests")
+      .select("id, request_type, meeting_format, title, message, status, priority, sla_hours, due_at, reserved_credits, pricing_note, specialist_name, specialist_response, client_contact, scheduled_at, scheduled_comment, created_at, answered_at, completed_at, cancelled_at")
+      .eq("owner_type", "anonymous_profile")
+      .eq("owner_id", owner.ownerId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("[getBodyServiceRequests] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить запросы." });
+    }
+
+    return res.status(200).json({ ok: true, requests: requests || [] });
+  } catch (error) {
+    console.error("handleGetBodyServiceRequests error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки запросов." });
+  }
+}
+
+async function handleGetBodyServiceRequest(req, res) {
+  try {
+    const { session_id, access_token, request_id } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!request_id) {
+      return res.status(400).json({ ok: false, error: "Missing request_id." });
+    }
+
+    const supabase = getSupabase();
+    const { data: request, error } = await supabase
+      .from("service_requests")
+      .select("*")
+      .eq("id", request_id)
+      .eq("owner_id", owner.ownerId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[getBodyServiceRequest] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить запрос." });
+    }
+    if (!request) {
+      return res.status(404).json({ ok: false, error: "Запрос не найден." });
+    }
+
+    return res.status(200).json({ ok: true, request });
+  } catch (error) {
+    console.error("handleGetBodyServiceRequest error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки запроса." });
+  }
+}
+
+async function handleCancelBodyServiceRequest(req, res) {
+  try {
+    const { session_id, access_token, request_id } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!request_id) {
+      return res.status(400).json({ ok: false, error: "Missing request_id." });
+    }
+
+    const supabase = getSupabase();
+    const { data: request, error: findError } = await supabase
+      .from("service_requests")
+      .select("id, status")
+      .eq("id", request_id)
+      .eq("owner_id", owner.ownerId)
+      .maybeSingle();
+
+    if (findError || !request) {
+      return res.status(404).json({ ok: false, error: "Запрос не найден." });
+    }
+
+    const cancellable = ["submitted", "accepted", "needs_clarification", "scheduled"];
+    if (!cancellable.includes(request.status)) {
+      return res.status(400).json({ ok: false, error: "Невозможно отменить запрос в текущем статусе." });
+    }
+
+    const { error: updateError } = await supabase
+      .from("service_requests")
+      .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", request_id);
+
+    if (updateError) {
+      console.error("[cancelBodyServiceRequest] update error:", updateError.code);
+      return res.status(500).json({ ok: false, error: "Не удалось отменить запрос." });
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error("handleCancelBodyServiceRequest error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка отмены запроса." });
   }
 }
