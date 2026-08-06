@@ -56,21 +56,21 @@ export default function PlateGuide() {
     <div style={{ marginBottom: 20 }}>
       {/* Plate visual */}
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
-        <svg width="200" height="200" viewBox="0 0 200 200" style={{ maxWidth: "100%" }}>
+        <svg width="280" height="280" viewBox="0 0 280 280" style={{ maxWidth: "80%", minWidth: 200 }}>
           {/* Plate circle */}
-          <circle cx="100" cy="100" r="90" fill="#faf6ef" stroke="#e8e2d8" strokeWidth="2" />
+          <circle cx="140" cy="140" r="130" fill="#faf6ef" stroke="#e8e2d8" strokeWidth="2" />
           {/* Veggies half - left */}
-          <path d="M100,100 L100,10 A90,90 0 0,0 10,100 Z" fill="#e8f0ea" stroke="#c4d0c6" strokeWidth="1" />
-          <text x="45" y="90" textAnchor="middle" fontSize="22">🥬</text>
-          <text x="45" y="108" textAnchor="middle" fontSize="10" fill="#5f574f" fontWeight="600">½</text>
+          <path d="M140,140 L140,10 A130,130 0 0,0 10,140 Z" fill="#e8f0ea" stroke="#c4d0c6" strokeWidth="1" />
+          <text x="65" y="128" textAnchor="middle" fontSize="32">🥬</text>
+          <text x="65" y="158" textAnchor="middle" fontSize="20" fill="#5f574f" fontWeight="700">½</text>
           {/* Protein - top right */}
-          <path d="M100,100 L100,10 A90,90 0 0,1 190,100 Z" fill="#fdf6ee" stroke="#e8d5b8" strokeWidth="1" />
-          <text x="145" y="70" textAnchor="middle" fontSize="22">🍗</text>
-          <text x="145" y="88" textAnchor="middle" fontSize="10" fill="#5f574f" fontWeight="600">¼</text>
+          <path d="M140,140 L140,10 A130,130 0 0,1 270,140 Z" fill="#fdf6ee" stroke="#e8d5b8" strokeWidth="1" />
+          <text x="205" y="100" textAnchor="middle" fontSize="32">🍗</text>
+          <text x="205" y="130" textAnchor="middle" fontSize="20" fill="#5f574f" fontWeight="700">¼</text>
           {/* Carbs - bottom right */}
-          <path d="M100,100 L190,100 A90,90 0 0,1 100,190 Z" fill="#f5f0e8" stroke="#d8cec1" strokeWidth="1" />
-          <text x="145" y="140" textAnchor="middle" fontSize="22">🍚</text>
-          <text x="145" y="158" textAnchor="middle" fontSize="10" fill="#5f574f" fontWeight="600">¼</text>
+          <path d="M140,140 L270,140 A130,130 0 0,1 140,270 Z" fill="#f5f0e8" stroke="#d8cec1" strokeWidth="1" />
+          <text x="205" y="195" textAnchor="middle" fontSize="32">🍚</text>
+          <text x="205" y="225" textAnchor="middle" fontSize="20" fill="#5f574f" fontWeight="700">¼</text>
         </svg>
       </div>
 
