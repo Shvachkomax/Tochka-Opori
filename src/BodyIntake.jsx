@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { getClientToken } from "./lib/clientToken.js";
 
 const FIELD_LABELS = {
@@ -227,6 +227,43 @@ export default function BodyIntake({ onComplete }) {
     });
   }
 
+  // Refs for scroll-to-error
+  const fieldRefs = {
+    display_name: useRef(null), sex: useRef(null), age: useRef(null),
+    goal: useRef(null), goal_custom: useRef(null),
+    height_cm: useRef(null), weight_kg: useRef(null),
+    work_activity_level: useRef(null), daily_steps_estimate: useRef(null),
+    sleep_hours_estimate: useRef(null), nutrition_main_problem: useRef(null),
+    meals_per_day: useRef(null), red_flags_check: useRef(null),
+    training_types: useRef(null),
+  };
+
+  const validateAndScroll = useCallback(() => {
+    const errs = validate();
+    setErrors(errs);
+    const errorKeys = Object.keys(errs);
+    if (errorKeys.length > 0) {
+      setSubmitError("Не все обязательные пункты заполнены. Проверьте выделенный вопрос ниже.");
+      // Scroll to first error
+      const firstKey = errorKeys[0];
+      const ref = fieldRefs[firstKey];
+      if (ref?.current) {
+        ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => {
+          const el = ref.current;
+          if (el && (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA")) {
+            el.focus();
+          } else if (el) {
+            el.focus();
+          }
+        }, 400);
+      }
+      return false;
+    }
+    setSubmitError("");
+    return true;
+  }, [fields]);
+
   function validate() {
     const errs = {};
     if (!fields.display_name.trim()) errs.display_name = "Укажите, как к вам обращаться";
@@ -250,9 +287,7 @@ export default function BodyIntake({ onComplete }) {
     e.preventDefault();
     setSubmitError("");
 
-    const errs = validate();
-    setErrors(errs);
-    if (Object.keys(errs).length > 0) return;
+    if (!validateAndScroll()) return;
 
     setSubmitting(true);
 
@@ -319,24 +354,39 @@ export default function BodyIntake({ onComplete }) {
   const progress = Math.min(filled / totalFields, 1);
 
   function input(key, type = "text", placeholder = "") {
+    const hasError = !!errors[key];
     return (
-      <div style={s.field}>
+      <div style={s.field} ref={fieldRefs[key]} tabIndex={-1}>
         <label style={s.label}>{FIELD_LABELS[key]}</label>
-        <input className="body-intake-input" style={s.input} type={type} placeholder={placeholder} value={fields[key]} onChange={e => set(key, e.target.value)} />
-        {errors[key] && <div style={s.error}>{errors[key]}</div>}
+        <input
+          ref={fieldRefs[key]}
+          className="body-intake-input"
+          style={{ ...s.input, borderColor: hasError ? "#b5473f" : undefined }}
+          type={type}
+          placeholder={placeholder}
+          value={fields[key]}
+          onChange={e => set(key, e.target.value)}
+        />
+        {hasError && <div style={s.error}>{errors[key]}</div>}
       </div>
     );
   }
 
   function select(key, options, placeholder = "Выберите...") {
+    const hasError = !!errors[key];
     return (
-      <div style={s.field}>
+      <div style={s.field} ref={fieldRefs[key]} tabIndex={-1}>
         <label style={s.label}>{FIELD_LABELS[key]}</label>
-        <select style={{ ...s.select, color: fields[key] ? "#2f2925" : "#8d8378" }} value={fields[key]} onChange={e => set(key, e.target.value)}>
+        <select
+          ref={fieldRefs[key]}
+          style={{ ...s.select, color: fields[key] ? "#2f2925" : "#8d8378", borderColor: hasError ? "#b5473f" : undefined }}
+          value={fields[key]}
+          onChange={e => set(key, e.target.value)}
+        >
           <option value="" disabled>{placeholder}</option>
           {options.map(o => <option key={o.value} value={o.value} style={{ color: "#020617" }}>{o.label}</option>)}
         </select>
-        {errors[key] && <div style={s.error}>{errors[key]}</div>}
+        {hasError && <div style={s.error}>{errors[key]}</div>}
       </div>
     );
   }
@@ -570,7 +620,7 @@ export default function BodyIntake({ onComplete }) {
       </div>
       {select("training_current", TRAINING_CURRENT_OPTIONS)}
       {fields.training_current && fields.training_current !== "none" && (
-        <div style={s.field}>
+        <div style={s.field} ref={fieldRefs.training_types} tabIndex={-1}>
           <label style={s.label}>{FIELD_LABELS.training_types}</label>
           <div className="healthCheckboxList">
             {TRAINING_TYPES_OPTIONS.map(o => (
@@ -621,7 +671,7 @@ export default function BodyIntake({ onComplete }) {
         <textarea className="body-intake-textarea" style={s.textarea} value={fields.health_limitations} onChange={e => set("health_limitations", e.target.value)} placeholder="Например: проблемы с коленями, гипертония, диабет, гипотиреоз..." />
       </div>
 
-      <div className="healthRedFlagsBlock">
+      <div className="healthRedFlagsBlock" ref={fieldRefs.red_flags_check} tabIndex={-1}>
         <div className="healthRedFlagsTitle">{FIELD_LABELS.red_flags_check}</div>
         <div className="healthRedFlagsList">
           {RED_FLAGS_OPTIONS.map(o => (
