@@ -62,7 +62,10 @@ export default function BodyServiceRequests({ onBack }) {
   const [includeWeekly, setIncludeWeekly] = useState(false);
   const [includeHealthCtx, setIncludeHealthCtx] = useState(false);
   const [contactPhone, setContactPhone] = useState("");
-  const [preferredTime, setPreferredTime] = useState("");
+  const [preferredDate, setPreferredDate] = useState("");
+  const [preferredTimeFrom, setPreferredTimeFrom] = useState("");
+  const [preferredTimeTo, setPreferredTimeTo] = useState("");
+  const [preferredTimeText, setPreferredTimeText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -96,7 +99,13 @@ export default function BodyServiceRequests({ onBack }) {
           include_weekly_summary: includeWeekly,
           include_health_context: includeHealthCtx,
         },
-        client_contact: contactPhone || preferredTime ? { phone: contactPhone, preferred_time: preferredTime } : {},
+        client_contact: {
+          phone: contactPhone || null,
+          preferred_date: preferredDate || null,
+          preferred_time_from: preferredTimeFrom || null,
+          preferred_time_to: preferredTimeTo || null,
+          preferred_time_text: preferredTimeText || null,
+        },
       });
       if (!data.ok) throw new Error(data.error || "Не удалось отправить.");
       setView("list");
@@ -148,10 +157,14 @@ export default function BodyServiceRequests({ onBack }) {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {requests.map(r => (
-                <div key={r.id} onClick={() => { setSelectedRequest(r); setView("detail"); }} style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid #e8e2d8", background: "#faf6ef", cursor: "pointer" }}>
+                <div key={r.id} onClick={() => { setSelectedRequest(r); setView("detail"); }} style={{ padding: "12px 16px", borderRadius: 12, border: `1px solid ${r.status === "answered" ? "#c4d0c6" : "#e8e2d8"}`, background: r.status === "answered" ? "#f0f5f1" : "#faf6ef", cursor: "pointer" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{r.title || REQUEST_TYPES.find(t => t.value === r.request_type)?.label || r.request_type}</div>
-                    <span style={{ fontSize: 12, color: STATUS_COLORS[r.status] || "#8a7e72", fontWeight: 600 }}>{STATUS_LABELS[r.status] || r.status}</span>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      {r.status === "answered" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#e8f0ea", color: "#5f8b7a", fontWeight: 600 }}>Есть ответ</span>}
+                      {r.status === "scheduled" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#e8f0ea", color: "#6b8fc7", fontWeight: 600 }}>Запланировано</span>}
+                      <span style={{ fontSize: 12, color: STATUS_COLORS[r.status] || "#8a7e72", fontWeight: 600 }}>{STATUS_LABELS[r.status] || r.status}</span>
+                    </div>
                   </div>
                   <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.message}</div>
                   <div style={{ fontSize: 12, color: "#8a7e72" }}>
@@ -211,12 +224,17 @@ export default function BodyServiceRequests({ onBack }) {
 
           {needContact && (
             <div style={{ marginBottom: 16, padding: 16, borderRadius: 12, background: "#faf6ef", border: "1px solid #e8e2d8" }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Контактные данные</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Когда вам удобно?</div>
               <div style={{ marginBottom: 8 }}>
                 <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Телефон" style={{ width: "100%", height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
               </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                <input value={preferredDate} onChange={e => setPreferredDate(e.target.value)} type="date" placeholder="Дата" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                <input value={preferredTimeFrom} onChange={e => setPreferredTimeFrom(e.target.value)} type="time" placeholder="С" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                <input value={preferredTimeTo} onChange={e => setPreferredTimeTo(e.target.value)} type="time" placeholder="До" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
               <div>
-                <input value={preferredTime} onChange={e => setPreferredTime(e.target.value)} placeholder="Удобное время (например, вечером после 18:00)" style={{ width: "100%", height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                <input value={preferredTimeText} onChange={e => setPreferredTimeText(e.target.value)} placeholder="Например: завтра после 18:00 или в будни утром" style={{ width: "100%", height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
               </div>
             </div>
           )}
@@ -244,7 +262,13 @@ export default function BodyServiceRequests({ onBack }) {
           <div style={{ padding: 16, borderRadius: 12, border: "1px solid #e8e2d8", marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <div style={{ fontSize: 16, fontWeight: 600, color: "#2f2925" }}>{selectedRequest.title || selectedRequest.request_type}</div>
-              <span style={{ fontSize: 13, color: STATUS_COLORS[selectedRequest.status], fontWeight: 600 }}>{STATUS_LABELS[selectedRequest.status]}</span>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {selectedRequest.status === "answered" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#e8f0ea", color: "#5f8b7a", fontWeight: 600 }}>Ответ специалиста получен</span>}
+                {selectedRequest.status === "scheduled" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#e8f0ea", color: "#6b8fc7", fontWeight: 600 }}>Консультация запланирована</span>}
+                {selectedRequest.status === "completed" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#e8f0ea", color: "#7D9A89", fontWeight: 600 }}>Запрос завершён</span>}
+                {selectedRequest.status === "cancelled" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#fdf2f2", color: "#b5473f", fontWeight: 600 }}>Запрос отменён</span>}
+                <span style={{ fontSize: 13, color: STATUS_COLORS[selectedRequest.status], fontWeight: 600 }}>{STATUS_LABELS[selectedRequest.status]}</span>
+              </div>
             </div>
             <div style={{ fontSize: 13, color: "#8a7e72", marginBottom: 8 }}>
               {new Date(selectedRequest.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
@@ -252,18 +276,31 @@ export default function BodyServiceRequests({ onBack }) {
               {selectedRequest.reserved_credits > 0 && ` · ${selectedRequest.reserved_credits} кредитов`}
             </div>
             <div style={{ fontSize: 14, color: "#2f2925", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{selectedRequest.message}</div>
+            {/* Contact info */}
+            {selectedRequest.client_contact && (selectedRequest.client_contact.phone || selectedRequest.client_contact.preferred_date) && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#5f574f", padding: "6px 10px", borderRadius: 8, background: "#faf6ef" }}>
+                {selectedRequest.client_contact.phone && <span>Тел: {selectedRequest.client_contact.phone}</span>}
+                {selectedRequest.client_contact.preferred_date && <span> · Дата: {selectedRequest.client_contact.preferred_date}</span>}
+                {selectedRequest.client_contact.preferred_time_from && <span> · С {selectedRequest.client_contact.preferred_time_from}</span>}
+                {selectedRequest.client_contact.preferred_time_to && <span> до {selectedRequest.client_contact.preferred_time_to}</span>}
+                {selectedRequest.client_contact.preferred_time_text && <span> · {selectedRequest.client_contact.preferred_time_text}</span>}
+              </div>
+            )}
           </div>
 
           {selectedRequest.specialist_response && (
             <div style={{ padding: 16, borderRadius: 12, background: "#f0f5f1", border: "1px solid #c4d0c6", marginBottom: 16 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 6 }}>Ответ специалиста</div>
               <div style={{ fontSize: 14, color: "#5f574f", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{selectedRequest.specialist_response}</div>
+              {selectedRequest.answered_at && (
+                <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 6 }}>{new Date(selectedRequest.answered_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}</div>
+              )}
             </div>
           )}
 
           {selectedRequest.scheduled_at && (
             <div style={{ padding: 12, borderRadius: 10, background: "#e8f0ea", border: "1px solid #c4d0c6", marginBottom: 16, fontSize: 13, color: "#2f2925" }}>
-              Запланировано: {new Date(selectedRequest.scheduled_at).toLocaleString("ru-RU")}
+              Консультация запланирована: {new Date(selectedRequest.scheduled_at).toLocaleString("ru-RU")}
               {selectedRequest.scheduled_comment && ` — ${selectedRequest.scheduled_comment}`}
             </div>
           )}

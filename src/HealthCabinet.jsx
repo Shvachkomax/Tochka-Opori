@@ -117,6 +117,55 @@ function MiniBarChart({ data, dataKey, width = 280, height = 80, color = "#7D9A8
   );
 }
 
+function ServiceRequestsCard({ sessionId, accessToken, onOpen }) {
+  const [counts, setCounts] = useState({ waiting: 0, answered: 0, scheduled: 0 });
+
+  useEffect(() => {
+    async function load() {
+      try {
+        let token;
+        try { token = await getClientToken("body", "session"); } catch {}
+        const hdrs = { "Content-Type": "application/json" };
+        if (token) hdrs["Authorization"] = `Bearer ${token}`;
+        const res = await fetch("/api/session", {
+          method: "POST", headers: hdrs,
+          body: JSON.stringify({ action: "getBodyServiceRequests", session_id: sessionId, access_token: accessToken }),
+        });
+        const data = await res.json();
+        if (data.ok && data.requests) {
+          const reqs = data.requests;
+          setCounts({
+            waiting: reqs.filter(r => ["submitted", "accepted", "needs_clarification"].includes(r.status)).length,
+            answered: reqs.filter(r => r.status === "answered").length,
+            scheduled: reqs.filter(r => r.status === "scheduled").length,
+          });
+        }
+      } catch {}
+    }
+    if (sessionId && accessToken) load();
+  }, [sessionId, accessToken]);
+
+  const total = counts.waiting + counts.answered + counts.scheduled;
+
+  return (
+    <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, border: "1px solid #e8e2d8", background: "#faf6ef" }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Связаться со специалистом</div>
+      {total > 0 ? (
+        <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 10 }}>
+          {counts.waiting > 0 && <span>Ожидает ответа: {counts.waiting}</span>}
+          {counts.answered > 0 && <span>{counts.waiting > 0 ? " · " : ""}Есть ответ: {counts.answered}</span>}
+          {counts.scheduled > 0 && <span>{(counts.waiting + counts.answered) > 0 ? " · " : ""}Запланировано: {counts.scheduled}</span>}
+        </div>
+      ) : (
+        <div style={{ fontSize: 13, color: "#8a7e72", marginBottom: 10 }}>Пока нет запросов</div>
+      )}
+      <button onClick={onOpen} style={{ width: "100%", padding: "8px 16px", borderRadius: 8, border: "1px solid #7D9A89", background: "#fff", color: "#5f8b7a", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+        Открыть
+      </button>
+    </div>
+  );
+}
+
 export default function HealthCabinet({
   sessionId,
   accessToken,
@@ -956,15 +1005,7 @@ export default function HealthCabinet({
       </div>
 
       {/* Service Requests */}
-      <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, border: "1px solid #e8e2d8", background: "#faf6ef" }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Связаться со специалистом</div>
-        <div style={{ fontSize: 13, color: "#8a7e72", marginBottom: 10 }}>
-          Отправьте вопрос или запросите консультацию
-        </div>
-        <button onClick={onOpenServiceRequests} style={{ width: "100%", padding: "8px 16px", borderRadius: 8, border: "1px solid #7D9A89", background: "#fff", color: "#5f8b7a", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
-          Открыть
-        </button>
-      </div>
+      <ServiceRequestsCard sessionId={sessionId} accessToken={accessToken} onOpen={onOpenServiceRequests} />
 
       {/* Access (collapsible) */}
       <div style={{ marginBottom: 24 }}>

@@ -5560,18 +5560,53 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         <div key={r.id} style={{ padding: "12px 16px", borderRadius: 12, border: `1px solid ${t.border}`, background: t.cardBg }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                             <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{r.title || r.request_type}</div>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: { submitted: "#e8a857", accepted: "#5f8b7a", answered: "#7D9A89", completed: "#7D9A89", cancelled: "#b5473f", scheduled: "#6b8fc7" }[r.status] || "#8a7e72" }}>
-                              {r.status}
-                            </span>
+                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                              {/* SLA badge */}
+                              {(() => {
+                                const now = new Date();
+                                const due = r.due_at ? new Date(r.due_at) : null;
+                                const activeStatuses = ["submitted", "accepted", "needs_clarification"];
+                                let slaLabel, slaColor;
+                                if (r.status === "scheduled") { slaLabel = "Запланировано"; slaColor = "#6b8fc7"; }
+                                else if (r.status === "answered") { slaLabel = "Ответ дан"; slaColor = "#7D9A89"; }
+                                else if (r.status === "completed") { slaLabel = "Завершено"; slaColor = "#7D9A89"; }
+                                else if (r.status === "cancelled") { slaLabel = "Отменён"; slaColor = "#b5473f"; }
+                                else if (activeStatuses.includes(r.status) && due) {
+                                  if (now > due) { slaLabel = "Просрочен"; slaColor = "#b5473f"; }
+                                  else if ((due - now) < 6 * 60 * 60 * 1000) { slaLabel = "Скоро срок"; slaColor = "#e8a857"; }
+                                  else { slaLabel = "В сроке"; slaColor = "#7D9A89"; }
+                                }
+                                if (slaLabel) return <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: slaColor + "18", color: slaColor, fontWeight: 600 }}>{slaLabel}</span>;
+                                return null;
+                              })()}
+                              <span style={{ fontSize: 12, fontWeight: 600, color: { submitted: "#e8a857", accepted: "#5f8b7a", answered: "#7D9A89", completed: "#7D9A89", cancelled: "#b5473f", scheduled: "#6b8fc7" }[r.status] || "#8a7e72" }}>
+                                {r.status}
+                              </span>
+                            </div>
                           </div>
                           <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 8 }}>{r.message?.slice(0, 200)}</div>
                           <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>
                             {r.specialist_name} · {new Date(r.created_at).toLocaleDateString("ru-RU")} · {r.reserved_credits || 0} кредитов
-                            {r.client_contact?.phone && ` · тел: ${r.client_contact.phone}`}
+                            {r.due_at && ` · срок: ${new Date(r.due_at).toLocaleDateString("ru-RU")}`}
                           </div>
+                          {/* Contact info for phone/video/offline */}
+                          {r.client_contact && (r.client_contact.phone || r.client_contact.preferred_date) && (
+                            <div style={{ fontSize: 12, color: "#5f574f", marginBottom: 8, padding: "6px 10px", borderRadius: 8, background: "#faf6ef" }}>
+                              {r.client_contact.phone && <span>Тел: {r.client_contact.phone} · </span>}
+                              {r.client_contact.preferred_date && <span>Дата: {r.client_contact.preferred_date} · </span>}
+                              {r.client_contact.preferred_time_from && <span>С {r.client_contact.preferred_time_from} </span>}
+                              {r.client_contact.preferred_time_to && <span>до {r.client_contact.preferred_time_to} </span>}
+                              {r.client_contact.preferred_time_text && <span>({r.client_contact.preferred_time_text})</span>}
+                            </div>
+                          )}
                           {r.specialist_response && (
                             <div style={{ fontSize: 13, color: "#5f574f", padding: 8, borderRadius: 8, background: "#f0f5f1", marginBottom: 8 }}>
                               <strong>Ответ:</strong> {r.specialist_response}
+                            </div>
+                          )}
+                          {r.status === "completed" && (
+                            <div style={{ fontSize: 11, color: "#8a7e72", marginBottom: 8 }}>
+                              Тестовый режим: фактическое списание кредитов пока не выполняется
                             </div>
                           )}
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
