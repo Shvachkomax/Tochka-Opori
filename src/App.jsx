@@ -5688,6 +5688,54 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       );
                     })()}
 
+                    {/* 4b. Health Context */}
+                    {bodyIntakeDetail.health_context && (() => {
+                      const hc = bodyIntakeDetail.health_context;
+                      return (
+                        <Section title="Здоровье, анализы и препараты">
+                          {hc.health_conditions?.length > 0 && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>Состояния</div>
+                              {hc.health_conditions.map((c, i) => (
+                                <div key={i} style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>• {c.name}{c.comment ? ` (${c.comment})` : ""}</div>
+                              ))}
+                            </div>
+                          )}
+                          {hc.medications?.length > 0 && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>Лекарства</div>
+                              {hc.medications.map((m, i) => (
+                                <div key={i} style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>• {m.name}{m.dosage ? ` ${m.dosage}` : ""}{m.prescribed_by ? ` (${m.prescribed_by})` : ""}</div>
+                              ))}
+                            </div>
+                          )}
+                          {hc.supplements?.length > 0 && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>БАДы и витамины</div>
+                              {hc.supplements.map((s, i) => (
+                                <div key={i} style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>• {s.name}{s.dosage ? ` ${s.dosage}` : ""}{s.recommended_by ? ` (${s.recommended_by})` : ""}</div>
+                              ))}
+                            </div>
+                          )}
+                          {hc.lab_notes?.has_recent_labs && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>Анализы</div>
+                              {hc.lab_notes.items?.length > 0 && (
+                                <div style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>Маркеры: {hc.lab_notes.items.join(", ")}</div>
+                              )}
+                              {hc.lab_notes.comment && (
+                                <div style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>{hc.lab_notes.comment}</div>
+                              )}
+                            </div>
+                          )}
+                          {hc.documents_note && (
+                            <Field label="Выписки" value={hc.documents_note} />
+                          )}
+                          <Field label="Согласие" value={hc.consent_acknowledged ? "Да" : "Нет"} />
+                        </Section>
+                      );
+                    })()}
+
                     {/* 5. Care Recommendation */}
                     {(() => {
                       const care = bodyIntakeDetail.care_recommendation;

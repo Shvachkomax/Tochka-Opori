@@ -241,6 +241,17 @@ async function handleGetBodyIntakeDetail(req, res) {
       .eq("session_id", record.session_id)
       .single();
     record = { ...record, client: client || null };
+
+    // Fetch health context if owner exists
+    if (client?.anonymous_owner_id) {
+      const { data: healthContext } = await supabase
+        .from("body_health_contexts")
+        .select("health_conditions, medications, supplements, lab_notes, documents_note, consent_acknowledged, updated_at")
+        .eq("owner_id", client.anonymous_owner_id)
+        .eq("module", "body")
+        .maybeSingle();
+      record = { ...record, health_context: healthContext || null };
+    }
   }
 
   return res.status(200).json({ ok: true, record });
