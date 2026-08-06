@@ -128,6 +128,7 @@ export default function HealthCabinet({
   onViewDiary,
   onLogout,
   onRotateCode,
+  onOpenHealthContext,
 }) {
   const [showRotateConfirm, setShowRotateConfirm] = useState(false);
   const [newCode, setNewCode] = useState(null);
@@ -248,6 +249,26 @@ export default function HealthCabinet({
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
+  const [healthContext, setHealthContext] = useState(null);
+
+  // Fetch health context on mount
+  useEffect(() => {
+    async function loadHealthContext() {
+      try {
+        let token;
+        try { token = await getClientToken("body", "session"); } catch {}
+        const hdrs = { "Content-Type": "application/json" };
+        if (token) hdrs["Authorization"] = `Bearer ${token}`;
+        const res = await fetch("/api/session", {
+          method: "POST", headers: hdrs,
+          body: JSON.stringify({ action: "getBodyHealthContext", session_id: sessionId, access_token: accessToken }),
+        });
+        const data = await res.json();
+        if (data.ok && data.context) setHealthContext(data.context);
+      } catch {}
+    }
+    if (sessionId && accessToken) loadHealthContext();
+  }, [sessionId, accessToken]);
   const [chatDebug, setChatDebug] = useState("");
 
   const SUGGESTED_PROMPTS = [
@@ -912,6 +933,26 @@ export default function HealthCabinet({
           </div>
         </div>
       )}
+
+      {/* Health Context */}
+      <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, border: "1px solid #e8e2d8", background: "#faf6ef" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#2f2925" }}>Здоровье, анализы и препараты</div>
+        </div>
+        <div style={{ fontSize: 13, color: "#8a7e72", marginBottom: 10 }}>
+          {healthContext && (healthContext.health_conditions?.length > 0 || healthContext.medications?.length > 0 || healthContext.supplements?.length > 0 || healthContext.lab_notes?.has_recent_labs) ? (
+            <>
+              {healthContext.health_conditions?.length > 0 && <span>{healthContext.health_conditions.length} сост. · </span>}
+              {healthContext.medications?.length > 0 && <span>{healthContext.medications.length} препарат{healthContext.medications.length === 1 ? "" : "а"} · </span>}
+              {healthContext.supplements?.length > 0 && <span>{healthContext.supplements.length} БАД · </span>}
+              {healthContext.lab_notes?.has_recent_labs && <span>анализы</span>}
+            </>
+          ) : "Не заполнено"}
+        </div>
+        <button onClick={onOpenHealthContext} style={{ width: "100%", padding: "8px 16px", borderRadius: 8, border: "1px solid #7D9A89", background: "#fff", color: "#5f8b7a", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+          Заполнить / обновить
+        </button>
+      </div>
 
       {/* Access (collapsible) */}
       <div style={{ marginBottom: 24 }}>

@@ -254,6 +254,10 @@ export default async function handler(req, res) {
         return await handleGetBodyAiChat(req, res);
       case "sendBodyAiMessage":
         return await handleSendBodyAiMessage(req, res);
+      case "getBodyHealthContext":
+        return await handleGetBodyHealthContext(req, res);
+      case "saveBodyHealthContext":
+        return await handleSaveBodyHealthContext(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -2741,4 +2745,130 @@ async function buildAiChatContext({ supabase, ownerId }) {
   } catch {}
 
   return context;
+}
+
+// ============================================================
+// Body Health Context
+// ============================================================
+
+async function handleGetBodyHealthContext(req, res) {
+  try {
+    const { session_id, access_token } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("body_health_contexts")
+      .select("*")
+      .eq("owner_type", "anonymous_profile")
+      .eq("owner_id", owner.ownerId)
+      .eq("module", "body")
+      .maybeSingle();
+
+    if (error) {
+      console.error("[getBodyHealthContext] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить контекст здоровья." });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      context: data || {
+        health_conditions: [],
+        medications: [],
+        supplements: [],
+        lab_notes: {},
+        documents_note: null,
+        doctor_observation: null,
+        safety_flags: [],
+        consent_acknowledged: false,
+      },
+    });
+  } catch (error) {
+    console.error("handleGetBodyHealthContext error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки контекста здоровья." });
+  }
+}
+
+async function handleSaveBodyHealthContext(req, res) {
+  try {
+    const { session_id, access_token, health_context } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!health_context || typeof health_context !== "object") {
+      return res.status(400).json({ ok: false, error: "Missing health_context." });
+    }
+
+    // Validate sizes
+    if (Array.isArray(health_context.health_conditions) && health_context.health_conditions.length > 30) {
+      return res.status(400).json({ ok: false, error: "Слишком много состояний (максимум 30)." });
+    }
+    if (Array.isArray(health_context.medications) && health_context.medications.length > 30) {
+      return res.status(400).json({ ok: false, error: "Слишком много препаратов (максимум 30)." });
+    }
+    if (Array.isArray(health_context.supplements) && health_context.supplements.length > 30) {
+      return res.status(400).json({ ok: false, error: "Слишком много БАДов (максимум 30)." });
+    }
+
+    const supabase = getSupabase();
+    const now = new Date().toISOString();
+
+    const ALLOWED = [
+      "health_conditions", "medications", "supplements",
+      "lab_notes", "documents_note", "doctor_observation",
+      "safety_flags", "consent_acknowledged",
+    ];
+
+    const payload = { owner_type: "anonymous_profile", owner_id: owner.ownerId, module: "body", updated_at: now };
+    for (const key of ALLOWED) {
+      if (health_context[key] !== undefined) {
+        payload[key] = health_context[key];
+      }
+    }
+
+    const { data: existing } = await supabase
+      .from("body_health_contexts")
+      .select("id")
+      .eq("owner_type", "anonymous_profile")
+      .eq("owner_id", owner.ownerId)
+      .eq("module", "body")
+      .maybeSingle();
+
+    let result;
+    if (existing) {
+      const { data: updated, error: updateError } = await supabase
+        .from("body_health_contexts")
+        .update(payload)
+        .eq("id", existing.id)
+        .select("*")
+        .single();
+      if (updateError) {
+        console.error("[saveBodyHealthContext] update error:", updateError.code);
+        return res.status(500).json({ ok: false, error: "Не удалось сохранить контекст здоровья." });
+      }
+      result = updated;
+    } else {
+      payload.created_at = now;
+      const { data: inserted, error: insertError } = await supabase
+        .from("body_health_contexts")
+        .insert(payload)
+        .select("*")
+        .single();
+      if (insertError) {
+        console.error("[saveBodyHealthContext] insert error:", insertError.code);
+        return res.status(500).json({ ok: false, error: "Не удалось сохранить контекст здоровья." });
+      }
+      result = inserted;
+    }
+
+    return res.status(200).json({ ok: true, context: result });
+  } catch (error) {
+    console.error("handleSaveBodyHealthContext error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сохранения контекста здоровья." });
+  }
 }
