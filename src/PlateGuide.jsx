@@ -8,7 +8,7 @@ const ZONES = [
     proportion: "примерно 1/2 тарелки",
     color: "#7D9A89",
     bgColor: "#e8f0ea",
-    borderColor: "#c4d0c6",
+    borderColor: "#b8d4c0",
     icon: "🥬",
     items: [
       "огурцы", "помидоры", "листья салата", "капуста", "брокколи",
@@ -24,7 +24,7 @@ const ZONES = [
     proportion: "примерно 1/4 тарелки",
     color: "#b8956a",
     bgColor: "#fdf6ee",
-    borderColor: "#e8d5b8",
+    borderColor: "#d4b896",
     icon: "🍗",
     items: [
       "курица", "индейка", "рыба", "яйца", "творог",
@@ -39,7 +39,7 @@ const ZONES = [
     proportion: "примерно 1/4 тарелки",
     color: "#c4956a",
     bgColor: "#f5f0e8",
-    borderColor: "#d8cec1",
+    borderColor: "#c9b8a4",
     icon: "🍚",
     items: [
       "гречка", "рис", "булгур", "овсянка", "цельнозерновые макароны",
@@ -52,25 +52,68 @@ const ZONES = [
 export default function PlateGuide() {
   const [openZone, setOpenZone] = useState(null);
 
+  function toggleZone(id) {
+    setOpenZone(prev => prev === id ? null : id);
+  }
+
   return (
     <div style={{ marginBottom: 20 }}>
-      {/* Plate visual */}
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+      {/* Header */}
+      <div style={{ textAlign: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#2f2925" }}>Примерный баланс тарелки</div>
+        <div style={{ fontSize: 13, color: "#8a7e72" }}>Ориентир: ½ овощи и зелень, ¼ белок, ¼ гарнир</div>
+      </div>
+
+      {/* Plate visual with clickable zones */}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
         <svg width="280" height="280" viewBox="0 0 280 280" style={{ maxWidth: "80%", minWidth: 200 }}>
           {/* Plate circle */}
           <circle cx="140" cy="140" r="130" fill="#faf6ef" stroke="#e8e2d8" strokeWidth="2" />
+
           {/* Veggies half - left */}
-          <path d="M140,140 L140,10 A130,130 0 0,0 10,140 Z" fill="#e8f0ea" stroke="#c4d0c6" strokeWidth="1" />
-          <text x="65" y="128" textAnchor="middle" fontSize="32">🥬</text>
-          <text x="65" y="158" textAnchor="middle" fontSize="20" fill="#5f574f" fontWeight="700">½</text>
+          <path
+            d="M140,140 L140,10 A130,130 0 0,0 10,140 Z"
+            fill="#e8f0ea" stroke="#a8c4b0" strokeWidth="2"
+            style={{ cursor: "pointer", transition: "opacity 0.15s" }}
+            className="plate-zone"
+            role="button"
+            aria-label="Открыть примеры овощей и зелени"
+            tabIndex={0}
+            onClick={() => toggleZone("veggies")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggleZone("veggies"); }}
+          />
+          <text x="65" y="128" textAnchor="middle" fontSize="32" style={{ pointerEvents: "none" }}>🥬</text>
+          <text x="65" y="158" textAnchor="middle" fontSize="20" fill="#5f574f" fontWeight="700" style={{ pointerEvents: "none" }}>½</text>
+
           {/* Protein - top right */}
-          <path d="M140,140 L140,10 A130,130 0 0,1 270,140 Z" fill="#fdf6ee" stroke="#e8d5b8" strokeWidth="1" />
-          <text x="205" y="100" textAnchor="middle" fontSize="32">🍗</text>
-          <text x="205" y="130" textAnchor="middle" fontSize="20" fill="#5f574f" fontWeight="700">¼</text>
+          <path
+            d="M140,140 L140,10 A130,130 0 0,1 270,140 Z"
+            fill="#fdf6ee" stroke="#c9a882" strokeWidth="2"
+            style={{ cursor: "pointer", transition: "opacity 0.15s" }}
+            className="plate-zone"
+            role="button"
+            aria-label="Открыть примеры белка"
+            tabIndex={0}
+            onClick={() => toggleZone("protein")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggleZone("protein"); }}
+          />
+          <text x="205" y="100" textAnchor="middle" fontSize="32" style={{ pointerEvents: "none" }}>🍗</text>
+          <text x="205" y="130" textAnchor="middle" fontSize="20" fill="#5f574f" fontWeight="700" style={{ pointerEvents: "none" }}>¼</text>
+
           {/* Carbs - bottom right */}
-          <path d="M140,140 L270,140 A130,130 0 0,1 140,270 Z" fill="#f5f0e8" stroke="#d8cec1" strokeWidth="1" />
-          <text x="205" y="195" textAnchor="middle" fontSize="32">🍚</text>
-          <text x="205" y="225" textAnchor="middle" fontSize="20" fill="#5f574f" fontWeight="700">¼</text>
+          <path
+            d="M140,140 L270,140 A130,130 0 0,1 140,270 Z"
+            fill="#f5f0e8" stroke="#b8a48e" strokeWidth="2"
+            style={{ cursor: "pointer", transition: "opacity 0.15s" }}
+            className="plate-zone"
+            role="button"
+            aria-label="Открыть примеры гарниров и углеводов"
+            tabIndex={0}
+            onClick={() => toggleZone("carbs")}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggleZone("carbs"); }}
+          />
+          <text x="205" y="195" textAnchor="middle" fontSize="32" style={{ pointerEvents: "none" }}>🍚</text>
+          <text x="205" y="225" textAnchor="middle" fontSize="20" fill="#5f574f" fontWeight="700" style={{ pointerEvents: "none" }}>¼</text>
         </svg>
       </div>
 
@@ -84,7 +127,7 @@ export default function PlateGuide() {
         {ZONES.map(zone => (
           <div key={zone.id}>
             <button
-              onClick={() => setOpenZone(openZone === zone.id ? null : zone.id)}
+              onClick={() => toggleZone(zone.id)}
               aria-expanded={openZone === zone.id}
               style={{
                 width: "100%", padding: "12px 16px", borderRadius: 12,
@@ -120,6 +163,11 @@ export default function PlateGuide() {
           </div>
         ))}
       </div>
+
+      <style>{`
+        .plate-zone:hover { opacity: 0.8; }
+        .plate-zone:focus { outline: 2px solid #7D9A89; outline-offset: 2px; }
+      `}</style>
     </div>
   );
 }
