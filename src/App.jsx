@@ -283,6 +283,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setToast({ message: "", type: "", key: 0 });
   }
 
+  // Navigate to body cabinet from any workspace screen
+  function goToBodyCabinet() {
+    if (activeModule !== "body") return;
+    if (bodyScreen === "cabinet") return; // Already there
+    // Confirm if in diary_edit with unsaved changes
+    if (bodyScreen === "diary_edit") {
+      if (!window.confirm("Вернуться в кабинет? Несохранённые изменения могут потеряться.")) return;
+    }
+    clearToast();
+    setBodyDiaryDayData(null);
+    setBodyScreen("cabinet");
+  }
+
   // Admin panel state
   const [adminPassword, setAdminPassword] = useState("");
   const [adminAuthed, setAdminAuthed] = useState(false);
@@ -4875,7 +4888,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 40 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            onClick={goToBodyCabinet}
+            role={isDedicatedSubdomain ? "button" : undefined}
+            aria-label={isDedicatedSubdomain ? "Вернуться в личный кабинет" : undefined}
+            tabIndex={isDedicatedSubdomain ? 0 : undefined}
+            onKeyDown={isDedicatedSubdomain ? (e) => { if (e.key === "Enter" || e.key === " ") goToBodyCabinet(); } : undefined}
+            style={{ display: "flex", alignItems: "center", gap: 12, cursor: isDedicatedSubdomain ? "pointer" : "default" }}
+            className="app-logo-link"
+          >
               <img src="/logo-tochka-opory-header.png" alt={adminModuleRoute === "body" ? "Опора. Здоровье & Стройность" : "Точка опоры"} style={{ height: 44, width: "auto", display: "block" }} />
               <div>
                 <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2 }}>{adminModuleRoute === "body" ? "Опора. Здоровье & Стройность" : "Точка опоры"}</div>
@@ -8100,6 +8121,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     .app-logo {
       height: 96px;
       width: auto;
+    }
+    .app-logo-link {
+      transition: opacity 0.15s ease;
+    }
+    .app-logo-link:hover {
+      opacity: 0.85;
     }
     @media (max-width: 768px) {
       .app-logo {
