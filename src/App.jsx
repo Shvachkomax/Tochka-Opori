@@ -2601,6 +2601,47 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }
 
+  // Service requests admin state and functions
+  const [adminServiceRequests, setAdminServiceRequests] = useState([]);
+  const [adminServiceRequestsLoading, setAdminServiceRequestsLoading] = useState(false);
+  const [adminServiceRequestsFilter, setAdminServiceRequestsFilter] = useState("all");
+
+  async function adminLoadBodyServiceRequests() {
+    setAdminServiceRequestsLoading(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listBodyServiceRequests", password: adminPassword, status: adminServiceRequestsFilter }),
+      });
+      const data = await res.json();
+      if (data.ok) setAdminServiceRequests(data.requests || []);
+    } catch {
+      showToast("Ошибка загрузки запросов", "error");
+    } finally {
+      setAdminServiceRequestsLoading(false);
+    }
+  }
+
+  async function adminUpdateServiceRequest(id, action, extra = {}) {
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateBodyServiceRequest", password: adminPassword, id, action: action, ...extra }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Обновлено", "success");
+        adminLoadBodyServiceRequests();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка обновления", "error");
+    }
+  }
+
   function adminOpenBodyExpertReviewForm(targetType, targetId, sessionId, sourcePayload, aiOutput) {
     setBodyExpertReviewForm({
       target_type: targetType,
@@ -4965,7 +5006,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
               {/* Tabs: Анкеты | Дневники | Корзина */}
               <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          {["intake", "diary", "trash", "reviews"].map(tab => (
+          {["intake", "diary", "trash", "reviews", "requests"].map(tab => (
             <button
               key={tab}
               style={{
@@ -4981,9 +5022,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 else if (tab === "trash") { setBodyIntakeShowDeleted(true); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }
                 else if (tab === "diary") { adminLoadBodyDailyLogs(); }
                 else if (tab === "reviews") { adminLoadBodyExpertReviews(); }
+                else if (tab === "requests") { adminLoadBodyServiceRequests(); }
               }}
             >
-              {tab === "intake" ? "Анкеты" : tab === "diary" ? "Дневники" : tab === "trash" ? "Корзина" : "Экспертные правки"}
+              {tab === "intake" ? "Анкеты" : tab === "diary" ? "Дневники" : tab === "trash" ? "Корзина" : tab === "reviews" ? "Экспертные правки" : "Запросы"}
             </button>
           ))}
               </div>
@@ -5483,6 +5525,85 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* Service Requests Tab */}
+              {bodyAdminTab === "requests" && (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>
+                      Запросы клиентов ({adminServiceRequests.length})
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {["all", "submitted", "accepted", "scheduled", "answered", "completed", "cancelled"].map(f => (
+                        <button key={f} onClick={() => { setAdminServiceRequestsFilter(f); }} style={{
+                          padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`,
+                          background: adminServiceRequestsFilter === f ? t.tabActive : t.tabBg,
+                          color: adminServiceRequestsFilter === f ? t.tabActiveText : t.text,
+                          cursor: "pointer", fontSize: 12, fontWeight: 600,
+                        }}>
+                          {f === "all" ? "Все" : f === "submitted" ? "Новые" : f === "accepted" ? "Принятые" : f === "scheduled" ? "Запланированы" : f === "answered" ? "Отвечены" : f === "completed" ? "Завершены" : "Отменены"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button onClick={adminLoadBodyServiceRequests} style={{ marginBottom: 12, padding: "6px 14px", borderRadius: 8, border: `1px solid ${t.border}`, background: t.tabBg, color: t.text, cursor: "pointer", fontSize: 13 }}>
+                    Обновить
+                  </button>
+                  {adminServiceRequestsLoading ? (
+                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>Загрузка...</div>
+                  ) : adminServiceRequests.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>Нет запросов</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {adminServiceRequests.map(r => (
+                        <div key={r.id} style={{ padding: "12px 16px", borderRadius: 12, border: `1px solid ${t.border}`, background: t.cardBg }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{r.title || r.request_type}</div>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: { submitted: "#e8a857", accepted: "#5f8b7a", answered: "#7D9A89", completed: "#7D9A89", cancelled: "#b5473f", scheduled: "#6b8fc7" }[r.status] || "#8a7e72" }}>
+                              {r.status}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 8 }}>{r.message?.slice(0, 200)}</div>
+                          <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>
+                            {r.specialist_name} · {new Date(r.created_at).toLocaleDateString("ru-RU")} · {r.reserved_credits || 0} кредитов
+                            {r.client_contact?.phone && ` · тел: ${r.client_contact.phone}`}
+                          </div>
+                          {r.specialist_response && (
+                            <div style={{ fontSize: 13, color: "#5f574f", padding: 8, borderRadius: 8, background: "#f0f5f1", marginBottom: 8 }}>
+                              <strong>Ответ:</strong> {r.specialist_response}
+                            </div>
+                          )}
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            {r.status === "submitted" && (
+                              <button onClick={() => adminUpdateServiceRequest(r.id, "accept")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>Принять</button>
+                            )}
+                            {["submitted", "accepted"].includes(r.status) && (
+                              <>
+                                <button onClick={() => {
+                                  const resp = window.prompt("Ответ специалиста:");
+                                  if (resp) adminUpdateServiceRequest(r.id, "answer", { specialist_response: resp });
+                                }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>Ответить</button>
+                                <button onClick={() => {
+                                  const dt = window.prompt("Дата и время (YYYY-MM-DD HH:MM):");
+                                  const comment = window.prompt("Комментарий (необязательно):");
+                                  if (dt) adminUpdateServiceRequest(r.id, "schedule", { scheduled_at: dt, scheduled_comment: comment });
+                                }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #6b8fc7", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>Запланировать</button>
+                              </>
+                            )}
+                            {r.status !== "completed" && r.status !== "cancelled" && (
+                              <>
+                                <button onClick={() => adminUpdateServiceRequest(r.id, "complete")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>Завершить</button>
+                                <button onClick={() => adminUpdateServiceRequest(r.id, "complete_no_charge")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d8cec1", background: "#fff", color: "#5f574f", cursor: "pointer", fontSize: 12 }}>Закрыть без списания</button>
+                                <button onClick={() => adminUpdateServiceRequest(r.id, "cancel")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #b5473f", background: "#fff", color: "#b5473f", cursor: "pointer", fontSize: 12 }}>Отменить</button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Delete confirmation modal */}

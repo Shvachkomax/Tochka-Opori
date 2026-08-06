@@ -60,6 +60,10 @@ export default async function handler(req, res) {
         return await handleRestoreBodyIntake(req, res);
       case "listBodyDailyLogs":
         return await handleListBodyDailyLogs(req, res);
+      case "listBodyServiceRequests":
+        return await handleListBodyServiceRequests(req, res);
+      case "updateBodyServiceRequest":
+        return await handleUpdateBodyServiceRequest(req, res);
       case "getBodyDailyLogDetail":
         return await handleGetBodyDailyLogDetail(req, res);
       case "deleteBodyDailyLog":
@@ -1916,4 +1920,117 @@ async function handleExportUsageLedger(req, res) {
   });
 
   return res.json({ ok: true, entries: data || [] });
+}
+
+// ============================================================
+// Service Requests (Admin)
+// ============================================================
+
+async function handleListBodyServiceRequests(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { status, limit: maxCount } = req.body || {};
+  const supabase = getSupabase();
+
+  let query = supabase
+    .from("service_requests")
+    .select("id, owner_id, session_id, specialist_id, specialist_name, request_type, meeting_format, title, message, status, priority, sla_hours, due_at, reserved_credits, charged_credits, pricing_note, context_snapshot, client_contact, specialist_response, scheduled_at, scheduled_comment, created_at, answered_at, completed_at, cancelled_at")
+    .eq("module", "body")
+    .order("created_at", { ascending: false })
+    .limit(maxCount || 100);
+
+  if (status && status !== "all") {
+    query = query.eq("status", status);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+
+  return res.json({ ok: true, requests: data || [] });
+}
+
+async function handleUpdateBodyServiceRequest(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Нет доступа" });
+  }
+
+  const { id, action: updateAction, specialist_response, scheduled_at, scheduled_comment, charged_credits } = req.body || {};
+  if (!id) {
+    return res.status(400).json({ ok: false, error: "Missing id" });
+  }
+
+  const supabase = getSupabase();
+  const { data: request, error: findError } = await supabase
+    .from("service_requests")
+    .select("id, status, reserved_credits")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (findError || !request) {
+    return res.status(404).json({ ok: false, error: "Запрос не найден" });
+  }
+
+  const now = new Date().toISOString();
+  const updates = { updated_at: now };
+
+  switch (updateAction) {
+    case "accept":
+      updates.status = "accepted";
+      break;
+    case "answer":
+      if (!specialist_response) return res.status(400).json({ ok: false, error: "Missing specialist_response" });
+      updates.status = "answered";
+      updates.specialist_response = specialist_response;
+      updates.answered_at = now;
+      break;
+    case "schedule":
+      updates.status = "scheduled";
+      updates.scheduled_at = scheduled_at || null;
+      updates.scheduled_comment = scheduled_comment || null;
+      break;
+    case "complete":
+      updates.status = "completed";
+      updates.completed_at = now;
+      updates.charged_credits = charged_credits != null ? charged_credits : request.reserved_credits;
+      break;
+    case "complete_no_charge":
+      updates.status = "completed";
+      updates.completed_at = now;
+      updates.charged_credits = 0;
+      break;
+    case "cancel":
+      updates.status = "cancelled";
+      updates.cancelled_at = now;
+      break;
+    default:
+      return res.status(400).json({ ok: false, error: "Unknown action" });
+  }
+
+  const { error: updateError } = await supabase
+    .from("service_requests")
+    .update(updates)
+    .eq("id", id);
+
+  if (updateError) {
+    return res.status(500).json({ ok: false, error: updateError.message });
+  }
+
+  await logAdminAction(role, "update_service_request", {
+    targetType: "service_request",
+    targetId: id,
+    module: "body",
+    ipAddress: getClientIp(req),
+    details: { updateAction, status: updates.status },
+  });
+
+  return res.json({ ok: true, status: updates.status });
 }
