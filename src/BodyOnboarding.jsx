@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getClientToken } from "./lib/clientToken.js";
+import PlateGuide from "./PlateGuide.jsx";
 import { getBodySession } from "./lib/sessionAccess.js";
 
 const TRACKERS = [
@@ -210,29 +211,9 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
           </div>
         </div>
 
-        {/* Plate scheme visual */}
+        {/* Plate scheme */}
         <div style={s.section}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#2f2925", marginBottom: 12 }}>Схема тарелки-ориентира</div>
-          <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 120, padding: 16, borderRadius: 12, background: "#e8f0ea", textAlign: "center" }}>
-              <div style={{ fontSize: 28, marginBottom: 4 }}>🥬</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925" }}>~половина</div>
-              <div style={{ fontSize: 12, color: "#5f574f" }}>Овощи и зелень</div>
-            </div>
-            <div style={{ flex: 1, minWidth: 120, padding: 16, borderRadius: 12, background: "#fdf6ee", textAlign: "center" }}>
-              <div style={{ fontSize: 28, marginBottom: 4 }}>🍗</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925" }}>~четверть</div>
-              <div style={{ fontSize: 12, color: "#5f574f" }}>Белок</div>
-            </div>
-            <div style={{ flex: 1, minWidth: 120, padding: 16, borderRadius: 12, background: "#f5f0e8", textAlign: "center" }}>
-              <div style={{ fontSize: 28, marginBottom: 4 }}>🍚</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925" }}>~четверть</div>
-              <div style={{ fontSize: 12, color: "#5f574f" }}>Гарнир / углеводы</div>
-            </div>
-          </div>
-          <div style={{ fontSize: 13, color: "#8a7e72", lineHeight: 1.5 }}>
-            Это ориентир, а не строгое правило. Индивидуальные особенности и медицинские ограничения важнее общей схемы.
-          </div>
+          <PlateGuide />
         </div>
 
         <div style={s.section}>
