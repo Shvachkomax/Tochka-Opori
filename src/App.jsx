@@ -108,8 +108,7 @@ export default function App() {
   const [debugInfo, setDebugInfo] = useState(null);
   const [careRecommendation, setCareRecommendation] = useState(null);
   const [showConsultPrep, setShowConsultPrep] = useState(false);
-  const [showMessageToClose, setShowMessageToClose] = useState(false);
-  const [messageText, setMessageText] = useState("");
+
 
   // Support Cabinet MVP
   const [supportCabinet, setSupportCabinet] = useState(null);
@@ -2680,8 +2679,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     } catch (e) {}
     setSavedBodyResult(null);
     setShowConsultPrep(false);
-    setShowMessageToClose(false);
-    setMessageText("");
     setRecording(false);
     setTranscribing(false);
     setVoiceError("");
@@ -9703,9 +9700,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             borderRadius: 12, padding: "12px 20px", fontWeight: 600, fontSize: 14,
                             cursor: "pointer",
                           }} onClick={() => {
-                            const msg = "Мне сейчас очень тяжело. Побудь со мной на связи, пожалуйста.";
-                            navigator.clipboard.writeText(msg);
-                            showToast("Сообщение скопировано");
+                            showToast("Попросите находящегося рядом человека помочь вам добраться до помощи. Не оставайтесь одни.");
                           }}>
                             Попросить близкого быть рядом
                           </button>
@@ -9743,13 +9738,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                           <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => setShowConsultPrep(true)}>
                             Подготовиться к первой консультации
-                          </button>
-                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
-                            const msg = "Мне сейчас тяжело. Мне не обязательно нужны советы, но мне важно, чтобы ты побыл(а) со мной на связи сегодня.";
-                            setMessageText(msg);
-                            setShowMessageToClose(true);
-                          }}>
-                            Составить сообщение близкому
                           </button>
                           <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
                             setShowSelfAssessment(true);
@@ -9814,13 +9802,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             showToast("Симптомы, требующие срочного внимания: боль в груди, одышка, сильная головная боль, слабость в конечности — звоните 112");
                           }}>
                             Когда нужна срочная помощь
-                          </button>
-                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
-                            const msg = "Я сейчас прохожу разбор телесных симптомов. Мне может понадобиться помощь с визитом к врачу в ближайшие дни.";
-                            setMessageText(msg);
-                            setShowMessageToClose(true);
-                          }}>
-                            Сообщить близкому
                           </button>
                         </div>
                         {careRecommendation.interim_support?.length > 0 && (
@@ -9922,30 +9903,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 )}
 
                 {/* Message to close person modal */}
-                {showMessageToClose && (
-                  <div style={s.overlay} onClick={() => setShowMessageToClose(false)}>
-                    <div style={s.modal} onClick={(e) => e.stopPropagation()}>
-                      <div style={s.modalTitle}>Сообщение близкому</div>
-                      <textarea
-                        style={{ ...s.textarea, minHeight: 100, marginBottom: 16 }}
-                        value={messageText}
-                        onChange={(e) => setMessageText(e.target.value)}
-                      />
-                      <button
-                        style={{ ...s.wide, background: "#7D9A89", color: "white" }}
-                        onClick={() => {
-                          navigator.clipboard.writeText(messageText);
-                          showToast("Сообщение скопировано");
-                        }}
-                      >
-                        Скопировать сообщение
-                      </button>
-                      <button style={{ ...s.secondary, marginTop: 10 }} onClick={() => setShowMessageToClose(false)}>
-                        Закрыть
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 {activeModule === "support" && !showSelfAssessment && !showSupportToolkit && !showSpecialistIntent && (
                   <div style={{ marginTop: 24, borderTop: "1px solid rgba(46,42,37,.1)", paddingTop: 20 }}>
