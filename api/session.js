@@ -356,6 +356,10 @@ export default async function handler(req, res) {
         return await handleGetSupportServiceRequest(req, res);
       case "cancelSupportServiceRequest":
         return await handleCancelSupportServiceRequest(req, res);
+      case "getSupportCheckins":
+        return await handleGetSupportCheckins(req, res);
+      case "saveSupportCheckin":
+        return await handleSaveSupportCheckin(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -3449,5 +3453,99 @@ async function handleCancelSupportServiceRequest(req, res) {
   } catch (error) {
     console.error("handleCancelSupportServiceRequest error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка отмены запроса." });
+  }
+}
+
+// ============================================================
+// Support Daily Check-ins
+// ============================================================
+
+async function handleGetSupportCheckins(req, res) {
+  try {
+    const { session_id, access_token, days } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const lookbackDays = Math.min(Math.max(parseInt(days) || 90, 1), 365);
+    const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const supabase = getSupabase();
+    const { data: checkins, error } = await supabase
+      .from("support_daily_checkins")
+      .select("id, checkin_date, wellbeing_score, anxiety_score, comment, created_at")
+      .eq("owner_type", "anonymous_case")
+      .eq("owner_id", owner.ownerId)
+      .gte("checkin_date", since)
+      .order("checkin_date", { ascending: true });
+
+    if (error) {
+      console.error("[getSupportCheckins] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить данные." });
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const todayCheckin = (checkins || []).find(c => c.checkin_date === today) || null;
+
+    return res.status(200).json({
+      ok: true,
+      today: todayCheckin,
+      history: checkins || [],
+    });
+  } catch (error) {
+    console.error("handleGetSupportCheckins error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки данных." });
+  }
+}
+
+async function handleSaveSupportCheckin(req, res) {
+  try {
+    const { session_id, access_token, wellbeing_score, anxiety_score, comment } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (wellbeing_score === undefined || wellbeing_score === null || !Number.isInteger(wellbeing_score) || wellbeing_score < -5 || wellbeing_score > 5) {
+      return res.status(400).json({ ok: false, error: "Оценка состояния должна быть от -5 до +5." });
+    }
+    if (anxiety_score !== undefined && anxiety_score !== null && (!Number.isInteger(anxiety_score) || anxiety_score < 0 || anxiety_score > 10)) {
+      return res.status(400).json({ ok: false, error: "Оценка напряжения должна быть от 0 до 10." });
+    }
+    if (comment && typeof comment === "string" && comment.length > 1000) {
+      return res.status(400).json({ ok: false, error: "Комментарий слишком длинный (максимум 1000 символов)." });
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date().toISOString();
+    const supabase = getSupabase();
+
+    const row = {
+      owner_type: "anonymous_case",
+      owner_id: owner.ownerId,
+      checkin_date: today,
+      wellbeing_score,
+      anxiety_score: anxiety_score ?? null,
+      comment: comment?.trim() || null,
+      source: "client_cabinet",
+      updated_at: now,
+    };
+
+    const { data: saved, error } = await supabase
+      .from("support_daily_checkins")
+      .upsert(row, { onConflict: "owner_type,owner_id,checkin_date" })
+      .select("id, checkin_date, wellbeing_score, anxiety_score, comment")
+      .single();
+
+    if (error) {
+      console.error("[saveSupportCheckin] upsert error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось сохранить." });
+    }
+
+    return res.status(200).json({ ok: true, checkin: saved });
+  } catch (error) {
+    console.error("handleSaveSupportCheckin error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сохранения." });
   }
 }

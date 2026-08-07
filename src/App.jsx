@@ -8,7 +8,7 @@ import BodyDayView from "./BodyDayView.jsx";
 import BodyHealthContext from "./BodyHealthContext.jsx";
 import BodyServiceRequests from "./BodyServiceRequests.jsx";
 import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
-import { saveBodySession, saveSupportSession, getBodySession, getSupportSession, clearBodySession, withAccessToken } from "./lib/sessionAccess.js";
+import { saveBodySession, saveSupportSession, getBodySession, getSupportSession, clearBodySession, clearSupportSession, withAccessToken } from "./lib/sessionAccess.js";
 import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
 import ExpertInvitePage from "./pages/expert/ExpertInvitePage.jsx";
 import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
@@ -123,6 +123,14 @@ export default function App() {
   const [supportNewRequestOpen, setSupportNewRequestOpen] = useState(false);
   const [supportNewRequest, setSupportNewRequest] = useState({ request_type: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
   const [supportRequestSubmitting, setSupportRequestSubmitting] = useState(false);
+  const [accessExpanded, setAccessExpanded] = useState(false);
+  // Daily check-in state
+  const [checkinToday, setCheckinToday] = useState(null);
+  const [checkinHistory, setCheckinHistory] = useState([]);
+  const [checkinWellbeing, setCheckinWellbeing] = useState(null);
+  const [checkinAnxiety, setCheckinAnxiety] = useState(null);
+  const [checkinComment, setCheckinComment] = useState("");
+  const [checkinSaving, setCheckinSaving] = useState(false);
 
   const [activeModule, setActiveModule] = useState(() => {
     if (typeof window !== "undefined") {
@@ -1177,6 +1185,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setSessionId(effectiveSessionId);
       setPublicCode(cabinetData.public_code || enteredCode || saved.sessionId);
       setPhase("cabinet");
+      loadSupportCheckins();
     } catch (e) {
       setContinuationCodeError(e.message || "Не удалось открыть разговор. Проверьте код продолжения.");
       showToast(e.message || "Не удалось открыть разговор. Проверьте код продолжения.", "error");
@@ -1574,6 +1583,66 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         });
       }
     } catch { /* silent */ }
+  }
+
+  // Load daily check-ins
+  async function loadSupportCheckins() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getSupportCheckins", session_id: saved.sessionId, access_token: saved.accessToken, days: 90 }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setCheckinToday(data.today);
+        setCheckinHistory(data.history || []);
+        if (data.today) {
+          setCheckinWellbeing(data.today.wellbeing_score);
+          setCheckinAnxiety(data.today.anxiety_score);
+          setCheckinComment(data.today.comment || "");
+        }
+      }
+    } catch { /* silent */ }
+  }
+
+  // Save daily check-in
+  async function saveSupportCheckin() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    if (checkinWellbeing === null || checkinWellbeing === undefined) {
+      showToast("Отметьте состояние.", "error");
+      return;
+    }
+    setCheckinSaving(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "saveSupportCheckin",
+          session_id: saved.sessionId,
+          access_token: saved.accessToken,
+          wellbeing_score: checkinWellbeing,
+          anxiety_score: checkinAnxiety,
+          comment: checkinComment,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setCheckinToday(data.checkin);
+        showToast("Сохранено.", "success");
+        await loadSupportCheckins();
+      } else {
+        showToast(data.error || "Не удалось сохранить", "error");
+      }
+    } catch {
+      showToast("Не удалось сохранить", "error");
+    } finally {
+      setCheckinSaving(false);
+    }
   }
 
   // Save patient feedback to case_reviews
@@ -8617,7 +8686,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 `}</style>
           <div style={s.wrap}>
-        <header style={{ ...s.header, marginBottom: activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen) ? 24 : 80 }} className="app-header">
+        <header style={{ ...s.header, marginBottom: (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && ["cabinet", "session_view"].includes(phase)) ? 24 : 80 }} className="app-header">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img
               src="/logo-tochka-opory-header.png"
@@ -8706,13 +8775,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
         {(() => {
           const isBodyCabinet = activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding", "health_context", "service_requests"].includes(bodyScreen);
+          const isSupportCabinet = activeModule === "support" && ["cabinet", "session_view", "followup"].includes(phase);
           const bodyMaxWidth = activeModule === "body" && bodyScreen === "cabinet" ? 1120
             : activeModule === "body" && ["diary_view", "diary_edit", "diary_result", "health_context", "service_requests"].includes(bodyScreen) ? 820
             : activeModule === "body" && bodyScreen === "onboarding" ? 640
             : null;
+          const isFullWidth = isBodyCabinet || isSupportCabinet;
+          const fullWidthMax = isSupportCabinet ? 1180 : (bodyMaxWidth || 1120);
           return (
-        <main style={isBodyCabinet ? { maxWidth: bodyMaxWidth || 1120, margin: "0 auto", padding: "0 16px", width: "100%", boxSizing: "border-box" } : s.grid} className={isBodyCabinet ? "" : "app-grid"}>
-          {!isBodyCabinet && (
+        <main style={isFullWidth ? { maxWidth: fullWidthMax, margin: "0 auto", padding: "0 16px", width: "100%", boxSizing: "border-box" } : s.grid} className={isFullWidth ? "" : "app-grid"}>
+          {!isFullWidth && (
           <section>
             <h1 style={s.h1} className="app-hero-title">
               {activeModule === "body" ? "Разберёмся с питанием, движением и режимом" : "Найдём точку опоры"}
@@ -10019,79 +10091,82 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             const walletBalance = supportCabinet.wallet?.visible ? supportCabinet.wallet.balance : null;
 
             return (
-              <section style={{ ...s.card, maxWidth: 840, margin: "0 auto" }} className="app-card">
+              <section style={{ width: "100%" }} className="app-card-support">
                 {/* Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 2 }}>Точка Опоры</div>
-                    <h2 style={{ margin: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 22 }}>Личный кабинет</h2>
-                  </div>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, flexWrap: "wrap", gap: 10 }}>
+                  <button
+                    onClick={() => { setPhase("input"); }}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 0", display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}
+                    title="На главную"
+                  >
+                    <span style={{ fontFamily: "Georgia, \"PT Serif\", serif", fontWeight: 700, fontSize: 18, color: "#2E2A25" }}>Точка Опоры</span>
+                  </button>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 13, color: "#7A7268" }}>Личный кабинет</span>
                     {walletBalance !== null && (
-                      <div style={{ fontSize: 13, color: "#5F7D6C", fontWeight: 600 }}>
+                      <span style={{ fontSize: 13, color: "#5F7D6C", fontWeight: 600 }}>
                         {walletBalance.toLocaleString("ru-RU")} кредитов
-                      </div>
+                      </span>
                     )}
                     <button
-                      style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }}
-                      onClick={() => { setPhase("input"); setSupportCabinet(null); }}
+                      style={{ ...s.secondary, fontSize: 13, padding: "6px 12px" }}
+                      onClick={() => { setPhase("input"); setSupportCabinet(null); clearSupportSession(); }}
                     >
                       Выйти
                     </button>
                   </div>
                 </div>
 
-                {/* Section: Сейчас */}
+                {/* ROW 1: Последний разговор + Следующий шаг */}
                 {latestSession && (
                   <div style={{
-                    background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
-                    borderRadius: 16, padding: 20, marginBottom: 24,
+                    display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16,
+                    marginBottom: 24,
                   }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                      <div>
-                        <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>Последний разговор</div>
-                        <div style={{ fontWeight: 700, fontSize: 16, color: "#2E2A25" }}>{latestDate}</div>
-                      </div>
+                    {/* Последний разговор */}
+                    <div style={{
+                      background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
+                      borderRadius: 16, padding: 20,
+                    }}>
+                      <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>Последний разговор</div>
+                      <div style={{ fontWeight: 700, fontSize: 16, color: "#2E2A25", marginBottom: 4 }}>{latestDate}</div>
                       <div style={{
-                        fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 20,
-                        background: latestSession.status === "followup" ? "#EDE3D8" : "#E2EBE4",
+                        display: "inline-block", fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
+                        background: latestSession.status === "followup" ? "#EDE3D8" : "rgba(255,255,255,.5)",
                         color: latestSession.status === "followup" ? "#8B6B4A" : "#5F7D6C",
+                        marginBottom: 12,
                       }}>
-                        {latestSession.status === "followup" ? "Продолжение" : "Первое обращение"}
+                        {latestSession.status === "followup" ? "продолжение" : "первое обращение"}
+                      </div>
+                      <div style={{ fontSize: 13, color: "#5F574F", marginBottom: 14 }}>{latestSession.summary?.slice(0, 120)}{latestSession.summary?.length > 120 ? "…" : ""}</div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button style={{ ...s.primary, fontSize: 13, padding: "8px 14px", flex: 1 }} onClick={startSupportFollowUp}>
+                          Продолжить разговор
+                        </button>
+                        <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px", flex: 1 }} onClick={() => openSupportReport(latestSession.sessionId)}>
+                          Открыть отчёт
+                        </button>
                       </div>
                     </div>
 
-                    {/* Care next step */}
+                    {/* Следующий шаг */}
                     <div style={{
-                      background: careNextStep.urgent ? "rgba(184,92,74,.12)" : "#ffffff",
-                      border: careNextStep.urgent ? "2px solid #B85C4A" : "1px solid rgba(125,154,137,.2)",
-                      borderRadius: 12, padding: "12px 16px", marginBottom: 16,
+                      background: careNextStep.urgent ? "rgba(184,92,74,.12)" : "#FAF6EF",
+                      border: careNextStep.urgent ? "2px solid #B85C4A" : "1px solid rgba(46,42,37,.1)",
+                      borderRadius: 16, padding: 20,
                     }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: careNextStep.urgent ? "#B85C4A" : "#2E2A25", marginBottom: 4 }}>
+                      <div style={{ fontSize: 12, color: careNextStep.urgent ? "#B85C4A" : "#7A7268", marginBottom: 4 }}>Следующий шаг</div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: careNextStep.urgent ? "#B85C4A" : "#2E2A25", marginBottom: 6 }}>
                         {careNextStep.text}
                       </div>
-                      <div style={{ fontSize: 13, color: careNextStep.urgent ? "#8B4A3A" : "#7A7268" }}>
+                      <div style={{ fontSize: 13, color: careNextStep.urgent ? "#8B4A3A" : "#5F574F" }}>
                         {careNextStep.description}
                       </div>
-                    </div>
-
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      <button style={{ ...s.primary, flex: 1, minWidth: 140 }} onClick={startSupportFollowUp}>
-                        Продолжить разговор
-                      </button>
-                      <button style={{ ...s.secondary, flex: 1, minWidth: 140 }} onClick={() => openSupportReport(latestSession.sessionId)}>
-                        Открыть отчёт
-                      </button>
-                      {(careNextStep.cta === "Связаться со специалистом") && (
-                        <button style={{ ...s.secondary, flex: 1, minWidth: 140, borderColor: "#7D9A89", color: "#5F7D6C" }} onClick={() => setSupportNewRequestOpen(true)}>
-                          Связаться со специалистом
-                        </button>
-                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Section: История разговоров */}
+                {/* ROW: История разговоров */}
                 {supportCabinet.sessions?.length > 0 && (
                   <div style={{ marginBottom: 24 }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>История разговоров</div>
@@ -10131,7 +10206,186 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 )}
 
-                {/* Section: Специалист */}
+                {/* ROW: Как вы сегодня? — Daily check-in */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 4 }}>Как вы себя чувствуете сегодня?</div>
+                  <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 14 }}>Отметьте общее состояние — это поможет увидеть изменения со временем.</div>
+
+                  {/* Wellbeing scale -5 to +5 */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#2E2A25", marginBottom: 8 }}>Общее состояние</div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                      {[-5,-4,-3,-2,-1,0,1,2,3,4,5].map((v) => {
+                        const isSelected = checkinWellbeing === v;
+                        const isNeg = v < 0;
+                        const isPos = v > 0;
+                        const isZero = v === 0;
+                        let bg = "#FAF6EF";
+                        let color = "#7A7268";
+                        let border = "1px solid rgba(46,42,37,.1)";
+                        if (isSelected) {
+                          if (isNeg) { bg = "#E8D8D0"; color = "#6B4A3A"; border = "1px solid #C4A090"; }
+                          else if (isPos) { bg = "#D0E8D8"; color = "#3A6B4A"; border = "1px solid #90C4A0"; }
+                          else { bg = "#E2E0DB"; color = "#4A4A4A"; border = "1px solid #B0AFA8"; }
+                        }
+                        return (
+                          <button
+                            key={v}
+                            onClick={() => setCheckinWellbeing(v)}
+                            style={{
+                              width: 38, height: 38, borderRadius: 10, background: bg, color,
+                              border, fontWeight: 700, fontSize: 14, cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                          >
+                            {v > 0 ? `+${v}` : v}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                      <span style={{ fontSize: 11, color: "#8a7e72" }}>Очень тяжело</span>
+                      <span style={{ fontSize: 11, color: "#8a7e72" }}>Обычно</span>
+                      <span style={{ fontSize: 11, color: "#8a7e72" }}>Очень хорошо</span>
+                    </div>
+                  </div>
+
+                  {/* Anxiety scale 0-10 */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#2E2A25", marginBottom: 8 }}>Напряжение / тревога</div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                      {[0,1,2,3,4,5,6,7,8,9,10].map((v) => {
+                        const isSelected = checkinAnxiety === v;
+                        let bg = "#FAF6EF";
+                        let color = "#7A7268";
+                        let border = "1px solid rgba(46,42,37,.1)";
+                        if (isSelected) {
+                          const intensity = v / 10;
+                          bg = `rgba(184,140,92,${0.15 + intensity * 0.35})`;
+                          color = "#5A4A3A";
+                          border = "1px solid #C4A080";
+                        }
+                        return (
+                          <button
+                            key={v}
+                            onClick={() => setCheckinAnxiety(v)}
+                            style={{
+                              width: 34, height: 34, borderRadius: 8, background: bg, color,
+                              border, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                          >
+                            {v}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                      <span style={{ fontSize: 11, color: "#8a7e72" }}>Совсем нет</span>
+                      <span style={{ fontSize: 11, color: "#8a7e72" }}>Очень сильно</span>
+                    </div>
+                  </div>
+
+                  {/* Optional comment */}
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 6 }}>Хотите добавить пару слов?</div>
+                    <textarea
+                      style={{ ...s.answerInput, minHeight: 50 }}
+                      value={checkinComment}
+                      onChange={(e) => setCheckinComment(e.target.value)}
+                      placeholder="Что сегодня больше всего влияет на ваше состояние?"
+                      maxLength={1000}
+                    />
+                  </div>
+
+                  <button
+                    style={{ ...s.primary, fontSize: 13, padding: "10px 18px", opacity: checkinSaving ? 0.6 : 1 }}
+                    disabled={checkinSaving || checkinWellbeing === null}
+                    onClick={saveSupportCheckin}
+                  >
+                    {checkinToday ? (checkinSaving ? "Сохранение..." : "Обновить отметку") : (checkinSaving ? "Сохранение..." : "Сохранить")}
+                  </button>
+                  {checkinToday && (
+                    <div style={{ fontSize: 12, color: "#5F7D6C", marginTop: 8 }}>
+                      Сегодня вы уже отметили: {checkinToday.wellbeing_score > 0 ? "+" : ""}{checkinToday.wellbeing_score}{checkinToday.anxiety_score !== null ? `, напряжение ${checkinToday.anxiety_score}/10` : ""}
+                    </div>
+                  )}
+
+                  {/* Dynamic chart — show when 2+ days */}
+                  {checkinHistory.length >= 2 && (() => {
+                    const periods = [7, 30, 90];
+                    const chartData = checkinHistory.slice(-30);
+                    const chartW = 360;
+                    const chartH = 100;
+                    const padX = 30;
+                    const padY = 10;
+
+                    // Wellbeing chart: -5 to +5
+                    const wbPoints = chartData.map((d, i) => {
+                      const x = padX + (i / (chartData.length - 1)) * (chartW - padX * 2);
+                      const y = padY + ((5 - d.wellbeing_score) / 10) * (chartH - padY * 2);
+                      return `${x},${y}`;
+                    }).join(" ");
+
+                    // Anxiety chart: 0 to 10
+                    const axPoints = chartData.map((d, i) => {
+                      if (d.anxiety_score === null || d.anxiety_score === undefined) return null;
+                      const x = padX + (i / (chartData.length - 1)) * (chartW - padX * 2);
+                      const y = padY + ((10 - d.anxiety_score) / 10) * (chartH - padY * 2);
+                      return `${x},${y}`;
+                    }).filter(Boolean).join(" ");
+
+                    const zeroY = padY + (5 / 10) * (chartH - padY * 2);
+
+                    return (
+                      <div style={{ marginTop: 16 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Динамика состояния</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+                          {/* Wellbeing chart */}
+                          <div style={{ background: "#fff", border: "1px solid rgba(46,42,37,.08)", borderRadius: 12, padding: 12 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: "#5F7D6C", marginBottom: 8 }}>Общее состояние</div>
+                            <svg viewBox={`0 0 ${chartW} ${chartH}`} width="100%" height={chartH}>
+                              <line x1={padX} y1={zeroY} x2={chartW - padX} y2={zeroY} stroke="#E2E0DB" strokeWidth="1" strokeDasharray="4" />
+                              <text x={4} y={zeroY + 4} fontSize="9" fill="#8a7e72">0</text>
+                              <text x={4} y={padY + 4} fontSize="9" fill="#8a7e72">+5</text>
+                              <text x={4} y={chartH - padY + 4} fontSize="9" fill="#8a7e72">-5</text>
+                              <polyline fill="none" stroke="#7D9A89" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={wbPoints} />
+                              {chartData.map((d, i) => {
+                                const x = padX + (i / (chartData.length - 1)) * (chartW - padX * 2);
+                                const y = padY + ((5 - d.wellbeing_score) / 10) * (chartH - padY * 2);
+                                return <circle key={i} cx={x} cy={y} r="3" fill="#7D9A89" />;
+                              })}
+                            </svg>
+                          </div>
+                          {/* Anxiety chart */}
+                          {axPoints && (
+                            <div style={{ background: "#fff", border: "1px solid rgba(46,42,37,.08)", borderRadius: 12, padding: 12 }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: "#8B6B4A", marginBottom: 8 }}>Напряжение / тревога</div>
+                              <svg viewBox={`0 0 ${chartW} ${chartH}`} width="100%" height={chartH}>
+                                <text x={4} y={padY + 4} fontSize="9" fill="#8a7e72">10</text>
+                                <text x={4} y={chartH - padY + 4} fontSize="9" fill="#8a7e72">0</text>
+                                <polyline fill="none" stroke="#B88C5C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={axPoints} />
+                                {chartData.map((d, i) => {
+                                  if (d.anxiety_score === null) return null;
+                                  const x = padX + (i / (chartData.length - 1)) * (chartW - padX * 2);
+                                  const y = padY + ((10 - d.anxiety_score) / 10) * (chartH - padY * 2);
+                                  return <circle key={i} cx={x} cy={y} r="3" fill="#B88C5C" />;
+                                })}
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {checkinHistory.length === 1 && (
+                    <div style={{ fontSize: 12, color: "#7A7268", marginTop: 12 }}>
+                      Добавьте ещё одну отметку в другой день, чтобы увидеть динамику.
+                    </div>
+                  )}
+                </div>
+
+                {/* ROW: Специалист — single CTA, no duplicate */}
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Специалист</div>
                   {supportCabinet.specialist ? (
@@ -10143,12 +10397,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         {supportCabinet.specialist.expertName || "Специалист"}
                       </div>
                       {supportCabinet.specialist.expertSpecialty && (
-                        <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 8 }}>
+                        <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 4 }}>
                           {supportCabinet.specialist.expertSpecialty}
                         </div>
                       )}
                       {supportCabinet.specialist.organizationName && (
-                        <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>
+                        <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 10 }}>
                           {supportCabinet.specialist.organizationName}
                         </div>
                       )}
@@ -10161,29 +10415,35 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
                       borderRadius: 14, padding: 16,
                     }}>
-                      <div style={{ fontSize: 14, color: "#5F574F", marginBottom: 12 }}>
-                        У вас пока нет закреплённого специалиста. Вы можете запросить консультацию.
+                      <div style={{ fontSize: 14, color: "#5F574F", marginBottom: 6 }}>
+                        У вас пока нет закреплённого специалиста.
+                      </div>
+                      <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
+                        Вы можете отправить запрос на консультацию.
                       </div>
                       <button style={{ ...s.primary, fontSize: 13, padding: "10px 16px" }} onClick={() => setSupportNewRequestOpen(true)}>
-                        Запросить консультацию
+                        Связаться со специалистом
                       </button>
                     </div>
                   )}
                 </div>
 
-                {/* Section: Запросы специалисту */}
+                {/* ROW: Запросы специалисту — no duplicate "Новый запрос" button */}
                 <div style={{ marginBottom: 24 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25" }}>Запросы специалисту</div>
-                    <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => setSupportNewRequestOpen(true)}>
-                      Новый запрос
-                    </button>
-                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Запросы специалисту</div>
                   {supportCabinet.service_requests?.length > 0 ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {supportCabinet.service_requests.map((req) => {
+                        const statusLabels = {
+                          submitted: "Новый", new: "Новый",
+                          accepted: "Принят",
+                          scheduled: "Запланирован",
+                          answered: "Получен ответ",
+                          completed: "Завершён",
+                          cancelled: "Отменён",
+                        };
                         const statusColors = {
-                          submitted: { bg: "#f0f0f0", text: "#666" },
+                          submitted: { bg: "#f0f0f0", text: "#666" }, new: { bg: "#f0f0f0", text: "#666" },
                           accepted: { bg: "#E2EBE4", text: "#5F7D6C" },
                           scheduled: { bg: "#E8E4F0", text: "#6B5F8A" },
                           answered: { bg: "#E2EBE4", text: "#5F7D6C" },
@@ -10191,14 +10451,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           cancelled: { bg: "#f0e0e0", text: "#8B4A3A" },
                         };
                         const sc = statusColors[req.status] || statusColors.submitted;
-                        const statusLabels = {
-                          submitted: "Отправлен",
-                          accepted: "Принят",
-                          scheduled: "Назначен",
-                          answered: "Отвечен",
-                          completed: "Завершён",
-                          cancelled: "Отменён",
-                        };
                         const reqDate = req.created_at ? new Date(req.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
                         return (
                           <div key={req.id} style={{
@@ -10217,7 +10469,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             {req.message && <div style={{ fontSize: 13, color: "#5F574F", marginTop: 8 }}>{req.message.slice(0, 150)}{req.message.length > 150 ? "…" : ""}</div>}
                             {req.scheduled_at && <div style={{ fontSize: 12, color: "#5F7D6C", marginTop: 6 }}>Встреча: {new Date(req.scheduled_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>}
                             {req.specialist_response && <div style={{ fontSize: 13, color: "#5F7D6C", marginTop: 8, padding: "8px 12px", background: "#E2EBE4", borderRadius: 8 }}>{req.specialist_response.slice(0, 200)}</div>}
-                            {["submitted", "accepted"].includes(req.status) && (
+                            {["submitted", "new", "accepted"].includes(req.status) && (
                               <button style={{ ...s.secondary, fontSize: 12, padding: "6px 12px", marginTop: 8, color: "#B85C4A", borderColor: "rgba(184,92,74,.3)" }} onClick={() => cancelSupportServiceRequest(req.id)}>
                                 Отменить
                               </button>
@@ -10227,41 +10479,47 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       })}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 14, color: "#7A7268", padding: "12px 0" }}>Пока нет запросов.</div>
+                    <div style={{ fontSize: 14, color: "#7A7268", padding: "12px 0" }}>Запросов пока нет.</div>
                   )}
                 </div>
 
-                {/* Section: Доступ */}
+                {/* ROW: Доступ — collapsible */}
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Доступ</div>
-                  <div style={{
-                    background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
-                    borderRadius: 14, padding: 16,
-                  }}>
-                    <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 6 }}>Код продолжения</div>
-                    <div style={{ fontWeight: 900, fontSize: 16, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace", wordBreak: "break-all", marginBottom: 12 }}>
-                      {supportCabinet.public_code || publicCode}
-                    </div>
-
-                    {regeneratedCode && (
-                      <div style={{ marginBottom: 12, padding: 12, background: "#ffffff", borderRadius: 10, border: "1px solid rgba(125,154,137,.25)" }}>
-                        <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>Новый код (старый больше не действует)</div>
-                        <div style={{ fontWeight: 900, fontSize: 14, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace", wordBreak: "break-all" }}>
-                          {regeneratedCode}
+                  <button
+                    onClick={() => setAccessExpanded(!accessExpanded)}
+                    style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      width: "100%", background: "none", border: "none", cursor: "pointer",
+                      fontSize: 16, fontWeight: 700, color: "#2E2A25", padding: "8px 0",
+                    }}
+                  >
+                    <span>Доступ</span>
+                    <span style={{ fontSize: 14, color: "#7A7268", transition: "transform 0.2s", transform: accessExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+                  </button>
+                  {accessExpanded && (
+                    <div style={{
+                      background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
+                      borderRadius: 14, padding: 16, marginTop: 8,
+                    }}>
+                      {regeneratedCode && (
+                        <div style={{ marginBottom: 12, padding: 12, background: "#ffffff", borderRadius: 10, border: "1px solid rgba(125,154,137,.25)" }}>
+                          <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>Новый код (старый больше не действует)</div>
+                          <div style={{ fontWeight: 900, fontSize: 14, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace", wordBreak: "break-all" }}>
+                            {regeneratedCode}
+                          </div>
+                          <button style={{ ...s.secondary, fontSize: 12, marginTop: 8 }} onClick={() => { navigator.clipboard.writeText(regeneratedCode); showToast("Код скопирован"); }}>
+                            Скопировать
+                          </button>
                         </div>
-                        <button style={{ ...s.secondary, fontSize: 12, marginTop: 8 }} onClick={() => { navigator.clipboard.writeText(regeneratedCode); showToast("Код скопирован"); }}>
-                          Скопировать
-                        </button>
-                      </div>
-                    )}
-
-                    <button
-                      style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }}
-                      onClick={regenerateSupportContinuationCode}
-                    >
-                      Создать новый код продолжения
-                    </button>
-                  </div>
+                      )}
+                      <button
+                        style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }}
+                        onClick={regenerateSupportContinuationCode}
+                      >
+                        Создать новый код продолжения
+                      </button>
+                    </div>
+                  )}
                 </div>
 
               </section>
@@ -10273,12 +10531,24 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             const s_data = supportViewingSessionData;
             const sessionDate = s_data.createdAt ? new Date(s_data.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
             return (
-              <section style={{ ...s.card, maxWidth: 840, margin: "0 auto" }} className="app-card">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
-                  <h2 style={{ margin: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 20 }}>Обращение — {sessionDate}</h2>
-                  <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => { setPhase("cabinet"); setSupportViewingSession(null); setSupportViewingSessionData(null); }}>
-                    Назад в кабинет
-                  </button>
+              <section style={{ width: "100%" }} className="app-card-support">
+                {/* Header with home link */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <button
+                      onClick={() => { setPhase("input"); }}
+                      style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 0", display: "flex", alignItems: "center", gap: 8 }}
+                      title="На главную"
+                    >
+                      <span style={{ fontFamily: "Georgia, \"PT Serif\", serif", fontWeight: 700, fontSize: 18, color: "#2E2A25" }}>Точка Опоры</span>
+                    </button>
+                    <span style={{ fontSize: 13, color: "#7A7268" }}>Разговор от {sessionDate}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => { setPhase("cabinet"); setSupportViewingSession(null); setSupportViewingSessionData(null); }}>
+                      ← В кабинет
+                    </button>
+                  </div>
                 </div>
 
                 {/* Client-safe content only */}
