@@ -1436,6 +1436,9 @@ async function handleExchangeContinuationCredential(req, res) {
     // Success: clear failures for this IP + lookup pair, issue new access token.
     await supabase.rpc("clear_continuation_failed_attempts", { p_attempt_key: attemptKey });
 
+    console.log("[exchange] start module=" + reqModule + " lookup_prefix=" + parsed.lookupCode.slice(0, 8));
+
+    // Step 1: Find target session
     const targetTable = reqModule === "body" ? "body_clients" : "sessions";
     let targetQuery = supabase
       .from(targetTable)
@@ -1452,25 +1455,48 @@ async function handleExchangeContinuationCredential(req, res) {
       .maybeSingle();
 
     if (targetError) {
-      console.error("[handleExchangeContinuationCredential] target query error:", targetError.code, "table:", targetTable);
+      console.error("[exchange] target query error:", targetError.code, targetError.message);
       return res.status(500).json({ ok: false, error: "Не удалось открыть профиль. Попробуйте позже." });
     }
     if (!targetSession?.session_id) {
-      console.log("[handleExchangeContinuationCredential] target_session_found:", false, "owner_found:", true);
+      console.log("[exchange] no target session for owner");
       return res.status(404).json({ ok: false, error: "Не удалось найти запись для этого кода. Обратитесь к специалисту." });
     }
 
-    const cabinet = await buildCabinetData({ module: reqModule, ownerId: credential.owner_id, supabase });
-    const usageBalance = await getUsageBalanceForOwner({ module: reqModule, ownerId: credential.owner_id });
+    console.log("[exchange] target session found");
 
+    // Step 2: Build cabinet
+    let cabinet;
+    try {
+      cabinet = await buildCabinetData({ module: reqModule, ownerId: credential.owner_id, supabase });
+      console.log("[exchange] cabinet built sessions=" + (cabinet.sessions?.length || 0));
+    } catch (cabinetError) {
+      console.error("[exchange] cabinet build error:", cabinetError.message);
+      throw cabinetError;
+    }
+
+    // Step 3: Get balance
+    let usageBalance;
+    try {
+      usageBalance = await getUsageBalanceForOwner({ module: reqModule, ownerId: credential.owner_id });
+      console.log("[exchange] balance ok=" + usageBalance.ok);
+    } catch (balanceError) {
+      console.error("[exchange] balance error:", balanceError.message);
+      throw balanceError;
+    }
+
+    // Step 4: Generate access token
     const newAccessToken = await generateSessionAccessToken(targetSession.session_id, {
       module: reqModule,
       anonymousOwnerId: credential.owner_id,
       publicCode: cabinet.sessions?.[0]?.publicCode || null,
     });
     if (!newAccessToken) {
+      console.error("[exchange] token generation returned null");
       return res.status(500).json({ ok: false, error: "Не удалось создать код доступа. Попробуйте позже." });
     }
+
+    console.log("[exchange] success");
 
     console.log("[exchange]", JSON.stringify({
       action: "exchange",

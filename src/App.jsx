@@ -50,6 +50,7 @@ export default function App() {
   const [answers, setAnswers] = useState({});
   const [result, setResult] = useState(null);
   const [phase, setPhase] = useState("input");
+  const [supportScreen, setSupportScreen] = useState("landing");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("user");
@@ -311,6 +312,24 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     clearToast();
     setBodyDiaryDayData(null);
     setBodyScreen("cabinet");
+  }
+
+  // Support navigation: go to landing (no logout)
+  function goToSupportLanding() {
+    setSupportScreen("landing");
+    setPhase("input");
+    setSupportNewRequestOpen(false);
+    setSupportViewingSession(null);
+    setSupportViewingSessionData(null);
+  }
+
+  // Support navigation: go to cabinet
+  function goToSupportCabinet() {
+    setSupportScreen("cabinet");
+    setPhase("cabinet");
+    setSupportNewRequestOpen(false);
+    setSupportViewingSession(null);
+    setSupportViewingSessionData(null);
   }
 
   // Admin panel state
@@ -1185,6 +1204,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setSessionId(effectiveSessionId);
       setPublicCode(cabinetData.public_code || enteredCode || saved.sessionId);
       setPhase("cabinet");
+      setSupportScreen("cabinet");
       loadSupportCheckins();
     } catch (e) {
       setContinuationCodeError(e.message || "Не удалось открыть разговор. Проверьте код продолжения.");
@@ -1362,6 +1382,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       }
       setActiveTab("user");
       setPhase("report");
+      setSupportScreen("report");
     } catch (e) {
       showToast(e.message || "Не удалось открыть отчёт", "error");
     } finally {
@@ -1392,6 +1413,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setResult(null);
     setFollowUpAnswers({});
     setPhase("followup");
+    setSupportScreen("followup");
   }
 
   async function submitFollowUp() {
@@ -1478,6 +1500,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setSupportViewingSession(targetSessionId);
       setSupportViewingSessionData(data.session);
       setPhase("session_view");
+      setSupportScreen("session_view");
     } catch (e) {
       showToast(e.message || "Не удалось открыть сессию", "error");
     } finally {
@@ -2186,6 +2209,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         setAnswers({});
         setDialogDepth((d) => d + 1);
         setPhase("questions");
+        setSupportScreen("questions");
 
         // Persist conversation pairs after each answer round
         if (dialogDepth > 0 && sessionId) {
@@ -2216,6 +2240,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         setReportSource("generated");
         setJustFinishedSession(true);
         setPhase("report");
+        setSupportScreen("report");
 
         const sid = sessionId || `session-${Date.now()}`;
         if (!sessionId) setSessionId(sid);
@@ -2354,6 +2379,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setReportSource("generated");
     setJustFinishedSession(true);
     setPhase("report");
+    setSupportScreen("report");
     if (status.public_code) setPublicCode(status.public_code);
     if (status.access_token) saveSupportSession(status.session_id, status.access_token);
     if (status.continuation_code) setContinuationCode(status.continuation_code);
@@ -2592,6 +2618,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   function handleReset() {
     setPhase("input");
+    setSupportScreen("landing");
     setQuestions(null);
     setAnswers({});
     setResult(null);
@@ -8686,7 +8713,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 `}</style>
           <div style={s.wrap}>
-        <header style={{ ...s.header, marginBottom: (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && ["cabinet", "session_view"].includes(phase)) ? 24 : 80 }} className="app-header">
+        <header style={{ ...s.header, marginBottom: (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <img
               src="/logo-tochka-opory-header.png"
@@ -8775,7 +8802,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
         {(() => {
           const isBodyCabinet = activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding", "health_context", "service_requests"].includes(bodyScreen);
-          const isSupportCabinet = activeModule === "support" && ["cabinet", "session_view", "followup"].includes(phase);
+          const isSupportCabinet = activeModule === "support" && supportScreen !== "landing";
           const bodyMaxWidth = activeModule === "body" && bodyScreen === "cabinet" ? 1120
             : activeModule === "body" && ["diary_view", "diary_edit", "diary_result", "health_context", "service_requests"].includes(bodyScreen) ? 820
             : activeModule === "body" && bodyScreen === "onboarding" ? 640
@@ -10064,7 +10091,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   {reportSource === "cabinet" && (
                     <button
                       style={{ ...s.secondary, flex: 1 }}
-                      onClick={() => { setPhase("cabinet"); setReportSource(null); }}
+                      onClick={() => { goToSupportCabinet(); setReportSource(null); }}
                     >
                       ← Назад в кабинет
                     </button>
@@ -10095,7 +10122,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 {/* Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, flexWrap: "wrap", gap: 10 }}>
                   <button
-                    onClick={() => { setPhase("input"); }}
+                    onClick={goToSupportLanding}
                     style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 0", display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}
                     title="На главную"
                   >
@@ -10110,7 +10137,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     )}
                     <button
                       style={{ ...s.secondary, fontSize: 13, padding: "6px 12px" }}
-                      onClick={() => { setPhase("input"); setSupportCabinet(null); clearSupportSession(); }}
+                      onClick={() => { goToSupportLanding(); setSupportCabinet(null); clearSupportSession(); }}
                     >
                       Выйти
                     </button>
@@ -10536,7 +10563,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <button
-                      onClick={() => { setPhase("input"); }}
+                      onClick={goToSupportLanding}
                       style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 0", display: "flex", alignItems: "center", gap: 8 }}
                       title="На главную"
                     >
@@ -10545,7 +10572,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     <span style={{ fontSize: 13, color: "#7A7268" }}>Разговор от {sessionDate}</span>
                   </div>
                   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => { setPhase("cabinet"); setSupportViewingSession(null); setSupportViewingSessionData(null); }}>
+                    <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={goToSupportCabinet}>
                       ← В кабинет
                     </button>
                   </div>
@@ -10710,14 +10737,23 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
           {/* Support follow-up form */}
           {phase === "followup" && (
-            <section style={s.card} className="app-card">
+            <section style={{ width: "100%" }} className="app-card-support">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
-                <h2 style={{ margin: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 22 }}>Что изменилось с прошлого разговора?</h2>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <button
+                    onClick={goToSupportLanding}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 0", display: "flex", alignItems: "center", gap: 8 }}
+                    title="На главную"
+                  >
+                    <span style={{ fontFamily: "Georgia, \"PT Serif\", serif", fontWeight: 700, fontSize: 18, color: "#2E2A25" }}>Точка Опоры</span>
+                  </button>
+                  <span style={{ fontSize: 13, color: "#7A7268" }}>Продолжение разговора</span>
+                </div>
                 <button
                   style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
-                  onClick={() => setPhase("cabinet")}
+                  onClick={goToSupportCabinet}
                 >
-                  Назад
+                  ← В кабинет
                 </button>
               </div>
 
