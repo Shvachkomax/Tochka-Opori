@@ -32,6 +32,88 @@ function getClientIp(req) {
     || "unknown";
 }
 
+// Resolve support owner from session_id + access_token.
+// Returns { ownerId, sessionId, publicCode } or null.
+async function resolveSupportOwner(sessionId, accessToken) {
+  if (!sessionId || !accessToken) return null;
+  const valid = await validateSessionAccess(sessionId, accessToken);
+  if (!valid) return null;
+  const supabase = getSupabase();
+  const { data: session, error } = await supabase
+    .from("sessions")
+    .select("session_id, public_code, anonymous_owner_id, module")
+    .eq("session_id", sessionId)
+    .eq("module", "support")
+    .maybeSingle();
+  if (error || !session || !session.anonymous_owner_id) return null;
+  return { ownerId: session.anonymous_owner_id, sessionId: session.session_id, publicCode: session.public_code };
+}
+
+// Resolve specialist relation for a support owner.
+// Returns { expertId, expertName, expertRole, expertSpecialty, organizationId, organizationName } or null.
+async function resolveSupportSpecialistRelation(ownerId) {
+  const supabase = getSupabase();
+
+  // Find public_code for this owner's sessions
+  const { data: ownerSessions } = await supabase
+    .from("sessions")
+    .select("public_code, primary_expert_id, organization_id")
+    .eq("anonymous_owner_id", ownerId)
+    .eq("module", "support")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (!ownerSessions || ownerSessions.length === 0) return null;
+
+  const latest = ownerSessions[0];
+  let expertId = latest.primary_expert_id;
+  let orgId = latest.organization_id;
+
+  // If session doesn't have expert, check patient_assignments
+  if (!expertId && latest.public_code) {
+    const { data: assignment } = await supabase
+      .from("patient_assignments")
+      .select("primary_expert_id, organization_id")
+      .eq("public_code", latest.public_code)
+      .eq("status", "active")
+      .maybeSingle();
+    if (assignment) {
+      expertId = assignment.primary_expert_id;
+      orgId = orgId || assignment.organization_id;
+    }
+  }
+
+  if (!expertId) return null;
+
+  // Get expert details
+  const { data: expert } = await supabase
+    .from("experts")
+    .select("id, name, role, specialty")
+    .eq("id", expertId)
+    .maybeSingle();
+
+  if (!expert) return null;
+
+  let orgName = null;
+  if (orgId) {
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("id, name")
+      .eq("id", orgId)
+      .maybeSingle();
+    orgName = org?.name || null;
+  }
+
+  return {
+    expertId: expert.id,
+    expertName: expert.name,
+    expertRole: expert.role,
+    expertSpecialty: expert.specialty,
+    organizationId: orgId,
+    organizationName: orgName,
+  };
+}
+
 // Resolve body owner from session_id + access_token.
 // Returns { ownerId, sessionId } or throws with appropriate HTTP status.
 async function resolveBodyOwner(sessionId, accessToken) {
@@ -266,6 +348,14 @@ export default async function handler(req, res) {
         return await handleGetBodyServiceRequest(req, res);
       case "cancelBodyServiceRequest":
         return await handleCancelBodyServiceRequest(req, res);
+      case "createSupportServiceRequest":
+        return await handleCreateSupportServiceRequest(req, res);
+      case "listSupportServiceRequests":
+        return await handleListSupportServiceRequests(req, res);
+      case "getSupportServiceRequest":
+        return await handleGetSupportServiceRequest(req, res);
+      case "cancelSupportServiceRequest":
+        return await handleCancelSupportServiceRequest(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -725,20 +815,41 @@ async function handleGetCabinet(req, res) {
       };
     });
 
-    // Latest session context needed for follow-up
+    // Latest session context needed for follow-up (client-safe: no doctor_report)
     const latest = sessions?.[0];
     const latestJson = latest?.json_data || {};
     const latestReport = latest ? {
       user_report: latest.user_report || "",
-      doctor_report: latest.doctor_report || "",
       previousPatientReport: latestJson.previousPatientReport || "",
-      previousDoctorReport: latestJson.previousDoctorReport || "",
       homeTasks: latestJson.homeTasks || "",
       resourceFactors: latestJson.resourceFactors || "",
       supportPlan: latest.support_plan || null,
+      careRecommendation: latest.care_recommendation || null,
       dialogDepth: latestJson.dialogDepth ?? 0,
       conversationHistory: latest.conversation_history || [],
+      createdAt: latest.created_at,
     } : null;
+
+    // Wallet balance
+    const { getWallet, getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
+    const wallet = await getWallet({ ownerType: "anonymous_case", ownerId, module: "support" });
+    let balance = null;
+    if (wallet) {
+      balance = await getUsageBalanceForClient({ walletId: wallet.id });
+    }
+
+    // Specialist relation
+    const specialist = await resolveSupportSpecialistRelation(ownerId);
+
+    // Service requests
+    const { data: serviceRequests } = await supabase
+      .from("service_requests")
+      .select("id, request_type, meeting_format, title, message, status, specialist_name, scheduled_at, created_at")
+      .eq("module", "support")
+      .eq("owner_type", "anonymous_case")
+      .eq("owner_id", ownerId)
+      .order("created_at", { ascending: false })
+      .limit(20);
 
     return res.status(200).json({
       ok: true,
@@ -746,6 +857,16 @@ async function handleGetCabinet(req, res) {
       session_id: currentSession.session_id,
       sessions: sessionList,
       latest_report: latestReport,
+      wallet: balance,
+      specialist: specialist ? {
+        expertId: specialist.expertId,
+        expertName: specialist.expertName,
+        expertRole: specialist.expertRole,
+        expertSpecialty: specialist.expertSpecialty,
+        organizationName: specialist.organizationName,
+      } : null,
+      service_requests: serviceRequests || [],
+      unread_message_count: 0,
     });
   } catch (error) {
     console.error("handleGetCabinet error", error);
@@ -830,6 +951,7 @@ async function handleGetReport(req, res) {
 
     const jsonData = data.json_data || {};
     const pairs = jsonData.conversation_pairs || [];
+    // Client-safe response: no doctor_report, no expert fields
     const session = {
       sessionId: data.session_id,
       module: data.module || "support",
@@ -838,12 +960,11 @@ async function handleGetReport(req, res) {
       conversationHistory: data.conversation_history,
       conversationPairs: Array.isArray(pairs) ? pairs : [],
       user_report: data.user_report,
-      doctor_report: data.doctor_report,
       supportPlan: data.support_plan,
+      careRecommendation: data.care_recommendation || null,
       riskLevel: data.risk_level,
       dialogDepth: jsonData.dialogDepth ?? 0,
       previousPatientReport: jsonData.previousPatientReport || "",
-      previousDoctorReport: jsonData.previousDoctorReport || "",
       homeTasks: jsonData.homeTasks || "",
       resourceFactors: jsonData.resourceFactors || "",
       questions: jsonData.questions || null,
@@ -3118,6 +3239,215 @@ async function handleCancelBodyServiceRequest(req, res) {
     return res.status(200).json({ ok: true });
   } catch (error) {
     console.error("handleCancelBodyServiceRequest error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка отмены запроса." });
+  }
+}
+
+// ============================================================
+// Support Service Requests
+// ============================================================
+
+const SUPPORT_REQUEST_TYPE_CONFIG = {
+  question: { label: "Онлайн-вопрос", meeting_format: "text", sla_hours: 24 },
+  phone: { label: "Телефонный звонок", meeting_format: "phone", sla_hours: 24 },
+  video: { label: "Видеоконсультация", meeting_format: "video", sla_hours: 48 },
+  offline: { label: "Очная встреча", meeting_format: "offline", sla_hours: 48 },
+};
+
+const SUPPORT_REASON_LABELS = {
+  discuss_report: "Обсуждение отчёта",
+  follow_up: "Продолжение наблюдения",
+  new_concern: "Новая проблема",
+  other: "Другое",
+};
+
+async function handleCreateSupportServiceRequest(req, res) {
+  try {
+    const { session_id, access_token, request_type, reason, message, preferred_date, time_from, time_to, comment } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!message || typeof message !== "string" || message.trim().length < 2) {
+      return res.status(400).json({ ok: false, error: "Укажите сообщение." });
+    }
+    if (message.length > 3000) {
+      return res.status(400).json({ ok: false, error: "Слишком длинное сообщение (максимум 3000 символов)." });
+    }
+
+    const config = SUPPORT_REQUEST_TYPE_CONFIG[request_type];
+    if (!config) {
+      return res.status(400).json({ ok: false, error: "Неверный тип запроса." });
+    }
+
+    const supabase = getSupabase();
+
+    // Resolve specialist from relation
+    const specialist = await resolveSupportSpecialistRelation(owner.ownerId);
+
+    const reasonLabel = SUPPORT_REASON_LABELS[reason] || reason || "";
+    const title = `${config.label}${reasonLabel ? " — " + reasonLabel : ""}`;
+
+    const now = new Date().toISOString();
+    const dueAt = config.sla_hours
+      ? new Date(Date.now() + config.sla_hours * 60 * 60 * 1000).toISOString()
+      : null;
+
+    const { data: inserted, error: insertError } = await supabase
+      .from("service_requests")
+      .insert({
+        module: "support",
+        owner_type: "anonymous_case",
+        owner_id: owner.ownerId,
+        session_id: owner.sessionId,
+        specialist_id: specialist?.expertId || null,
+        specialist_name: specialist?.expertName || null,
+        request_type,
+        meeting_format: config.meeting_format,
+        title,
+        message: message.trim(),
+        status: "submitted",
+        priority: "normal",
+        sla_hours: config.sla_hours,
+        due_at: dueAt,
+        reserved_credits: 0,
+        context_snapshot: {
+          reason: reason || null,
+          preferred_date: preferred_date || null,
+          time_from: time_from || null,
+          time_to: time_to || null,
+          comment: comment || null,
+          session_summary: owner.publicCode,
+        },
+        created_at: now,
+        updated_at: now,
+      })
+      .select("id, request_type, meeting_format, title, status, specialist_name, due_at, created_at")
+      .single();
+
+    if (insertError) {
+      console.error("[createSupportServiceRequest] insert error:", insertError.code);
+      return res.status(500).json({ ok: false, error: "Не удалось отправить запрос." });
+    }
+
+    return res.status(200).json({ ok: true, request: inserted });
+  } catch (error) {
+    console.error("handleCreateSupportServiceRequest error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка отправки запроса." });
+  }
+}
+
+async function handleListSupportServiceRequests(req, res) {
+  try {
+    const { session_id, access_token } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+    const { data: requests, error } = await supabase
+      .from("service_requests")
+      .select("id, request_type, meeting_format, title, message, status, priority, sla_hours, due_at, specialist_name, specialist_response, scheduled_at, scheduled_comment, created_at, answered_at, completed_at, cancelled_at")
+      .eq("module", "support")
+      .eq("owner_type", "anonymous_case")
+      .eq("owner_id", owner.ownerId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("[listSupportServiceRequests] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить запросы." });
+    }
+
+    return res.status(200).json({ ok: true, requests: requests || [] });
+  } catch (error) {
+    console.error("handleListSupportServiceRequests error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки запросов." });
+  }
+}
+
+async function handleGetSupportServiceRequest(req, res) {
+  try {
+    const { session_id, access_token, request_id } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!request_id) {
+      return res.status(400).json({ ok: false, error: "Missing request_id." });
+    }
+
+    const supabase = getSupabase();
+    const { data: request, error } = await supabase
+      .from("service_requests")
+      .select("*")
+      .eq("id", request_id)
+      .eq("module", "support")
+      .eq("owner_id", owner.ownerId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[getSupportServiceRequest] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить запрос." });
+    }
+    if (!request) {
+      return res.status(404).json({ ok: false, error: "Запрос не найден." });
+    }
+
+    return res.status(200).json({ ok: true, request });
+  } catch (error) {
+    console.error("handleGetSupportServiceRequest error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки запроса." });
+  }
+}
+
+async function handleCancelSupportServiceRequest(req, res) {
+  try {
+    const { session_id, access_token, request_id } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!request_id) {
+      return res.status(400).json({ ok: false, error: "Missing request_id." });
+    }
+
+    const supabase = getSupabase();
+    const { data: request, error: findError } = await supabase
+      .from("service_requests")
+      .select("id, status, owner_id")
+      .eq("id", request_id)
+      .eq("module", "support")
+      .eq("owner_id", owner.ownerId)
+      .maybeSingle();
+
+    if (findError || !request) {
+      return res.status(404).json({ ok: false, error: "Запрос не найден." });
+    }
+
+    const cancellable = ["submitted", "accepted", "needs_clarification", "scheduled"];
+    if (!cancellable.includes(request.status)) {
+      return res.status(400).json({ ok: false, error: "Невозможно отменить запрос в текущем статусе." });
+    }
+
+    const { error: updateError } = await supabase
+      .from("service_requests")
+      .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", request_id)
+      .eq("owner_id", owner.ownerId);
+
+    if (updateError) {
+      console.error("[cancelSupportServiceRequest] update error:", updateError.code);
+      return res.status(500).json({ ok: false, error: "Не удалось отменить запрос." });
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error("handleCancelSupportServiceRequest error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка отмены запроса." });
   }
 }

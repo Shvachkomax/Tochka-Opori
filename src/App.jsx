@@ -116,6 +116,13 @@ export default function App() {
   const [followUpAnswers, setFollowUpAnswers] = useState({});
   const [reportSource, setReportSource] = useState(null); // "generated" | "cabinet"
   const [justFinishedSession, setJustFinishedSession] = useState(false);
+  // Support Cabinet expanded features
+  const [supportViewingSession, setSupportViewingSession] = useState(null);
+  const [supportViewingSessionData, setSupportViewingSessionData] = useState(null);
+  const [supportSessionLoading, setSupportSessionLoading] = useState(false);
+  const [supportNewRequestOpen, setSupportNewRequestOpen] = useState(false);
+  const [supportNewRequest, setSupportNewRequest] = useState({ request_type: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
+  const [supportRequestSubmitting, setSupportRequestSubmitting] = useState(false);
 
   const [activeModule, setActiveModule] = useState(() => {
     if (typeof window !== "undefined") {
@@ -1113,27 +1120,21 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setError("");
     try {
       let cabinetData;
-      let usageData;
       let effectiveSessionId;
       let effectiveAccessToken;
 
       if (accessToken && saved.sessionId) {
         // Same device: use stored access token.
         const body = { action: "getCabinet", sessionId: saved.sessionId, access_token: accessToken };
-        const usageBody = { action: "getUsageBalance", sessionId: saved.sessionId, module: "support", access_token: accessToken };
-        const [cabinetRes, usageRes] = await Promise.all([
-          fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
-          fetch("/api/usage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(usageBody) }),
-        ]);
+        const cabinetRes = await fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         cabinetData = await cabinetRes.json();
-        usageData = await usageRes.json();
         if (!cabinetRes.ok || !cabinetData.ok) {
           throw new Error(cabinetData.error || "Не удалось открыть кабинет");
         }
         effectiveSessionId = cabinetData.session_id || saved.sessionId;
         effectiveAccessToken = accessToken;
       } else if (enteredCode) {
-        // Cross-device: exchange continuation code for access token.
+        // Cross-device: exchange continuation code for access token, then load cabinet.
         const exchangeRes = await fetch("/api/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1143,11 +1144,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         if (!exchangeRes.ok || !exchangeData.ok) {
           throw new Error(exchangeData.error || "Не удалось открыть разговор. Проверьте код продолжения.");
         }
-        cabinetData = exchangeData.cabinet;
-        usageData = exchangeData.usage_balance;
         effectiveSessionId = exchangeData.session_id;
         effectiveAccessToken = exchangeData.access_token;
         saveSupportSession(effectiveSessionId, effectiveAccessToken);
+        // Now load full cabinet with wallet/specialist/requests
+        const cabinetRes = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "getCabinet", sessionId: effectiveSessionId, access_token: effectiveAccessToken }),
+        });
+        cabinetData = await cabinetRes.json();
+        if (!cabinetRes.ok || !cabinetData.ok) {
+          // Fallback to exchange cabinet data
+          cabinetData = { ...exchangeData.cabinet, ok: true, public_code: exchangeData.public_code, session_id: exchangeData.session_id };
+        }
       } else {
         // No stored token and no code: show modal.
         setSessionModalOpen(true);
@@ -1156,8 +1166,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       }
 
       setSupportCabinet({
-        ...cabinetData,
-        balance: usageData.ok && usageData.visible ? usageData : null,
+        sessions: cabinetData.sessions || [],
+        latest_report: cabinetData.latest_report || null,
+        public_code: cabinetData.public_code || "",
+        wallet: cabinetData.wallet || null,
+        specialist: cabinetData.specialist || null,
+        service_requests: cabinetData.service_requests || [],
+        unread_message_count: cabinetData.unread_message_count || 0,
       });
       setSessionId(effectiveSessionId);
       setPublicCode(cabinetData.public_code || enteredCode || saved.sessionId);
@@ -1326,14 +1341,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setConversationHistory(s.conversationHistory || s.conversation_history || []);
       setDialogDepth(s.dialogDepth || 0);
       setPreviousPatientReport(s.previousPatientReport || s.user_report || "");
-      setPreviousDoctorReport(s.previousDoctorReport || s.doctor_report || "");
+      setPreviousDoctorReport("");
       setHomeTasks(s.homeTasks || "");
       setResourceFactors(s.resourceFactors || "");
-      setResult(s.ai_result || s.result || `${s.user_report || ""}\n\n===DOCTOR_REPORT===\n\n${s.doctor_report || ""}`);
+      // Client-safe: only user_report, no doctor_report
+      setResult(s.user_report || "");
       setReportSource("cabinet");
       setJustFinishedSession(false);
-      if (supportCabinet?.balance) {
-        setUsageBalance({ ...supportCabinet.balance, module: "support" });
+      if (supportCabinet?.wallet) {
+        setUsageBalance({ ...supportCabinet.wallet, module: "support" });
       }
       setActiveTab("user");
       setPhase("report");
@@ -1356,7 +1372,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setPublicCode(latest?.publicCode || supportCabinet?.public_code || saved.sessionId);
     setIsContinuation(true);
     setPreviousPatientReport(latestReport.user_report || "");
-    setPreviousDoctorReport(latestReport.doctor_report || "");
+    setPreviousDoctorReport("");
     setHomeTasks(latestReport.homeTasks || "");
     setResourceFactors(latestReport.resourceFactors || "");
     setSupportPlan(latestReport.supportPlan || null);
@@ -1430,6 +1446,189 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     } finally {
       setLoading(false);
     }
+  }
+
+  // Open a specific session from cabinet (session_view)
+  async function openSupportSessionView(targetSessionId) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("Нужен код доступа к разговору.", "error");
+      return;
+    }
+    setSupportSessionLoading(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getReport", sessionId: targetSessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Не удалось открыть сессию");
+      }
+      setSupportViewingSession(targetSessionId);
+      setSupportViewingSessionData(data.session);
+      setPhase("session_view");
+    } catch (e) {
+      showToast(e.message || "Не удалось открыть сессию", "error");
+    } finally {
+      setSupportSessionLoading(false);
+    }
+  }
+
+  // Submit a new support service request
+  async function submitSupportServiceRequest() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("Нужен код доступа.", "error");
+      return;
+    }
+    if (!supportNewRequest.request_type) {
+      showToast("Выберите способ связи.", "error");
+      return;
+    }
+    if (!supportNewRequest.message || supportNewRequest.message.trim().length < 2) {
+      showToast("Укажите сообщение.", "error");
+      return;
+    }
+    setSupportRequestSubmitting(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "createSupportServiceRequest",
+          session_id: saved.sessionId,
+          access_token: saved.accessToken,
+          request_type: supportNewRequest.request_type,
+          reason: supportNewRequest.reason,
+          message: supportNewRequest.message,
+          preferred_date: supportNewRequest.preferred_date,
+          time_from: supportNewRequest.time_from,
+          time_to: supportNewRequest.time_to,
+          comment: supportNewRequest.comment,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Не удалось отправить запрос");
+      }
+      showToast("Запрос отправлен специалисту.", "success");
+      setSupportNewRequestOpen(false);
+      setSupportNewRequest({ request_type: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
+      // Refresh cabinet to show new request
+      await refreshSupportCabinet();
+    } catch (e) {
+      showToast(e.message || "Не удалось отправить запрос", "error");
+    } finally {
+      setSupportRequestSubmitting(false);
+    }
+  }
+
+  // Cancel a support service request
+  async function cancelSupportServiceRequest(requestId) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "cancelSupportServiceRequest",
+          session_id: saved.sessionId,
+          access_token: saved.accessToken,
+          request_id: requestId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Не удалось отменить запрос");
+      }
+      showToast("Запрос отменён.", "success");
+      await refreshSupportCabinet();
+    } catch (e) {
+      showToast(e.message || "Не удалось отменить запрос", "error");
+    }
+  }
+
+  // Refresh support cabinet data
+  async function refreshSupportCabinet() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getCabinet", sessionId: saved.sessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setSupportCabinet({
+          sessions: data.sessions || [],
+          latest_report: data.latest_report || null,
+          public_code: data.public_code || "",
+          wallet: data.wallet || null,
+          specialist: data.specialist || null,
+          service_requests: data.service_requests || [],
+          unread_message_count: data.unread_message_count || 0,
+        });
+      }
+    } catch { /* silent */ }
+  }
+
+  // Save patient feedback to case_reviews
+  async function savePatientFeedback() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    if (!patientRating && !patientUseful && !patientUnclear) {
+      showToast("Заполните хотя бы одно поле.", "error");
+      return;
+    }
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save",
+          case_id: sessionId,
+          sessionId: sessionId,
+          publicCode: publicCode || "",
+          module: "support",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          patient_feedback: {
+            rating: patientRating,
+            useful: patientUseful,
+            unclear_or_useless: patientUnclear,
+          },
+          doctor_feedback: {},
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Спасибо за отзыв!", "success");
+      } else {
+        showToast(data.error || "Не удалось сохранить отзыв", "error");
+      }
+    } catch {
+      showToast("Не удалось сохранить отзыв", "error");
+    }
+  }
+
+  // Care recommendation → CTA helper
+  function getCareNextStep(careRecommendation) {
+    const level = careRecommendation?.level;
+    if (level === "urgent_help") {
+      return { text: "Экстренная помощь", description: "Если есть риск — звоните 112 или 103", urgent: true };
+    }
+    if (level === "medical_consultation") {
+      return { text: "Рекомендуется консультация врача", description: "Обратитесь к специалисту для очной оценки", cta: "Связаться со специалистом" };
+    }
+    if (level === "professional_contact") {
+      return { text: "Стоит обсудить со специалистом", description: "Рекомендуем связаться со специалистом", cta: "Связаться со специалистом" };
+    }
+    // self_care / self_support / default
+    return { text: "Можно продолжить наблюдение", description: "При необходимости вернитесь к разговору", cta: "Продолжить разговор" };
   }
 
   async function ensureStartSession() {
@@ -9281,12 +9480,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   >
                     Для вас
                   </button>
-                  <button
-                    style={activeTab === "doctor" ? s.activeTab : s.tab}
-                    onClick={() => setActiveTab("doctor")}
-                  >
-                    Для специалиста
-                  </button>
+                  {expertData && (
+                    <button
+                      style={activeTab === "doctor" ? s.activeTab : s.tab}
+                      onClick={() => setActiveTab("doctor")}
+                    >
+                      Для специалиста
+                    </button>
+                  )}
                   <button
                     onClick={downloadReportPDF}
                     style={{ ...s.tab, fontSize: 12, marginLeft: "auto" }}
@@ -9367,10 +9568,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     </div>
                   ) : activeTab === "user" ? (
                     renderUserReport(userPart)
-                  ) : (
+                  ) : expertData ? (
                     <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
                       {doctorPart}
                     </div>
+                  ) : (
+                    renderUserReport(userPart)
                   )}
                 </div>
 
@@ -9774,125 +9977,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       placeholder="Например: вопросы были слишком общими, заключение непонятно..."
                     />
 
-                    <div style={{ borderTop: "1px solid rgba(46,42,37,.1)", margin: "20px 0" }} />
+                    <button
+                      style={{ ...s.wide, marginTop: 12 }}
+                      onClick={savePatientFeedback}
+                    >
+                      Сохранить отзыв
+                    </button>
 
-                    <label style={s.label}>Оценка специалистом</label>
 
-                    <label style={s.label2}>Какие вопросы были лишними?</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={doctorFeedback.wrongQuestions}
-                      onChange={(e) =>
-                        setDoctorFeedback({ ...doctorFeedback, wrongQuestions: e.target.value })
-                      }
-                      placeholder="Например: вопрос был не связан с жалобой, усиливал тревогу..."
-                    />
-
-                    <label style={s.label2}>Каких вопросов не хватило?</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={doctorFeedback.missingQuestions}
-                      onChange={(e) =>
-                        setDoctorFeedback({ ...doctorFeedback, missingQuestions: e.target.value })
-                      }
-                      placeholder="Например: не спросил про утрату, вещества, соматические причины..."
-                    />
-
-                    <label style={s.label2}>Какие вопросы были сформулированы неверно?</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={doctorFeedback.badQuestionWording}
-                      onChange={(e) =>
-                        setDoctorFeedback({ ...doctorFeedback, badQuestionWording: e.target.value })
-                      }
-                      placeholder="Например: вопрос содержал несколько смыслов, подсказывал диагноз..."
-                    />
-
-                    <label style={s.label2}>Исправленная версия заключения для пациента</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={doctorFeedback.correctedUserReport}
-                      onChange={(e) =>
-                        setDoctorFeedback({ ...doctorFeedback, correctedUserReport: e.target.value })
-                      }
-                      placeholder="Вставьте правильную версию мягкого отчета для пациента..."
-                    />
-
-                    <label style={s.label2}>Исправленная карта для специалиста</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={doctorFeedback.correctedDoctorReport}
-                      onChange={(e) =>
-                        setDoctorFeedback({ ...doctorFeedback, correctedDoctorReport: e.target.value })
-                      }
-                      placeholder="Вставьте правильную врачебную версию..."
-                    />
-
-                    <label style={s.label2}>Какое правило добавить в clinical protocol?</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={doctorFeedback.protocolUpdate}
-                      onChange={(e) =>
-                        setDoctorFeedback({ ...doctorFeedback, protocolUpdate: e.target.value })
-                      }
-                      placeholder="Например: если бессонница + тревога, всегда уточнять вещества, утрату и соматику..."
-                    />
-
-                    <label style={s.label2}>Общий комментарий специалиста</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={doctorFeedback.generalComment}
-                      onChange={(e) =>
-                        setDoctorFeedback({ ...doctorFeedback, generalComment: e.target.value })
-                      }
-                      placeholder="Любые дополнительные замечания..."
-                    />
-
-                    <label style={s.label2}>Рекомендации до следующей встречи</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={homeTasks}
-                      onChange={(e) => setHomeTasks(e.target.value)}
-                      placeholder="Например: вести дневник настроения, попробовать техники релаксации, обратиться к конкретному специалисту..."
-                    />
-
-                    <label style={s.label2}>Ресурсные факторы (что помогает / поддерживает)</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={resourceFactors}
-                      onChange={(e) => setResourceFactors(e.target.value)}
-                      placeholder="Например: поддержка близких, хобби, спорт, стабильный режим..."
-                    />
-
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button
-                        style={s.wide}
-                        onClick={() => {
-                          downloadCaseReview(buildCaseReview());
-                        }}
-                      >
-                        Скачать JSON
-                      </button>
-                      {window.location.hostname.includes("localhost") && (
-                        <button
-                          style={s.wide}
-                          onClick={async () => {
-                            try {
-                              await fetch("/api/reviews", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ action: "save", ...buildCaseReview() }),
-                              });
-                              alert("Сохранено локально");
-                            } catch {
-                              alert("Ошибка локального сохранения");
-                            }
-                          }}
-                        >
-                          Сохранить локально
-                        </button>
-                      )}
-                    </div>
                   </div>
                 )}
 
@@ -9917,142 +10009,433 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           </section>
           ) /* ends !(body && intake not idle) guard */}
 
-          {/* Support Cabinet MVP */}
-          {phase === "cabinet" && supportCabinet && (
-            <section style={s.card} className="app-card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
-                <h2 style={{ margin: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 24 }}>Ваши разговоры</h2>
-                <button
-                  style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
-                  onClick={() => { setPhase("input"); setSupportCabinet(null); }}
-                >
-                  На главную
-                </button>
-              </div>
+          {/* Support Client Cabinet */}
+          {phase === "cabinet" && supportCabinet && (() => {
+            const careNextStep = getCareNextStep(supportCabinet.latest_report?.careRecommendation || supportCabinet.latest_report?.supportPlan?.care_recommendation);
+            const latestSession = supportCabinet.sessions?.[0];
+            const latestDate = latestSession?.createdAt
+              ? new Date(latestSession.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
+              : "—";
+            const walletBalance = supportCabinet.wallet?.visible ? supportCabinet.wallet.balance : null;
 
-              <div style={{
-                background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
-                borderRadius: 16, padding: 18, marginBottom: 24,
-              }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
+            return (
+              <section style={{ ...s.card, maxWidth: 840, margin: "0 auto" }} className="app-card">
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 10 }}>
                   <div>
-                    <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>Код разговора</div>
-                    <div style={{ fontWeight: 900, fontSize: 20, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace" }}>
-                      {supportCabinet.public_code || publicCode}
-                    </div>
+                    <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 2 }}>Точка Опоры</div>
+                    <h2 style={{ margin: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 22 }}>Личный кабинет</h2>
                   </div>
-                  <div style={{ width: 1, height: 40, background: "rgba(125,154,137,.3)", flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>Баланс</div>
-                    <div style={{ fontWeight: 700, fontSize: 18, color: "#2E2A25" }}>
-                      {supportCabinet.balance?.visible
-                        ? `${supportCabinet.balance.balance.toLocaleString("ru-RU")} кредитов`
-                        : "—"}
-                    </div>
-                    <div style={{ fontSize: 12, color: "#7A7268" }}>Тестовый баланс. Деньги не списываются.</div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    {walletBalance !== null && (
+                      <div style={{ fontSize: 13, color: "#5F7D6C", fontWeight: 600 }}>
+                        {walletBalance.toLocaleString("ru-RU")} кредитов
+                      </div>
+                    )}
+                    <button
+                      style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }}
+                      onClick={() => { setPhase("input"); setSupportCabinet(null); }}
+                    >
+                      Выйти
+                    </button>
                   </div>
                 </div>
 
-                {regeneratedCode && (
-                  <div style={{ marginTop: 16, padding: 14, background: "#ffffff", borderRadius: 12, border: "1px solid rgba(125,154,137,.25)" }}>
-                    <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 6 }}>Новый код продолжения (сохраните его, старый больше не действует)</div>
-                    <div style={{ fontWeight: 900, fontSize: 16, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace", wordBreak: "break-all" }}>
-                      {regeneratedCode}
+                {/* Section: Сейчас */}
+                {latestSession && (
+                  <div style={{
+                    background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
+                    borderRadius: 16, padding: 20, marginBottom: 24,
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>Последний разговор</div>
+                        <div style={{ fontWeight: 700, fontSize: 16, color: "#2E2A25" }}>{latestDate}</div>
+                      </div>
+                      <div style={{
+                        fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 20,
+                        background: latestSession.status === "followup" ? "#EDE3D8" : "#E2EBE4",
+                        color: latestSession.status === "followup" ? "#8B6B4A" : "#5F7D6C",
+                      }}>
+                        {latestSession.status === "followup" ? "Продолжение" : "Первое обращение"}
+                      </div>
                     </div>
-                    <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                      <button style={{ ...s.secondary, fontSize: 13 }} onClick={() => { navigator.clipboard.writeText(regeneratedCode); showToast("Код скопирован"); }}>
-                        Скопировать
+
+                    {/* Care next step */}
+                    <div style={{
+                      background: careNextStep.urgent ? "rgba(184,92,74,.12)" : "#ffffff",
+                      border: careNextStep.urgent ? "2px solid #B85C4A" : "1px solid rgba(125,154,137,.2)",
+                      borderRadius: 12, padding: "12px 16px", marginBottom: 16,
+                    }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: careNextStep.urgent ? "#B85C4A" : "#2E2A25", marginBottom: 4 }}>
+                        {careNextStep.text}
+                      </div>
+                      <div style={{ fontSize: 13, color: careNextStep.urgent ? "#8B4A3A" : "#7A7268" }}>
+                        {careNextStep.description}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <button style={{ ...s.primary, flex: 1, minWidth: 140 }} onClick={startSupportFollowUp}>
+                        Продолжить разговор
                       </button>
-                      <button style={{ ...s.secondary, fontSize: 13 }} onClick={() => setRegeneratedCode(null)}>
-                        Скрыть
+                      <button style={{ ...s.secondary, flex: 1, minWidth: 140 }} onClick={() => openSupportReport(latestSession.sessionId)}>
+                        Открыть отчёт
                       </button>
+                      {(careNextStep.cta === "Связаться со специалистом") && (
+                        <button style={{ ...s.secondary, flex: 1, minWidth: 140, borderColor: "#7D9A89", color: "#5F7D6C" }} onClick={() => setSupportNewRequestOpen(true)}>
+                          Связаться со специалистом
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
 
-                <div style={{ marginTop: 16 }}>
+                {/* Section: История разговоров */}
+                {supportCabinet.sessions?.length > 0 && (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>История разговоров</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {supportCabinet.sessions.map((sess) => {
+                        const dateStr = sess.createdAt
+                          ? new Date(sess.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
+                          : "—";
+                        return (
+                          <div key={sess.sessionId} style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            flexWrap: "wrap", gap: 10,
+                            padding: "12px 16px", borderRadius: 12, background: "#ffffff",
+                            border: "1px solid rgba(46,42,37,.08)",
+                          }}>
+                            <div style={{ flex: 1, minWidth: 200 }}>
+                              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                <span style={{ fontWeight: 700, fontSize: 14, color: "#2E2A25" }}>№{sess.order}</span>
+                                <span style={{ fontSize: 12, color: "#7A7268" }}>{dateStr}</span>
+                                <span style={{
+                                  fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
+                                  background: sess.status === "followup" ? "#EDE3D8" : "#E2EBE4",
+                                  color: sess.status === "followup" ? "#8B6B4A" : "#5F7D6C",
+                                }}>
+                                  {sess.status === "followup" ? "продолжение" : "первое"}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: 13, color: "#5F574F", marginTop: 4, maxWidth: 500 }}>{sess.summary}</div>
+                            </div>
+                            <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px", flexShrink: 0 }} onClick={() => openSupportSessionView(sess.sessionId)}>
+                              Открыть
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Section: Специалист */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Специалист</div>
+                  {supportCabinet.specialist ? (
+                    <div style={{
+                      background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
+                      borderRadius: 14, padding: 16,
+                    }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: "#2E2A25", marginBottom: 4 }}>
+                        {supportCabinet.specialist.expertName || "Специалист"}
+                      </div>
+                      {supportCabinet.specialist.expertSpecialty && (
+                        <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 8 }}>
+                          {supportCabinet.specialist.expertSpecialty}
+                        </div>
+                      )}
+                      {supportCabinet.specialist.organizationName && (
+                        <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>
+                          {supportCabinet.specialist.organizationName}
+                        </div>
+                      )}
+                      <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => setSupportNewRequestOpen(true)}>
+                        Связаться
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{
+                      background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
+                      borderRadius: 14, padding: 16,
+                    }}>
+                      <div style={{ fontSize: 14, color: "#5F574F", marginBottom: 12 }}>
+                        У вас пока нет закреплённого специалиста. Вы можете запросить консультацию.
+                      </div>
+                      <button style={{ ...s.primary, fontSize: 13, padding: "10px 16px" }} onClick={() => setSupportNewRequestOpen(true)}>
+                        Запросить консультацию
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Section: Запросы специалисту */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25" }}>Запросы специалисту</div>
+                    <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => setSupportNewRequestOpen(true)}>
+                      Новый запрос
+                    </button>
+                  </div>
+                  {supportCabinet.service_requests?.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {supportCabinet.service_requests.map((req) => {
+                        const statusColors = {
+                          submitted: { bg: "#f0f0f0", text: "#666" },
+                          accepted: { bg: "#E2EBE4", text: "#5F7D6C" },
+                          scheduled: { bg: "#E8E4F0", text: "#6B5F8A" },
+                          answered: { bg: "#E2EBE4", text: "#5F7D6C" },
+                          completed: { bg: "#E2EBE4", text: "#5F7D6C" },
+                          cancelled: { bg: "#f0e0e0", text: "#8B4A3A" },
+                        };
+                        const sc = statusColors[req.status] || statusColors.submitted;
+                        const statusLabels = {
+                          submitted: "Отправлен",
+                          accepted: "Принят",
+                          scheduled: "Назначен",
+                          answered: "Отвечен",
+                          completed: "Завершён",
+                          cancelled: "Отменён",
+                        };
+                        const reqDate = req.created_at ? new Date(req.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+                        return (
+                          <div key={req.id} style={{
+                            padding: "12px 16px", borderRadius: 12, background: "#ffffff",
+                            border: "1px solid rgba(46,42,37,.08)",
+                          }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                              <div>
+                                <div style={{ fontWeight: 600, fontSize: 14, color: "#2E2A25" }}>{req.title || req.request_type}</div>
+                                <div style={{ fontSize: 12, color: "#7A7268", marginTop: 2 }}>{reqDate}</div>
+                              </div>
+                              <span style={{ fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 10, background: sc.bg, color: sc.text }}>
+                                {statusLabels[req.status] || req.status}
+                              </span>
+                            </div>
+                            {req.message && <div style={{ fontSize: 13, color: "#5F574F", marginTop: 8 }}>{req.message.slice(0, 150)}{req.message.length > 150 ? "…" : ""}</div>}
+                            {req.scheduled_at && <div style={{ fontSize: 12, color: "#5F7D6C", marginTop: 6 }}>Встреча: {new Date(req.scheduled_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>}
+                            {req.specialist_response && <div style={{ fontSize: 13, color: "#5F7D6C", marginTop: 8, padding: "8px 12px", background: "#E2EBE4", borderRadius: 8 }}>{req.specialist_response.slice(0, 200)}</div>}
+                            {["submitted", "accepted"].includes(req.status) && (
+                              <button style={{ ...s.secondary, fontSize: 12, padding: "6px 12px", marginTop: 8, color: "#B85C4A", borderColor: "rgba(184,92,74,.3)" }} onClick={() => cancelSupportServiceRequest(req.id)}>
+                                Отменить
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 14, color: "#7A7268", padding: "12px 0" }}>Пока нет запросов.</div>
+                  )}
+                </div>
+
+                {/* Section: Доступ */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Доступ</div>
+                  <div style={{
+                    background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
+                    borderRadius: 14, padding: 16,
+                  }}>
+                    <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 6 }}>Код продолжения</div>
+                    <div style={{ fontWeight: 900, fontSize: 16, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace", wordBreak: "break-all", marginBottom: 12 }}>
+                      {supportCabinet.public_code || publicCode}
+                    </div>
+
+                    {regeneratedCode && (
+                      <div style={{ marginBottom: 12, padding: 12, background: "#ffffff", borderRadius: 10, border: "1px solid rgba(125,154,137,.25)" }}>
+                        <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>Новый код (старый больше не действует)</div>
+                        <div style={{ fontWeight: 900, fontSize: 14, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace", wordBreak: "break-all" }}>
+                          {regeneratedCode}
+                        </div>
+                        <button style={{ ...s.secondary, fontSize: 12, marginTop: 8 }} onClick={() => { navigator.clipboard.writeText(regeneratedCode); showToast("Код скопирован"); }}>
+                          Скопировать
+                        </button>
+                      </div>
+                    )}
+
+                    <button
+                      style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }}
+                      onClick={regenerateSupportContinuationCode}
+                    >
+                      Создать новый код продолжения
+                    </button>
+                  </div>
+                </div>
+
+              </section>
+            );
+          })()}
+
+          {/* Support Session View */}
+          {phase === "session_view" && supportViewingSessionData && (() => {
+            const s_data = supportViewingSessionData;
+            const sessionDate = s_data.createdAt ? new Date(s_data.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+            return (
+              <section style={{ ...s.card, maxWidth: 840, margin: "0 auto" }} className="app-card">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
+                  <h2 style={{ margin: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 20 }}>Обращение — {sessionDate}</h2>
+                  <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => { setPhase("cabinet"); setSupportViewingSession(null); setSupportViewingSessionData(null); }}>
+                    Назад в кабинет
+                  </button>
+                </div>
+
+                {/* Client-safe content only */}
+                {s_data.patient_input && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 6, fontWeight: 600 }}>Ваше обращение</div>
+                    <div style={{ fontSize: 14, color: "#5F574F", lineHeight: 1.6, padding: "12px 16px", background: "#FAF6EF", borderRadius: 12 }}>
+                      {s_data.patient_input.slice(0, 500)}{s_data.patient_input.length > 500 ? "…" : ""}
+                    </div>
+                  </div>
+                )}
+
+                {s_data.user_report && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 6, fontWeight: 600 }}>Отчёт</div>
+                    <div style={{ fontSize: 14, color: "#2E2A25", lineHeight: 1.7, padding: "16px", background: "#fff", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)" }}>
+                      {s_data.user_report.split("\n").map((line, i) => <div key={i}>{line || <br />}</div>)}
+                    </div>
+                  </div>
+                )}
+
+                {s_data.supportPlan?.care_recommendation && (() => {
+                  const nextStep = getCareNextStep(s_data.supportPlan.care_recommendation);
+                  return (
+                    <div style={{
+                      background: nextStep.urgent ? "rgba(184,92,74,.12)" : "#E2EBE4",
+                      border: nextStep.urgent ? "2px solid #B85C4A" : "1px solid rgba(125,154,137,.3)",
+                      borderRadius: 14, padding: 16, marginBottom: 16,
+                    }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: nextStep.urgent ? "#B85C4A" : "#2E2A25", marginBottom: 4 }}>
+                        {nextStep.text}
+                      </div>
+                      <div style={{ fontSize: 13, color: nextStep.urgent ? "#8B4A3A" : "#5F7D6C" }}>
+                        {nextStep.description}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
+                  <button style={{ ...s.primary, flex: 1, minWidth: 140 }} onClick={startSupportFollowUp}>
+                    Продолжить разговор
+                  </button>
+                  <button style={{ ...s.secondary, flex: 1, minWidth: 140 }} onClick={() => setSupportNewRequestOpen(true)}>
+                    Связаться со специалистом
+                  </button>
+                </div>
+              </section>
+            );
+          })()}
+
+          {/* Shared: Support New Request Modal */}
+          {supportNewRequestOpen && (
+            <div style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,.4)", zIndex: 1000,
+              display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+            }} onClick={(e) => { if (e.target === e.currentTarget) setSupportNewRequestOpen(false); }}>
+              <div style={{
+                background: "#fff", borderRadius: 18, padding: 24, maxWidth: 520, width: "100%",
+                maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,.15)",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <h3 style={{ margin: 0, fontFamily: "Georgia, serif", fontSize: 18 }}>Запрос специалисту</h3>
+                  <button style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#7A7268" }} onClick={() => setSupportNewRequestOpen(false)}>&times;</button>
+                </div>
+
+                <label style={{ ...s.label, fontWeight: 700 }}>Способ связи</label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                  {[
+                    { value: "question", label: "Вопрос" },
+                    { value: "phone", label: "Телефон" },
+                    { value: "video", label: "Видео" },
+                    { value: "offline", label: "Очная" },
+                  ].map((opt) => (
+                    <button key={opt.value} style={{
+                      padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                      border: `1px solid ${supportNewRequest.request_type === opt.value ? "#7D9A89" : "rgba(46,42,37,.15)"}`,
+                      background: supportNewRequest.request_type === opt.value ? "#E2EBE4" : "#fff",
+                      color: supportNewRequest.request_type === opt.value ? "#5F7D6C" : "#2E2A25",
+                    }} onClick={() => setSupportNewRequest({ ...supportNewRequest, request_type: opt.value })}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                <label style={{ ...s.label, fontWeight: 700 }}>Причина</label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                  {[
+                    { value: "discuss_report", label: "Обсудить отчёт" },
+                    { value: "follow_up", label: "Продолжение" },
+                    { value: "new_concern", label: "Новая проблема" },
+                    { value: "other", label: "Другое" },
+                  ].map((opt) => (
+                    <button key={opt.value} style={{
+                      padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      border: `1px solid ${supportNewRequest.reason === opt.value ? "#7D9A89" : "rgba(46,42,37,.15)"}`,
+                      background: supportNewRequest.reason === opt.value ? "#E2EBE4" : "#fff",
+                      color: supportNewRequest.reason === opt.value ? "#5F7D6C" : "#2E2A25",
+                    }} onClick={() => setSupportNewRequest({ ...supportNewRequest, reason: opt.value })}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                <label style={s.label}>Сообщение</label>
+                <textarea
+                  style={{ ...s.answerInput, minHeight: 80 }}
+                  value={supportNewRequest.message}
+                  onChange={(e) => setSupportNewRequest({ ...supportNewRequest, message: e.target.value })}
+                  placeholder="Опишите, что хотите обсудить со специалистом..."
+                />
+
+                {(supportNewRequest.request_type === "phone" || supportNewRequest.request_type === "video" || supportNewRequest.request_type === "offline") && (
+                  <>
+                    <label style={s.label}>Предпочтительная дата</label>
+                    <input
+                      type="date"
+                      style={s.answerInput}
+                      value={supportNewRequest.preferred_date}
+                      onChange={(e) => setSupportNewRequest({ ...supportNewRequest, preferred_date: e.target.value })}
+                    />
+                    <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={s.label}>С</label>
+                        <input type="time" style={s.answerInput} value={supportNewRequest.time_from} onChange={(e) => setSupportNewRequest({ ...supportNewRequest, time_from: e.target.value })} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={s.label}>До</label>
+                        <input type="time" style={s.answerInput} value={supportNewRequest.time_to} onChange={(e) => setSupportNewRequest({ ...supportNewRequest, time_to: e.target.value })} />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <label style={s.label}>Комментарий (необязательно)</label>
+                <textarea
+                  style={{ ...s.answerInput, minHeight: 50 }}
+                  value={supportNewRequest.comment}
+                  onChange={(e) => setSupportNewRequest({ ...supportNewRequest, comment: e.target.value })}
+                  placeholder="Дополнительные пожелания..."
+                />
+
+                <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
                   <button
-                    style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
-                    onClick={regenerateSupportContinuationCode}
+                    style={{ ...s.wide, opacity: supportRequestSubmitting ? 0.6 : 1 }}
+                    disabled={supportRequestSubmitting}
+                    onClick={submitSupportServiceRequest}
                   >
-                    Создать новый код продолжения
+                    {supportRequestSubmitting ? "Отправка..." : "Отправить запрос"}
+                  </button>
+                  <button style={s.secondary} onClick={() => setSupportNewRequestOpen(false)}>
+                    Отмена
                   </button>
                 </div>
               </div>
-
-              {supportCabinet.sessions?.length > 0 && (
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Последнее обращение</div>
-                  {(() => {
-                    const latest = supportCabinet.sessions[0];
-                    const dateStr = latest.createdAt
-                      ? new Date(latest.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
-                      : "—";
-                    return (
-                      <div style={{
-                        background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
-                        borderRadius: 16, padding: 18,
-                      }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: 16, color: "#2E2A25" }}>Обращение №{latest.order}</div>
-                            <div style={{ fontSize: 13, color: "#7A7268", marginTop: 2 }}>{dateStr}</div>
-                          </div>
-                          <div style={{
-                            fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 20,
-                            background: latest.status === "followup" ? "#EDE3D8" : "#E2EBE4",
-                            color: latest.status === "followup" ? "#8B6B4A" : "#5F7D6C",
-                          }}>
-                            {latest.status === "followup" ? "Продолжение" : "Первое обращение"}
-                          </div>
-                        </div>
-                        <div style={{ fontSize: 14, color: "#5F574F", lineHeight: 1.5, marginBottom: 16 }}>
-                          {latest.summary}
-                        </div>
-                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                          <button style={{ ...s.primary, flex: 1, minWidth: 140 }} onClick={startSupportFollowUp}>
-                            Продолжить разговор
-                          </button>
-                          <button style={{ ...s.secondary, flex: 1, minWidth: 140 }} onClick={() => openSupportReport(latest.sessionId)}>
-                            Открыть отчёт
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {supportCabinet.sessions?.length > 1 && (
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>История обращений</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {supportCabinet.sessions.slice(1).map((s) => {
-                      const dateStr = s.createdAt
-                        ? new Date(s.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
-                        : "—";
-                      return (
-                        <div key={s.sessionId} style={{
-                          display: "flex", justifyContent: "space-between", alignItems: "center",
-                          flexWrap: "wrap", gap: 10,
-                          padding: 14, borderRadius: 12, background: "#ffffff",
-                          border: "1px solid rgba(46,42,37,.08)",
-                        }}>
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: 14, color: "#2E2A25" }}>Обращение №{s.order}</div>
-                            <div style={{ fontSize: 12, color: "#7A7268", marginTop: 2 }}>{dateStr}</div>
-                            <div style={{ fontSize: 13, color: "#5F574F", marginTop: 4, maxWidth: 400 }}>{s.summary}</div>
-                          </div>
-                          <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => openSupportReport(s.sessionId)}>
-                            Открыть
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </section>
+            </div>
           )}
 
           {/* Support follow-up form */}
