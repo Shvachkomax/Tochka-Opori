@@ -134,6 +134,8 @@ export default function App() {
   // Practices state
   const [supportPractices, setSupportPractices] = useState([]);
   const [practiceDetailKey, setPracticeDetailKey] = useState(null);
+  // Follow-up answered topics for AI dedup
+  const [followupAnsweredTopics, setFollowupAnsweredTopics] = useState(null);
 
   const [activeModule, setActiveModule] = useState(() => {
     if (typeof window !== "undefined") {
@@ -1477,6 +1479,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
       const followUpText = followUpParts.join("\n\n");
 
+      // Build structured answered topics for AI dedup
+      const answeredTopics = {};
+      if (answers.dynamics?.trim()) answeredTopics.overall_change = answers.dynamics.trim();
+      if (answers.new_concerns?.trim()) answeredTopics.new_concerns = answers.new_concerns.trim();
+      if (answers.tried?.trim()) answeredTopics.tried_practices = answers.tried.trim();
+      if (answers.free_text?.trim()) answeredTopics.free_text = answers.free_text.trim();
+      // Add practice statuses
+      if (supportPractices.length > 0) {
+        answeredTopics.practice_statuses = supportPractices
+          .filter(p => p.status === "active")
+          .map(p => ({ title: p.title, status: p.user_status }));
+      }
+      setFollowupAnsweredTopics(answeredTopics);
+
       setText(followUpText);
       setConversationHistory([]);
       setDialogDepth(0);
@@ -2245,6 +2261,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           voiceObservations,
           module: mod,
           session_id: sessionId || undefined,
+          followup_answered_topics: followupAnsweredTopics || undefined,
         }),
       });
 
@@ -2262,6 +2279,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         const qs = Array.isArray(data.questions)
           ? data.questions.filter(Boolean)
           : [];
+
+        // If questions are empty after dedup (follow-up with sufficient data), skip to report
+        if (qs.length === 0 && followupAnsweredTopics) {
+          setFollowupAnsweredTopics(null);
+          // Submit again with depth incremented to trigger report generation
+          setDialogDepth((d) => d + 1);
+          await submitRound(inputText);
+          return;
+        }
 
         const newHistory = [
           ...conversationHistory,

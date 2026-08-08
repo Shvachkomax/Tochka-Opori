@@ -79,6 +79,72 @@ ${previousAnswers.map((a, i) => `${i + 1}. ${a}`).join("\n")}
 `;
 }
 
+// Build a block from structured follow-up answered topics
+function buildFollowupAnsweredBlock(topics) {
+  if (!topics || typeof topics !== "object") return "";
+
+  const lines = [];
+  if (topics.overall_change) lines.push(`- Динамика состояния: ${topics.overall_change}`);
+  if (topics.new_concerns) lines.push(`- Новые беспокойства: ${topics.new_concerns}`);
+  if (topics.tried_practices) lines.push(`- Что удалось попробовать: ${topics.tried_practices}`);
+  if (topics.free_text) lines.push(`- Свободный текст пользователя: ${topics.free_text}`);
+  if (topics.practice_statuses?.length) {
+    const ps = topics.practice_statuses.map(p => `${p.title}: ${p.status}`).join("; ");
+    lines.push(`- Статус практик: ${ps}`);
+  }
+
+  if (lines.length === 0) return "";
+
+  return `
+ПОЛЬЗОВАТЕЛЬ УЖЕ ОТВЕТИЛ НА СЛЕДУЮЩИЕ ВОПРОСЫ В ФОРМЕ ПЕРЕД ЭТИМ РАУНДОМ:
+${lines.join("\n")}
+
+СТРОГОЕ ПРАВИЛО: НЕ задавай вопросы, которые повторяют эти темы.
+Ты уже знаешь ответы на вопросы о динамике, новых беспокойствах, попробованных практиках.
+Если тебе нужно уточнение — спрашивай ТОЛЬКО о том, чего НЕТ в ответах выше.
+Если данных достаточно — не задавай новых вопросов, а перейди к рекомендациям.
+`;
+}
+
+// Topic keyword rules for deterministic dedup
+const TOPIC_KEYWORDS = {
+  overall_change: [/легч[eе]/, /тяжел[eе]/, /так же/, /изменилось/, /динамик/, /состоян/],
+  sleep: [/сон/, /засыпать/, /просыпаться/, /спать/, /бессонниц/],
+  new_concerns: [/нов[оеы]/, /беспокоит/, /тревожит/, /тревог[аи]/, /беспокойств/],
+  tried_practices: [/пробовал/, /удалось/, /практик/, /дыхание/, /прогулк/, /предложенн/],
+  helpful: [/помогало/, /поддерживал/, /держаться/, /стабильн/],
+  worsening: [/ухудшал/, /выбило/, /усилило/, /стало хуже/],
+};
+
+// Check if a question duplicates an answered topic
+function isQuestionDuplicate(question, answeredTopics) {
+  if (!answeredTopics || typeof answeredTopics !== "object") return false;
+  const q = question.toLowerCase();
+
+  // Check each answered topic
+  for (const [topic, keywords] of Object.entries(TOPIC_KEYWORDS)) {
+    // Only check topics that were actually answered
+    if (topic === "overall_change" && !answeredTopics.overall_change) continue;
+    if (topic === "new_concerns" && !answeredTopics.new_concerns) continue;
+    if (topic === "tried_practices" && !answeredTopics.tried_practices) continue;
+    if (topic === "sleep" && !answeredTopics.sleep) continue;
+    if (topic === "helpful" && !answeredTopics.helpful) continue;
+    if (topic === "worsening" && !answeredTopics.worsening) continue;
+
+    // If the question matches keywords for an already-answered topic, it's a duplicate
+    const matchCount = keywords.filter(kw => kw.test(q)).length;
+    if (matchCount >= 1) return true;
+  }
+
+  return false;
+}
+
+// Filter questions that duplicate answered topics
+function dedupQuestionsByTopics(questions, answeredTopics) {
+  if (!answeredTopics || !Array.isArray(questions)) return questions;
+  return questions.filter(q => !isQuestionDuplicate(q, answeredTopics));
+}
+
 const PROMPT_VERSION = "3.1-care-routing";
 
 const PROHIBITED_TERMS_USER_REPORT = [
@@ -1338,7 +1404,7 @@ export default async function handler(req, res) {
   const tokenCheck = requireClientToken(["analyze"])(req, res);
   if (!tokenCheck) return;
 
-  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations, module: reqModule, stage, intake: intakeData, session_id, daily_log } = req.body || {};
+  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations, module: reqModule, stage, intake: intakeData, session_id, daily_log, followup_answered_topics } = req.body || {};
 
   const activeModule = isValidModule(reqModule) ? reqModule : DEFAULT_MODULE;
 
@@ -1577,6 +1643,9 @@ ${antiRepeatBlock}
   let userPrompt = "";
 
   if (isContinuation && depth === 0) {
+    const followupAnsweredBlock = buildFollowupAnsweredBlock(followup_answered_topics);
+    const hasAnsweredTopics = followup_answered_topics && Object.keys(followup_answered_topics).length > 0;
+
     userPrompt = `Это продолжение предыдущей сессии.
 
 Исходное описание пользователя (из прошлой сессии):
@@ -1600,12 +1669,27 @@ ${homeTasks}
 
 Ресурсные факторы:
 ${resourceFactors}
-
+${followupAnsweredBlock}
 ${
   supportPlan?.selected_practices?.length
     ? `Выбранные практики из прошлой сессии:\n${supportPlan.selected_practices.map((p) => `- ${p.title}`).join("\n")}\n\n`
     : ""
-}${supportPlan?.diary_requested ? "Был предложен дневник состояния на 3 дня.\n\n" : ""}Твоя задача: это follow-up сессия.
+}${supportPlan?.diary_requested ? "Был предложен дневник состояния на 3 дня.\n\n" : ""}${
+  hasAnsweredTopics
+    ? `Пользователь уже заполнил структурированную форму перед этим раундом. Ты уже знаешь о динамике, новых беспокойствах и попробованных практиках.
+НЕ задавай вопросы, которые повторяют эти темы. Не спрашивай "стало легче или тяжелее" — пользователь уже ответил.
+Не спрашивай "что помогало" или "что удалось попробовать" — это уже в ответах.
+
+Задай ТОЛЬКО 1-3 вопроса, которые:
+- уточняют то, что НЕ покрыто ответами выше;
+- реагируют на свободный текст пользователя, если он есть;
+- проверяют safety сигналы, если есть основания;
+- углубляются в конкретный аспект, который требует внимания.
+
+Если данных достаточно для отчёта — не задавай вопросов вообще.
+Верни: { "type": "questions", "questions": [] } если вопросов нет.
+Иначе: { "type": "questions", "questions": ["вопрос 1"] }`
+    : `Твоя задача: это follow-up сессия.
 НЕ начинай новый опрос с нуля.
 Кратко напомни прошлый разговор и спроси о динамике:
 - что изменилось?
@@ -1621,7 +1705,8 @@ ${
 Задай 3-5 вопросов про динамику.
 
 Верни JSON:
-{ "type": "questions", "questions": ["вопрос 1", "вопрос 2", "вопрос 3", "вопрос 4"] }`;
+{ "type": "questions", "questions": ["вопрос 1", "вопрос 2", "вопрос 3", "вопрос 4"] }`
+}`;
   } else if (!convHistory.length && depth === 0 && !isContinuation) {
     userPrompt = `Это первый раунд диалога.
 
@@ -1872,9 +1957,21 @@ ${antiRepeatBlock}
       } catch (e) {
         console.error("[credits] support_analyze questions debit failed:", e.message);
       }
+
+      // Deterministic dedup guard: filter questions that duplicate answered topics
+      let filteredQuestions = parsed.questions.filter(Boolean).slice(0, 7);
+      if (followup_answered_topics && isContinuation) {
+        filteredQuestions = dedupQuestionsByTopics(filteredQuestions, followup_answered_topics);
+      }
+
+      // If all questions were filtered out, return empty questions (skip clarification round)
+      if (filteredQuestions.length === 0 && followup_answered_topics) {
+        console.log("[analyze] all questions filtered by dedup guard, skipping clarification round");
+      }
+
       return res.status(200).json({
-        type: "questions",
-        questions: parsed.questions.filter(Boolean).slice(0, 7),
+        type: filteredQuestions.length > 0 ? "questions" : "questions",
+        questions: filteredQuestions,
         model_used: modelUsed,
         fallback_used: fallbackUsed,
         provider: result.provider,
