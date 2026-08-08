@@ -131,6 +131,9 @@ export default function App() {
   const [checkinAnxiety, setCheckinAnxiety] = useState(null);
   const [checkinComment, setCheckinComment] = useState("");
   const [checkinSaving, setCheckinSaving] = useState(false);
+  // Practices state
+  const [supportPractices, setSupportPractices] = useState([]);
+  const [practiceDetailKey, setPracticeDetailKey] = useState(null);
 
   const [activeModule, setActiveModule] = useState(() => {
     if (typeof window !== "undefined") {
@@ -262,6 +265,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     const newPlan = { ...(supportPlan || {}), selected_practices: updated };
     setSupportPlan(newPlan);
     saveSupportPlan(newPlan);
+    saveSupportPractice(practiceId);
     showToast("Добавлено в план. При следующем разговоре мы спросим, удалось ли попробовать.");
   }
 
@@ -1205,6 +1209,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setPhase("cabinet");
       setSupportScreen("cabinet");
       loadSupportCheckins();
+      loadSupportPractices();
     } catch (e) {
       setContinuationCodeError(e.message || "Не удалось открыть разговор. Проверьте код продолжения.");
       showToast(e.message || "Не удалось открыть разговор. Проверьте код продолжения.", "error");
@@ -1413,6 +1418,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setFollowUpAnswers({});
     setPhase("followup");
     setSupportScreen("followup");
+    loadSupportPractices();
   }
 
   async function submitFollowUp() {
@@ -1422,10 +1428,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       return;
     }
     const answers = followUpAnswers;
-    const required = ["dynamics", "sleep_appetite", "new_concerns", "tried", "help_needed"];
-    const missing = required.filter((k) => !answers[k]?.trim());
-    if (missing.length > 0) {
-      showToast("Ответьте, пожалуйста, на все вопросы.", "error");
+    const hasStructured = answers.dynamics?.trim() || answers.new_concerns?.trim() || answers.tried?.trim();
+    const hasFreeText = answers.free_text?.trim();
+    if (!hasStructured && !hasFreeText) {
+      showToast("Заполните хотя бы одно поле или напишите свободный текст.", "error");
       return;
     }
 
@@ -1452,13 +1458,24 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setPublicCode(createData.public_code);
       sessionRef.current = { sessionId: createData.sessionId, accessToken: createData.access_token };
 
-      const followUpText = [
-        `Стало легче, тяжелее или примерно так же: ${answers.dynamics}`,
-        `Что изменилось в сне, аппетите и обычных делах: ${answers.sleep_appetite}`,
-        `Появилось ли что-то новое, что особенно тревожит: ${answers.new_concerns}`,
-        `Что из предложенного удалось попробовать: ${answers.tried}`,
-        `Какая помощь сейчас была бы наиболее полезна: ${answers.help_needed}`,
-      ].join("\n\n");
+      const followUpParts = [];
+      if (answers.dynamics?.trim()) followUpParts.push(`Стало легче, тяжелее или примерно так же: ${answers.dynamics}`);
+      if (answers.new_concerns?.trim()) followUpParts.push(`Появилось ли что-то новое, что особенно беспокоит: ${answers.new_concerns}`);
+      if (answers.tried?.trim()) followUpParts.push(`Что из предложенного раньше удалось попробовать: ${answers.tried}`);
+      if (answers.free_text?.trim()) followUpParts.push(`Дополнительно от пользователя:\n${answers.free_text}`);
+
+      // Add practice context for AI
+      if (supportPractices.length > 0) {
+        const practiceContext = supportPractices
+          .filter(p => p.status === "active")
+          .map(p => `- ${p.title} (статус: ${p.user_status === "helped" ? "помогло" : p.user_status === "not_helpful" ? "не подошло" : p.user_status === "tried" ? "пробовал" : "не пробовал"})`)
+          .join("\n");
+        if (practiceContext) {
+          followUpParts.push(`Ранее рекомендованные практики:\n${practiceContext}`);
+        }
+      }
+
+      const followUpText = followUpParts.join("\n\n");
 
       setText(followUpText);
       setConversationHistory([]);
@@ -1665,6 +1682,57 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     } finally {
       setCheckinSaving(false);
     }
+  }
+
+  // Load support practices
+  async function loadSupportPractices() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getSupportPractices", session_id: saved.sessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setSupportPractices(data.practices || []);
+      }
+    } catch { /* silent */ }
+  }
+
+  // Save a practice (add to owner-level)
+  async function saveSupportPractice(practiceKey) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "saveSupportPractice", session_id: saved.sessionId, access_token: saved.accessToken, practice_key: practiceKey }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        await loadSupportPractices();
+      }
+    } catch { /* silent */ }
+  }
+
+  // Update practice user_status
+  async function updatePracticeStatus(practiceKey, userStatus) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateSupportPracticeStatus", session_id: saved.sessionId, access_token: saved.accessToken, practice_key: practiceKey, user_status: userStatus }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        await loadSupportPractices();
+      }
+    } catch { /* silent */ }
   }
 
   // Save patient feedback to case_reviews
@@ -10368,6 +10436,106 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   )}
                 </div>
 
+                {/* ROW: Мои практики */}
+                {supportPractices.length > 0 && (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Мои практики</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+                      {supportPractices.slice(0, 4).map((p) => {
+                        const statusLabels = { not_tried: "Не пробовал(а)", tried: "Пробовал(а)", helped: "Помогло", not_helpful: "Не подошло" };
+                        const statusColors = { not_tried: "#7A7268", tried: "#5F7D6C", helped: "#3A6B4A", not_helpful: "#8B6B4A" };
+                        return (
+                          <div key={p.practice_key} style={{
+                            background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
+                            borderRadius: 14, padding: 16, cursor: "pointer",
+                          }} onClick={() => setPracticeDetailKey(p.practice_key)}>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: "#2E2A25", marginBottom: 6 }}>{p.title}</div>
+                            <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 8, lineHeight: 1.4 }}>{p.description?.slice(0, 80)}{p.description?.length > 80 ? "…" : ""}</div>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span style={{ fontSize: 11, fontWeight: 600, color: statusColors[p.user_status] || "#7A7268" }}>
+                                {statusLabels[p.user_status] || "Не пробовал(а)"}
+                              </span>
+                              <span style={{ fontSize: 11, color: "#8a7e72" }}>Открыть →</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {supportPractices.length > 4 && (
+                      <button style={{ ...s.secondary, fontSize: 12, marginTop: 8 }} onClick={() => setPracticeDetailKey("__all__")}>
+                        Показать все ({supportPractices.length})
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Practice Detail Modal */}
+                {practiceDetailKey && (
+                  <div style={{
+                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                    background: "rgba(0,0,0,.4)", zIndex: 1000,
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+                  }} onClick={(e) => { if (e.target === e.currentTarget) setPracticeDetailKey(null); }}>
+                    <div style={{
+                      background: "#fff", borderRadius: 18, padding: 24, maxWidth: 520, width: "100%",
+                      maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,.15)",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                        <h3 style={{ margin: 0, fontFamily: "Georgia, serif", fontSize: 18 }}>
+                          {practiceDetailKey === "__all__" ? "Все практики" : (supportPractices.find(p => p.practice_key === practiceDetailKey)?.title || "Практика")}
+                        </h3>
+                        <button style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#7A7268" }} onClick={() => setPracticeDetailKey(null)}>&times;</button>
+                      </div>
+
+                      {practiceDetailKey === "__all__" ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          {supportPractices.map((p) => {
+                            const statusLabels = { not_tried: "Не пробовал(а)", tried: "Пробовал(а)", helped: "Помогло", not_helpful: "Не подошло" };
+                            return (
+                              <div key={p.practice_key} style={{ padding: "10px 14px", borderRadius: 10, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.08)", cursor: "pointer" }} onClick={() => setPracticeDetailKey(p.practice_key)}>
+                                <div style={{ fontWeight: 600, fontSize: 14, color: "#2E2A25" }}>{p.title}</div>
+                                <div style={{ fontSize: 12, color: "#7A7268", marginTop: 2 }}>{statusLabels[p.user_status] || "Не пробовал(а)"}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (() => {
+                        const practice = supportPractices.find(p => p.practice_key === practiceDetailKey);
+                        if (!practice) return null;
+                        const recommendedDate = practice.first_recommended_at ? new Date(practice.first_recommended_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+                        return (
+                          <div>
+                            <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>Рекомендовано: {recommendedDate}</div>
+                            {practice.description && <div style={{ fontSize: 14, color: "#2E2A25", lineHeight: 1.6, marginBottom: 16 }}>{practice.description}</div>}
+                            <div style={{ fontSize: 13, color: "#5F574F", lineHeight: 1.6, marginBottom: 16, padding: "12px 16px", background: "#FAF6EF", borderRadius: 12 }}>
+                              Подробные инструкции доступны по ссылке «Открыть» в отчёте.
+                            </div>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                              {[
+                                { key: "tried", label: "Пробовал(а)" },
+                                { key: "helped", label: "Помогло" },
+                                { key: "not_helpful", label: "Не подошло" },
+                              ].map((opt) => (
+                                <button key={opt.key} style={{
+                                  padding: "8px 14px", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                  border: `1px solid ${practice.user_status === opt.key ? "#7D9A89" : "rgba(46,42,37,.15)"}`,
+                                  background: practice.user_status === opt.key ? "#E2EBE4" : "#fff",
+                                  color: practice.user_status === opt.key ? "#5F7D6C" : "#2E2A25",
+                                }} onClick={() => updatePracticeStatus(practiceDetailKey, opt.key)}>
+                                  {opt.label}
+                                </button>
+                              ))}
+                            </div>
+                            <button style={{ ...s.secondary, fontSize: 13 }} onClick={() => setPracticeDetailKey(null)}>
+                              В кабинет
+                            </button>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+
                 {/* ROW: Специалист — single CTA, no duplicate */}
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Специалист</div>
@@ -10700,14 +10868,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
 
               {[
-                { key: "dynamics", label: "1. Стало легче, тяжелее или примерно так же?", placeholder: "Например: стало немного легше, но к вечеру всё равно тревожно" },
-                { key: "sleep_appetite", label: "2. Что изменилось в сне, аппетите и обычных делах?", placeholder: "Например: стал лучше засыпать, аппетит вернулся" },
-                { key: "new_concerns", label: "3. Появилось ли что-то новое, что особенно тревожит?", placeholder: "Например: появились мысли, от которых трудно отвлечься" },
-                { key: "tried", label: "4. Что из предложенного удалось попробовать?", placeholder: "Например: попробовал дыхание 4-6, записывал сон" },
-                { key: "help_needed", label: "5. Какая помощь сейчас была бы наиболее полезна?", placeholder: "Например: хочу понять, стоит ли обратиться к психологу" },
+                { key: "dynamics", label: "Стало легче, тяжелее или примерно так же?", placeholder: "Например: стало немного легше, но к вечеру всё равно тревожно" },
+                { key: "new_concerns", label: "Появилось ли что-то новое, что особенно беспокоит?", placeholder: "Например: появились мысли, от которых трудно отвлечься" },
+                { key: "tried", label: "Что из предложенного раньше удалось попробовать?", placeholder: "Например: попробовал дыхание 4-6, записывал сон" },
               ].map((q) => (
                 <div key={q.key} style={{ marginBottom: 16 }}>
                   <label style={{ ...s.label2, fontWeight: 700, marginBottom: 8, display: "block" }}>{q.label}</label>
+                  {q.key === "tried" && supportPractices.length > 0 && (
+                    <div style={{ marginBottom: 8, padding: "10px 14px", background: "#E2EBE4", borderRadius: 10, fontSize: 13, color: "#5F7D6C" }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>Ранее предложенные практики:</div>
+                      {supportPractices.filter(p => p.status === "active").slice(0, 3).map(p => (
+                        <div key={p.practice_key} style={{ marginBottom: 2 }}>— {p.title}</div>
+                      ))}
+                    </div>
+                  )}
                   <textarea
                     style={s.answerInput}
                     value={followUpAnswers[q.key] || ""}
@@ -10718,12 +10892,28 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </div>
               ))}
 
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ ...s.label2, fontWeight: 700, marginBottom: 8, display: "block" }}>
+                  Что ещё вы хотите рассказать или спросить?
+                </label>
+                <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 8 }}>
+                  Можно написать о чём угодно — о состоянии, сне, отношениях, работе, тревоге или просто задать вопрос.
+                </div>
+                <textarea
+                  style={{ ...s.answerInput, minHeight: 120 }}
+                  value={followUpAnswers.free_text || ""}
+                  onChange={(e) => setFollowUpAnswers({ ...followUpAnswers, free_text: e.target.value })}
+                  placeholder="Напишите здесь всё, что хотите..."
+                  rows={5}
+                />
+              </div>
+
               <button
                 style={s.wide}
                 onClick={submitFollowUp}
                 disabled={loading}
               >
-                {loading ? "Начинаем разбор..." : "Продолжить разбор"}
+                {loading ? "Начинаем разговор..." : "Продолжить разговор"}
               </button>
             </section>
           )}

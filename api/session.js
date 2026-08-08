@@ -360,6 +360,12 @@ export default async function handler(req, res) {
         return await handleGetSupportCheckins(req, res);
       case "saveSupportCheckin":
         return await handleSaveSupportCheckin(req, res);
+      case "getSupportPractices":
+        return await handleGetSupportPractices(req, res);
+      case "saveSupportPractice":
+        return await handleSaveSupportPractice(req, res);
+      case "updateSupportPracticeStatus":
+        return await handleUpdateSupportPracticeStatus(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -3573,5 +3579,167 @@ async function handleSaveSupportCheckin(req, res) {
   } catch (error) {
     console.error("handleSaveSupportCheckin error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка сохранения." });
+  }
+}
+
+// ============================================================
+// Support Owner Practices
+// ============================================================
+
+// Known practice definitions (mirror of PRACTICES constant in App.jsx)
+const PRACTICE_DEFS = {
+  breathing: { title: "Дыхание 4–6 минут при тревоге", description: "Медленный вдох и более длинный выдох, чтобы немного снизить напряжение." },
+  grounding: { title: "Заземление 5–4–3–2–1", description: "Техника заземления через органы чувств для возвращения в настоящий момент." },
+  jaw_relaxation: { title: "Мягкое расслабление лица и челюсти", description: "Снятие напряжения с лица, челюсти и шеи." },
+  sleep_prep: { title: "Практика перед сном", description: "Мягкая подготовка ко сну при тревоге или бессоннице." },
+  neck_shoulders_stretch: { title: "Мягкая растяжка шеи и плеч", description: "Снятие мышечного напряжения в верхней части тела." },
+  diary: { title: "Дневник состояния на 3 дня", description: "Краткие ежедневные записи для отслеживания изменений." },
+  "24h_plan": { title: "План 24 часа без ухудшения", description: "Пошаговый план на ближайшие сутки." },
+};
+
+async function handleGetSupportPractices(req, res) {
+  try {
+    const { session_id, access_token } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+    const { data: practices, error } = await supabase
+      .from("support_owner_practices")
+      .select("id, practice_key, title, description, first_recommended_at, last_recommended_at, recommendation_count, status, helpfulness, user_status, source_session_ids")
+      .eq("owner_type", "anonymous_case")
+      .eq("owner_id", owner.ownerId)
+      .order("last_recommended_at", { ascending: false });
+
+    if (error) {
+      console.error("[getSupportPractices] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить практики." });
+    }
+
+    return res.status(200).json({ ok: true, practices: practices || [] });
+  } catch (error) {
+    console.error("handleGetSupportPractices error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки практик." });
+  }
+}
+
+async function handleSaveSupportPractice(req, res) {
+  try {
+    const { session_id, access_token, practice_key, status: newStatus, helpfulness: newHelpfulness, user_status: newUserStatus } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!practice_key || typeof practice_key !== "string") {
+      return res.status(400).json({ ok: false, error: "Укажите практику." });
+    }
+
+    const def = PRACTICE_DEFS[practice_key];
+    if (!def) {
+      return res.status(400).json({ ok: false, error: "Неизвестная практика." });
+    }
+
+    const supabase = getSupabase();
+    const now = new Date().toISOString();
+
+    // Try to find existing practice
+    const { data: existing } = await supabase
+      .from("support_owner_practices")
+      .select("id, recommendation_count, source_session_ids")
+      .eq("owner_type", "anonymous_case")
+      .eq("owner_id", owner.ownerId)
+      .eq("practice_key", practice_key)
+      .maybeSingle();
+
+    if (existing) {
+      // Update existing
+      const updateFields = { last_recommended_at: now, updated_at: now };
+      if (newStatus) updateFields.status = newStatus;
+      if (newHelpfulness) updateFields.helpfulness = newHelpfulness;
+      if (newUserStatus) updateFields.user_status = newUserStatus;
+
+      const { error: updateError } = await supabase
+        .from("support_owner_practices")
+        .update(updateFields)
+        .eq("id", existing.id);
+
+      if (updateError) {
+        console.error("[saveSupportPractice] update error:", updateError.code);
+        return res.status(500).json({ ok: false, error: "Не удалось обновить практику." });
+      }
+
+      return res.status(200).json({ ok: true, practice: { ...existing, ...updateFields } });
+    }
+
+    // Insert new
+    const { data: inserted, error: insertError } = await supabase
+      .from("support_owner_practices")
+      .insert({
+        owner_type: "anonymous_case",
+        owner_id: owner.ownerId,
+        practice_key,
+        title: def.title,
+        description: def.description,
+        first_recommended_at: now,
+        last_recommended_at: now,
+        recommendation_count: 1,
+        source_session_ids: [owner.sessionId],
+        status: newStatus || "active",
+        helpfulness: newHelpfulness || "unknown",
+        user_status: newUserStatus || "not_tried",
+      })
+      .select("id, practice_key, title, description, first_recommended_at, last_recommended_at, recommendation_count, status, helpfulness, user_status")
+      .single();
+
+    if (insertError) {
+      console.error("[saveSupportPractice] insert error:", insertError.code);
+      return res.status(500).json({ ok: false, error: "Не удалось сохранить практику." });
+    }
+
+    return res.status(200).json({ ok: true, practice: inserted });
+  } catch (error) {
+    console.error("handleSaveSupportPractice error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сохранения практики." });
+  }
+}
+
+async function handleUpdateSupportPracticeStatus(req, res) {
+  try {
+    const { session_id, access_token, practice_key, user_status: newUserStatus, helpfulness: newHelpfulness } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!practice_key) {
+      return res.status(400).json({ ok: false, error: "Укажите практику." });
+    }
+
+    const supabase = getSupabase();
+    const updateFields = { updated_at: new Date().toISOString() };
+    if (newUserStatus) updateFields.user_status = newUserStatus;
+    if (newHelpfulness) updateFields.helpfulness = newHelpfulness;
+
+    const { data: updated, error } = await supabase
+      .from("support_owner_practices")
+      .update(updateFields)
+      .eq("owner_type", "anonymous_case")
+      .eq("owner_id", owner.ownerId)
+      .eq("practice_key", practice_key)
+      .select("id, practice_key, user_status, helpfulness")
+      .single();
+
+    if (error) {
+      console.error("[updateSupportPracticeStatus] error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось обновить статус." });
+    }
+
+    return res.status(200).json({ ok: true, practice: updated });
+  } catch (error) {
+    console.error("handleUpdateSupportPracticeStatus error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка обновления." });
   }
 }
