@@ -366,6 +366,10 @@ export default async function handler(req, res) {
         return await handleSaveSupportPractice(req, res);
       case "updateSupportPracticeStatus":
         return await handleUpdateSupportPracticeStatus(req, res);
+      case "getSupportProfile":
+        return await handleGetSupportProfile(req, res);
+      case "saveSupportProfile":
+        return await handleSaveSupportProfile(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -861,6 +865,14 @@ async function handleGetCabinet(req, res) {
       .order("created_at", { ascending: false })
       .limit(20);
 
+    // Owner display_name
+    const { data: ownerProfile } = await supabase
+      .from("support_owner_profiles")
+      .select("display_name")
+      .eq("owner_type", "anonymous_case")
+      .eq("owner_id", ownerId)
+      .maybeSingle();
+
     return res.status(200).json({
       ok: true,
       public_code: currentSession.public_code,
@@ -877,6 +889,7 @@ async function handleGetCabinet(req, res) {
       } : null,
       service_requests: serviceRequests || [],
       unread_message_count: 0,
+      display_name: ownerProfile?.display_name || null,
     });
   } catch (error) {
     console.error("handleGetCabinet error", error);
@@ -3741,5 +3754,66 @@ async function handleUpdateSupportPracticeStatus(req, res) {
   } catch (error) {
     console.error("handleUpdateSupportPracticeStatus error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка обновления." });
+  }
+}
+
+// ============================================================
+// Support Owner Profile (display_name)
+// ============================================================
+
+async function handleGetSupportProfile(req, res) {
+  try {
+    const { session_id, access_token } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+    const { data: profile } = await supabase
+      .from("support_owner_profiles")
+      .select("display_name, created_at")
+      .eq("owner_type", "anonymous_case")
+      .eq("owner_id", owner.ownerId)
+      .maybeSingle();
+
+    return res.status(200).json({ ok: true, display_name: profile?.display_name || null });
+  } catch (error) {
+    console.error("handleGetSupportProfile error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки профиля." });
+  }
+}
+
+async function handleSaveSupportProfile(req, res) {
+  try {
+    const { session_id, access_token, display_name } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const cleanName = typeof display_name === "string" ? display_name.trim().slice(0, 50) : "";
+
+    const supabase = getSupabase();
+    const now = new Date().toISOString();
+
+    const { error } = await supabase
+      .from("support_owner_profiles")
+      .upsert({
+        owner_type: "anonymous_case",
+        owner_id: owner.ownerId,
+        display_name: cleanName || null,
+        updated_at: now,
+      }, { onConflict: "owner_type,owner_id" });
+
+    if (error) {
+      console.error("[saveSupportProfile] upsert error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось сохранить имя." });
+    }
+
+    return res.status(200).json({ ok: true, display_name: cleanName || null });
+  } catch (error) {
+    console.error("handleSaveSupportProfile error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сохранения." });
   }
 }

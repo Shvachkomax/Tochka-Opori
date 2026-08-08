@@ -136,6 +136,9 @@ export default function App() {
   const [practiceDetailKey, setPracticeDetailKey] = useState(null);
   // Follow-up answered topics for AI dedup
   const [followupAnsweredTopics, setFollowupAnsweredTopics] = useState(null);
+  // Display name
+  const [supportDisplayName, setSupportDisplayName] = useState(null);
+  const [displayNameInput, setDisplayNameInput] = useState("");
 
   const [activeModule, setActiveModule] = useState(() => {
     if (typeof window !== "undefined") {
@@ -1205,7 +1208,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         specialist: cabinetData.specialist || null,
         service_requests: cabinetData.service_requests || [],
         unread_message_count: cabinetData.unread_message_count || 0,
+        display_name: cabinetData.display_name || null,
       });
+      setSupportDisplayName(cabinetData.display_name || null);
       setSessionId(effectiveSessionId);
       setPublicCode(cabinetData.public_code || enteredCode || saved.sessionId);
       setPhase("cabinet");
@@ -1635,7 +1640,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           specialist: data.specialist || null,
           service_requests: data.service_requests || [],
           unread_message_count: data.unread_message_count || 0,
+          display_name: data.display_name || null,
         });
+        if (data.display_name) setSupportDisplayName(data.display_name);
       }
     } catch { /* silent */ }
   }
@@ -2228,6 +2235,18 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     if (dialogDepth === 0 && inputText.trim().length < 10) {
       setError("Напишите хотя бы 2–3 предложения.");
       return;
+    }
+
+    // Save display_name on first round if provided
+    if (dialogDepth === 0 && displayNameInput.trim() && !supportDisplayName) {
+      const saved = getSupportSession();
+      if (saved.sessionId && saved.accessToken) {
+        fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "saveSupportProfile", session_id: saved.sessionId, access_token: saved.accessToken, display_name: displayNameInput.trim() }),
+        }).then(r => r.json()).then(d => { if (d.ok) setSupportDisplayName(d.display_name); }).catch(() => {});
+      }
     }
 
     setLoading(true);
@@ -8957,6 +8976,33 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </div>
             )}
 
+            {/* Display name input — shown when no saved session */}
+            {activeModule === "support" && phase === "input" && !getSupportSession().sessionId && (
+              <div style={{ marginTop: 16 }}>
+                <label style={{ fontSize: 13, color: "#7A7268", marginBottom: 6, display: "block" }}>Как к вам обращаться?</label>
+                <input
+                  type="text"
+                  style={{ ...s.answerInput, maxWidth: 320 }}
+                  value={displayNameInput}
+                  onChange={(e) => setDisplayNameInput(e.target.value)}
+                  placeholder="Имя или псевдоним (необязательно)"
+                  maxLength={50}
+                />
+              </div>
+            )}
+
+            {/* Open cabinet CTA — shown when saved session exists */}
+            {activeModule === "support" && phase === "input" && supportScreen === "landing" && getSupportSession().sessionId && (
+              <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  style={{ ...s.primary, fontSize: 14, padding: "12px 20px" }}
+                  onClick={() => loadSupportCabinet()}
+                >
+                  Открыть личный кабинет
+                </button>
+              </div>
+            )}
+
             {activeModule === "body" && bodyScreen === "landing" && (
               <div style={{ marginTop: 16, padding: 16, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 8 }}>
@@ -10179,7 +10225,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 {/* Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 15, fontWeight: 600, color: "#2E2A25" }}>Личный кабинет</span>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: "#2E2A25" }}>
+                      Личный кабинет{supportDisplayName ? ` ${supportDisplayName}` : ""}
+                    </span>
                     {walletBalance !== null && (
                       <span style={{ fontSize: 13, color: "#5F7D6C", fontWeight: 600 }}>
                         {walletBalance.toLocaleString("ru-RU")} кредитов
