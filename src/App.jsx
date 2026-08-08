@@ -8711,7 +8711,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 `}</style>
           <div style={s.wrap}>
         <header style={{ ...s.header, marginBottom: (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 12, cursor: activeModule === "support" && supportScreen !== "landing" ? "pointer" : "default" }}
+            onClick={activeModule === "support" && supportScreen !== "landing" ? goToSupportLanding : undefined}
+            title={activeModule === "support" && supportScreen !== "landing" ? "На главную" : undefined}
+          >
             <img
               src="/logo-tochka-opory-header.png"
               alt={isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : "Точка опоры"}
@@ -8759,12 +8763,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
             )}
             {!isDedicatedSubdomain && (<>
+            {!(activeModule === "support" && supportScreen !== "landing") && (
             <button
               style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
               onClick={() => setExpertModalOpen(true)}
             >
               Для специалистов
             </button>
+            )}
             <button
               style={s.crisis}
               onClick={() => setCrisisOpen(true)}
@@ -10078,15 +10084,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               <section style={{ width: "100%" }} className="app-card-support">
                 {/* Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, flexWrap: "wrap", gap: 10 }}>
-                  <button
-                    onClick={goToSupportLanding}
-                    style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 0", display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}
-                    title="На главную"
-                  >
-                    <span style={{ fontFamily: "Georgia, \"PT Serif\", serif", fontWeight: 700, fontSize: 18, color: "#2E2A25" }}>Точка Опоры</span>
-                  </button>
                   <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 13, color: "#7A7268" }}>Личный кабинет</span>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: "#2E2A25" }}>Личный кабинет</span>
                     {walletBalance !== null && (
                       <span style={{ fontSize: 13, color: "#5F7D6C", fontWeight: 600 }}>
                         {walletBalance.toLocaleString("ru-RU")} кредитов
@@ -10516,17 +10515,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             const sessionDate = s_data.createdAt ? new Date(s_data.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
             return (
               <section style={{ width: "100%" }} className="app-card-support">
-                {/* Header with home link */}
+                {/* Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <button
-                      onClick={goToSupportLanding}
-                      style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 0", display: "flex", alignItems: "center", gap: 8 }}
-                      title="На главную"
-                    >
-                      <span style={{ fontFamily: "Georgia, \"PT Serif\", serif", fontWeight: 700, fontSize: 18, color: "#2E2A25" }}>Точка Опоры</span>
-                    </button>
-                    <span style={{ fontSize: 13, color: "#7A7268" }}>Разговор от {sessionDate}</span>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: "#2E2A25" }}>Разговор от {sessionDate}</span>
                   </div>
                   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                     <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={goToSupportCabinet}>
@@ -10697,14 +10689,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             <section style={{ width: "100%" }} className="app-card-support">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <button
-                    onClick={goToSupportLanding}
-                    style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 0", display: "flex", alignItems: "center", gap: 8 }}
-                    title="На главную"
-                  >
-                    <span style={{ fontFamily: "Georgia, \"PT Serif\", serif", fontWeight: 700, fontSize: 18, color: "#2E2A25" }}>Точка Опоры</span>
-                  </button>
-                  <span style={{ fontSize: 13, color: "#7A7268" }}>Продолжение разговора</span>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: "#2E2A25" }}>Продолжение разговора</span>
                 </div>
                 <button
                   style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
