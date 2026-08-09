@@ -848,34 +848,55 @@ async function handleGetCabinet(req, res) {
       createdAt: latest.created_at,
     } : null;
 
-    // Wallet balance
-    const { getWallet, getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
-    const wallet = await getWallet({ ownerType: "anonymous_case", ownerId, module: "support" });
+    // Wallet balance (critical — but degrade gracefully)
     let balance = null;
-    if (wallet) {
-      balance = await getUsageBalanceForClient({ walletId: wallet.id });
+    try {
+      const { getWallet, getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
+      const wallet = await getWallet({ ownerType: "anonymous_case", ownerId, module: "support" });
+      if (wallet) {
+        balance = await getUsageBalanceForClient({ walletId: wallet.id });
+      }
+    } catch (walletError) {
+      console.error("[getCabinet] wallet error (non-blocking):", walletError.message);
     }
 
-    // Specialist relation
-    const specialist = await resolveSupportSpecialistRelation(ownerId);
+    // Specialist relation (optional)
+    let specialist = null;
+    try {
+      specialist = await resolveSupportSpecialistRelation(ownerId);
+    } catch (specError) {
+      console.error("[getCabinet] specialist error (non-blocking):", specError.message);
+    }
 
-    // Service requests
-    const { data: serviceRequests } = await supabase
-      .from("service_requests")
-      .select("id, request_type, meeting_format, title, message, status, specialist_name, scheduled_at, created_at")
-      .eq("module", "support")
-      .eq("owner_type", "anonymous_case")
-      .eq("owner_id", ownerId)
-      .order("created_at", { ascending: false })
-      .limit(20);
+    // Service requests (optional)
+    let serviceRequests = [];
+    try {
+      const { data: sr } = await supabase
+        .from("service_requests")
+        .select("id, request_type, meeting_format, title, message, status, specialist_name, scheduled_at, created_at")
+        .eq("module", "support")
+        .eq("owner_type", "anonymous_case")
+        .eq("owner_id", ownerId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      serviceRequests = sr || [];
+    } catch (srError) {
+      console.error("[getCabinet] service_requests error (non-blocking):", srError.message);
+    }
 
-    // Owner display_name
-    const { data: ownerProfile } = await supabase
-      .from("support_owner_profiles")
-      .select("display_name")
-      .eq("owner_type", "anonymous_case")
-      .eq("owner_id", ownerId)
-      .maybeSingle();
+    // Owner display_name (optional)
+    let ownerDisplayName = null;
+    try {
+      const { data: ownerProfile } = await supabase
+        .from("support_owner_profiles")
+        .select("display_name")
+        .eq("owner_type", "anonymous_case")
+        .eq("owner_id", ownerId)
+        .maybeSingle();
+      ownerDisplayName = ownerProfile?.display_name || null;
+    } catch (profileError) {
+      console.error("[getCabinet] profile error (non-blocking):", profileError.message);
+    }
 
     return res.status(200).json({
       ok: true,
@@ -891,9 +912,9 @@ async function handleGetCabinet(req, res) {
         expertSpecialty: specialist.expertSpecialty,
         organizationName: specialist.organizationName,
       } : null,
-      service_requests: serviceRequests || [],
+      service_requests: serviceRequests,
       unread_message_count: 0,
-      display_name: ownerProfile?.display_name || null,
+      display_name: ownerDisplayName,
     });
   } catch (error) {
     console.error("handleGetCabinet error", error);

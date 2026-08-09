@@ -1221,12 +1221,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setPublicCode(cabinetData.public_code || enteredCode || saved.sessionId);
       setPhase("cabinet");
       setSupportScreen("cabinet");
-      loadSupportCheckins();
-      loadSupportPractices();
-      loadSupportChat();
+      // Optional loads — non-blocking
+      loadSupportCheckins().catch(() => {});
+      loadSupportPractices().catch(() => {});
+      loadSupportChat().catch(() => {});
     } catch (e) {
-      setContinuationCodeError(e.message || "Не удалось открыть разговор. Проверьте код продолжения.");
-      showToast(e.message || "Не удалось открыть разговор. Проверьте код продолжения.", "error");
+      const msg = e.message || "";
+      let userMsg = "Не удалось открыть кабинет. Попробуйте ещё раз.";
+      if (msg.includes("код продолжения") || msg.includes("continuation") || msg.includes("401") || msg.includes("403")) {
+        userMsg = "Проверьте код продолжения.";
+      } else if (msg.includes("fetch") || msg.includes("NetworkError") || msg.includes("network")) {
+        userMsg = "Не удалось связаться с сервисом. Попробуйте ещё раз.";
+      }
+      setContinuationCodeError(userMsg);
+      showToast(userMsg, "error");
     } finally {
       setCabinetLoading(false);
     }
