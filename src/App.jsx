@@ -2252,6 +2252,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setLoading(true);
     setError("");
     setQuestions(null);
+
+    // Ensure session exists before first analyze call
+    if (!sessionId && activeModule === "support") {
+      try {
+        const sessionData = await ensureStartSession();
+        setSessionId(sessionData.sessionId);
+      } catch (e) {
+        setError(e.message || "Не удалось начать разговор.");
+        setLoading(false);
+        return;
+      }
+    }
+
     if (dialogDepth >= 3 && activeModule === "support") {
       setLoadingMessage("Готовим отчёт…");
       setTimeout(() => {
@@ -10707,6 +10720,50 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     <div style={{ fontSize: 14, color: "#7A7268", padding: "12px 0" }}>Запросов пока нет.</div>
                   )}
                 </div>
+
+                {/* ROW: Display name — shown when no name set */}
+                {!supportDisplayName && (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{
+                      background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
+                      borderRadius: 14, padding: 16,
+                    }}>
+                      <div style={{ fontSize: 14, color: "#5F574F", marginBottom: 10 }}>Как к вам обращаться?</div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <input
+                          type="text"
+                          style={{ ...s.answerInput, flex: 1, maxWidth: 280, marginBottom: 0 }}
+                          value={displayNameInput}
+                          onChange={(e) => setDisplayNameInput(e.target.value)}
+                          placeholder="Имя или псевдоним"
+                          maxLength={50}
+                        />
+                        <button
+                          style={{ ...s.secondary, fontSize: 13, padding: "8px 14px", flexShrink: 0 }}
+                          onClick={async () => {
+                            if (!displayNameInput.trim()) return;
+                            const saved = getSupportSession();
+                            if (!saved.sessionId || !saved.accessToken) return;
+                            try {
+                              const res = await fetch("/api/session", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "saveSupportProfile", session_id: saved.sessionId, access_token: saved.accessToken, display_name: displayNameInput.trim() }),
+                              });
+                              const d = await res.json();
+                              if (d.ok) {
+                                setSupportDisplayName(d.display_name);
+                                showToast("Имя сохранено", "success");
+                              }
+                            } catch { /* silent */ }
+                          }}
+                        >
+                          Сохранить
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* ROW: Доступ — collapsible */}
                 <div style={{ marginBottom: 16 }}>
