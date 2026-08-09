@@ -1800,7 +1800,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     // Optimistic add
     const tempId = "temp-" + Date.now();
     setQuickChatMessages(prev => [...prev, { id: tempId, role: "user", message_text: trimmed, created_at: new Date().toISOString() }]);
-    setQuickChatInput("");
     setQuickChatLoading(true);
 
     try {
@@ -1811,7 +1810,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       });
       const data = await res.json();
       if (res.ok && data.ok) {
-        // Replace temp with real messages
+        // Success: clear input and replace temp with real messages
+        setQuickChatInput("");
         setQuickChatMessages(prev => {
           const withoutTemp = prev.filter(m => m.id !== tempId);
           return [...withoutTemp,
@@ -1821,10 +1821,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         });
       } else {
         setQuickChatMessages(prev => prev.filter(m => m.id !== tempId));
+        setQuickChatInput(trimmed); // Restore input on failure
         showToast(data.error || "Не удалось отправить", "error");
       }
     } catch {
       setQuickChatMessages(prev => prev.filter(m => m.id !== tempId));
+      setQuickChatInput(trimmed); // Restore input on failure
       showToast("Ошибка отправки", "error");
     } finally {
       setQuickChatLoading(false);
@@ -10472,75 +10474,81 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   {/* Wellbeing scale -5 to +5 */}
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#2E2A25", marginBottom: 8 }}>Общее состояние</div>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
-                      {[-5,-4,-3,-2,-1,0,1,2,3,4,5].map((v) => {
-                        const isSelected = checkinWellbeing === v;
-                        const isNeg = v < 0;
-                        const isPos = v > 0;
-                        const isZero = v === 0;
-                        let bg = "#FAF6EF";
-                        let color = "#7A7268";
-                        let border = "1px solid rgba(46,42,37,.1)";
-                        if (isSelected) {
-                          if (isNeg) { bg = "#E8D8D0"; color = "#6B4A3A"; border = "1px solid #C4A090"; }
-                          else if (isPos) { bg = "#D0E8D8"; color = "#3A6B4A"; border = "1px solid #90C4A0"; }
-                          else { bg = "#E2E0DB"; color = "#4A4A4A"; border = "1px solid #B0AFA8"; }
-                        }
-                        return (
-                          <button
-                            key={v}
-                            onClick={() => setCheckinWellbeing(v)}
-                            style={{
-                              width: 38, height: 38, borderRadius: 10, background: bg, color,
-                              border, fontWeight: 700, fontSize: 14, cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}
-                          >
-                            {v > 0 ? `+${v}` : v}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                      <span style={{ fontSize: 11, color: "#8a7e72" }}>Очень тяжело</span>
-                      <span style={{ fontSize: 11, color: "#8a7e72" }}>Обычно</span>
-                      <span style={{ fontSize: 11, color: "#8a7e72" }}>Очень хорошо</span>
+                    <div style={{ display: "inline-block" }}>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        {[-5,-4,-3,-2,-1,0,1,2,3,4,5].map((v) => {
+                          const isSelected = checkinWellbeing === v;
+                          const isNeg = v < 0;
+                          const isPos = v > 0;
+                          let bg = "#FAF6EF";
+                          let color = "#7A7268";
+                          let border = "1px solid rgba(46,42,37,.1)";
+                          if (isSelected) {
+                            if (isNeg) { bg = "#E8D8D0"; color = "#6B4A3A"; border = "1px solid #C4A090"; }
+                            else if (isPos) { bg = "#D0E8D8"; color = "#3A6B4A"; border = "1px solid #90C4A0"; }
+                            else { bg = "#E2E0DB"; color = "#4A4A4A"; border = "1px solid #B0AFA8"; }
+                          }
+                          return (
+                            <button
+                              key={v}
+                              onClick={() => setCheckinWellbeing(v)}
+                              style={{
+                                width: 38, height: 38, borderRadius: 10, background: bg, color,
+                                border, fontWeight: 700, fontSize: 14, cursor: "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                              }}
+                            >
+                              {v > 0 ? `+${v}` : v}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                        <span style={{ fontSize: 11, color: "#8a7e72", width: 38, textAlign: "center" }}>−5</span>
+                        <span style={{ fontSize: 11, color: "#8a7e72" }}>Очень тяжело</span>
+                        <span style={{ fontSize: 11, color: "#8a7e72", width: 38, textAlign: "center" }}>0</span>
+                        <span style={{ fontSize: 11, color: "#8a7e72" }}>Обычно</span>
+                        <span style={{ fontSize: 11, color: "#8a7e72", width: 38, textAlign: "center" }}>+5</span>
+                        <span style={{ fontSize: 11, color: "#8a7e72" }}>Очень хорошо</span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Anxiety scale 0-10 */}
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#2E2A25", marginBottom: 8 }}>Напряжение / тревога</div>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
-                      {[0,1,2,3,4,5,6,7,8,9,10].map((v) => {
-                        const isSelected = checkinAnxiety === v;
-                        let bg = "#FAF6EF";
-                        let color = "#7A7268";
-                        let border = "1px solid rgba(46,42,37,.1)";
-                        if (isSelected) {
-                          const intensity = v / 10;
-                          bg = `rgba(184,140,92,${0.15 + intensity * 0.35})`;
-                          color = "#5A4A3A";
-                          border = "1px solid #C4A080";
-                        }
-                        return (
-                          <button
-                            key={v}
-                            onClick={() => setCheckinAnxiety(v)}
-                            style={{
-                              width: 34, height: 34, borderRadius: 8, background: bg, color,
-                              border, fontWeight: 600, fontSize: 13, cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}
-                          >
-                            {v}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                      <span style={{ fontSize: 11, color: "#8a7e72" }}>Совсем нет</span>
-                      <span style={{ fontSize: 11, color: "#8a7e72" }}>Очень сильно</span>
+                    <div style={{ display: "inline-block" }}>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        {[0,1,2,3,4,5,6,7,8,9,10].map((v) => {
+                          const isSelected = checkinAnxiety === v;
+                          let bg = "#FAF6EF";
+                          let color = "#7A7268";
+                          let border = "1px solid rgba(46,42,37,.1)";
+                          if (isSelected) {
+                            const intensity = v / 10;
+                            bg = `rgba(184,140,92,${0.15 + intensity * 0.35})`;
+                            color = "#5A4A3A";
+                            border = "1px solid #C4A080";
+                          }
+                          return (
+                            <button
+                              key={v}
+                              onClick={() => setCheckinAnxiety(v)}
+                              style={{
+                                width: 34, height: 34, borderRadius: 8, background: bg, color,
+                                border, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                              }}
+                            >
+                              {v}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                        <span style={{ fontSize: 11, color: "#8a7e72" }}>Совсем нет</span>
+                        <span style={{ fontSize: 11, color: "#8a7e72" }}>Очень сильно</span>
+                      </div>
                     </div>
                   </div>
 
