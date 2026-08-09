@@ -124,6 +124,7 @@ export default function App() {
   const [supportNewRequest, setSupportNewRequest] = useState({ request_type: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
   const [supportRequestSubmitting, setSupportRequestSubmitting] = useState(false);
   const [accessExpanded, setAccessExpanded] = useState(false);
+  const [profileExpanded, setProfileExpanded] = useState(false);
   // Daily check-in state
   const [checkinToday, setCheckinToday] = useState(null);
   const [checkinHistory, setCheckinHistory] = useState([]);
@@ -2237,18 +2238,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       return;
     }
 
-    // Save display_name on first round if provided
-    if (dialogDepth === 0 && displayNameInput.trim() && !supportDisplayName) {
-      const saved = getSupportSession();
-      if (saved.sessionId && saved.accessToken) {
-        fetch("/api/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "saveSupportProfile", session_id: saved.sessionId, access_token: saved.accessToken, display_name: displayNameInput.trim() }),
-        }).then(r => r.json()).then(d => { if (d.ok) setSupportDisplayName(d.display_name); }).catch(() => {});
-      }
-    }
-
     setLoading(true);
     setError("");
     setQuestions(null);
@@ -2258,6 +2247,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       try {
         const sessionData = await ensureStartSession();
         setSessionId(sessionData.sessionId);
+
+        // Save display_name immediately after session creation
+        if (displayNameInput.trim() && !supportDisplayName) {
+          fetch("/api/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "saveSupportProfile", session_id: sessionData.sessionId, access_token: sessionData.accessToken, display_name: displayNameInput.trim() }),
+          }).then(r => r.json()).then(d => { if (d.ok) setSupportDisplayName(d.display_name); }).catch(() => {});
+        }
       } catch (e) {
         setError(e.message || "Не удалось начать разговор.");
         setLoading(false);
@@ -10721,19 +10719,30 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   )}
                 </div>
 
-                {/* ROW: Display name — shown when no name set */}
-                {!supportDisplayName && (
-                  <div style={{ marginBottom: 24 }}>
+                {/* ROW: Профиль — collapsible */}
+                <div style={{ marginBottom: 24 }}>
+                  <button
+                    onClick={() => setProfileExpanded(!profileExpanded)}
+                    style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      width: "100%", background: "none", border: "none", cursor: "pointer",
+                      fontSize: 16, fontWeight: 700, color: "#2E2A25", padding: "8px 0",
+                    }}
+                  >
+                    <span>Профиль</span>
+                    <span style={{ fontSize: 14, color: "#7A7268", transition: "transform 0.2s", transform: profileExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+                  </button>
+                  {profileExpanded && (
                     <div style={{
                       background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
-                      borderRadius: 14, padding: 16,
+                      borderRadius: 14, padding: 16, marginTop: 8,
                     }}>
-                      <div style={{ fontSize: 14, color: "#5F574F", marginBottom: 10 }}>Как к вам обращаться?</div>
+                      <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 6 }}>Как к вам обращаться</div>
                       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                         <input
                           type="text"
                           style={{ ...s.answerInput, flex: 1, maxWidth: 280, marginBottom: 0 }}
-                          value={displayNameInput}
+                          value={supportDisplayName || displayNameInput}
                           onChange={(e) => setDisplayNameInput(e.target.value)}
                           placeholder="Имя или псевдоним"
                           maxLength={50}
@@ -10758,12 +10767,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             } catch { /* silent */ }
                           }}
                         >
-                          Сохранить
+                          {supportDisplayName ? "Изменить" : "Сохранить"}
                         </button>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* ROW: Доступ — collapsible */}
                 <div style={{ marginBottom: 16 }}>
