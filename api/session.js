@@ -3924,16 +3924,12 @@ async function handleSendSupportMessage(req, res) {
 
     let aiResult;
     try {
-      aiResult = await runTask({
-        taskType: TASK_TYPES.PATIENT_DIALOG,
+      aiResult = await runTask(TASK_TYPES.PATIENT_DIALOG, {
+        systemPrompt,
+        userPrompt: trimmed,
         model,
         fallbackModel,
         reasoningEffort,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: trimmed },
-        ],
-        maxTokens: 1024,
       });
     } catch (aiError) {
       console.error("[sendSupportMessage] AI error:", aiError.message);
@@ -3955,11 +3951,11 @@ async function handleSendSupportMessage(req, res) {
     // Parse AI response
     let parsed;
     try {
-      const raw = aiResult.text || "";
+      const raw = aiResult.raw || "";
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { answer: raw.slice(0, 2000), safety_note: null, confidence: "low", suggest_followup: false };
     } catch {
-      parsed = { answer: (aiResult.text || "").slice(0, 2000), safety_note: null, confidence: "low", suggest_followup: false };
+      parsed = { answer: (aiResult.raw || "").slice(0, 2000), safety_note: null, confidence: "low", suggest_followup: false };
     }
 
     // Safety check: if safety_note exists, log it
@@ -3977,7 +3973,7 @@ async function handleSendSupportMessage(req, res) {
       ai_response: parsed,
       source_session_id: owner.sessionId,
       request_id: requestId,
-      model_used: aiResult.model || model,
+      model_used: aiResult.model_used || model,
       created_at: new Date().toISOString(),
     });
 

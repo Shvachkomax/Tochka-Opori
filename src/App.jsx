@@ -10398,24 +10398,24 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       )}
 
                       {/* Input */}
-                      <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                        <textarea
-                          style={{ ...s.answerInput, flex: 1, minHeight: 44, maxHeight: 100, marginBottom: 0, resize: "none" }}
-                          value={quickChatInput}
-                          onChange={(e) => setQuickChatInput(e.target.value)}
-                          placeholder="Что у вас сегодня? Можно спросить о чём угодно…"
-                          rows={1}
-                          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendQuickChatMessage(); } }}
-                        />
+                      <textarea
+                        style={{ ...s.answerInput, width: "100%", minHeight: 60, maxHeight: 120, marginBottom: 8, resize: "vertical" }}
+                        value={quickChatInput}
+                        onChange={(e) => setQuickChatInput(e.target.value)}
+                        placeholder="Что у вас сегодня? Можно спросить о чём угодно…"
+                        rows={2}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendQuickChatMessage(); } }}
+                      />
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
                         <button
-                          style={{ ...s.primary, fontSize: 13, padding: "10px 16px", flexShrink: 0, opacity: quickChatLoading || !quickChatInput.trim() ? 0.5 : 1 }}
+                          style={{ ...s.primary, fontSize: 13, padding: "10px 20px", opacity: quickChatLoading || !quickChatInput.trim() ? 0.5 : 1 }}
                           disabled={quickChatLoading || !quickChatInput.trim()}
                           onClick={() => sendQuickChatMessage()}
                         >
                           Отправить
                         </button>
                       </div>
-                      <div style={{ marginTop: 8 }}>
+                      <div style={{ marginTop: 10 }}>
                         <button style={{ background: "none", border: "none", fontSize: 12, color: "#7A7268", cursor: "pointer", textDecoration: "underline" }} onClick={startSupportFollowUp}>
                           Нужен подробный разбор? Продолжить разговор →
                         </button>
