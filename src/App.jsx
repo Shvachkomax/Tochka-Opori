@@ -135,6 +135,11 @@ export default function App() {
   // Practices state
   const [supportPractices, setSupportPractices] = useState([]);
   const [practiceDetailKey, setPracticeDetailKey] = useState(null);
+  // Quick chat state
+  const [quickChatMessages, setQuickChatMessages] = useState([]);
+  const [quickChatInput, setQuickChatInput] = useState("");
+  const [quickChatLoading, setQuickChatLoading] = useState(false);
+  const [quickChatExpanded, setQuickChatExpanded] = useState(false);
   // Follow-up answered topics for AI dedup
   const [followupAnsweredTopics, setFollowupAnsweredTopics] = useState(null);
   // Display name
@@ -1218,6 +1223,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setSupportScreen("cabinet");
       loadSupportCheckins();
       loadSupportPractices();
+      loadSupportChat();
     } catch (e) {
       setContinuationCodeError(e.message || "Не удалось открыть разговор. Проверьте код продолжения.");
       showToast(e.message || "Не удалось открыть разговор. Проверьте код продолжения.", "error");
@@ -1757,6 +1763,64 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         await loadSupportPractices();
       }
     } catch { /* silent */ }
+  }
+
+  // Load support chat messages
+  async function loadSupportChat() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getSupportChat", session_id: saved.sessionId, access_token: saved.accessToken, limit: 20 }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setQuickChatMessages(data.messages || []);
+      }
+    } catch { /* silent */ }
+  }
+
+  // Send quick chat message
+  async function sendQuickChatMessage(text) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    const trimmed = (text || quickChatInput).trim();
+    if (!trimmed) return;
+
+    // Optimistic add
+    const tempId = "temp-" + Date.now();
+    setQuickChatMessages(prev => [...prev, { id: tempId, role: "user", message_text: trimmed, created_at: new Date().toISOString() }]);
+    setQuickChatInput("");
+    setQuickChatLoading(true);
+
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sendSupportMessage", session_id: saved.sessionId, access_token: saved.accessToken, message: trimmed }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        // Replace temp with real messages
+        setQuickChatMessages(prev => {
+          const withoutTemp = prev.filter(m => m.id !== tempId);
+          return [...withoutTemp,
+            { id: "user-" + Date.now(), role: "user", message_text: trimmed, created_at: new Date().toISOString() },
+            { id: "ai-" + Date.now(), role: "assistant", message_text: data.response?.answer || "", ai_response: data.response, created_at: new Date().toISOString() },
+          ];
+        });
+      } else {
+        setQuickChatMessages(prev => prev.filter(m => m.id !== tempId));
+        showToast(data.error || "Не удалось отправить", "error");
+      }
+    } catch {
+      setQuickChatMessages(prev => prev.filter(m => m.id !== tempId));
+      showToast("Ошибка отправки", "error");
+    } finally {
+      setQuickChatLoading(false);
+    }
   }
 
   // Save patient feedback to case_reviews
@@ -10285,18 +10349,68 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       </div>
                     </div>
 
-                    {/* Следующий шаг */}
+                    {/* Поговорим? — Quick AI Chat */}
                     <div style={{
-                      background: careNextStep.urgent ? "rgba(184,92,74,.12)" : "#FAF6EF",
-                      border: careNextStep.urgent ? "2px solid #B85C4A" : "1px solid rgba(46,42,37,.1)",
-                      borderRadius: 16, padding: 20,
+                      background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
+                      borderRadius: 16, padding: 20, display: "flex", flexDirection: "column",
                     }}>
-                      <div style={{ fontSize: 12, color: careNextStep.urgent ? "#B85C4A" : "#7A7268", marginBottom: 4 }}>Следующий шаг</div>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: careNextStep.urgent ? "#B85C4A" : "#2E2A25", marginBottom: 6 }}>
-                        {careNextStep.text}
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 6 }}>Поговорим?</div>
+                      <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
+                        Можно просто задать вопрос или рассказать, что произошло сегодня.
                       </div>
-                      <div style={{ fontSize: 13, color: careNextStep.urgent ? "#8B4A3A" : "#5F574F" }}>
-                        {careNextStep.description}
+
+                      {/* Chat messages */}
+                      {quickChatMessages.length > 0 && (
+                        <div style={{ marginBottom: 12, maxHeight: 240, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                          {quickChatMessages.slice(-5).map((msg) => (
+                            <div key={msg.id} style={{
+                              alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                              maxWidth: "85%",
+                              padding: "8px 12px",
+                              borderRadius: 12,
+                              fontSize: 13,
+                              lineHeight: 1.5,
+                              background: msg.role === "user" ? "#7D9A89" : "#f0f5f1",
+                              color: msg.role === "user" ? "white" : "#2E2A25",
+                            }}>
+                              {msg.ai_response?.answer || msg.message_text}
+                              {msg.ai_response?.safety_note && (
+                                <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(184,92,74,.1)", borderRadius: 8, color: "#B85C4A", fontSize: 12 }}>
+                                  {msg.ai_response.safety_note}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                          {quickChatLoading && (
+                            <div style={{ alignSelf: "flex-start", padding: "8px 12px", borderRadius: 12, background: "#f0f5f1", fontSize: 13, color: "#7A7268" }}>
+                              Думаю...
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Input */}
+                      <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                        <textarea
+                          style={{ ...s.answerInput, flex: 1, minHeight: 44, maxHeight: 100, marginBottom: 0, resize: "none" }}
+                          value={quickChatInput}
+                          onChange={(e) => setQuickChatInput(e.target.value)}
+                          placeholder="Что у вас сегодня? Можно спросить о чём угодно…"
+                          rows={1}
+                          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendQuickChatMessage(); } }}
+                        />
+                        <button
+                          style={{ ...s.primary, fontSize: 13, padding: "10px 16px", flexShrink: 0, opacity: quickChatLoading || !quickChatInput.trim() ? 0.5 : 1 }}
+                          disabled={quickChatLoading || !quickChatInput.trim()}
+                          onClick={() => sendQuickChatMessage()}
+                        >
+                          Отправить
+                        </button>
+                      </div>
+                      <div style={{ marginTop: 8 }}>
+                        <button style={{ background: "none", border: "none", fontSize: 12, color: "#7A7268", cursor: "pointer", textDecoration: "underline" }} onClick={startSupportFollowUp}>
+                          Нужен подробный разбор? Продолжить разговор →
+                        </button>
                       </div>
                     </div>
                   </div>

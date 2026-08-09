@@ -370,6 +370,10 @@ export default async function handler(req, res) {
         return await handleGetSupportProfile(req, res);
       case "saveSupportProfile":
         return await handleSaveSupportProfile(req, res);
+      case "getSupportChat":
+        return await handleGetSupportChat(req, res);
+      case "sendSupportMessage":
+        return await handleSendSupportMessage(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -3816,4 +3820,213 @@ async function handleSaveSupportProfile(req, res) {
     console.error("handleSaveSupportProfile error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка сохранения." });
   }
+}
+
+// ============================================================
+// Support Quick Chat
+// ============================================================
+
+async function handleGetSupportChat(req, res) {
+  try {
+    const { session_id, access_token, limit: msgLimit } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+    const lim = Math.min(Math.max(parseInt(msgLimit) || 20, 1), 50);
+
+    const { data: messages, error } = await supabase
+      .from("support_ai_chat")
+      .select("id, role, message_text, ai_response, created_at")
+      .eq("owner_type", "anonymous_case")
+      .eq("owner_id", owner.ownerId)
+      .order("created_at", { ascending: false })
+      .limit(lim);
+
+    if (error) {
+      console.error("[getSupportChat] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить чат." });
+    }
+
+    return res.status(200).json({ ok: true, messages: (messages || []).reverse() });
+  } catch (error) {
+    console.error("handleGetSupportChat error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки чата." });
+  }
+}
+
+async function handleSendSupportMessage(req, res) {
+  try {
+    const { session_id, access_token, message } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const trimmed = typeof message === "string" ? message.trim() : "";
+    if (!trimmed || trimmed.length < 2) {
+      return res.status(400).json({ ok: false, error: "Сообщение слишком короткое." });
+    }
+    if (trimmed.length > 3000) {
+      return res.status(400).json({ ok: false, error: "Сообщение слишком длинное (максимум 3000)." });
+    }
+
+    const supabase = getSupabase();
+    const now = new Date().toISOString();
+
+    // Save user message
+    await supabase.from("support_ai_chat").insert({
+      owner_type: "anonymous_case",
+      owner_id: owner.ownerId,
+      role: "user",
+      message_text: trimmed,
+      source_session_id: owner.sessionId,
+      created_at: now,
+    });
+
+    // Build context for AI
+    const context = await buildSupportChatContext(supabase, owner.ownerId);
+
+    // Read prompt
+    const { readModulePrompt, readCorePrompt } = await import("../lib/prompts.js");
+    const chatPrompt = readModulePrompt("support", "ai-chat.md");
+    const conversationStyle = readCorePrompt("conversation-style.md");
+    const systemPrompt = `${chatPrompt}\n\n${conversationStyle}\n\nКонтекст пользователя:\n${JSON.stringify(context, null, 2)}`;
+
+    // Call AI
+    const { runTask, TASK_TYPES } = await import("../lib/modelRouter.js");
+    const model = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
+    const fallbackModel = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
+    const reasoningEffort = process.env.AI_REASONING_EFFORT || "medium";
+
+    let aiResult;
+    try {
+      aiResult = await runTask({
+        taskType: TASK_TYPES.PATIENT_DIALOG,
+        model,
+        fallbackModel,
+        reasoningEffort,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: trimmed },
+        ],
+        maxTokens: 1024,
+      });
+    } catch (aiError) {
+      console.error("[sendSupportMessage] AI error:", aiError.message);
+      // Save error response
+      const errorResponse = { answer: "Не удалось ответить сейчас. Попробуйте позже.", safety_note: null, confidence: "low", suggest_followup: false };
+      await supabase.from("support_ai_chat").insert({
+        owner_type: "anonymous_case",
+        owner_id: owner.ownerId,
+        role: "assistant",
+        message_text: errorResponse.answer,
+        ai_response: errorResponse,
+        source_session_id: owner.sessionId,
+        model_used: "error",
+        created_at: new Date().toISOString(),
+      });
+      return res.status(200).json({ ok: true, response: errorResponse });
+    }
+
+    // Parse AI response
+    let parsed;
+    try {
+      const raw = aiResult.text || "";
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { answer: raw.slice(0, 2000), safety_note: null, confidence: "low", suggest_followup: false };
+    } catch {
+      parsed = { answer: (aiResult.text || "").slice(0, 2000), safety_note: null, confidence: "low", suggest_followup: false };
+    }
+
+    // Safety check: if safety_note exists, log it
+    if (parsed.safety_note) {
+      console.log("[sendSupportMessage] safety_note detected:", parsed.safety_note.slice(0, 100));
+    }
+
+    // Save assistant message
+    const requestId = `chat-${owner.sessionId || "no-session"}-${Date.now()}`;
+    await supabase.from("support_ai_chat").insert({
+      owner_type: "anonymous_case",
+      owner_id: owner.ownerId,
+      role: "assistant",
+      message_text: parsed.answer || "",
+      ai_response: parsed,
+      source_session_id: owner.sessionId,
+      request_id: requestId,
+      model_used: aiResult.model || model,
+      created_at: new Date().toISOString(),
+    });
+
+    return res.status(200).json({ ok: true, response: parsed });
+  } catch (error) {
+    console.error("handleSendSupportMessage error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка отправки." });
+  }
+}
+
+// Build context for Support quick chat AI
+async function buildSupportChatContext(supabase, ownerId) {
+  const context = {};
+
+  // Display name
+  const { data: profile } = await supabase
+    .from("support_owner_profiles")
+    .select("display_name")
+    .eq("owner_type", "anonymous_case")
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+  context.display_name = profile?.display_name || null;
+
+  // Latest session summary
+  const { data: latestSession } = await supabase
+    .from("sessions")
+    .select("user_report, support_plan, care_recommendation, patient_text, created_at")
+    .eq("anonymous_owner_id", ownerId)
+    .eq("module", "support")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestSession) {
+    context.latest_report_summary = (latestSession.user_report || "").slice(0, 800);
+    context.care_recommendation = latestSession.care_recommendation || null;
+    context.support_plan = latestSession.support_plan || null;
+    context.latest_session_date = latestSession.created_at;
+  }
+
+  // Recent check-ins (last 14 days)
+  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const { data: checkins } = await supabase
+    .from("support_daily_checkins")
+    .select("checkin_date, wellbeing_score, anxiety_score, comment")
+    .eq("owner_type", "anonymous_case")
+    .eq("owner_id", ownerId)
+    .gte("checkin_date", since)
+    .order("checkin_date", { ascending: true });
+  context.recent_checkins = checkins || [];
+
+  // Active practices
+  const { data: practices } = await supabase
+    .from("support_owner_practices")
+    .select("practice_key, title, user_status, helpfulness")
+    .eq("owner_type", "anonymous_case")
+    .eq("owner_id", ownerId)
+    .eq("status", "active")
+    .limit(10);
+  context.active_practices = practices || [];
+
+  // Recent chat messages (last 5)
+  const { data: recentChat } = await supabase
+    .from("support_ai_chat")
+    .select("role, message_text")
+    .eq("owner_type", "anonymous_case")
+    .eq("owner_id", ownerId)
+    .order("created_at", { ascending: false })
+    .limit(5);
+  context.recent_chat = (recentChat || []).reverse();
+
+  return context;
 }
