@@ -105,5 +105,42 @@ assert(!fbSupport?.answer?.includes("дневник"), "Cross: Support fallback 
 assert(!fbBody?.answer?.includes("практик"), "Cross: Body fallback has no Support terms");
 
 console.log("");
+
+// --- Service FAQ tests ---
+console.log("--- Service FAQ ---");
+
+const faqCredits = detectIntent("За что списываются кредиты?", supportConfig);
+assert(faqCredits?.intent_type === "service_faq", "FAQ: credits usage detected");
+assert(faqCredits?.topic === "credits_usage", "FAQ: correct topic");
+assert(faqCredits?.answer?.includes("Кредиты"), "FAQ: answer mentions credits");
+assert(!faqCredits?.answer?.includes("авторизац"), "FAQ: no auth mention");
+
+const faqBalance = detectIntent("Сколько у меня кредитов?", supportConfig, { wallet_balance: 19000 });
+assert(faqBalance?.intent_type === "service_faq", "FAQ: balance detected");
+assert(faqBalance?.answer?.includes("19"), "FAQ: shows actual balance (19xxx)");
+
+const faqFree = detectIntent("Что бесплатно?", supportConfig);
+assert(faqFree?.intent_type === "service_faq", "FAQ: free actions detected");
+assert(faqFree?.topic === "credits_free_actions", "FAQ: correct topic");
+assert(faqFree?.answer?.includes("кабинет"), "FAQ: mentions cabinet as free");
+
+const faqChat = detectIntent("Что такое Поговорим?", supportConfig);
+assert(faqChat?.intent_type === "service_faq", "FAQ: quick chat detected");
+assert(faqChat?.topic === "quick_chat", "FAQ: correct topic");
+
+const faqDiff = detectIntent("Чем Поговорим отличается от подробного разговора?", supportConfig);
+assert(faqDiff?.intent_type === "service_faq", "FAQ: difference question detected");
+
+const faqPrivacy = detectIntent("Это анонимно?", supportConfig);
+assert(faqPrivacy?.intent_type === "service_faq", "FAQ: privacy detected");
+assert(faqPrivacy?.topic === "privacy", "FAQ: privacy topic");
+
+// Navigation vs FAQ distinction
+const navPractice = detectIntent("Где практики?", supportConfig);
+assert(navPractice?.intent_type === "navigation", "Distinction: 'где практики' = navigation");
+const faqPractice = detectIntent("Что такое практики?", supportConfig);
+assert(faqPractice?.intent_type === "service_faq", "Distinction: 'что такое практики' = FAQ");
+
+console.log("");
 console.log(`=== RESULTS: ${passed} passed, ${failed} failed ===`);
 process.exit(failed > 0 ? 1 : 0);

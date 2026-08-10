@@ -4155,7 +4155,29 @@ async function handleSendSupportMessage(req, res) {
 
     // === DETERMINISTIC INTENT ROUTING (before AI) ===
     const config = getModuleConfig("support");
-    const intentResult = detectIntent(trimmed, config);
+
+    // Build context for dynamic FAQ answers
+    const intentContext = {};
+    try {
+      const { getWallet } = await import("../lib/usage/wallet.js");
+      const wallet = await getWallet({ ownerType: "anonymous_case", ownerId: owner.ownerId, module: "support" });
+      if (wallet) {
+        const { getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
+        const balance = await getUsageBalanceForClient({ walletId: wallet.id });
+        intentContext.wallet_balance = balance?.balance ?? null;
+      }
+      const { count: practiceCount } = await supabase
+        .from("support_owner_practices")
+        .select("*", { count: "exact", head: true })
+        .eq("owner_type", "anonymous_case")
+        .eq("owner_id", owner.ownerId)
+        .eq("status", "active");
+      intentContext.practice_count = practiceCount || 0;
+    } catch (ctxError) {
+      // Non-blocking — continue without context
+    }
+
+    const intentResult = detectIntent(trimmed, config, intentContext);
     if (intentResult) {
       // Save deterministic response
       await supabase.from("support_ai_chat").insert({
