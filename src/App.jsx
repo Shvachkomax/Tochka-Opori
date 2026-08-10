@@ -10411,9 +10411,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         onChange={(e) => setQuickChatInput(e.target.value)}
                         placeholder="Что у вас сегодня? Можно спросить о чём угодно…"
                         rows={2}
-                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendQuickChatMessage(); } }}
+                        onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); sendQuickChatMessage(); } }}
                       />
-                      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 11, color: "#8a7e72" }}>⌘/Ctrl + Enter — отправить</span>
                         <button
                           style={{ ...s.primary, fontSize: 13, padding: "10px 20px", opacity: quickChatLoading || !quickChatInput.trim() ? 0.5 : 1 }}
                           disabled={quickChatLoading || !quickChatInput.trim()}
@@ -10600,6 +10601,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       onChange={(e) => setCheckinComment(e.target.value)}
                       placeholder="Что сегодня больше всего влияет на ваше состояние?"
                       maxLength={1000}
+                      onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); saveSupportCheckin(); } }}
                     />
                   </div>
 
@@ -10950,6 +10952,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           onChange={(e) => setDisplayNameInput(e.target.value)}
                           placeholder="Имя или псевдоним"
                           maxLength={50}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && displayNameInput.trim()) {
+                              e.preventDefault();
+                              // Trigger save button
+                              const saveBtn = e.target.parentElement.querySelector("button");
+                              if (saveBtn) saveBtn.click();
+                            }
+                          }}
                         />
                         <button
                           style={{ ...s.secondary, fontSize: 13, padding: "8px 14px", flexShrink: 0 }}
@@ -11249,6 +11259,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   onChange={(e) => setFollowUpAnswers({ ...followUpAnswers, free_text: e.target.value })}
                   placeholder="Напишите здесь всё, что хотите..."
                   rows={5}
+                  onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submitFollowUp(); } }}
                 />
               </div>
 
@@ -11351,6 +11362,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 value={continuationCodeInput}
                 onChange={(e) => setContinuationCodeInput(e.target.value.toUpperCase())}
                 placeholder="Код продолжения"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && continuationCodeInput.trim().length >= 5 && !loadingSession) {
+                    e.preventDefault();
+                    loadSupportCabinet(continuationCodeInput.trim())
+                      .then(() => { setSessionModalOpen(false); setContinuationCodeInput(""); })
+                      .catch(() => {});
+                  }
+                }}
               />
 
               {continuationCodeError && (
@@ -11377,6 +11397,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 >
                   {loadingSession ? "Поиск..." : "Продолжить по коду"}
                 </button>
+              </div>
                 <button
                   style={{ ...s.secondary, width: "100%" }}
                   onClick={() => setSessionModalOpen(false)}
@@ -11385,7 +11406,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </button>
               </div>
             </div>
-          </div>
         )}
 
         {expertModalOpen && (
