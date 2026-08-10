@@ -177,13 +177,14 @@ export default function App() {
   const [specialistIntentDone, setSpecialistIntentDone] = useState(false);
 
   const PRACTICES = [
-    { id: "breathing", title: "Дыхание 4–6 минут при тревоге", file: "01-breathing.md" },
-    { id: "grounding", title: "Заземление 5–4–3–2–1", file: "02-grounding.md" },
-    { id: "jaw_relaxation", title: "Мягкое расслабление лица и челюсти", file: "03-jaw-relaxation.md" },
-    { id: "sleep_prep", title: "Практика перед сном", file: "04-sleep-prep.md" },
-    { id: "neck_shoulders_stretch", title: "Мягкая растяжка шеи и плеч", file: "05-neck-shoulders-stretch.md" },
-    { id: "diary", title: "Дневник состояния на 3 дня", file: "06-diary.md" },
-    { id: "24h_plan", title: "План 24 часа без ухудшения", file: "07-24h-plan.md" },
+    { id: "breathing", title: "Дыхание 4–6 минут при тревоге", file: "01-breathing.md", description: "Медленное дыхание с более длинным выдохом, чтобы немного снизить телесное напряжение.", duration: "3–5 минут", category: "breathing" },
+    { id: "grounding", title: "Заземление 5–4–3–2–1", file: "02-grounding.md", description: "Техника заземления через органы чувств для возвращения в настоящий момент.", duration: "5 минут", category: "grounding" },
+    { id: "jaw_relaxation", title: "Мягкое расслабление лица и челюсти", file: "03-jaw-relaxation.md", description: "Снятие напряжения с лица, челюсти и шеи.", duration: "3–5 минут", category: "grounding" },
+    { id: "sleep_prep", title: "Практика перед сном", file: "04-sleep-prep.md", description: "Мягкая подготовка ко сну при тревоге или бессоннице.", duration: "10–15 минут", category: "sleep" },
+    { id: "neck_shoulders_stretch", title: "Мягкая растяжка шеи и плеч", file: "05-neck-shoulders-stretch.md", description: "Снятие мышечного напряжения в верхней части тела.", duration: "5 минут", category: "activity" },
+    { id: "diary", title: "Дневник состояния на 3 дня", file: "06-diary.md", description: "Краткие ежедневные записи для отслеживания изменений.", duration: "5 минут в день", category: "journaling" },
+    { id: "24h_plan", title: "План 24 часа без ухудшения", file: "07-24h-plan.md", description: "Пошаговый план на ближайшие сутки.", duration: "—", category: "routine" },
+    { id: "short_walk", title: "Короткая прогулка", file: null, description: "Прогулка на свежем воздухе для смены обстановки и лёгкой физической активности.", duration: "15–30 минут", category: "activity" },
   ];
 
   function downloadPracticeFile(file) {
@@ -10692,9 +10693,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 {/* ROW: Мои практики */}
                 {supportPractices.length > 0 && (
                   <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Мои практики</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
-                      {supportPractices.slice(0, 4).map((p) => {
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>
+                      Мои практики · {supportPractices.filter(p => p.status === "active").length}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+                      {supportPractices.filter(p => p.status === "active").slice(0, 4).map((p) => {
                         const statusLabels = { not_tried: "Не пробовал(а)", tried: "Пробовал(а)", helped: "Помогло", not_helpful: "Не подошло" };
                         const statusColors = { not_tried: "#7A7268", tried: "#5F7D6C", helped: "#3A6B4A", not_helpful: "#8B6B4A" };
                         return (
@@ -10702,8 +10705,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
                             borderRadius: 14, padding: 16, cursor: "pointer",
                           }} onClick={() => setPracticeDetailKey(p.practice_key)}>
-                            <div style={{ fontWeight: 700, fontSize: 14, color: "#2E2A25", marginBottom: 6 }}>{p.title}</div>
-                            <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 8, lineHeight: 1.4 }}>{p.description?.slice(0, 80)}{p.description?.length > 80 ? "…" : ""}</div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: "#2E2A25", marginBottom: 4 }}>{p.title}</div>
+                            <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 6, lineHeight: 1.4 }}>{p.description?.slice(0, 100)}{p.description?.length > 100 ? "…" : ""}</div>
+                            {p.duration_minutes && (
+                              <div style={{ fontSize: 11, color: "#8a7e72", marginBottom: 8 }}>{p.duration_minutes} мин</div>
+                            )}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                               <span style={{ fontSize: 11, fontWeight: 600, color: statusColors[p.user_status] || "#7A7268" }}>
                                 {statusLabels[p.user_status] || "Не пробовал(а)"}
@@ -10714,10 +10720,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         );
                       })}
                     </div>
-                    {supportPractices.length > 4 && (
+                    {supportPractices.filter(p => p.status === "active").length > 4 && (
                       <button style={{ ...s.secondary, fontSize: 12, marginTop: 8 }} onClick={() => setPracticeDetailKey("__all__")}>
-                        Показать все ({supportPractices.length})
+                        Показать все ({supportPractices.filter(p => p.status === "active").length})
                       </button>
+                    )}
+                    {supportPractices.filter(p => p.status === "active").length === 0 && (
+                      <div style={{ fontSize: 13, color: "#7A7268", padding: "8px 0" }}>
+                        После разговора здесь появятся предложенные практики.
+                      </div>
                     )}
                   </div>
                 )}
@@ -10759,10 +10770,30 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         return (
                           <div>
                             <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>Рекомендовано: {recommendedDate}</div>
-                            {practice.description && <div style={{ fontSize: 14, color: "#2E2A25", lineHeight: 1.6, marginBottom: 16 }}>{practice.description}</div>}
-                            <div style={{ fontSize: 13, color: "#5F574F", lineHeight: 1.6, marginBottom: 16, padding: "12px 16px", background: "#FAF6EF", borderRadius: 12 }}>
-                              Подробные инструкции доступны по ссылке «Открыть» в отчёте.
-                            </div>
+                            {practice.description && <div style={{ fontSize: 14, color: "#2E2A25", lineHeight: 1.6, marginBottom: 12 }}>{practice.description}</div>}
+                            {practice.duration_minutes && (
+                              <div style={{ fontSize: 13, color: "#5F7D6C", marginBottom: 12 }}>⏱ {practice.duration_minutes} минут</div>
+                            )}
+                            {practice.when_to_use && (
+                              <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12, padding: "10px 14px", background: "#FAF6EF", borderRadius: 10 }}>
+                                <strong>Когда применять:</strong> {practice.when_to_use}
+                              </div>
+                            )}
+                            {practice.instructions && Array.isArray(practice.instructions) && practice.instructions.length > 0 && (
+                              <div style={{ marginBottom: 16, padding: "12px 16px", background: "#fff", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)" }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "#2E2A25", marginBottom: 8 }}>Как выполнить:</div>
+                                {practice.instructions.map((step, i) => (
+                                  <div key={i} style={{ fontSize: 13, color: "#5F574F", lineHeight: 1.6, marginBottom: 4 }}>
+                                    {step.step || i + 1}. {step.text || step}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {practice.safety_note && (
+                              <div style={{ fontSize: 12, color: "#B85C4A", marginBottom: 12, padding: "8px 12px", background: "rgba(184,92,74,.08)", borderRadius: 8 }}>
+                                {practice.safety_note}
+                              </div>
+                            )}
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
                               {[
                                 { key: "tried", label: "Пробовал(а)" },

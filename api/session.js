@@ -3626,14 +3626,201 @@ async function handleSaveSupportCheckin(req, res) {
 
 // Known practice definitions (mirror of PRACTICES constant in App.jsx)
 const PRACTICE_DEFS = {
-  breathing: { title: "Дыхание 4–6 минут при тревоге", description: "Медленный вдох и более длинный выдох, чтобы немного снизить напряжение." },
-  grounding: { title: "Заземление 5–4–3–2–1", description: "Техника заземления через органы чувств для возвращения в настоящий момент." },
-  jaw_relaxation: { title: "Мягкое расслабление лица и челюсти", description: "Снятие напряжения с лица, челюсти и шеи." },
-  sleep_prep: { title: "Практика перед сном", description: "Мягкая подготовка ко сну при тревоге или бессоннице." },
-  neck_shoulders_stretch: { title: "Мягкая растяжка шеи и плеч", description: "Снятие мышечного напряжения в верхней части тела." },
-  diary: { title: "Дневник состояния на 3 дня", description: "Краткие ежедневные записи для отслеживания изменений." },
-  "24h_plan": { title: "План 24 часа без ухудшения", description: "Пошаговый план на ближайшие сутки." },
+  breathing: {
+    title: "Дыхание 4–6 минут при тревоге",
+    description: "Медленное дыхание с более длинным выдохом, чтобы немного снизить телесное напряжение.",
+    instructions: [{ step: 1, text: "Сядьте удобно или лягте." }, { step: 2, text: "Медленно вдохните на 4 счёта." }, { step: 3, text: "Выдохните на 6–8 счётов." }, { step: 4, text: "Повторяйте 5–10 минут." }],
+    duration_minutes: 5,
+    when_to_use: "При тревоге, панике, напряжении перед сном.",
+    safety_note: null,
+    category: "breathing",
+  },
+  grounding: {
+    title: "Заземление 5–4–3–2–1",
+    description: "Техника заземления через органы чувств для возвращения в настоящий момент.",
+    instructions: [{ step: 1, text: "Назовите 5 вещей, которые видите." }, { step: 2, text: "4 вещи, которые можете потрогать." }, { step: 3, text: "3 звука, которые слышите." }, { step: 4, text: "2 запаха." }, { step: 5, text: "1 вкус." }],
+    duration_minutes: 5,
+    when_to_use: "При диссоциации, навязчивых мыслях, панике.",
+    safety_note: null,
+    category: "grounding",
+  },
+  jaw_relaxation: {
+    title: "Мягкое расслабление лица и челюсти",
+    description: "Снятие напряжения с лица, челюсти и шеи.",
+    instructions: [{ step: 1, text: "Мягко приоткройте рот." }, { step: 2, text: "Массируйте челюсть круговыми движениями." }, { step: 3, text: "Потяните шею в стороны." }, { step: 4, text: "Покатайте плечами." }],
+    duration_minutes: 5,
+    when_to_use: "При сжатии челюсти, головной боли напряжения.",
+    safety_note: null,
+    category: "grounding",
+  },
+  sleep_prep: {
+    title: "Практика перед сном",
+    description: "Мягкая подготовка ко сну при тревоге или бессоннице.",
+    instructions: [{ step: 1, text: "За 1 час до сна уберите экраны." }, { step: 2, text: "Сделайте дыхание 4–6." }, { step: 3, text: "Запишите 3 вещи за день." }, { step: 4, text: "Лягте в тёмной прохладной комнате." }],
+    duration_minutes: 15,
+    when_to_use: "При бессоннице, тревоге перед сном.",
+    safety_note: null,
+    category: "sleep",
+  },
+  neck_shoulders_stretch: {
+    title: "Мягкая растяжка шеи и плеч",
+    description: "Снятие мышечного напряжения в верхней части тела.",
+    instructions: [{ step: 1, text: "Наклоните голову вправо, задержите 15 сек." }, { step: 2, text: "Повторите влево." }, { step: 3, text: "Круговые движения плечами." }, { step: 4, text: "Сцепите руки за спиной и потяните." }],
+    duration_minutes: 5,
+    when_to_use: "При мышечном напряжении, сидячей работе.",
+    safety_note: null,
+    category: "activity",
+  },
+  diary: {
+    title: "Дневник состояния на 3 дня",
+    description: "Краткие ежедневные записи для отслеживания изменений.",
+    instructions: [{ step: 1, text: "Утром: как спали, общее состояние." }, { step: 2, text: "Вечером: что помогло, что было трудно." }, { step: 3, text: "Замечайте паттерны без оценки." }],
+    duration_minutes: 5,
+    when_to_use: "Для понимания динамики, подготовки к консультации.",
+    safety_note: null,
+    category: "journaling",
+  },
+  "24h_plan": {
+    title: "План 24 часа без ухудшения",
+    description: "Пошаговый план на ближайшие сутки.",
+    instructions: [{ step: 1, text: "Определите один главный приоритет на день." }, { step: 2, text: "Запланируйте один приятный маленький шаг." }, { step: 3, text: "Определите время для отдыха." }, { step: 4, text: "Отметьте вечером что получилось." }],
+    duration_minutes: null,
+    when_to_use: "При чувстве перегруженности, неясности с чего начать.",
+    safety_note: null,
+    category: "routine",
+  },
+  short_walk: {
+    title: "Короткая прогулка",
+    description: "Прогулка на свежем воздухе для смены обстановки и лёгкой физической активности.",
+    instructions: [{ step: 1, text: "Выйдите на 15–30 минут." }, { step: 2, text: "Идите без цели, просто замечайте окружение." }, { step: 3, text: "Если קשה — хотя бы до ближайшей скамейки." }],
+    duration_minutes: 20,
+    when_to_use: "При тревоге, низкой мотивации, потребности в смене обстановки.",
+    safety_note: null,
+    category: "activity",
+  },
 };
+
+// ============================================================
+// Practice Matching & Sync
+// ============================================================
+
+// Canonical alias mapping for deterministic practice detection
+const PRACTICE_ALIASES = {
+  breathing: [/дыхание\s*4[\-\s–]*6/i, /медленн\w+\s*дыхан/i, /удлин[её]нн\w+\s*выдох/i, /глубок\w+\s*дыхан/i, /дыхательн\w+\s*упражнен/i],
+  grounding: [/заземлен/i, /5[\-\s]*4[\-\s]*3[\-\s]*2[\-\s]*1/i, /5\s*4\s*3\s*2\s*1/i, /органы\s*чувств/i],
+  jaw_relaxation: [/расслаблен\w+\s*(лиц|челюст)/i, /лиц[ао]\s*челюст/i, /напряжен\w+\s*(лиц|челюст)/i],
+  sleep_prep: [/подготовк\w+\s*ко\s*сну/i, /ритуал\w*\s*перед\s*сном/i, /спокойн\w+\s*вечер/i, /режим\w*\s*сна/i],
+  neck_shoulders_stretch: [/растяжк\w+\s*(ше|плеч)/i, /ше[яию]\s*и\s*плеч/i, /мышечн\w+\s*напряжен/i],
+  diary: [/дневник/i, /запис\w+\s*состоян/i, /отслеживан/i],
+  "24h_plan": [/план\w*\s*24/i, /24\s*час/i, /пошагов/i],
+  short_walk: [/прогулк/i, /пройтись/i, /свеж\w+\s*воздух/i, /выйти\s*на/i],
+};
+
+// Match text to practice keys
+function matchPractices(text) {
+  if (!text || typeof text !== "string") return [];
+  const matches = [];
+  for (const [key, patterns] of Object.entries(PRACTICE_ALIASES)) {
+    for (const pat of patterns) {
+      if (pat.test(text)) {
+        matches.push(key);
+        break;
+      }
+    }
+  }
+  return matches;
+}
+
+// Sync practices from report to owner-level storage
+async function syncPracticesFromReport({ supabase, ownerId, sessionId, userReport, careRecommendation, supportPlan }) {
+  try {
+    // Collect recommendation text from multiple sources
+    const texts = [];
+    if (userReport) texts.push(userReport);
+    if (careRecommendation?.interim_support) texts.push(careRecommendation.interim_support.join(" "));
+    if (supportPlan?.selected_practices) {
+      for (const p of supportPlan.selected_practices) {
+        if (p.id) {
+          // Direct practice ID from user selection
+          await upsertPractice(supabase, ownerId, sessionId, p.id);
+        }
+      }
+    }
+
+    // Deterministic match from report text
+    const combinedText = texts.join(" ");
+    const matchedKeys = matchPractices(combinedText);
+
+    for (const key of matchedKeys) {
+      await upsertPractice(supabase, ownerId, sessionId, key);
+    }
+  } catch (syncError) {
+    console.error("[syncPracticesFromReport] non-blocking error:", syncError.message);
+    // Don't throw — report save must not fail because of practice sync
+  }
+}
+
+// Upsert a single practice
+async function supsertPractice(supabase, ownerId, sessionId, practiceKey) {
+  const def = PRACTICE_DEFS[practiceKey];
+  if (!def) return;
+
+  const now = new Date().toISOString();
+
+  const { data: existing } = await supabase
+    .from("support_owner_practices")
+    .select("id, recommendation_count, source_session_ids")
+    .eq("owner_type", "anonymous_case")
+    .eq("owner_id", ownerId)
+    .eq("practice_key", practiceKey)
+    .maybeSingle();
+
+  if (existing) {
+    // Update existing — preserve user status
+    const sourceIds = existing.source_session_ids || [];
+    const newSourceIds = sessionId && !sourceIds.includes(sessionId)
+      ? [...sourceIds, sessionId]
+      : sourceIds;
+
+    await supabase
+      .from("support_owner_practices")
+      .update({
+        last_recommended_at: now,
+        recommendation_count: (existing.recommendation_count || 1) + 1,
+        source_session_ids: newSourceIds,
+        instructions: def.instructions || null,
+        duration_minutes: def.duration_minutes || null,
+        when_to_use: def.when_to_use || null,
+        safety_note: def.safety_note || null,
+        category: def.category || null,
+        updated_at: now,
+      })
+      .eq("id", existing.id);
+  } else {
+    // Insert new
+    await supabase
+      .from("support_owner_practices")
+      .insert({
+        owner_type: "anonymous_case",
+        owner_id: ownerId,
+        practice_key: practiceKey,
+        title: def.title,
+        description: def.description,
+        instructions: def.instructions || null,
+        duration_minutes: def.duration_minutes || null,
+        when_to_use: def.when_to_use || null,
+        safety_note: def.safety_note || null,
+        category: def.category || null,
+        first_recommended_at: now,
+        last_recommended_at: now,
+        recommendation_count: 1,
+        source_session_ids: sessionId ? [sessionId] : [],
+        status: "active",
+        helpfulness: "unknown",
+        user_status: "not_tried",
+      });
+  }
+}
 
 async function handleGetSupportPractices(req, res) {
   try {
@@ -3646,7 +3833,7 @@ async function handleGetSupportPractices(req, res) {
     const supabase = getSupabase();
     const { data: practices, error } = await supabase
       .from("support_owner_practices")
-      .select("id, practice_key, title, description, first_recommended_at, last_recommended_at, recommendation_count, status, helpfulness, user_status, source_session_ids")
+      .select("id, practice_key, title, description, instructions, duration_minutes, when_to_use, safety_note, category, first_recommended_at, last_recommended_at, recommendation_count, status, helpfulness, user_status, source_session_ids")
       .eq("owner_type", "anonymous_case")
       .eq("owner_id", owner.ownerId)
       .order("last_recommended_at", { ascending: false });
@@ -3721,6 +3908,11 @@ async function handleSaveSupportPractice(req, res) {
         practice_key,
         title: def.title,
         description: def.description,
+        instructions: def.instructions || null,
+        duration_minutes: def.duration_minutes || null,
+        when_to_use: def.when_to_use || null,
+        safety_note: def.safety_note || null,
+        category: def.category || null,
         first_recommended_at: now,
         last_recommended_at: now,
         recommendation_count: 1,
@@ -3729,7 +3921,7 @@ async function handleSaveSupportPractice(req, res) {
         helpfulness: newHelpfulness || "unknown",
         user_status: newUserStatus || "not_tried",
       })
-      .select("id, practice_key, title, description, first_recommended_at, last_recommended_at, recommendation_count, status, helpfulness, user_status")
+      .select("id, practice_key, title, description, instructions, duration_minutes, when_to_use, safety_note, category, first_recommended_at, last_recommended_at, recommendation_count, status, helpfulness, user_status")
       .single();
 
     if (insertError) {
@@ -4047,3 +4239,5 @@ async function buildSupportChatContext(supabase, ownerId) {
 
   return context;
 }
+
+export { syncPracticesFromReport };

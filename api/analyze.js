@@ -2144,6 +2144,21 @@ ${antiRepeatBlock}
         });
       }
 
+      // 1b. Sync practices from report (non-blocking, after durable save).
+      if (activeModule === "support" && session.anonymous_owner_id) {
+        const { syncPracticesFromReport } = await import("../api/session.js").catch(() => ({}));
+        if (syncPracticesFromReport) {
+          syncPracticesFromReport({
+            supabase,
+            ownerId: session.anonymous_owner_id,
+            sessionId: session_id,
+            userReport: userPart,
+            careRecommendation: careRec,
+            supportPlan: req.body.supportPlan || null,
+          }).catch(e => console.error("[analyze] practice sync non-blocking error:", e.message));
+        }
+      }
+
       // 2. Create access token and continuation credential AFTER save.
       const tStep1 = Date.now();
       const artifacts = await createReportArtifacts({
