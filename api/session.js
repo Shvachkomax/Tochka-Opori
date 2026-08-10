@@ -4109,6 +4109,123 @@ async function handleGetSupportChat(req, res) {
   }
 }
 
+// ============================================================
+// Deterministic Intent Routing
+// ============================================================
+
+// Cabinet navigation intents — no AI needed
+const CABINET_NAV_INTENTS = [
+  {
+    patterns: [/где.*практик/i, /мои.*практик/i, /где.*упражнен/i, /найти.*практик/i],
+    answer: "Раздел «Мои практики» находится в кабинете ниже графика состояния. Прокрутите страницу вниз — там будут карточки с упражнениями и техниками.",
+    section: "practices",
+  },
+  {
+    patterns: [/где.*истор/i, /истор.*разговор/i, /прошл.*разговор/i, /стар.*разговор/i],
+    answer: "История разговоров находится в кабинете ниже блока «Последний разговор». Там сохранены все ваши обращения.",
+    section: "history",
+  },
+  {
+    patterns: [/где.*отч[её]т/i, /мой.*отч[её]т/i, /посмотр.*отч[её]т/i, /открыть.*отч[её]т/i],
+    answer: "Отчёт можно открыть из карточки последнего разговора — нажмите «Открыть отчёт». Или из истории — нажмите «Открыть» рядом с нужным разговором.",
+    section: "report",
+  },
+  {
+    patterns: [/где.*график/i, /график.*состоян/i, /динамик/i, /где.*чек.?ин/i, /где.*отметк/i],
+    answer: "График состояния и дневник чек-инов находятся в верхней части кабинета, в блоке «Как вы себя чувствуете сегодня?».",
+    section: "checkins",
+  },
+  {
+    patterns: [/как.*имя/i, /измен.*имя/i, /псевдоним/i, /обращен/i, /как.*зовут/i],
+    answer: "Имя можно изменить в разделе «Профиль» внизу кабинета. Нажмите на стрелку, введите имя и сохраните.",
+    section: "profile",
+  },
+  {
+    patterns: [/где.*код/i, /код.*продолжен/i, /код.*доступ/i, /продолжен.*код/i],
+    answer: "Код продолжения можно создать или посмотреть в разделе «Доступ» внизу кабинета.",
+    section: "access",
+  },
+  {
+    patterns: [/как.*связаться/i, /связаться.*специалист/i, /написать.*специалист/i, /отправить.*запрос/i],
+    answer: "Чтобы связаться со специалистом, нажмите кнопку «Связаться со специалистом» в разделе «Специалист» или «Запросы специалисту» в кабинете.",
+    section: "specialist",
+    cta: "service_request",
+  },
+];
+
+// Human handoff intents — offer specialist CTA
+const HANDOFF_PATTERNS = [
+  /хочу.*врач/i, /нужен.*специалист/i, /нужен.*врач/i, /поговорить.*врач/i,
+  /поговорить.*специалист/i, /консультац/i, /слишком.*сложн/i, /нужен.*человек/i,
+  /хочу.*человек/i, /живой.*человек/i, /не.*бот/i, /не.*ai/i,
+];
+
+// Medication patterns — never prescribe
+const MEDICATION_PATTERNS = [
+  /какие.*таблетк/i, /какие.*препарат/i, /какие.*лекарств/i,
+  /сильн.*снотворн/i, /начать.*принимать/i, /дозировк/i,
+  /антидепрессант/i, /успокоительн/i, /транквилизатор/i,
+  /рецепт/i, /назначить.*лекарств/i, /отменить.*лекарств/i,
+];
+
+function detectAndHandleIntent(text, supabase, owner) {
+  if (!text || typeof text !== "string") return null;
+  const lower = text.toLowerCase();
+
+  // Check cabinet navigation intents
+  for (const intent of CABINET_NAV_INTENTS) {
+    for (const pat of intent.patterns) {
+      if (pat.test(lower)) {
+        return {
+          answer: intent.answer,
+          safety_note: null,
+          confidence: "high",
+          suggest_followup: false,
+          intent_type: "navigation",
+          section: intent.section,
+          cta: intent.cta || null,
+        };
+      }
+    }
+  }
+
+  // Check human handoff intent
+  for (const pat of HANDOFF_PATTERNS) {
+    if (pat.test(lower)) {
+      return {
+        answer: "Я могу помочь отправить запрос специалисту. Хотите, чтобы я открыл форму связи?",
+        safety_note: null,
+        confidence: "high",
+        suggest_followup: false,
+        intent_type: "handoff",
+        cta: "service_request",
+      };
+    }
+  }
+
+  return null; // No deterministic intent — proceed to AI
+}
+
+function detectMedicationIntent(text) {
+  if (!text || typeof text !== "string") return null;
+  const lower = text.toLowerCase();
+
+  for (const pat of MEDICATION_PATTERNS) {
+    if (pat.test(lower)) {
+      return {
+        answer: "Подбор и изменение лекарств — это задача для врача. Я не могу назначать препараты или дозировки. Если вам нужна помощь с лекарствами, лучше обсудить это со специалистом. Я могу помочь отправить запрос.",
+        safety_note: null,
+        confidence: "high",
+        suggest_followup: false,
+        intent_type: "medication",
+        cta: "service_request",
+      };
+    }
+  }
+
+  return null;
+}
+
 async function handleSendSupportMessage(req, res) {
   try {
     const { session_id, access_token, message } = req.body || {};
@@ -4137,6 +4254,39 @@ async function handleSendSupportMessage(req, res) {
       source_session_id: owner.sessionId,
       created_at: now,
     });
+
+    // === DETERMINISTIC INTENT ROUTING (before AI) ===
+    const intentResult = await detectAndHandleIntent(trimmed, supabase, owner);
+    if (intentResult) {
+      // Save deterministic response
+      await supabase.from("support_ai_chat").insert({
+        owner_type: "anonymous_case",
+        owner_id: owner.ownerId,
+        role: "assistant",
+        message_text: intentResult.answer,
+        ai_response: intentResult,
+        source_session_id: owner.sessionId,
+        model_used: "deterministic",
+        created_at: new Date().toISOString(),
+      });
+      return res.status(200).json({ ok: true, response: intentResult });
+    }
+
+    // === MEDICATION INTENT ===
+    const medicationResult = detectMedicationIntent(trimmed);
+    if (medicationResult) {
+      await supabase.from("support_ai_chat").insert({
+        owner_type: "anonymous_case",
+        owner_id: owner.ownerId,
+        role: "assistant",
+        message_text: medicationResult.answer,
+        ai_response: medicationResult,
+        source_session_id: owner.sessionId,
+        model_used: "deterministic",
+        created_at: new Date().toISOString(),
+      });
+      return res.status(200).json({ ok: true, response: medicationResult });
+    }
 
     // Build context for AI
     const context = await buildSupportChatContext(supabase, owner.ownerId);
@@ -4275,6 +4425,16 @@ async function buildSupportChatContext(supabase, ownerId) {
     .order("created_at", { ascending: false })
     .limit(5);
   context.recent_chat = (recentChat || []).reverse();
+
+  // UI capabilities — what the user can access
+  context.available_sections = [
+    "report", "history", "checkins", "practices",
+    "specialist_request", "profile", "access",
+  ];
+  context.practice_count = (practices || []).length;
+  context.has_report = !!latestSession?.user_report;
+  context.has_specialist = false; // resolved separately if needed
+  context.service_request_available = true;
 
   return context;
 }

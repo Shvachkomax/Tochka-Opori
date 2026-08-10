@@ -1825,14 +1825,26 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           ];
         });
       } else {
-        setQuickChatMessages(prev => prev.filter(m => m.id !== tempId));
-        setQuickChatInput(trimmed); // Restore input on failure
-        showToast(data.error || "Не удалось отправить", "error");
+        // API returned error — show fallback message
+        setQuickChatMessages(prev => {
+          const withoutTemp = prev.filter(m => m.id !== tempId);
+          return [...withoutTemp,
+            { id: "user-" + Date.now(), role: "user", message_text: trimmed, created_at: new Date().toISOString() },
+            { id: "ai-" + Date.now(), role: "assistant", message_text: "Сейчас не получилось сформировать ответ. Вы можете попробовать ещё раз или продолжить разговор в подробном режиме.", ai_response: { answer: "Сейчас не получилось сформировать ответ. Вы можете попробовать ещё раз или продолжить разговор в подробном режиме.", safety_note: null, confidence: "low", suggest_followup: true, intent_type: "error" }, created_at: new Date().toISOString() },
+          ];
+        });
+        setQuickChatInput(trimmed);
       }
     } catch {
-      setQuickChatMessages(prev => prev.filter(m => m.id !== tempId));
-      setQuickChatInput(trimmed); // Restore input on failure
-      showToast("Ошибка отправки", "error");
+      // Network error — show fallback
+      setQuickChatMessages(prev => {
+        const withoutTemp = prev.filter(m => m.id !== tempId);
+        return [...withoutTemp,
+          { id: "user-" + Date.now(), role: "user", message_text: trimmed, created_at: new Date().toISOString() },
+          { id: "ai-" + Date.now(), role: "assistant", message_text: "Не удалось связаться с сервисом. Попробуйте ещё раз или продолжите разговор в подробном режиме.", ai_response: { answer: "Не удалось связаться с сервисом. Попробуйте ещё раз или продолжите разговор в подробном режиме.", safety_note: null, confidence: "low", suggest_followup: true, intent_type: "error" }, created_at: new Date().toISOString() },
+        ];
+      });
+      setQuickChatInput(trimmed);
     } finally {
       setQuickChatLoading(false);
     }
@@ -10392,6 +10404,21 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                               {msg.ai_response?.safety_note && (
                                 <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(184,92,74,.1)", borderRadius: 8, color: "#B85C4A", fontSize: 12 }}>
                                   {msg.ai_response.safety_note}
+                                </div>
+                              )}
+                              {/* CTA buttons for navigation/handoff/error intents */}
+                              {(msg.ai_response?.cta === "service_request" || msg.ai_response?.intent_type === "handoff") && (
+                                <div style={{ marginTop: 8 }}>
+                                  <button style={{ fontSize: 12, padding: "6px 12px", background: "#7D9A89", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }} onClick={() => setSupportNewRequestOpen(true)}>
+                                    Связаться со специалистом
+                                  </button>
+                                </div>
+                              )}
+                              {msg.ai_response?.suggest_followup && (
+                                <div style={{ marginTop: 8 }}>
+                                  <button style={{ fontSize: 12, padding: "6px 12px", background: "#E2EBE4", color: "#5F7D6C", border: "1px solid rgba(125,154,137,.3)", borderRadius: 8, cursor: "pointer" }} onClick={startSupportFollowUp}>
+                                    Продолжить разговор
+                                  </button>
                                 </div>
                               )}
                             </div>
