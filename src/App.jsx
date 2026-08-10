@@ -140,6 +140,7 @@ export default function App() {
   const [quickChatInput, setQuickChatInput] = useState("");
   const [quickChatLoading, setQuickChatLoading] = useState(false);
   const [quickChatExpanded, setQuickChatExpanded] = useState(false);
+  const [quickChatShowHistory, setQuickChatShowHistory] = useState(false);
   // Follow-up answered topics for AI dedup
   const [followupAnsweredTopics, setFollowupAnsweredTopics] = useState(null);
   // Display name
@@ -1224,7 +1225,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       // Optional loads — non-blocking
       loadSupportCheckins().catch(() => {});
       loadSupportPractices().catch(() => {});
-      loadSupportChat().catch(() => {});
+      // Don't auto-load chat — show fresh composer
+      setQuickChatMessages([]);
+      setQuickChatInput("");
+      setQuickChatShowHistory(false);
     } catch (e) {
       const msg = e.message || "";
       let userMsg = "Не удалось открыть кабинет. Попробуйте ещё раз.";
@@ -10369,10 +10373,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         Можно просто задать вопрос или рассказать, что произошло сегодня.
                       </div>
 
-                      {/* Chat messages */}
+                      {/* Current session messages (only new messages from this session) */}
                       {quickChatMessages.length > 0 && (
                         <div style={{ marginBottom: 12, maxHeight: 240, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-                          {quickChatMessages.slice(-5).map((msg) => (
+                          {quickChatMessages.map((msg) => (
                             <div key={msg.id} style={{
                               alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
                               maxWidth: "85%",
@@ -10417,7 +10421,44 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           Отправить
                         </button>
                       </div>
-                      <div style={{ marginTop: 10 }}>
+
+                      {/* Show/Hide previous conversation */}
+                      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                        <button
+                          style={{ background: "none", border: "none", fontSize: 12, color: "#7A7268", cursor: "pointer", textDecoration: "underline", textAlign: "left", padding: 0 }}
+                          onClick={async () => {
+                            if (quickChatShowHistory) {
+                              setQuickChatShowHistory(false);
+                            } else {
+                              await loadSupportChat();
+                              setQuickChatShowHistory(true);
+                            }
+                          }}
+                        >
+                          {quickChatShowHistory ? "Скрыть предыдущий разговор" : "Показать предыдущий разговор"}
+                        </button>
+
+                        {quickChatShowHistory && quickChatMessages.length > 0 && (
+                          <div style={{ maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: "8px 0" }}>
+                            {quickChatMessages.map((msg) => (
+                              <div key={msg.id} style={{
+                                alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                                maxWidth: "85%",
+                                padding: "8px 12px",
+                                borderRadius: 12,
+                                fontSize: 12,
+                                lineHeight: 1.4,
+                                background: msg.role === "user" ? "#7D9A89" : "#f0f5f1",
+                                color: msg.role === "user" ? "white" : "#2E2A25",
+                              }}>
+                                {msg.ai_response?.answer || msg.message_text}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ marginTop: 6 }}>
                         <button style={{ background: "none", border: "none", fontSize: 12, color: "#7A7268", cursor: "pointer", textDecoration: "underline" }} onClick={startSupportFollowUp}>
                           Нужен подробный разбор? Продолжить разговор →
                         </button>
@@ -10504,11 +10545,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         })}
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                        <span style={{ fontSize: 11, color: "#8a7e72", width: 38, textAlign: "center" }}>−5</span>
                         <span style={{ fontSize: 11, color: "#8a7e72" }}>Очень тяжело</span>
-                        <span style={{ fontSize: 11, color: "#8a7e72", width: 38, textAlign: "center" }}>0</span>
                         <span style={{ fontSize: 11, color: "#8a7e72" }}>Обычно</span>
-                        <span style={{ fontSize: 11, color: "#8a7e72", width: 38, textAlign: "center" }}>+5</span>
                         <span style={{ fontSize: 11, color: "#8a7e72" }}>Очень хорошо</span>
                       </div>
                     </div>
