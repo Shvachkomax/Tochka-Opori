@@ -3831,7 +3831,7 @@ async function handleGetSupportPractices(req, res) {
     }
 
     const supabase = getSupabase();
-    const { data: practices, error } = await supabase
+    let { data: practices, error } = await supabase
       .from("support_owner_practices")
       .select("id, practice_key, title, description, instructions, duration_minutes, when_to_use, safety_note, category, first_recommended_at, last_recommended_at, recommendation_count, status, helpfulness, user_status, source_session_ids")
       .eq("owner_type", "anonymous_case")
@@ -3841,6 +3841,45 @@ async function handleGetSupportPractices(req, res) {
     if (error) {
       console.error("[getSupportPractices] query error:", error.code);
       return res.status(500).json({ ok: false, error: "Не удалось загрузить практики." });
+    }
+
+    // Lazy backfill: if no practices exist, scan existing reports
+    if (!practices || practices.length === 0) {
+      try {
+        const { data: sessions } = await supabase
+          .from("sessions")
+          .select("session_id, user_report, support_plan")
+          .eq("anonymous_owner_id", owner.ownerId)
+          .eq("module", "support")
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        if (sessions && sessions.length > 0) {
+          for (const sess of sessions) {
+            if (sess.user_report) {
+              await syncPracticesFromReport({
+                supabase,
+                ownerId: owner.ownerId,
+                sessionId: sess.session_id,
+                userReport: sess.user_report,
+                supportPlan: sess.support_plan || null,
+              });
+            }
+          }
+
+          // Re-query after backfill
+          const { data: refreshed } = await supabase
+            .from("support_owner_practices")
+            .select("id, practice_key, title, description, instructions, duration_minutes, when_to_use, safety_note, category, first_recommended_at, last_recommended_at, recommendation_count, status, helpfulness, user_status, source_session_ids")
+            .eq("owner_type", "anonymous_case")
+            .eq("owner_id", owner.ownerId)
+            .order("last_recommended_at", { ascending: false });
+          practices = refreshed || [];
+        }
+      } catch (backfillError) {
+        console.error("[getSupportPractices] lazy backfill non-blocking error:", backfillError.message);
+        // Continue with empty practices — don't fail the request
+      }
     }
 
     return res.status(200).json({ ok: true, practices: practices || [] });

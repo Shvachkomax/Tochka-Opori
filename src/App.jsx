@@ -10690,12 +10690,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   )}
                 </div>
 
-                {/* ROW: Мои практики */}
-                {supportPractices.length > 0 && (
-                  <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>
-                      Мои практики · {supportPractices.filter(p => p.status === "active").length}
-                    </div>
+                {/* ROW: Мои практики — always visible */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>
+                    Мои практики{supportPractices.filter(p => p.status === "active").length > 0 ? ` · ${supportPractices.filter(p => p.status === "active").length}` : ""}
+                  </div>
+                  {supportPractices.filter(p => p.status === "active").length > 0 ? (
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
                       {supportPractices.filter(p => p.status === "active").slice(0, 4).map((p) => {
                         const statusLabels = { not_tried: "Не пробовал(а)", tried: "Пробовал(а)", helped: "Помогло", not_helpful: "Не подошло" };
@@ -10720,18 +10720,23 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         );
                       })}
                     </div>
-                    {supportPractices.filter(p => p.status === "active").length > 4 && (
-                      <button style={{ ...s.secondary, fontSize: 12, marginTop: 8 }} onClick={() => setPracticeDetailKey("__all__")}>
-                        Показать все ({supportPractices.filter(p => p.status === "active").length})
-                      </button>
-                    )}
-                    {supportPractices.filter(p => p.status === "active").length === 0 && (
-                      <div style={{ fontSize: 13, color: "#7A7268", padding: "8px 0" }}>
-                        После разговора здесь появятся предложенные практики.
+                  ) : (
+                    <div style={{
+                      background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
+                      borderRadius: 14, padding: 20, textAlign: "center",
+                    }}>
+                      <div style={{ fontSize: 14, color: "#5F574F", lineHeight: 1.6 }}>
+                        Здесь будут сохраняться упражнения и практики,
+                        которые Точка Опоры предложит вам во время разговоров.
                       </div>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
+                  {supportPractices.filter(p => p.status === "active").length > 4 && (
+                    <button style={{ ...s.secondary, fontSize: 12, marginTop: 8 }} onClick={() => setPracticeDetailKey("__all__")}>
+                      Показать все ({supportPractices.filter(p => p.status === "active").length})
+                    </button>
+                  )}
+                </div>
 
                 {/* Practice Detail Modal */}
                 {practiceDetailKey && (
