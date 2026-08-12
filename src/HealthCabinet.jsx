@@ -318,6 +318,14 @@ export default function HealthCabinet({
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
 
+  // Force textarea DOM sync — React may not update controlled textarea value
+  // when state changes while textarea was disabled
+  useEffect(() => {
+    if (chatInputRef.current && chatInputRef.current.value !== chatInput) {
+      chatInputRef.current.value = chatInput;
+    }
+  }, [chatInput]);
+
   // Fetch health context on mount
   useEffect(() => {
     async function loadHealthContext() {
@@ -508,11 +516,6 @@ export default function HealthCabinet({
       // Enable textarea BEFORE setting value to ensure DOM updates
       setTranscribing(false);
       setChatInput(prev => prev ? prev + " " + data.text : data.text);
-      // Force DOM value update — React may not sync controlled textarea while disabled
-      if (chatInputRef.current) {
-        const cur = chatInputRef.current.value;
-        chatInputRef.current.value = cur ? cur + " " + data.text : data.text;
-      }
       setTimeout(() => chatInputRef.current?.focus(), 0);
     } catch (e) {
       console.error("Transcription failed:", e);
