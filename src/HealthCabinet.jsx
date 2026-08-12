@@ -169,6 +169,7 @@ function ServiceRequestsCard({ sessionId, accessToken, onOpen }) {
 export default function HealthCabinet({
   sessionId,
   accessToken,
+  displayName,
   profile,
   wallet,
   todayLog,
@@ -179,6 +180,7 @@ export default function HealthCabinet({
   onRotateCode,
   onOpenHealthContext,
   onOpenServiceRequests,
+  onUpdateDisplayName,
 }) {
   const [showRotateConfirm, setShowRotateConfirm] = useState(false);
   const [newCode, setNewCode] = useState(null);
@@ -190,6 +192,8 @@ export default function HealthCabinet({
   const [accessOpen, setAccessOpen] = useState(false);
   const [plateHistory, setPlateHistory] = useState(null);
   const [plateHistoryDays, setPlateHistoryDays] = useState(7);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(displayName || "");
   const [insights, setInsights] = useState([]);
 
   // Fetch plate history on mount and when period changes
@@ -577,7 +581,7 @@ export default function HealthCabinet({
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: "#7D9A89", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 700 }}>О</div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#2f2925" }}>Личный кабинет</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#2f2925" }}>Личный кабинет{displayName ? ` ${displayName}` : ""}</div>
             <div style={{ fontSize: 12, color: "#8a7e72" }}>Опора. Здоровье & Стройность</div>
           </div>
         </div>
@@ -1081,6 +1085,38 @@ export default function HealthCabinet({
       {profile && Object.keys(profile).length > 0 && (
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: "#2f2925", marginBottom: 12 }}>Профиль</div>
+
+          {/* Display name edit */}
+          <div style={{ padding: "12px 14px", borderRadius: 10, background: "#faf6ef", border: "1px solid #e8e2d8", marginBottom: 8 }}>
+            <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 4 }}>Как к вам обращаться</div>
+            {editingName ? (
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="text"
+                  value={nameInput}
+                  onChange={e => setNameInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { onUpdateDisplayName?.(nameInput); setEditingName(false); } }}
+                  placeholder="Имя или псевдоним"
+                  autoFocus
+                  style={{ flex: 1, height: 36, padding: "0 10px", borderRadius: 8, border: "1px solid #d8cec1", fontSize: 14, outline: "none", fontFamily: "inherit" }}
+                />
+                <button onClick={() => { onUpdateDisplayName?.(nameInput); setEditingName(false); }} style={{ height: 36, padding: "0 12px", borderRadius: 8, border: 0, background: "#7D9A89", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                  Сохранить
+                </button>
+                <button onClick={() => { setEditingName(false); setNameInput(displayName || ""); }} style={{ height: 36, padding: "0 12px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", color: "#5f574f", fontSize: 13, cursor: "pointer" }}>
+                  Отмена
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{displayName || "Не указано"}</span>
+                <button onClick={() => { setEditingName(true); setNameInput(displayName || ""); }} style={{ fontSize: 12, color: "#7D9A89", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+                  Изменить
+                </button>
+              </div>
+            )}
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {profile.age && <div style={{ padding: "10px 14px", borderRadius: 10, background: "#faf6ef", border: "1px solid #e8e2d8", fontSize: 13 }}><span style={{ color: "#8a7e72" }}>Возраст: </span><span style={{ fontWeight: 600 }}>{profile.age}</span></div>}
             {profile.gender && <div style={{ padding: "10px 14px", borderRadius: 10, background: "#faf6ef", border: "1px solid #e8e2d8", fontSize: 13 }}><span style={{ color: "#8a7e72" }}>Пол: </span><span style={{ fontWeight: 600 }}>{GENDER_LABELS[profile.gender] || profile.gender}</span></div>}

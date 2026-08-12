@@ -318,6 +318,8 @@ export default async function handler(req, res) {
         return await handleGetBodyOnboarding(req, res);
       case "saveBodyOnboarding":
         return await handleSaveBodyOnboarding(req, res);
+      case "updateBodyDisplayName":
+        return await handleUpdateBodyDisplayName(req, res);
       case "getBodyDiaryDay":
         return await handleGetBodyDiaryDay(req, res);
       case "savePlateHistory":
@@ -1896,6 +1898,7 @@ async function handleGetBodyCabinet(req, res) {
     return res.status(200).json({
       ok: true,
       session_id: sessionId,
+      display_name: client.display_name || null,
       profile,
       wallet: wallet ? { balance: wallet.balance, total_used: wallet.total_used } : null,
       today_log: todayLog || null,
@@ -1924,6 +1927,33 @@ async function handleGetBodyCabinet(req, res) {
   } catch (error) {
     console.error("handleGetBodyCabinet error", error);
     return res.status(500).json({ ok: false, error: error.message || "Ошибка загрузки кабинета" });
+  }
+}
+
+async function handleUpdateBodyDisplayName(req, res) {
+  try {
+    const { session_id, access_token, display_name } = req.body || {};
+    const owner = await resolveBodyOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+    const name = typeof display_name === "string" ? display_name.trim() : "";
+    if (name.length > 100) {
+      return res.status(400).json({ ok: false, error: "Имя слишком длинное." });
+    }
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from("body_clients")
+      .update({ display_name: name || null })
+      .eq("anonymous_owner_id", owner.ownerId);
+    if (error) {
+      console.error("[updateBodyDisplayName] error:", error.message);
+      return res.status(500).json({ ok: false, error: "Не удалось сохранить имя." });
+    }
+    return res.status(200).json({ ok: true, display_name: name || null });
+  } catch (error) {
+    console.error("handleUpdateBodyDisplayName error", error);
+    return res.status(500).json({ ok: false, error: "Ошибка сохранения имени." });
   }
 }
 

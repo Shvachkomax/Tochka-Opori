@@ -9448,23 +9448,42 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </section>
           )}
 
-          {/* Health Cabinet */}
-          {activeModule === "body" && bodyScreen === "cabinet" && bodyCabinetData && (
-            <HealthCabinet
-              sessionId={bodyDiarySessionId}
-              accessToken={getBodySession().accessToken}
-              profile={bodyCabinetData.profile}
-              wallet={bodyCabinetData.wallet}
-              todayLog={bodyCabinetData.today_log}
-              history={bodyCabinetData.history}
-              onNewDiary={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }}
-              onViewDiary={(log) => { clearToast(); setBodyDiaryDayData(log); setBodyScreen("diary_view"); }}
-              onLogout={() => { clearBodySession(); setBodyScreen("landing"); setBodyCabinetData(null); setBodyDiarySessionId(null); }}
-              onRotateCode={regenerateBodyContinuationCode}
-              onOpenHealthContext={() => { clearToast(); setBodyScreen("health_context"); }}
-              onOpenServiceRequests={() => { clearToast(); setBodyScreen("service_requests"); }}
-            />
-          )}
+           {/* Health Cabinet */}
+           {activeModule === "body" && bodyScreen === "cabinet" && bodyCabinetData && (
+             <HealthCabinet
+               sessionId={bodyDiarySessionId}
+               accessToken={getBodySession().accessToken}
+               displayName={bodyCabinetData.display_name || null}
+               profile={bodyCabinetData.profile}
+               wallet={bodyCabinetData.wallet}
+               todayLog={bodyCabinetData.today_log}
+               history={bodyCabinetData.history}
+               onNewDiary={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }}
+               onViewDiary={(log) => { clearToast(); setBodyDiaryDayData(log); setBodyScreen("diary_view"); }}
+               onLogout={() => { clearBodySession(); setBodyScreen("landing"); setBodyCabinetData(null); setBodyDiarySessionId(null); }}
+               onRotateCode={regenerateBodyContinuationCode}
+               onOpenHealthContext={() => { clearToast(); setBodyScreen("health_context"); }}
+               onOpenServiceRequests={() => { clearToast(); setBodyScreen("service_requests"); }}
+               onUpdateDisplayName={async (name) => {
+                 try {
+                   const res = await fetch("/api/session", {
+                     method: "POST",
+                     headers: { "Content-Type": "application/json" },
+                     body: JSON.stringify({ action: "updateBodyDisplayName", session_id: bodyDiarySessionId, access_token: getBodySession().accessToken, display_name: name }),
+                   });
+                   const data = await res.json();
+                   if (data.ok) {
+                     setBodyCabinetData(prev => ({ ...prev, display_name: data.display_name }));
+                     showToast("Имя сохранено");
+                   } else {
+                     showToast(data.error || "Не удалось сохранить имя", "error");
+                   }
+                 } catch {
+                   showToast("Ошибка сохранения имени", "error");
+                 }
+               }}
+             />
+           )}
 
           {/* Body onboarding */}
           {activeModule === "body" && bodyScreen === "onboarding" && (
