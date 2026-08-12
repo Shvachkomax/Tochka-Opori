@@ -502,14 +502,16 @@ export default function HealthCabinet({
       if (!res.ok || !data || !data.text) {
         const msg = (data && data.error) || `Ошибка распознавания (${res.status})`;
         setTranscriptionError(msg);
+        setTranscribing(false);
         return;
       }
+      // Enable textarea BEFORE setting value to ensure DOM updates
+      setTranscribing(false);
       setChatInput(prev => prev ? prev + " " + data.text : data.text);
       chatInputRef.current?.focus();
     } catch (e) {
       console.error("Transcription failed:", e);
       setTranscriptionError("Не удалось распознать речь. Попробуйте ещё раз.");
-    } finally {
       setTranscribing(false);
     }
   }
