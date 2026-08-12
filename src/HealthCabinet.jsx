@@ -236,40 +236,87 @@ export default function HealthCabinet({
     if (sessionId && accessToken) loadInsights();
   }, [sessionId, accessToken]);
 
-  // Weekly summary
-  const [weeklySummary, setWeeklySummary] = useState(null);
-  const [weeklyStale, setWeeklyStale] = useState(false);
+  // Weekly summaries (multiple weeks)
+  const [weeklySummaries, setWeeklySummaries] = useState([]);
+  const [weeklyExpandedIds, setWeeklyExpandedIds] = useState(new Set());
+  const [weeklyShowAll, setWeeklyShowAll] = useState(false);
   const [weeklyLoading, setWeeklyLoading] = useState(false);
   const [weeklyError, setWeeklyError] = useState("");
 
-  // Calculate period (last 7 days including today)
-  const weekEnd = getLocalDateString();
-  const weekStart = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // Calculate last 6 weeks (Mon–Sun)
+  function getWeekRanges(count = 6) {
+    const ranges = [];
+    const today = new Date();
+    const dayOfWeek = today.getDay() || 7; // Mon=1 .. Sun=7
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() + (7 - dayOfWeek));
+    for (let i = 0; i < count; i++) {
+      const end = new Date(sunday);
+      end.setDate(sunday.getDate() - i * 7);
+      const start = new Date(end);
+      start.setDate(end.getDate() - 6);
+      ranges.push({
+        period_start: start.toISOString().slice(0, 10),
+        period_end: end.toISOString().slice(0, 10),
+      });
+    }
+    return ranges;
+  }
 
-  // Check for cached summary on mount
+  const weekRanges = getWeekRanges(6);
+
+  function formatPeriodLabel(start, end) {
+    const s = new Date(start + "T00:00:00");
+    const e = new Date(end + "T00:00:00");
+    const months = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+    const sDay = s.getDate();
+    const eDay = e.getDate();
+    const sMonth = months[s.getMonth()];
+    const eMonth = months[e.getMonth()];
+    if (s.getMonth() === e.getMonth()) {
+      return `${sDay}–${eDay} ${eMonth}`;
+    }
+    return `${sDay} ${sMonth}–${eDay} ${eMonth}`;
+  }
+
+  // Fetch weekly summaries on mount
   useEffect(() => {
-    async function loadWeekly() {
+    if (!sessionId || !accessToken) return;
+    let cancelled = false;
+    async function loadAllWeekly() {
+      setWeeklyLoading(true);
       try {
         let token;
         try { token = await getClientToken("body", "session"); } catch {}
         const hdrs = { "Content-Type": "application/json" };
         if (token) hdrs["Authorization"] = `Bearer ${token}`;
-        const res = await fetch("/api/session", {
-          method: "POST",
-          headers: hdrs,
-          body: JSON.stringify({ action: "getBodyWeeklySummary", session_id: sessionId, access_token: accessToken, period_start: weekStart, period_end: weekEnd }),
-        });
-        const data = await res.json();
-        if (data.ok && data.summary) {
-          setWeeklySummary(data.summary);
-          setWeeklyStale(!!data.stale);
+        const results = await Promise.all(
+          weekRanges.map(async (range) => {
+            const res = await fetch("/api/session", {
+              method: "POST",
+              headers: hdrs,
+              body: JSON.stringify({ action: "getBodyWeeklySummary", session_id: sessionId, access_token: accessToken, period_start: range.period_start, period_end: range.period_end }),
+            });
+            const data = await res.json();
+            if (data.ok && data.summary) {
+              return { ...data.summary, stale: !!data.stale };
+            }
+            return null;
+          })
+        );
+        if (!cancelled) {
+          setWeeklySummaries(results.filter(Boolean));
         }
       } catch {}
+      if (!cancelled) setWeeklyLoading(false);
     }
-    if (sessionId && accessToken) loadWeekly();
-  }, [sessionId, accessToken, weekStart, weekEnd]);
+    loadAllWeekly();
+    return () => { cancelled = true; };
+  }, [sessionId, accessToken]);
 
-  async function generateWeekly() {
+  const visibleWeeklySummaries = weeklyShowAll ? weeklySummaries : weeklySummaries.slice(0, 3);
+
+  async function generateWeekly(period_start, period_end) {
     setWeeklyLoading(true);
     setWeeklyError("");
     try {
@@ -280,21 +327,37 @@ export default function HealthCabinet({
       const res = await fetch("/api/session", {
         method: "POST",
         headers: hdrs,
-        body: JSON.stringify({ action: "generateBodyWeeklySummary", session_id: sessionId, access_token: accessToken, period_start: weekStart, period_end: weekEnd }),
+        body: JSON.stringify({ action: "generateBodyWeeklySummary", session_id: sessionId, access_token: accessToken, period_start, period_end }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
         throw new Error(data.error || "Не удалось сформировать итог.");
       }
       if (data.summary) {
-        setWeeklySummary(data.summary);
-        setWeeklyStale(false);
+        setWeeklySummaries(prev => {
+          const idx = prev.findIndex(s => s.period_start === period_start);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = { ...data.summary, stale: false };
+            return next;
+          }
+          return [{ ...data.summary, stale: false }, ...prev];
+        });
       }
     } catch (e) {
       setWeeklyError(e.message || "Ошибка формирования итога.");
     } finally {
       setWeeklyLoading(false);
     }
+  }
+
+  function toggleWeeklyExpand(id) {
+    setWeeklyExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   // AI Chat
@@ -976,15 +1039,21 @@ export default function HealthCabinet({
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: "#2f2925", marginBottom: 12 }}>Итог недели</div>
 
-        {!weeklySummary && !weeklyLoading && (
+        {weeklyLoading && weeklySummaries.length === 0 && (
+          <div style={{ padding: 16, borderRadius: 12, background: "#faf6ef", border: "1px solid #e8e2d8", textAlign: "center", color: "#8a7e72" }}>
+            Загружаем итоги недель...
+          </div>
+        )}
+
+        {!weeklyLoading && weeklySummaries.length === 0 && (
           <div style={{ padding: 16, borderRadius: 12, background: "#faf6ef", border: "1px solid #e8e2d8" }}>
             <div style={{ fontSize: 14, color: "#5f574f", marginBottom: 12 }}>
               {history && history.length > 0
                 ? "Данных пока мало, но можно получить предварительный итог."
                 : "Пока нет дневников для недельного итога."}
             </div>
-            {history && history.length > 0 && (
-              <button onClick={generateWeekly} disabled={weeklyLoading} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, border: 0, background: "#7D9A89", color: "#fff", fontWeight: 600, fontSize: 14, cursor: weeklyLoading ? "not-allowed" : "pointer", opacity: weeklyLoading ? 0.6 : 1 }}>
+            {history && history.length > 0 && weekRanges[0] && (
+              <button onClick={() => generateWeekly(weekRanges[0].period_start, weekRanges[0].period_end)} disabled={weeklyLoading} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, border: 0, background: "#7D9A89", color: "#fff", fontWeight: 600, fontSize: 14, cursor: weeklyLoading ? "not-allowed" : "pointer", opacity: weeklyLoading ? 0.6 : 1 }}>
                 {weeklyLoading ? "Формируем..." : "Сформировать итог недели"}
               </button>
             )}
@@ -992,113 +1061,130 @@ export default function HealthCabinet({
           </div>
         )}
 
-        {weeklyLoading && !weeklySummary && (
-          <div style={{ padding: 16, borderRadius: 12, background: "#faf6ef", border: "1px solid #e8e2d8", textAlign: "center", color: "#8a7e72" }}>
-            Формируем итог недели...
-          </div>
-        )}
+        {visibleWeeklySummaries.map((summary) => {
+          const isExpanded = weeklyExpandedIds.has(summary.period_start);
+          const isStale = summary.stale;
+          const label = formatPeriodLabel(summary.period_start, summary.period_end);
+          const oneLiner = summary.summary_json?.period_summary || "";
+          const shortSummary = oneLiner.length > 100 ? oneLiner.slice(0, 97) + "..." : oneLiner;
 
-        {weeklySummary && weeklySummary.summary_json && (
-          <div style={{ padding: 16, borderRadius: 12, background: weeklyStale ? "#fdf6ee" : "#f0f5f1", border: `1px solid ${weeklyStale ? "#e8d5b8" : "#c4d0c6"}` }}>
-            {weeklyStale ? (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#e8a857", marginBottom: 4 }}>Итог недели нужно обновить</div>
-                <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 8 }}>После прошлого итога появились новые записи дневника. Обновите итог, чтобы он учитывал последние дни.</div>
-                {weeklySummary.source_days != null && (
-                  <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>Предыдущий итог был создан на основе {weeklySummary.source_days} {weeklySummary.source_days === 1 ? "записи" : "записей"}.</div>
+          return (
+            <div key={summary.period_start} style={{ marginBottom: 12 }}>
+              {/* Compact card */}
+              <div style={{ padding: "12px 16px", borderRadius: 12, background: isStale ? "#fdf6ee" : "#f0f5f1", border: `1px solid ${isStale ? "#e8d5b8" : "#c4d0c6"}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>Итог недели · {label}</div>
+                    {shortSummary && !isExpanded && (
+                      <div style={{ fontSize: 13, color: "#5f574f", marginTop: 4, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortSummary}</div>
+                    )}
+                  </div>
+                  <button onClick={() => toggleWeeklyExpand(summary.period_start)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 12, color: "#5f574f", whiteSpace: "nowrap", fontWeight: 600 }}>
+                    {isExpanded ? "Свернуть" : "Открыть итог"}
+                  </button>
+                </div>
+
+                {isExpanded && (
+                  <div style={{ marginTop: 12 }}>
+                    {isStale && (
+                      <div style={{ marginBottom: 10, padding: 10, borderRadius: 8, background: "#fdf6ee", border: "1px solid #e8d5b8" }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#e8a857", marginBottom: 4 }}>Итог нужно обновить</div>
+                        <div style={{ fontSize: 12, color: "#5f574f", marginBottom: 8 }}>После прошлого итога появились новые записи дневника.</div>
+                        <button onClick={() => generateWeekly(summary.period_start, summary.period_end)} disabled={weeklyLoading} style={{ width: "100%", padding: "6px 14px", borderRadius: 8, border: 0, background: "#7D9A89", color: "#fff", fontWeight: 600, fontSize: 13, cursor: weeklyLoading ? "not-allowed" : "pointer", opacity: weeklyLoading ? 0.6 : 1 }}>
+                          {weeklyLoading ? "Обновляем..." : "Обновить итог"}
+                        </button>
+                      </div>
+                    )}
+
+                    {summary.summary_json?.period_summary && (
+                      <div style={{ fontSize: 14, color: "#5f574f", lineHeight: 1.6, marginBottom: 12 }}>{summary.summary_json.period_summary}</div>
+                    )}
+
+                    {summary.summary_json?.positive_changes?.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Что получилось</div>
+                        {summary.summary_json.positive_changes.map((item, i) => (
+                          <div key={i} style={{ fontSize: 13, color: "#7D9A89", marginBottom: 2 }}>{item}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    {summary.summary_json?.patterns?.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Повторяющиеся моменты</div>
+                        {summary.summary_json.patterns.map((item, i) => (
+                          <div key={i} style={{ fontSize: 13, color: "#e8a857", marginBottom: 2 }}>{item}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    {summary.summary_json?.nutrition_observations?.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Питание</div>
+                        {summary.summary_json.nutrition_observations.map((item, i) => (
+                          <div key={i} style={{ fontSize: 13, color: "#5f574f", marginBottom: 2 }}>{item}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    {summary.summary_json?.activity_observations?.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Активность</div>
+                        {summary.summary_json.activity_observations.map((item, i) => (
+                          <div key={i} style={{ fontSize: 13, color: "#5f574f", marginBottom: 2 }}>{item}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    {summary.summary_json?.sleep_observations?.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Сон</div>
+                        {summary.summary_json.sleep_observations.map((item, i) => (
+                          <div key={i} style={{ fontSize: 13, color: "#5f574f", marginBottom: 2 }}>{item}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    {summary.summary_json?.next_week_focus?.length > 0 && (
+                      <div style={{ padding: 10, borderRadius: 8, background: "#fff", border: "1px solid #c4d0c6", marginTop: 8, marginBottom: 8 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Фокус на следующую неделю</div>
+                        {summary.summary_json.next_week_focus.map((item, i) => (
+                          <div key={i} style={{ fontSize: 13, color: "#5f574f", marginBottom: 2 }}>{item}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    {summary.summary_json?.questions_for_specialist?.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#8a7e72", marginBottom: 4 }}>Что обсудить со специалистом</div>
+                        {summary.summary_json.questions_for_specialist.map((item, i) => (
+                          <div key={i} style={{ fontSize: 13, color: "#8a7e72", marginBottom: 2 }}>{item}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    {summary.summary_json?.data_quality && !summary.summary_json.data_quality.is_enough_data && (
+                      <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 8, fontStyle: "italic" }}>
+                        {summary.summary_json.data_quality.comment || "Данных пока мало, вывод предварительный."}
+                      </div>
+                    )}
+
+                    <button onClick={() => { setChatInput("Обсудить итог недели " + formatPeriodLabel(summary.period_start, summary.period_end)); chatInputRef.current?.focus(); window.scrollTo({ top: 0, behavior: "smooth" }); }} style={{ width: "100%", marginTop: 10, padding: "8px 14px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5f574f", fontFamily: "inherit", textAlign: "left" }}>
+                      Обсудить итог недели с AI-компаньоном
+                    </button>
+                  </div>
                 )}
-                <button onClick={generateWeekly} disabled={weeklyLoading} style={{ width: "100%", padding: "8px 16px", borderRadius: 8, border: 0, background: "#7D9A89", color: "#fff", fontWeight: 600, fontSize: 13, cursor: weeklyLoading ? "not-allowed" : "pointer", opacity: weeklyLoading ? 0.6 : 1 }}>
-                  {weeklyLoading ? "Обновляем..." : "Обновить итог недели"}
-                </button>
               </div>
-            ) : (
-              <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>Сохранённый итог недели</div>
-            )}
+            </div>
+          );
+        })}
 
-            {weeklySummary.summary_json.period_summary && (
-              <div style={{ fontSize: 14, color: "#5f574f", lineHeight: 1.6, marginBottom: 12 }}>{weeklySummary.summary_json.period_summary}</div>
-            )}
-
-            {weeklySummary.summary_json.positive_changes?.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Что получилось</div>
-                {weeklySummary.summary_json.positive_changes.map((item, i) => (
-                  <div key={i} style={{ fontSize: 13, color: "#7D9A89", marginBottom: 2 }}>🟢 {item}</div>
-                ))}
-              </div>
-            )}
-
-            {weeklySummary.summary_json.patterns?.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Повторяющиеся моменты</div>
-                {weeklySummary.summary_json.patterns.map((item, i) => (
-                  <div key={i} style={{ fontSize: 13, color: "#e8a857", marginBottom: 2 }}>📊 {item}</div>
-                ))}
-              </div>
-            )}
-
-            {weeklySummary.summary_json.nutrition_observations?.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Питание</div>
-                {weeklySummary.summary_json.nutrition_observations.map((item, i) => (
-                  <div key={i} style={{ fontSize: 13, color: "#5f574f", marginBottom: 2 }}>🍽 {item}</div>
-                ))}
-              </div>
-            )}
-
-            {weeklySummary.summary_json.activity_observations?.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Активность</div>
-                {weeklySummary.summary_json.activity_observations.map((item, i) => (
-                  <div key={i} style={{ fontSize: 13, color: "#5f574f", marginBottom: 2 }}>🏃 {item}</div>
-                ))}
-              </div>
-            )}
-
-            {weeklySummary.summary_json.sleep_observations?.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Сон</div>
-                {weeklySummary.summary_json.sleep_observations.map((item, i) => (
-                  <div key={i} style={{ fontSize: 13, color: "#5f574f", marginBottom: 2 }}>😴 {item}</div>
-                ))}
-              </div>
-            )}
-
-            {weeklySummary.summary_json.next_week_focus?.length > 0 && (
-              <div style={{ padding: 10, borderRadius: 8, background: "#fff", border: "1px solid #c4d0c6", marginTop: 8, marginBottom: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#2f2925", marginBottom: 4 }}>Фокус на следующую неделю</div>
-                {weeklySummary.summary_json.next_week_focus.map((item, i) => (
-                  <div key={i} style={{ fontSize: 13, color: "#5f574f", marginBottom: 2 }}>→ {item}</div>
-                ))}
-              </div>
-            )}
-
-            {weeklySummary.summary_json.questions_for_specialist?.length > 0 && (
-              <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#8a7e72", marginBottom: 4 }}>Что обсудить со специалистом</div>
-                {weeklySummary.summary_json.questions_for_specialist.map((item, i) => (
-                  <div key={i} style={{ fontSize: 13, color: "#8a7e72", marginBottom: 2 }}>💬 {item}</div>
-                ))}
-              </div>
-            )}
-
-            {weeklySummary.summary_json.data_quality && !weeklySummary.summary_json.data_quality.is_enough_data && (
-              <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 8, fontStyle: "italic" }}>
-                ⚠ {weeklySummary.summary_json.data_quality.comment || "Данных пока мало, вывод предварительный."}
-              </div>
-            )}
-          </div>
+        {!weeklyLoading && weeklySummaries.length > 3 && !weeklyShowAll && (
+          <button onClick={() => setWeeklyShowAll(true)} style={{ width: "100%", padding: "8px 14px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5f574f", fontFamily: "inherit" }}>
+            Показать предыдущие недели ({weeklySummaries.length - 3})
+          </button>
         )}
       </div>
-
-      {/* Compact AI link from weekly summary */}
-      {weeklySummary && (
-        <div style={{ marginBottom: 24 }}>
-          <button onClick={() => { setChatInput("Обсудить итог недели"); chatInputRef.current?.focus(); window.scrollTo({ top: 0, behavior: "smooth" }); }} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, border: "1px solid #e8e2d8", background: "#f0f5f1", cursor: "pointer", fontSize: 13, color: "#5f574f", fontFamily: "inherit", textAlign: "left" }}>
-            💬 Обсудить итог недели с AI-компаньоном
-          </button>
-        </div>
-      )}
 
       {/* Profile */}
       {profile && Object.keys(profile).length > 0 && (
