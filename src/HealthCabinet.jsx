@@ -444,6 +444,8 @@ export default function HealthCabinet({
   }
 
   // Voice recording
+  const [transcriptionError, setTranscriptionError] = useState("");
+
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -454,14 +456,17 @@ export default function HealthCabinet({
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        if (blob.size < 100) { setTranscribing(false); return; }
         await transcribeAudio(blob);
       };
       mr.start();
       setRecording(true);
       setRecordingTime(0);
+      setTranscriptionError("");
       timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
     } catch (e) {
       console.error("Recording failed:", e);
+      setTranscriptionError("Не удалось начать запись. Проверьте разрешение микрофона.");
     }
   }
 
@@ -475,25 +480,35 @@ export default function HealthCabinet({
 
   async function transcribeAudio(blob) {
     setTranscribing(true);
+    setTranscriptionError("");
     try {
       let token;
-      try { token = await getClientToken("body", "session"); } catch {}
-      const hdrs = {};
-      if (token) hdrs["Authorization"] = `Bearer ${token}`;
-      const formData = new FormData();
-      formData.append("audio", blob, "voice.webm");
+      try { token = await getClientToken("body", "transcribe"); } catch {}
+      const tHeaders = {
+        "Content-Type": "audio/webm",
+        "X-Session-Id": sessionId,
+        "X-Module": "body",
+        "X-Access-Token": accessToken,
+      };
+      if (token) tHeaders["Authorization"] = `Bearer ${token}`;
       const res = await fetch("/api/transcribe", {
         method: "POST",
-        headers: { ...hdrs, "X-Module": "body", "X-Session-Id": sessionId, "X-Access-Token": accessToken },
-        body: formData,
+        headers: tHeaders,
+        body: blob,
       });
-      const data = await res.json();
-      if (data.ok && data.text) {
-        setChatInput(prev => prev ? prev + " " + data.text : data.text);
-        chatInputRef.current?.focus();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = null; }
+      if (!res.ok || !data || !data.text) {
+        const msg = (data && data.error) || `Ошибка распознавания (${res.status})`;
+        setTranscriptionError(msg);
+        return;
       }
+      setChatInput(prev => prev ? prev + " " + data.text : data.text);
+      chatInputRef.current?.focus();
     } catch (e) {
       console.error("Transcription failed:", e);
+      setTranscriptionError("Не удалось распознать речь. Попробуйте ещё раз.");
     } finally {
       setTranscribing(false);
     }
@@ -811,8 +826,11 @@ export default function HealthCabinet({
               {chatLoading ? "…" : "Отправить"}
             </button>
             <button onClick={recording ? stopRecording : startRecording} disabled={transcribing} style={{ height: 36, padding: "0 12px", borderRadius: 10, border: recording ? "2px solid #b5473f" : "1px solid #d8cec1", background: recording ? "#fdf2f2" : transcribing ? "#f0f5f1" : "#fff", color: recording ? "#b5473f" : "#5f574f", fontSize: 13, cursor: transcribing ? "not-allowed" : "pointer" }}>
-              {transcribing ? "…" : recording ? `⏹ ${recordingTime}с` : "🎙 Рассказать голосом"}
+              {transcribing ? "Распознаю речь…" : recording ? `⏹ Остановить · ${recordingTime} с` : "🎙 Говорить"}
             </button>
+            {transcriptionError && (
+              <div style={{ fontSize: 11, color: "#b5473f", textAlign: "center" }}>{transcriptionError}</div>
+            )}
           </div>
         </div>
       </div>
