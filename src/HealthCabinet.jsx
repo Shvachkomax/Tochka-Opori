@@ -513,10 +513,12 @@ export default function HealthCabinet({
         setTranscribing(false);
         return;
       }
-      // Enable textarea BEFORE setting value to ensure DOM updates
+      // Defer to next frame so React processes setTranscribing first
       setTranscribing(false);
-      setChatInput(prev => prev ? prev + " " + data.text : data.text);
-      setTimeout(() => chatInputRef.current?.focus(), 0);
+      requestAnimationFrame(() => {
+        setChatInput(prev => prev ? prev + " " + data.text : data.text);
+        setTimeout(() => chatInputRef.current?.focus(), 0);
+      });
     } catch (e) {
       console.error("Transcription failed:", e);
       setTranscriptionError("Не удалось распознать речь. Попробуйте ещё раз.");
