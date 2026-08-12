@@ -2695,6 +2695,54 @@ async function handleSendBodyAiMessage(req, res) {
       console.log("[chat] step=3 user message saved");
     }
 
+    // === DETERMINISTIC INTENT ROUTING (before AI) ===
+    const config = getModuleConfig("body");
+    const intentContext = {};
+    try {
+      const { getWallet, getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
+      const wallet = await getWallet({ ownerType: "anonymous_profile", ownerId: owner.ownerId, module: "body" });
+      if (wallet) {
+        const balance = await getUsageBalanceForClient({ walletId: wallet.id });
+        intentContext.wallet_balance = balance?.balance ?? null;
+      }
+      // Body-specific context
+      const { count: plateCount } = await supabase
+        .from("body_plate_photos")
+        .select("*", { count: "exact", head: true })
+        .eq("owner_id", owner.ownerId);
+      intentContext.plate_count = plateCount || 0;
+    } catch (ctxError) {
+      // Non-blocking — continue without context
+    }
+
+    const intentResult = detectIntent(trimmed, config, intentContext);
+    if (intentResult) {
+      // Save deterministic response
+      await supabase.from("body_ai_chat").insert({
+        owner_type: "anonymous_profile",
+        owner_id: owner.ownerId,
+        session_id,
+        role: "assistant",
+        message_text: intentResult.answer,
+        ai_response: intentResult,
+        model_used: "deterministic",
+        created_at: new Date().toISOString(),
+      });
+      return res.status(200).json({
+        ok: true,
+        message: {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          answer: intentResult.answer,
+          small_next_step: null,
+          question_for_specialist: null,
+          safety_note: intentResult.safety_note || null,
+          confidence: intentResult.confidence || "high",
+          created_at: new Date().toISOString(),
+        },
+      });
+    }
+
     // Build context snapshot
     let context;
     try {
@@ -4115,9 +4163,11 @@ async function handleGetSupportChat(req, res) {
 
 import { detectIntent, buildFallbackResponse } from "../lib/intent-router.js";
 import { supportConfig } from "../lib/intent-configs/support.js";
+import { bodyConfig } from "../lib/intent-configs/body.js";
 
 const MODULE_CONFIGS = {
   support: supportConfig,
+  body: bodyConfig,
 };
 
 function getModuleConfig(module) {
