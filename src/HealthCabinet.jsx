@@ -298,8 +298,21 @@ export default function HealthCabinet({
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState("");
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true);
   const [healthContext, setHealthContext] = useState(null);
+  const [chatScrolledUp, setChatScrolledUp] = useState(false);
+  const [chatHasNewResponse, setChatHasNewResponse] = useState(false);
+  const [chatShowHistory, setChatShowHistory] = useState(false);
+  const chatContainerRef = useRef(null);
+  const chatInputRef = useRef(null);
+
+  // Voice recording
+  const [recording, setRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [transcribing, setTranscribing] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const timerRef = useRef(null);
 
   // Fetch health context on mount
   useEffect(() => {
@@ -327,9 +340,9 @@ export default function HealthCabinet({
     "Что обсудить со специалистом?",
   ];
 
-  // Load chat history on open
+  // Load chat history on mount
   useEffect(() => {
-    if (!chatOpen || !sessionId || !accessToken) return;
+    if (!sessionId || !accessToken) return;
     async function loadChat() {
       try {
         let token;
@@ -346,7 +359,7 @@ export default function HealthCabinet({
       } catch {}
     }
     loadChat();
-  }, [chatOpen, sessionId, accessToken]);
+  }, [sessionId, accessToken]);
 
   async function sendChat(text) {
     const msg = (text || chatInput).trim();
@@ -359,6 +372,9 @@ export default function HealthCabinet({
     // Add user message optimistically
     const userMsg = { id: "temp-" + Date.now(), role: "user", message_text: msg, created_at: new Date().toISOString() };
     setChatMessages(prev => [...prev, userMsg]);
+    setChatHasNewResponse(false);
+    // Scroll to bottom after optimistic add
+    requestAnimationFrame(() => { setTimeout(() => scrollToChatBottom(false), 0); });
 
     try {
       let token;
@@ -388,6 +404,16 @@ export default function HealthCabinet({
         const withoutTemp = prev.filter(m => m.id !== userMsg.id);
         return [...withoutTemp, { ...userMsg, id: "user-" + Date.now() }, assistantMsg];
       });
+      // Auto-scroll to new response
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (!chatScrolledUp) {
+            scrollToChatBottom(true);
+          } else {
+            setChatHasNewResponse(true);
+          }
+        }, 0);
+      });
       setChatDebug("done");
     } catch (e) {
       setChatError(e.message || "Ошибка.");
@@ -395,6 +421,77 @@ export default function HealthCabinet({
       setChatMessages(prev => prev.filter(m => m.id !== userMsg.id));
     } finally {
       setChatLoading(false);
+    }
+  }
+
+  // Chat scroll
+  function handleChatScroll(e) {
+    const el = e.target;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    setChatScrolledUp(!atBottom);
+  }
+
+  function scrollToChatBottom(smooth = true) {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "instant" });
+    setChatScrolledUp(false);
+    setChatHasNewResponse(false);
+  }
+
+  // Voice recording
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      mediaRecorderRef.current = mr;
+      audioChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        await transcribeAudio(blob);
+      };
+      mr.start();
+      setRecording(true);
+      setRecordingTime(0);
+      timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+    } catch (e) {
+      console.error("Recording failed:", e);
+    }
+  }
+
+  function stopRecording() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+    }
+    setRecording(false);
+  }
+
+  async function transcribeAudio(blob) {
+    setTranscribing(true);
+    try {
+      let token;
+      try { token = await getClientToken("body", "session"); } catch {}
+      const hdrs = {};
+      if (token) hdrs["Authorization"] = `Bearer ${token}`;
+      const formData = new FormData();
+      formData.append("audio", blob, "voice.webm");
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: { ...hdrs, "X-Module": "body", "X-Session-Id": sessionId, "X-Access-Token": accessToken },
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.ok && data.text) {
+        setChatInput(prev => prev ? prev + " " + data.text : data.text);
+        chatInputRef.current?.focus();
+      }
+    } catch (e) {
+      console.error("Transcription failed:", e);
+    } finally {
+      setTranscribing(false);
     }
   }
 
@@ -626,6 +723,95 @@ export default function HealthCabinet({
           Заполните дневник ещё раз, чтобы увидеть графики динамики.
         </div>
       )}
+
+      {/* AI Companion — always visible */}
+      <div style={{ marginBottom: 24, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", borderRadius: 16, padding: 20 }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: "#2f2925", marginBottom: 4 }}>Спросить AI-компаньона</div>
+        <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
+          Можно задать вопрос о питании, активности, сне, дневнике или самочувствии.
+        </div>
+
+        {/* Chat messages */}
+        {chatMessages.length > 0 && (
+          <div ref={chatContainerRef} onScroll={handleChatScroll} style={{ maxHeight: 240, overflowY: "auto", marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+            {chatMessages.map((msg) => (
+              <div key={msg.id} style={{ alignSelf: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: "85%" }}>
+                {msg.role === "user" ? (
+                  <div style={{ padding: "8px 14px", borderRadius: 12, background: "#7D9A89", color: "#fff", fontSize: 14 }}>
+                    {msg.message_text}
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ padding: "8px 14px", borderRadius: 12, background: "#f0f5f1", color: "#2f2925", fontSize: 14, lineHeight: 1.5 }}>
+                      {msg.answer || msg.ai_response?.answer || msg.message_text}
+                    </div>
+                    {(msg.small_next_step || msg.ai_response?.small_next_step) && (
+                      <div style={{ fontSize: 12, color: "#7D9A89", marginTop: 4, marginLeft: 8 }}>→ {msg.small_next_step || msg.ai_response?.small_next_step}</div>
+                    )}
+                    {(msg.question_for_specialist || msg.ai_response?.question_for_specialist) && (
+                      <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 4, marginLeft: 8, fontStyle: "italic" }}>💬 {msg.question_for_specialist || msg.ai_response?.question_for_specialist}</div>
+                    )}
+                    {(msg.safety_note || msg.ai_response?.safety_note) && (
+                      <div style={{ fontSize: 12, color: "#b5473f", marginTop: 4, marginLeft: 8, padding: "4px 8px", borderRadius: 6, background: "#fdf2f2" }}>⚠ {msg.safety_note || msg.ai_response?.safety_note}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+            {chatLoading && (
+              <div style={{ alignSelf: "flex-start", padding: "8px 14px", borderRadius: 12, background: "#f0f5f1", fontSize: 13, color: "#8a7e72", fontStyle: "italic" }}>
+                AI-компаньон отвечает…
+              </div>
+            )}
+            {chatHasNewResponse && chatScrolledUp && (
+              <button onClick={() => scrollToChatBottom(true)} style={{ alignSelf: "center", padding: "6px 14px", borderRadius: 20, background: "#7D9A89", color: "white", border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", marginTop: 4 }}>
+                Новый ответ ↓
+              </button>
+            )}
+          </div>
+        )}
+
+        {chatMessages.length === 0 && !chatLoading && (
+          <div style={{ fontSize: 13, color: "#8a7e72", marginBottom: 12 }}>
+            Задайте вопрос по дневнику, питанию, сну, активности или недельному итогу.
+          </div>
+        )}
+
+        {/* Suggested prompts */}
+        {chatMessages.length === 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+            {SUGGESTED_PROMPTS.map((p, i) => (
+              <button key={i} onClick={() => sendChat(p)} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 12, color: "#5f574f" }}>
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {chatError && <div style={{ color: "#b5473f", fontSize: 13, marginBottom: 8 }}>{chatError}</div>}
+
+        {/* Input */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <textarea
+            ref={chatInputRef}
+            value={chatInput}
+            onChange={e => setChatInput(e.target.value)}
+            onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); sendChat(); } }}
+            placeholder="Что хотите обсудить?"
+            rows={2}
+            disabled={chatLoading || transcribing}
+            style={{ flex: 1, minHeight: 44, maxHeight: 100, padding: "8px 12px", borderRadius: 10, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }}
+          />
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <button onClick={() => sendChat()} disabled={chatLoading || !chatInput.trim()} style={{ height: 36, padding: "0 16px", borderRadius: 10, border: 0, background: chatLoading || !chatInput.trim() ? "#c4d0c6" : "#7D9A89", color: "#fff", fontWeight: 600, fontSize: 13, cursor: chatLoading || !chatInput.trim() ? "not-allowed" : "pointer" }}>
+              {chatLoading ? "…" : "Отправить"}
+            </button>
+            <button onClick={recording ? stopRecording : startRecording} disabled={transcribing} style={{ height: 36, padding: "0 12px", borderRadius: 10, border: recording ? "2px solid #b5473f" : "1px solid #d8cec1", background: recording ? "#fdf2f2" : transcribing ? "#f0f5f1" : "#fff", color: recording ? "#b5473f" : "#5f574f", fontSize: 13, cursor: transcribing ? "not-allowed" : "pointer" }}>
+              {transcribing ? "…" : recording ? `⏹ ${recordingTime}с` : "🎙 Рассказать голосом"}
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* History */}
       <div style={{ marginBottom: 24 }}>
@@ -882,92 +1068,14 @@ export default function HealthCabinet({
         )}
       </div>
 
-      {/* AI Chat */}
-      <div style={{ marginBottom: 24 }}>
-        <button onClick={() => setChatOpen(!chatOpen)} style={{ width: "100%", padding: "12px 16px", borderRadius: 12, border: "1px solid #e8e2d8", background: chatOpen ? "#f0f5f1" : "#faf6ef", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 15, fontWeight: 600, color: "#2f2925", fontFamily: "inherit" }}>
-          <span>Спросить AI-компаньона</span>
-          <span style={{ fontSize: 12, color: "#8a7e72" }}>{chatOpen ? "▲" : "▼"}</span>
-        </button>
-
-        {chatOpen && (
-          <div style={{ padding: 16, borderRadius: "0 0 12px 12px", border: "1px solid #e8e2d8", borderTop: 0, background: "#fff" }}>
-            {/* Chat history */}
-            {chatMessages.length > 0 && (
-              <div style={{ maxHeight: 400, overflowY: "auto", marginBottom: 16 }}>
-                {chatMessages.map((msg) => (
-                  <div key={msg.id} style={{ marginBottom: 12 }}>
-                    {msg.role === "user" ? (
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ display: "inline-block", padding: "8px 14px", borderRadius: 12, background: "#7D9A89", color: "#fff", fontSize: 14, maxWidth: "80%", textAlign: "left" }}>
-                          {msg.message_text}
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div style={{ display: "inline-block", padding: "8px 14px", borderRadius: 12, background: "#f0f5f1", color: "#2f2925", fontSize: 14, maxWidth: "80%", lineHeight: 1.5 }}>
-                          {msg.answer || msg.ai_response?.answer || msg.message_text}
-                        </div>
-                        {(msg.small_next_step || msg.ai_response?.small_next_step) && (
-                          <div style={{ fontSize: 12, color: "#7D9A89", marginTop: 4, marginLeft: 8 }}>→ {msg.small_next_step || msg.ai_response?.small_next_step}</div>
-                        )}
-                        {(msg.question_for_specialist || msg.ai_response?.question_for_specialist) && (
-                          <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 4, marginLeft: 8, fontStyle: "italic" }}>💬 {msg.question_for_specialist || msg.ai_response?.question_for_specialist}</div>
-                        )}
-                        {(msg.safety_note || msg.ai_response?.safety_note) && (
-                          <div style={{ fontSize: 12, color: "#b5473f", marginTop: 4, marginLeft: 8, padding: "4px 8px", borderRadius: 6, background: "#fdf2f2" }}>⚠ {msg.safety_note || msg.ai_response?.safety_note}</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {chatLoading && (
-                  <div style={{ fontSize: 13, color: "#8a7e72", fontStyle: "italic" }}>Смотрим ваши записи…</div>
-                )}
-              </div>
-            )}
-
-            {chatMessages.length === 0 && !chatLoading && (
-              <div style={{ fontSize: 13, color: "#8a7e72", marginBottom: 12 }}>
-                Можно задать вопрос по дневнику, питанию, сну, активности или недельному итогу.
-              </div>
-            )}
-
-            {/* Suggested prompts */}
-            {chatMessages.length === 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-                {SUGGESTED_PROMPTS.map((p, i) => (
-                  <button key={i} onClick={() => sendChat(p)} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 12, color: "#5f574f" }}>
-                    {p}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {chatError && <div style={{ color: "#b5473f", fontSize: 13, marginBottom: 8 }}>{chatError}</div>}
-
-            {/* Input */}
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                type="text"
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && sendChat()}
-                placeholder="Например: почему в дни плохого сна тянет на сладкое?"
-                disabled={chatLoading}
-                style={{ flex: 1, height: 40, padding: "0 12px", borderRadius: 10, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
-              />
-              <button onClick={() => sendChat()} disabled={chatLoading || !chatInput.trim()} style={{ height: 40, padding: "0 16px", borderRadius: 10, border: 0, background: chatLoading || !chatInput.trim() ? "#c4d0c6" : "#7D9A89", color: "#fff", fontWeight: 600, fontSize: 14, cursor: chatLoading || !chatInput.trim() ? "not-allowed" : "pointer" }}>
-                {chatLoading ? "…" : "Отправить"}
-              </button>
-            </div>
-            {chatDebug && import.meta.env?.DEV && (
-              <div style={{ fontSize: 11, color: "#8a7e72", marginTop: 4, fontFamily: "monospace" }}>
-                status: {chatDebug}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Compact AI link from weekly summary */}
+      {weeklySummary && (
+        <div style={{ marginBottom: 24 }}>
+          <button onClick={() => { setChatInput("Обсудить итог недели"); chatInputRef.current?.focus(); window.scrollTo({ top: 0, behavior: "smooth" }); }} style={{ width: "100%", padding: "10px 16px", borderRadius: 10, border: "1px solid #e8e2d8", background: "#f0f5f1", cursor: "pointer", fontSize: 13, color: "#5f574f", fontFamily: "inherit", textAlign: "left" }}>
+            💬 Обсудить итог недели с AI-компаньоном
+          </button>
+        </div>
+      )}
 
       {/* Profile */}
       {profile && Object.keys(profile).length > 0 && (
