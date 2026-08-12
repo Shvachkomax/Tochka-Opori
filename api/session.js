@@ -1536,8 +1536,58 @@ async function handleExchangeContinuationCredential(req, res) {
       publicCode: cabinet.sessions?.[0]?.publicCode || null,
     });
     if (!newAccessToken) {
-      console.error("[exchange] token generation returned null");
-      return res.status(500).json({ ok: false, error: "Не удалось создать код доступа. Попробуйте позже." });
+      console.error("[exchange] token generation returned null, retrying with direct insert");
+      // Fallback: ensure sessions row exists directly
+      const crypto = await import("crypto");
+      const fallbackToken = crypto.randomBytes(32).toString("hex");
+      const fallbackHash = crypto.createHash("sha256").update(fallbackToken).digest("hex");
+      const { error: fallbackErr } = await supabase.from("sessions").upsert({
+        session_id: targetSession.session_id,
+        module: reqModule,
+        anonymous_owner_id: credential.owner_id,
+        public_code: cabinet.sessions?.[0]?.publicCode || null,
+        patient_text: "",
+        conversation_history: [],
+        json_data: {},
+        access_token_hash: fallbackHash,
+        access_token_generated_at: new Date().toISOString(),
+        legacy_access: false,
+      }, { onConflict: "session_id" });
+      if (fallbackErr) {
+        console.error("[exchange] fallback insert failed:", fallbackErr.message);
+        return res.status(500).json({ ok: false, error: "Не удалось создать код доступа. Попробуйте позже." });
+      }
+      // Verify the row was created
+      const { data: verifyRow } = await supabase
+        .from("sessions")
+        .select("session_id")
+        .eq("session_id", targetSession.session_id)
+        .maybeSingle();
+      if (!verifyRow) {
+        console.error("[exchange] verification failed after fallback insert");
+        return res.status(500).json({ ok: false, error: "Не удалось создать код доступа. Попробуйте позже." });
+      }
+      console.log("[exchange] fallback token created successfully");
+      return res.status(200).json({
+        ok: true,
+        session_id: targetSession.session_id,
+        access_token: fallbackToken,
+        module: reqModule,
+        public_code: cabinet.sessions?.[0]?.publicCode || null,
+        cabinet,
+        usage_balance: usageBalance,
+      });
+    }
+
+    // Verify sessions row exists after token generation
+    const { data: verifySession } = await supabase
+      .from("sessions")
+      .select("session_id, access_token_hash")
+      .eq("session_id", targetSession.session_id)
+      .maybeSingle();
+    if (!verifySession || !verifySession.access_token_hash) {
+      console.error("[exchange] sessions row verification failed after token generation");
+      return res.status(500).json({ ok: false, error: "Не удалось подтвердить сессию. Попробуйте позже." });
     }
 
     console.log("[exchange] success");
