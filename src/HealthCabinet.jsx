@@ -318,14 +318,6 @@ export default function HealthCabinet({
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
 
-  // Force textarea DOM sync — React may not update controlled textarea value
-  // when state changes while textarea was disabled
-  useEffect(() => {
-    if (chatInputRef.current && chatInputRef.current.value !== chatInput) {
-      chatInputRef.current.value = chatInput;
-    }
-  }, [chatInput]);
-
   // Fetch health context on mount
   useEffect(() => {
     async function loadHealthContext() {
@@ -513,12 +505,9 @@ export default function HealthCabinet({
         setTranscribing(false);
         return;
       }
-      // Defer to next frame so React processes setTranscribing first
       setTranscribing(false);
-      requestAnimationFrame(() => {
-        setChatInput(prev => prev ? prev + " " + data.text : data.text);
-        setTimeout(() => chatInputRef.current?.focus(), 0);
-      });
+      setChatInput(prev => prev ? prev + " " + data.text : data.text);
+      chatInputRef.current?.focus();
     } catch (e) {
       console.error("Transcription failed:", e);
       setTranscriptionError("Не удалось распознать речь. Попробуйте ещё раз.");
@@ -831,7 +820,7 @@ export default function HealthCabinet({
             placeholder="Что хотите обсудить?"
             rows={2}
             disabled={chatLoading || transcribing}
-            style={{ flex: 1, minHeight: 44, maxHeight: 100, padding: "8px 12px", borderRadius: 10, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }}
+            style={{ flex: 1, minHeight: 44, maxHeight: 100, padding: "8px 12px", borderRadius: 10, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 14, outline: "none", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }}
           />
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <button onClick={() => sendChat()} disabled={chatLoading || !chatInput.trim()} style={{ height: 36, padding: "0 16px", borderRadius: 10, border: 0, background: chatLoading || !chatInput.trim() ? "#c4d0c6" : "#7D9A89", color: "#fff", fontWeight: 600, fontSize: 13, cursor: chatLoading || !chatInput.trim() ? "not-allowed" : "pointer" }}>
