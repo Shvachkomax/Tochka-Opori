@@ -62,6 +62,22 @@ assert(bodyNav2?.intent_type === "navigation", "Body: charts navigation");
 assert(bodyNav2?.section === "charts", "Body: charts section");
 assert(!bodyNav2?.answer?.includes("кабинет ниже"), "Body: doesn't use Support wording");
 
+const bodyNavPlate = detectIntent("Где мои фото тарелок?", bodyConfig);
+assert(bodyNavPlate?.intent_type === "navigation", "Body: plate navigation");
+assert(bodyNavPlate?.section === "plate", "Body: plate section");
+
+const bodyNavWeekly = detectIntent("Где итог недели?", bodyConfig);
+assert(bodyNavWeekly?.intent_type === "navigation", "Body: weekly navigation");
+assert(bodyNavWeekly?.section === "weekly", "Body: weekly section");
+
+const bodyNavAi = detectIntent("Где AI-компаньон?", bodyConfig);
+assert(bodyNavAi?.intent_type === "navigation", "Body: AI companion navigation");
+assert(bodyNavAi?.section === "ai_companion", "Body: ai_companion section");
+
+const bodyNavAccess = detectIntent("Где код продолжения?", bodyConfig);
+assert(bodyNavAccess?.intent_type === "navigation", "Body: access navigation");
+assert(bodyNavAccess?.section === "access", "Body: access section");
+
 const bodyHandoff = detectIntent("Хочу консультацию", bodyConfig);
 assert(bodyHandoff?.intent_type === "handoff", "Body: handoff detected");
 assert(bodyHandoff?.answer?.includes("специалисту"), "Body: handoff mentions specialist");
@@ -71,12 +87,70 @@ assert(bodyMed?.intent_type === "medication", "Body: medication detected");
 assert(bodyMed?.answer?.includes("врача"), "Body: medication mentions doctor");
 assert(!bodyMed?.answer?.includes("практик"), "Body: medication doesn't mention practices");
 
+const bodyMedDiet = detectIntent("Какие таблетки для похудения?", bodyConfig);
+assert(bodyMedDiet?.intent_type === "medication", "Body: diet pill medication detected");
+
 const bodySafety = detectIntent("Сильная боль в груди", bodyConfig);
 assert(bodySafety?.intent_type === "safety", "Body: safety intent detected");
+
+const bodySafetyRestrict = detectIntent("Хочу голодать 3 дня", bodyConfig);
+assert(bodySafetyRestrict?.intent_type === "safety", "Body: starvation safety detected");
+assert(bodySafetyRestrict?.severity === "warning", "Body: starvation is warning");
+
+const bodySafetyCalorie = detectIntent("Урезать до 800 ккал в день", bodyConfig);
+assert(bodySafetyCalorie?.intent_type === "safety", "Body: extreme calorie safety detected");
 
 const bodyFallback = buildFallbackResponse("network_error", bodyConfig);
 assert(bodyFallback?.intent_type === "error", "Body: fallback response");
 assert(!bodyFallback?.answer?.includes("практик"), "Body: fallback doesn't mention practices");
+
+console.log("");
+
+// --- Body FAQ tests ---
+console.log("--- Body FAQ ---");
+
+const bodyFaqCredits = detectIntent("За что списываются кредиты?", bodyConfig);
+assert(bodyFaqCredits?.intent_type === "service_faq", "Body FAQ: credits usage detected");
+assert(bodyFaqCredits?.topic === "credits_usage", "Body FAQ: correct topic");
+assert(bodyFaqCredits?.answer?.includes("Кредиты"), "Body FAQ: answer mentions credits");
+
+const bodyFaqBalance = detectIntent("Сколько у меня кредитов?", bodyConfig, { wallet_balance: 19000 });
+assert(bodyFaqBalance?.intent_type === "service_faq", "Body FAQ: balance detected");
+assert(bodyFaqBalance?.answer?.includes("19"), "Body FAQ: shows actual balance");
+
+const bodyFaqFree = detectIntent("Что бесплатно?", bodyConfig);
+assert(bodyFaqFree?.intent_type === "service_faq", "Body FAQ: free actions detected");
+assert(bodyFaqFree?.topic === "credits_free_actions", "Body FAQ: correct topic");
+
+const bodyFaqRub = detectIntent("Сколько рублей один кредит?", bodyConfig);
+assert(bodyFaqRub?.intent_type === "service_faq", "Body FAQ: ruble value detected");
+assert(bodyFaqRub?.topic === "credits_ruble_value", "Body FAQ: ruble topic");
+
+const bodyFaqZero = detectIntent("Что будет при нуле?", bodyConfig);
+assert(bodyFaqZero?.intent_type === "service_faq", "Body FAQ: zero balance detected");
+assert(bodyFaqZero?.topic === "credits_exhausted", "Body FAQ: exhausted topic");
+
+const bodyFaqPlateAcc = detectIntent("Насколько точный анализ фото?", bodyConfig);
+assert(bodyFaqPlateAcc?.intent_type === "service_faq", "Body FAQ: plate accuracy detected");
+assert(bodyFaqPlateAcc?.topic === "plate_accuracy", "Body FAQ: plate_accuracy topic");
+
+const bodyFaqCalories = detectIntent("Сколько калорий на фото?", bodyConfig);
+assert(bodyFaqCalories?.intent_type === "service_faq", "Body FAQ: calories from photo detected");
+assert(bodyFaqCalories?.topic === "calories_from_photo", "Body FAQ: calories_from_photo topic");
+
+const bodyFaqDiary = detectIntent("Зачем вести дневник?", bodyConfig);
+assert(bodyFaqDiary?.intent_type === "service_faq", "Body FAQ: diary purpose detected");
+assert(bodyFaqDiary?.topic === "health_diary", "Body FAQ: health_diary topic");
+
+const bodyFaqPrivacy = detectIntent("Это анонимно?", bodyConfig);
+assert(bodyFaqPrivacy?.intent_type === "service_faq", "Body FAQ: privacy detected");
+assert(bodyFaqPrivacy?.topic === "privacy", "Body FAQ: privacy topic");
+
+// Navigation vs FAQ distinction
+const bodyNavDiary = detectIntent("Где дневник?", bodyConfig);
+assert(bodyNavDiary?.intent_type === "navigation", "Body distinction: 'где дневник' = navigation");
+const bodyFaqDiaryWhat = detectIntent("Что такое дневник?", bodyConfig);
+assert(bodyFaqDiaryWhat?.intent_type === "service_faq", "Body distinction: 'что такое дневник' = FAQ");
 
 console.log("");
 
@@ -91,11 +165,27 @@ assert(crossSupport === null, "Cross: Support doesn't answer Body diary question
 const crossBody = detectIntent("Где мои практики?", bodyConfig);
 assert(crossBody === null, "Cross: Body doesn't answer Support practices question");
 
+// Body FAQ should NOT leak to Support
+const crossBodyFaq = detectIntent("Насколько точный анализ фото?", supportConfig);
+assert(crossBodyFaq === null, "Cross: Support doesn't answer Body plate accuracy FAQ");
+
+// Support FAQ should NOT leak to Body
+const crossSupportFaq = detectIntent("Что такое Поговорим?", bodyConfig);
+assert(crossSupportFaq === null, "Cross: Body doesn't answer Support quick chat FAQ");
+
 // Both should respond to generic handoff
 const handoffBothSupport = detectIntent("Нужен специалист", supportConfig);
 const handoffBothBody = detectIntent("Нужен специалист", bodyConfig);
 assert(handoffBothSupport?.intent_type === "handoff", "Cross: Support handoff works");
 assert(handoffBothBody?.intent_type === "handoff", "Cross: Body handoff works");
+
+// Both should respond to generic credit balance
+const creditBothSupport = detectIntent("Сколько у меня кредитов?", supportConfig, { wallet_balance: 1000 });
+const creditBothBody = detectIntent("Сколько у меня кредитов?", bodyConfig, { wallet_balance: 2000 });
+assert(creditBothSupport?.intent_type === "service_faq", "Cross: Support credit balance works");
+assert(creditBothBody?.intent_type === "service_faq", "Cross: Body credit balance works");
+assert(creditBothSupport?.answer?.includes("1"), "Cross: Support shows 1000");
+assert(creditBothBody?.answer?.includes("2"), "Cross: Body shows 2000");
 
 // Fallback messages should be module-specific
 const fbSupport = buildFallbackResponse("ai_error", supportConfig);
