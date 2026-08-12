@@ -63,6 +63,9 @@ export default function App() {
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
 
+  const quickChatContainerRef = useRef(null);
+  const quickChatInputRef = useRef(null);
+
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [voiceError, setVoiceError] = useState("");
@@ -141,6 +144,8 @@ export default function App() {
   const [quickChatLoading, setQuickChatLoading] = useState(false);
   const [quickChatExpanded, setQuickChatExpanded] = useState(false);
   const [quickChatShowHistory, setQuickChatShowHistory] = useState(false);
+  const [quickChatScrolledUp, setQuickChatScrolledUp] = useState(false);
+  const [quickChatHasNewResponse, setQuickChatHasNewResponse] = useState(false);
   // Follow-up answered topics for AI dedup
   const [followupAnsweredTopics, setFollowupAnsweredTopics] = useState(null);
   // Display name
@@ -1795,6 +1800,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     } catch { /* silent */ }
   }
 
+  function handleQuickChatScroll(e) {
+    const el = e.target;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    setQuickChatScrolledUp(!atBottom);
+  }
+
+  function scrollToQuickChatBottom(smooth = true) {
+    const el = quickChatContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "instant" });
+    setQuickChatScrolledUp(false);
+    setQuickChatHasNewResponse(false);
+  }
+
   // Send quick chat message
   async function sendQuickChatMessage(text) {
     const saved = getSupportSession();
@@ -1806,6 +1825,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     const tempId = "temp-" + Date.now();
     setQuickChatMessages(prev => [...prev, { id: tempId, role: "user", message_text: trimmed, created_at: new Date().toISOString() }]);
     setQuickChatLoading(true);
+    setQuickChatHasNewResponse(false);
+
+    // Scroll to bottom after optimistic add (after React render)
+    requestAnimationFrame(() => { setTimeout(() => scrollToQuickChatBottom(false), 0); });
 
     try {
       const res = await fetch("/api/session", {
@@ -1824,8 +1847,18 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             { id: "ai-" + Date.now(), role: "assistant", message_text: data.response?.answer || "", ai_response: data.response, created_at: new Date().toISOString() },
           ];
         });
+        // Auto-scroll to new assistant message (unless user scrolled up)
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (!quickChatScrolledUp) {
+              scrollToQuickChatBottom(true);
+            } else {
+              setQuickChatHasNewResponse(true);
+            }
+          }, 0);
+        });
       } else {
-        // API returned error — show fallback message
+        // API returned error — show fallback message and restore text
         setQuickChatMessages(prev => {
           const withoutTemp = prev.filter(m => m.id !== tempId);
           return [...withoutTemp,
@@ -1834,9 +1867,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           ];
         });
         setQuickChatInput(trimmed);
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            quickChatInputRef.current?.focus();
+            if (!quickChatScrolledUp) scrollToQuickChatBottom(true);
+          }, 0);
+        });
       }
     } catch {
-      // Network error — show fallback
+      // Network error — show fallback and restore text
       setQuickChatMessages(prev => {
         const withoutTemp = prev.filter(m => m.id !== tempId);
         return [...withoutTemp,
@@ -1845,6 +1884,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         ];
       });
       setQuickChatInput(trimmed);
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          quickChatInputRef.current?.focus();
+          if (!quickChatScrolledUp) scrollToQuickChatBottom(true);
+        }, 0);
+      });
     } finally {
       setQuickChatLoading(false);
     }
@@ -10388,7 +10433,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
                       {/* Current session messages (only new messages from this session) */}
                       {quickChatMessages.length > 0 && (
-                        <div style={{ marginBottom: 12, maxHeight: 240, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div ref={quickChatContainerRef} onScroll={handleQuickChatScroll} style={{ marginBottom: 12, maxHeight: 240, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
                           {quickChatMessages.map((msg) => (
                             <div key={msg.id} style={{
                               alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
@@ -10425,14 +10470,23 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           ))}
                           {quickChatLoading && (
                             <div style={{ alignSelf: "flex-start", padding: "8px 12px", borderRadius: 12, background: "#f0f5f1", fontSize: 13, color: "#7A7268" }}>
-                              Думаю...
+                              Точка Опоры отвечает…
                             </div>
+                          )}
+                          {quickChatHasNewResponse && quickChatScrolledUp && (
+                            <button
+                              onClick={() => scrollToQuickChatBottom(true)}
+                              style={{ alignSelf: "center", padding: "6px 14px", borderRadius: 20, background: "#7D9A89", color: "white", border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", marginTop: 4 }}
+                            >
+                              Новый ответ ↓
+                            </button>
                           )}
                         </div>
                       )}
 
                       {/* Input */}
                       <textarea
+                        ref={quickChatInputRef}
                         style={{ ...s.answerInput, width: "100%", minHeight: 60, maxHeight: 120, marginBottom: 8, resize: "vertical" }}
                         value={quickChatInput}
                         onChange={(e) => setQuickChatInput(e.target.value)}
