@@ -82,15 +82,19 @@ async function authorizeExpertById(expertId) {
   return data;
 }
 
-async function getExpertMembership(expertId) {
-  if (!expertId) return null;
+async function getExpertMemberships(expertId) {
+  if (!expertId) return [];
   const { data } = await getSupabase()
     .from("expert_organization_memberships")
     .select("id, organization_id, role, status, organizations(name, slug, type)")
     .eq("expert_id", expertId)
-    .eq("status", "active")
-    .maybeSingle();
-  return data;
+    .eq("status", "active");
+  return data || [];
+}
+
+async function getExpertMembership(expertId) {
+  const memberships = await getExpertMemberships(expertId);
+  return memberships[0] || null;
 }
 
 // ── Login (enhanced) ──────────────────────────────────────
@@ -121,16 +125,19 @@ async function handleLogin(req, res) {
       return res.status(404).json({ ok: false, error: "Код специалиста не найден" });
     }
 
-    const membership = await getExpertMembership(data.id);
-    const orgInfo = membership
-      ? {
-          organization_id: membership.organization_id,
-          organization_name: membership.organizations?.name || null,
-          organization_slug: membership.organizations?.slug || null,
-          organization_type: membership.organizations?.type || null,
-          role_in_organization: membership.role,
-        }
-      : null;
+    const memberships = await getExpertMemberships(data.id);
+    const membershipsList = memberships.map((m) => ({
+      organization_id: m.organization_id,
+      organization_name: m.organizations?.name || null,
+      organization_slug: m.organizations?.slug || null,
+      organization_type: m.organizations?.type || null,
+      role_in_organization: m.role,
+      membership_id: m.id,
+    }));
+
+    // Legacy field: only populated when exactly one active membership exists.
+    // Never silently choose the first clinic when multiple exist.
+    const legacyMembership = membershipsList.length === 1 ? membershipsList[0] : null;
 
     return res.status(200).json({
       ok: true,
@@ -141,7 +148,8 @@ async function handleLogin(req, res) {
         specialty: data.specialty,
         city: data.city,
         organization: data.organization,
-        membership: orgInfo,
+        memberships: membershipsList,
+        membership: legacyMembership,
       },
     });
   } catch (error) {
@@ -749,7 +757,8 @@ async function handleDisableDoctorInviteLink(req, res) {
 // ═══════════════════════════════════════════════════════════
 
 async function handleListMyPatients(req, res) {
-  const { expert_id, expert_code, organization_id: reqOrgId } = req.body || {};
+  const { expert_id, expert_code, organization_id: reqOrgId, module: reqModule } = req.body || {};
+  const module = reqModule === "body" ? "body" : "support";
   const isAdmin = authorizeAdmin(req);
 
   const supabase = getSupabase();
@@ -775,8 +784,9 @@ async function handleListMyPatients(req, res) {
   // Build the patient list
   // Patients accessible via: patient_assignments (primary) OR patient_access
   const expertId = expert?.id;
-  const membership = expertId ? await getExpertMembership(expertId) : null;
-  const orgId = reqOrgId || membership?.organization_id;
+  const memberships = expertId ? await getExpertMemberships(expertId) : [];
+  const orgIds = memberships.map((m) => m.organization_id);
+  const orgId = reqOrgId || orgIds[0] || null;
 
   let query = supabase
     .from("patient_assignments")
@@ -786,15 +796,13 @@ async function handleListMyPatients(req, res) {
       organization:organization_id(id, name)
     `)
     .eq("status", "active")
+    .eq("module", module)
     .order("created_at", { ascending: false });
 
   if (isAdmin && !expertId && !orgId) {
-    // Admin sees all
+    // Admin sees all for this module
   } else if (expertId) {
-    // Expert sees patients where they are primary OR have access
-    // For simplicity, we do two queries and combine
-    // First: patients where this expert is primary
-    // Second: patients where this expert has access via patient_access
+    // Expert sees patients where they are primary OR have access, within this module
     const { data: assigned, error: err1 } = await supabase
       .from("patient_assignments")
       .select(`
@@ -803,6 +811,7 @@ async function handleListMyPatients(req, res) {
         organization:organization_id(id, name)
       `)
       .eq("status", "active")
+      .eq("module", module)
       .eq("primary_expert_id", expertId)
       .order("created_at", { ascending: false });
 
@@ -810,8 +819,11 @@ async function handleListMyPatients(req, res) {
       .from("patient_access")
       .select(`
         public_code,
+        owner_type,
+        owner_id,
         access_role,
         status,
+        module,
         patient_assignments!inner(
           *,
           primary_expert:primary_expert_id(id, name),
@@ -819,6 +831,7 @@ async function handleListMyPatients(req, res) {
         )
       `)
       .eq("expert_id", expertId)
+      .eq("module", module)
       .eq("status", "active");
 
     if (err1 || err2) {
@@ -826,15 +839,18 @@ async function handleListMyPatients(req, res) {
     }
 
     // Merge: accessed patients that might overlap with assigned
-    const seenCodes = new Set();
+    // Use composite key: public_code for support, owner_type+owner_id for body
+    const seenKeys = new Set();
     const patients = [];
 
     for (const p of assigned || []) {
-      seenCodes.add(p.public_code);
+      const key = p.public_code || `${p.owner_type}:${p.owner_id}`;
+      seenKeys.add(key);
       patients.push(p);
     }
     for (const a of accessed || []) {
-      if (!seenCodes.has(a.public_code)) {
+      const key = a.public_code || `${a.owner_type}:${a.owner_id}`;
+      if (!seenKeys.has(key)) {
         const pa = a.patient_assignments;
         if (pa) {
           patients.push({
@@ -842,11 +858,13 @@ async function handleListMyPatients(req, res) {
             access_role: a.access_role,
             _access_via: "patient_access",
           });
-          seenCodes.add(a.public_code);
+          seenKeys.add(key);
         }
       } else {
-        // Add access_role to existing
-        const existing = patients.find((p) => p.public_code === a.public_code);
+        const existing = patients.find((p) => {
+          const pKey = p.public_code || `${p.owner_type}:${p.owner_id}`;
+          return pKey === key;
+        });
         if (existing) {
           existing.access_role = a.access_role;
         }
@@ -903,7 +921,8 @@ async function enrichPatientsWithSessionData(supabase, patients) {
 }
 
 async function handleAssignPatientToExpert(req, res) {
-  const { public_code, expert_id, organization_id, source, patient_label, admin_secret, expert_code, assigned_by_expert_name } = req.body || {};
+  const { public_code, expert_id, organization_id, source, patient_label, admin_secret, expert_code, assigned_by_expert_name, module: reqModule } = req.body || {};
+  const module = reqModule === "body" ? "body" : "support";
   const isAdmin = authorizeAdmin(req);
 
   if (!public_code) {
@@ -956,15 +975,16 @@ async function handleAssignPatientToExpert(req, res) {
   // Find or determine organization
   let orgId = organization_id || null;
   if (!orgId) {
-    const membership = await getExpertMembership(targetExpertId);
-    orgId = membership?.organization_id || null;
+    const memberships = await getExpertMemberships(targetExpertId);
+    orgId = memberships[0]?.organization_id || null;
   }
 
-  // Check if there's already a patient_assignment for this code
+  // Check if there's already a patient_assignment for this code + module
   const { data: existingAssignment } = await supabase
     .from("patient_assignments")
     .select("id, primary_expert_id, organization_id, status")
     .eq("public_code", normalizedCode)
+    .eq("module", module)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -1003,6 +1023,7 @@ async function handleAssignPatientToExpert(req, res) {
         assigned_by_expert_name: assignerName,
         source: source || "manual",
         status: "active",
+        module,
         patient_label: patient_label?.trim() || null,
       });
 
@@ -1018,6 +1039,7 @@ async function handleAssignPatientToExpert(req, res) {
     .eq("public_code", normalizedCode)
     .eq("organization_id", orgId)
     .eq("expert_id", targetExpertId)
+    .eq("module", module)
     .maybeSingle();
 
   if (!existingAccess) {
@@ -1030,6 +1052,7 @@ async function handleAssignPatientToExpert(req, res) {
         access_role: "owner",
         granted_by_expert_id: assignerExpertId,
         granted_by_expert_name: assignerName,
+        module,
       })
       .then(() => {});
   }
@@ -1064,7 +1087,7 @@ async function handleListAllExperts(req, res) {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("experts")
-    .select("id, name, role, specialty, city, organization, access_code, is_active")
+    .select("id, name, role, specialty, city, organization, access_code, is_active, expert_organization_memberships(organization_id, status, organizations(name))")
     .order("name", { ascending: true });
 
   if (error) {

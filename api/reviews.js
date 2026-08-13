@@ -141,10 +141,12 @@ async function handleSave(req, res) {
         primExpertId = sessionData.primary_expert_id;
       }
       if (!orgId && !primExpertId) {
+        const reviewModule = cleanedReview.module || "support";
         const { data: assignData } = await supabase
           .from("patient_assignments")
           .select("organization_id, primary_expert_id")
           .eq("public_code", cleanedReview.publicCode)
+          .eq("module", reviewModule)
           .eq("status", "active")
           .maybeSingle();
         if (assignData) {
@@ -2112,16 +2114,16 @@ async function handleGetSessionTimeline(req, res) {
     let expertOrgId = null;
     let expertOrgRole = null;
     if (!isAdmin && expertId) {
-      const { data: membership } = await supabase
+      const { data: memberships } = await supabase
         .from("expert_organization_memberships")
         .select("organization_id, role")
         .eq("expert_id", expertId)
-        .eq("status", "active")
-        .maybeSingle();
-      if (membership) {
-        expertOrgId = membership.organization_id;
-        expertOrgRole = membership.role;
-      }
+        .eq("status", "active");
+      const orgMembership = (memberships || []).find((m) =>
+        ["owner", "admin", "supervisor"].includes(m.role)
+      );
+      expertOrgId = orgMembership?.organization_id || null;
+      expertOrgRole = orgMembership?.role || null;
       const { data: accessRecords } = await supabase
         .from("patient_access")
         .select("public_code")

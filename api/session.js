@@ -75,6 +75,7 @@ async function resolveSupportSpecialistRelation(ownerId) {
       .from("patient_assignments")
       .select("primary_expert_id, organization_id")
       .eq("public_code", latest.public_code)
+      .eq("module", "support")
       .eq("status", "active")
       .maybeSingle();
     if (assignment) {
@@ -443,6 +444,7 @@ async function handleSave(req, res) {
         .from("patient_assignments")
         .select("organization_id, primary_expert_id")
         .eq("public_code", publicCode)
+        .eq("module", "support")
         .eq("status", "active")
         .maybeSingle();
       if (assignment) {
@@ -477,6 +479,7 @@ async function handleSave(req, res) {
             .from("patient_assignments")
             .select("id")
             .eq("public_code", publicCode)
+            .eq("module", "support")
             .maybeSingle();
 
           if (!existingAssignment) {
@@ -488,6 +491,7 @@ async function handleSave(req, res) {
               assigned_by_expert_name: "auto",
               source: "invite_link",
               status: "active",
+              module: "support",
             });
 
             await supabase.from("patient_access").insert({
@@ -497,6 +501,7 @@ async function handleSave(req, res) {
               access_role: "owner",
               granted_by_expert_id: primaryExpertId,
               granted_by_expert_name: "auto",
+              module: "support",
             });
           }
 

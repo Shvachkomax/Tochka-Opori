@@ -12,6 +12,7 @@ import { saveBodySession, saveSupportSession, getBodySession, getSupportSession,
 import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
 import ExpertInvitePage from "./pages/expert/ExpertInvitePage.jsx";
 import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
+import SpecialistCabinet from "./pages/specialist/SpecialistCabinet.jsx";
 
 class AdminErrorBoundary extends Component {
   constructor(props) {
@@ -537,6 +538,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [bodyExpertReviewForm, setBodyExpertReviewForm] = useState(null);
   const [bodyExpertReviewSaving, setBodyExpertReviewSaving] = useState(false);
   const [bodyExportingCases, setBodyExportingCases] = useState(false);
+  // Body client assignment
+  const [bodyAssignments, setBodyAssignments] = useState([]);
+  const [bodyAssignmentsLoading, setBodyAssignmentsLoading] = useState(false);
+  const [bodyExperts, setBodyExperts] = useState([]);
+  const [bodyAssignTarget, setBodyAssignTarget] = useState(null); // body_client_ref being assigned
+  const [bodyAssignExpertId, setBodyAssignExpertId] = useState("");
+  const [bodyAssignOrgId, setBodyAssignOrgId] = useState(null);
+  const [bodyAssignSaving, setBodyAssignSaving] = useState(false);
+  const [bodyAssignIsReassign, setBodyAssignIsReassign] = useState(false);
+  const [bodyAssignExpertOrgs, setBodyAssignExpertOrgs] = useState([]);
 
   // Restore body intake result from localStorage
   const [savedBodyResult, setSavedBodyResult] = useState(() => {
@@ -3175,6 +3186,70 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }
 
+  async function adminLoadBodyAssignments() {
+    setBodyAssignmentsLoading(true);
+    try {
+      const [clientsRes, expertsRes] = await Promise.all([
+        fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "listUnassignedBodyClients", password: adminPassword }),
+        }),
+        fetch("/api/experts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "listAllExperts", admin_secret: adminPassword }),
+        }),
+      ]);
+      const [clientsData, expertsData] = await Promise.all([clientsRes.json(), expertsRes.json()]);
+      if (clientsData.ok) setBodyAssignments(clientsData.clients || []);
+      if (expertsData.ok) {
+        const experts = (expertsData.experts || []).map((e) => ({
+          ...e,
+          organizations: (e.expert_organization_memberships || [])
+            .filter((m) => m.status === "active")
+            .map((m) => ({ id: m.organization_id, name: m.organizations?.name })),
+        }));
+        setBodyExperts(experts);
+      }
+    } catch {
+      showToast("Ошибка загрузки привязок", "error");
+    } finally {
+      setBodyAssignmentsLoading(false);
+    }
+  }
+
+  async function adminAssignBodyClient(bodyClientRef, expertId, orgId, isReassign = false) {
+    setBodyAssignSaving(true);
+    try {
+      const action = isReassign ? "reassignBodyClientExpert" : "assignBodyClientToExpert";
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          password: adminPassword,
+          body_client_ref: bodyClientRef,
+          expert_id: expertId,
+          organization_id: orgId,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.noop ? "Уже назначено" : (isReassign ? "Специалист переназначен" : "Клиент назначен"), "success");
+        setBodyAssignTarget(null);
+        setBodyAssignIsReassign(false);
+        adminLoadBodyAssignments();
+      } else {
+        showToast(data.error || "Ошибка назначения", "error");
+      }
+    } catch {
+      showToast("Ошибка сети", "error");
+    } finally {
+      setBodyAssignSaving(false);
+    }
+  }
+
   async function adminUpdateServiceRequest(id, action, extra = {}) {
     try {
       const res = await fetch("/api/admin", {
@@ -5558,7 +5633,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
               {/* Tabs: Анкеты | Дневники | Корзина */}
               <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          {["intake", "diary", "trash", "reviews", "requests"].map(tab => (
+          {["intake", "diary", "trash", "reviews", "requests", "assignments"].map(tab => (
             <button
               key={tab}
               style={{
@@ -5575,9 +5650,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 else if (tab === "diary") { adminLoadBodyDailyLogs(); }
                 else if (tab === "reviews") { adminLoadBodyExpertReviews(); }
                 else if (tab === "requests") { adminLoadBodyServiceRequests(); }
+                else if (tab === "assignments") { adminLoadBodyAssignments(); }
               }}
             >
-              {tab === "intake" ? "Анкеты" : tab === "diary" ? "Дневники" : tab === "trash" ? "Корзина" : tab === "reviews" ? "Экспертные правки" : "Запросы"}
+              {tab === "intake" ? "Анкеты" : tab === "diary" ? "Дневники" : tab === "trash" ? "Корзина" : tab === "reviews" ? "Экспертные правки" : tab === "requests" ? "Запросы" : "Привязка"}
             </button>
           ))}
               </div>
@@ -6188,6 +6264,140 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Assignments tab */}
+              {bodyAdminTab === "assignments" && (
+                <>
+                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>Привязка клиентов к специалистам</div>
+                  {bodyAssignmentsLoading ? (
+                    <div style={{ color: t.muted, fontSize: 13 }}>Загрузка...</div>
+                  ) : bodyAssignments.length === 0 ? (
+                    <div style={{ color: t.muted, fontSize: 13 }}>Нет активных body-клиентов</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {bodyAssignments.map((c) => (
+                        <div key={c.body_client_ref} style={{
+                          background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 12, padding: 14,
+                          display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between",
+                        }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{c.display_name}</div>
+                            <div style={{ fontSize: 12, color: t.muted }}>
+                              {c.legacy_specialist_name ? `Legacy: ${c.legacy_specialist_name}` : "Без legacy-метки"}
+                              {c.assignment_status.assigned ? (
+                                <span style={{ marginLeft: 8, color: "#7D9A89" }}>
+                                  → {c.assignment_status.expert_name} ({c.assignment_status.organization_name})
+                                </span>
+                              ) : (
+                                <span style={{ marginLeft: 8, color: "#b5473f" }}>Не назначен</span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setBodyAssignTarget(c.body_client_ref);
+                              setBodyAssignIsReassign(c.assignment_status.assigned);
+                              setBodyAssignExpertId("");
+                              setBodyAssignOrgId(null);
+                              setBodyAssignExpertOrgs([]);
+                            }}
+                            style={{
+                              padding: "6px 14px", borderRadius: 8, border: `1px solid ${t.border}`,
+                              background: t.tabBg, color: t.text, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {c.assignment_status.assigned ? "Переназначить" : "Назначить"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Assignment modal */}
+                  {bodyAssignTarget && (
+                    <div style={{
+                      position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
+                      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+                    }} onClick={() => { setBodyAssignTarget(null); setBodyAssignIsReassign(false); }}>
+                      <div style={{
+                        background: t.bg, borderRadius: 20, padding: 32, maxWidth: 440, width: "90%",
+                      }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>
+                          {bodyAssignIsReassign ? "Переназначить специалиста" : "Назначить специалиста"}
+                        </div>
+
+                        <label style={{ fontSize: 13, color: t.muted, marginBottom: 4, display: "block" }}>Специалист</label>
+                        <select
+                          value={bodyAssignExpertId}
+                          onChange={(e) => {
+                            const expertId = e.target.value;
+                            setBodyAssignExpertId(expertId);
+                            setBodyAssignOrgId(null);
+                            // Find selected expert's organization memberships
+                            const expert = bodyExperts.find((ex) => ex.id === expertId);
+                            setBodyAssignExpertOrgs(expert?.organizations || []);
+                          }}
+                          style={{
+                            width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${t.border}`,
+                            background: t.cardBg, color: t.text, fontSize: 14, marginBottom: 16,
+                          }}
+                        >
+                          <option value="">Выберите специалиста</option>
+                          {bodyExperts.filter((e) => e.is_active).map((e) => (
+                            <option key={e.id} value={e.id}>{e.name} — {e.role || "специалист"}</option>
+                          ))}
+                        </select>
+
+                        <label style={{ fontSize: 13, color: t.muted, marginBottom: 4, display: "block" }}>Контекст</label>
+                        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                          <button
+                            onClick={() => setBodyAssignOrgId(null)}
+                            style={{
+                              padding: "8px 14px", borderRadius: 8, border: `1px solid ${!bodyAssignOrgId ? "#7D9A89" : t.border}`,
+                              background: !bodyAssignOrgId ? "#e8f0ea" : t.cardBg, color: t.text, cursor: "pointer", fontSize: 13,
+                            }}
+                          >
+                            Частная практика
+                          </button>
+                          {bodyAssignExpertOrgs.map((org) => (
+                            <button
+                              key={org.id}
+                              onClick={() => setBodyAssignOrgId(org.id)}
+                              style={{
+                                padding: "8px 14px", borderRadius: 8, border: `1px solid ${bodyAssignOrgId === org.id ? "#7D9A89" : t.border}`,
+                                background: bodyAssignOrgId === org.id ? "#e8f0ea" : t.cardBg, color: t.text, cursor: "pointer", fontSize: 13,
+                              }}
+                            >
+                              {org.name || "Организация"}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8 }}>
+                          <button
+                            onClick={() => { setBodyAssignTarget(null); setBodyAssignExpertId(""); setBodyAssignIsReassign(false); }}
+                            style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.cardBg, color: t.text, cursor: "pointer", fontSize: 13 }}
+                          >
+                            Отмена
+                          </button>
+                          <button
+                            disabled={!bodyAssignExpertId || bodyAssignSaving}
+                            onClick={() => adminAssignBodyClient(bodyAssignTarget, bodyAssignExpertId, bodyAssignOrgId, bodyAssignIsReassign)}
+                            style={{
+                              padding: "8px 16px", borderRadius: 10, border: 0,
+                              background: bodyAssignExpertId && !bodyAssignSaving ? (bodyAssignIsReassign ? "#B85C4A" : "#7D9A89") : "#c4d0c6",
+                              color: "#fff", fontWeight: 700, fontSize: 13, cursor: bodyAssignExpertId ? "pointer" : "default",
+                            }}
+                          >
+                            {bodyAssignSaving ? "Сохранение..." : (bodyAssignIsReassign ? "Переназначить" : "Назначить")}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </>
@@ -8851,6 +9061,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   // --- Expert Invite page (/expert-invite/<token>) ---
   if (typeof window !== "undefined" && window.location.pathname.match(/^\/expert-invite\//)) {
     return <ExpertInvitePage />;
+  }
+
+  // --- Specialist Cabinet page (/specialist) ---
+  if (typeof window !== "undefined" && window.location.pathname.match(/^\/specialist\/?$/)) {
+    return <SpecialistCabinet />;
   }
 
   // --- Expert Cabinet page (/expert) ---

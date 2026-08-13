@@ -140,6 +140,13 @@ export default async function handler(req, res) {
         return await handleRestoreUsageWallet(req, res);
       case "exportUsageLedger":
         return await handleExportUsageLedger(req, res);
+      // Body client assignment
+      case "listUnassignedBodyClients":
+        return await handleListUnassignedBodyClients(req, res);
+      case "assignBodyClientToExpert":
+        return await handleAssignBodyClientToExpert(req, res);
+      case "reassignBodyClientExpert":
+        return await handleReassignBodyClientExpert(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -2033,4 +2040,312 @@ async function handleUpdateBodyServiceRequest(req, res) {
   });
 
   return res.json({ ok: true, status: updates.status });
+}
+
+// ═══════════════════════════════════════════════════════════
+// BODY CLIENT ASSIGNMENT
+// ═══════════════════════════════════════════════════════════
+
+async function handleListUnassignedBodyClients(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!role) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+
+  const supabase = getSupabase();
+
+  // Get all body_clients with valid anonymous_owner_id
+  const { data: allClients, error: clientError } = await supabase
+    .from("body_clients")
+    .select("id, session_id, display_name, source, specialist_id, specialist_name, anonymous_owner_id, created_at, status")
+    .not("anonymous_owner_id", "is", null)
+    .eq("status", "active")
+    .order("created_at", { ascending: false });
+
+  if (clientError) {
+    return res.status(500).json({ ok: false, error: clientError.message });
+  }
+
+  // Get all active body assignments
+  const { data: activeAssignments } = await supabase
+    .from("patient_assignments")
+    .select("owner_id, primary_expert_id, organization_id, status")
+    .eq("module", "body")
+    .eq("status", "active")
+    .not("owner_id", "is", null);
+
+  // Build set of assigned owner_ids
+  const assignedOwnerIds = new Set((activeAssignments || []).map((a) => a.owner_id));
+
+  // Get expert names for assigned clients
+  const assignedExpertIds = [...new Set((activeAssignments || []).map((a) => a.primary_expert_id).filter(Boolean))];
+  const expertMap = new Map();
+  if (assignedExpertIds.length > 0) {
+    const { data: experts } = await supabase
+      .from("experts")
+      .select("id, name")
+      .in("id", assignedExpertIds);
+    for (const e of experts || []) expertMap.set(e.id, e.name);
+  }
+
+  // Get org names for assigned clients
+  const assignedOrgIds = [...new Set((activeAssignments || []).map((a) => a.organization_id).filter(Boolean))];
+  const orgMap = new Map();
+  if (assignedOrgIds.length > 0) {
+    const { data: orgs } = await supabase
+      .from("organizations")
+      .select("id, name")
+      .in("id", assignedOrgIds);
+    for (const o of orgs || []) orgMap.set(o.id, o.name);
+  }
+
+  const result = (allClients || []).map((c) => {
+    const assignment = (activeAssignments || []).find((a) => a.owner_id === c.anonymous_owner_id);
+    return {
+      body_client_ref: c.id,
+      display_name: c.display_name || "Клиент без имени",
+      source: c.source,
+      legacy_specialist_id: c.specialist_id || null,
+      legacy_specialist_name: c.specialist_name || null,
+      created_at: c.created_at,
+      assignment_status: assignment
+        ? {
+            assigned: true,
+            expert_name: expertMap.get(assignment.primary_expert_id) || null,
+            organization_name: assignment.organization_id ? orgMap.get(assignment.organization_id) || null : "Частная практика",
+          }
+        : { assigned: false },
+    };
+  });
+
+  await logAdminAction(role, "list_unassigned_body_clients", {
+    module: "body",
+    ipAddress: getClientIp(req),
+    details: { count: result.length },
+  });
+
+  return res.json({ ok: true, clients: result });
+}
+
+async function handleAssignBodyClientToExpert(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!role) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+
+  const { body_client_ref, expert_id, organization_id } = req.body || {};
+  if (!body_client_ref || !expert_id) {
+    return res.status(400).json({ ok: false, error: "Укажите body_client_ref и expert_id" });
+  }
+
+  const supabase = getSupabase();
+
+  // 1. Resolve body_client_ref → canonical anonymous_owner_id
+  const { data: bc, error: bcError } = await supabase
+    .from("body_clients")
+    .select("id, anonymous_owner_id, display_name")
+    .eq("id", body_client_ref)
+    .maybeSingle();
+
+  if (bcError || !bc) {
+    return res.status(404).json({ ok: false, error: "Body-клиент не найден" });
+  }
+  if (!bc.anonymous_owner_id) {
+    return res.status(400).json({ ok: false, error: "У клиента нет владельца (legacy-строка)" });
+  }
+
+  // 2. Verify expert exists and is_active
+  const { data: expert } = await supabase
+    .from("experts")
+    .select("id, name, is_active")
+    .eq("id", expert_id)
+    .maybeSingle();
+
+  if (!expert || !expert.is_active) {
+    return res.status(404).json({ ok: false, error: "Специалист не найден или неактивен" });
+  }
+
+  // 3. If organization_id != null, verify expert has active membership
+  if (organization_id) {
+    const { data: membership } = await supabase
+      .from("expert_organization_memberships")
+      .select("id")
+      .eq("expert_id", expert_id)
+      .eq("organization_id", organization_id)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (!membership) {
+      return res.status(400).json({ ok: false, error: "Специалист не состоит в указанной организации" });
+    }
+  }
+
+  // 4. Check for existing active assignment for this owner+module+org
+  let existingQuery = supabase
+    .from("patient_assignments")
+    .select("id, primary_expert_id, status")
+    .eq("owner_type", "anonymous_profile")
+    .eq("owner_id", bc.anonymous_owner_id)
+    .eq("module", "body")
+    .eq("status", "active");
+
+  if (organization_id === null || organization_id === undefined) {
+    existingQuery = existingQuery.is("organization_id", null);
+  } else {
+    existingQuery = existingQuery.eq("organization_id", organization_id);
+  }
+
+  const { data: existing } = await existingQuery.maybeSingle();
+
+  if (existing) {
+    if (existing.primary_expert_id === expert_id) {
+      return res.json({ ok: true, message: "Уже назначено", assignment_id: existing.id, noop: true });
+    }
+    return res.status(409).json({
+      ok: false,
+      error: "Клиент уже назначен другому специалисту. Используйте reassign для перевода.",
+    });
+  }
+
+  // 5. Create assignment
+  const { data: assignment, error: assignError } = await supabase
+    .from("patient_assignments")
+    .insert({
+      public_code: null,
+      owner_type: "anonymous_profile",
+      owner_id: bc.anonymous_owner_id,
+      organization_id: organization_id || null,
+      primary_expert_id: expert_id,
+      assigned_by_expert_id: null,
+      assigned_by_expert_name: role,
+      source: "admin_body_assignment",
+      status: "active",
+      module: "body",
+      patient_label: bc.display_name || null,
+    })
+    .select("id")
+    .single();
+
+  if (assignError) {
+    return res.status(500).json({ ok: false, error: assignError.message });
+  }
+
+  await logAdminAction(role, "assign_body_client", {
+    targetType: "patient_assignment",
+    targetId: assignment.id,
+    module: "body",
+    ipAddress: getClientIp(req),
+    details: {
+      body_client_id: bc.id,
+      owner_id: bc.anonymous_owner_id,
+      expert_id,
+      expert_name: expert.name,
+      organization_id: organization_id || null,
+    },
+  });
+
+  return res.json({ ok: true, assignment_id: assignment.id });
+}
+
+async function handleReassignBodyClientExpert(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!role) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+
+  const { body_client_ref, expert_id, organization_id } = req.body || {};
+  if (!body_client_ref || !expert_id) {
+    return res.status(400).json({ ok: false, error: "Укажите body_client_ref и expert_id" });
+  }
+
+  const supabase = getSupabase();
+
+  // 1. Resolve body_client_ref → canonical anonymous_owner_id (server-side only)
+  const { data: bc, error: bcError } = await supabase
+    .from("body_clients")
+    .select("id, anonymous_owner_id, display_name")
+    .eq("id", body_client_ref)
+    .maybeSingle();
+
+  if (bcError || !bc) {
+    return res.status(404).json({ ok: false, error: "Body-клиент не найден" });
+  }
+  if (!bc.anonymous_owner_id) {
+    return res.status(400).json({ ok: false, error: "У клиента нет владельца (legacy-строка)" });
+  }
+
+  // 2. Verify expert exists and is active (defense-in-depth; RPC also checks)
+  const { data: expert } = await supabase
+    .from("experts")
+    .select("id, name, is_active")
+    .eq("id", expert_id)
+    .maybeSingle();
+
+  if (!expert || !expert.is_active) {
+    return res.status(404).json({ ok: false, error: "Специалист не найден или неактивен" });
+  }
+
+  // 3. Verify org membership if needed (defense-in-depth; RPC also checks)
+  if (organization_id) {
+    const { data: membership } = await supabase
+      .from("expert_organization_memberships")
+      .select("id")
+      .eq("expert_id", expert_id)
+      .eq("organization_id", organization_id)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (!membership) {
+      return res.status(400).json({ ok: false, error: "Специалист не состоит в указанной организации" });
+    }
+  }
+
+  // 4. Execute atomic reassignment via RPC
+  let rpcResult = null;
+  let rpcError = null;
+
+  try {
+    const result = await supabase.rpc("reassign_body_client", {
+      p_owner_id: bc.anonymous_owner_id,
+      p_new_expert_id: expert_id,
+      p_organization_id: organization_id || null,
+    });
+    rpcResult = result.data;
+    rpcError = result.error;
+  } catch (e) {
+    rpcError = e;
+  }
+
+  // If RPC not available (migration 045 not applied), return 503
+  if (rpcError?.message?.includes("Could not find the function")) {
+    return res.status(503).json({ ok: false, error: "Функция переназначения ещё не установлена. Примените миграцию 045." });
+  }
+
+  if (rpcError) {
+    return res.status(500).json({ ok: false, error: rpcError.message });
+  }
+
+  if (!rpcResult?.ok) {
+    return res.status(400).json({ ok: false, error: rpcResult?.error || "Ошибка переназначения" });
+  }
+
+  // 5. Audit log
+  await logAdminAction(role, "reassign_body_client", {
+    targetType: "patient_assignment",
+    targetId: rpcResult.assignment_id,
+    module: "body",
+    ipAddress: getClientIp(req),
+    details: {
+      body_client_id: bc.id,
+      old_assignment_id: rpcResult.old_assignment_id || null,
+      new_expert_id: expert_id,
+      new_expert_name: expert.name,
+      organization_id: organization_id || null,
+      noop: rpcResult.noop || false,
+    },
+  });
+
+  return res.json({
+    ok: true,
+    assignment_id: rpcResult.assignment_id,
+    noop: rpcResult.noop || false,
+    message: rpcResult.message || null,
+  });
 }

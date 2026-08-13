@@ -14,6 +14,7 @@ import crisisHandler from "./api/crisis.js";
 import councilHandler from "./api/council.js";
 import usageHandler from "./api/usage.js";
 import startSessionHandler from "./api/start-session.js";
+import specialistHandler from "./api/specialist.js";
 
 const PORT = 3001;
 
@@ -57,6 +58,9 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     const bodyBuffer = Buffer.concat(chunks);
     const { req, res } = createReqRes(nodeReq, nodeRes, bodyBuffer);
 
+    if (nodeReq.url.startsWith("/api/specialist")) {
+      return specialistHandler(req, res);
+    }
     if (nodeReq.url.startsWith("/api/start-session")) {
       return startSessionHandler(req, res);
     }
