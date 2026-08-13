@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 // ── Styles ────────────────────────────────────────────────
 
@@ -57,6 +57,11 @@ export default function SpecialistCabinet() {
   // Professional analysis state
   const [profAnalysis, setProfAnalysis] = useState(null);
   const [profAnalysisLoading, setProfAnalysisLoading] = useState(false);
+
+  // Stale-response guard: only the latest detail request result is applied
+  const detailGenerationRef = useRef(0);
+  // Refresh key: incremented on re-click to force re-fetch even for same client_ref
+  const [detailRefreshKey, setDetailRefreshKey] = useState(0);
 
   // ── Session restore on mount ─────────────────────────────
 
@@ -141,8 +146,11 @@ export default function SpecialistCabinet() {
       setClientDetail(null);
       return;
     }
+    const generation = ++detailGenerationRef.current;
     let cancelled = false;
     const controller = new AbortController();
+
+    const detailAction = module === "body" ? "getBodyClientOverview" : "getClientOverview";
 
     (async () => {
       setClientDetailLoading(true);
@@ -153,28 +161,32 @@ export default function SpecialistCabinet() {
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
           signal: controller.signal,
-          body: JSON.stringify({ action: "getClientOverview", client_ref: selectedClient, organization_id: orgId, module }),
+          body: JSON.stringify({ action: detailAction, client_ref: selectedClient, organization_id: orgId, module }),
         });
         const data = await res.json();
-        if (!cancelled) {
+        if (!cancelled && generation === detailGenerationRef.current) {
           if (data.ok) {
             setClientDetail(data);
+            setClientDetailError(null);
           } else {
-            setClientDetailError(data.error || "Ошибка загрузки");
+            // Revoked/expired/forbidden access — show controlled error, clear sensitive content
             setClientDetail(null);
+            setClientDetailError(data.error || "Доступ к клиенту больше недоступен.");
           }
         }
       } catch (e) {
-        if (!cancelled && e.name !== "AbortError") {
+        if (!cancelled && e.name !== "AbortError" && generation === detailGenerationRef.current) {
           setClientDetailError("Ошибка сети");
           setClientDetail(null);
         }
       }
-      if (!cancelled) setClientDetailLoading(false);
+      if (!cancelled && generation === detailGenerationRef.current) {
+        setClientDetailLoading(false);
+      }
     })();
 
     return () => { cancelled = true; controller.abort(); };
-  }, [auth, selectedClient, orgId, module]);
+  }, [auth, selectedClient, orgId, module, detailRefreshKey]);
 
   // ── Fetch professional analysis when analysis tab selected ──
 
@@ -183,6 +195,7 @@ export default function SpecialistCabinet() {
       setProfAnalysis(null);
       return;
     }
+    const generation = ++detailGenerationRef.current;
     let cancelled = false;
     const controller = new AbortController();
 
@@ -197,15 +210,15 @@ export default function SpecialistCabinet() {
           body: JSON.stringify({ action: "getClientProfessionalAnalysis", client_ref: selectedClient, organization_id: orgId, module }),
         });
         const data = await res.json();
-        if (!cancelled) {
+        if (!cancelled && generation === detailGenerationRef.current) {
           setProfAnalysis(data.ok ? data : null);
         }
       } catch (e) {
-        if (!cancelled && e.name !== "AbortError") {
+        if (!cancelled && e.name !== "AbortError" && generation === detailGenerationRef.current) {
           setProfAnalysis(null);
         }
       }
-      if (!cancelled) setProfAnalysisLoading(false);
+      if (!cancelled && generation === detailGenerationRef.current) setProfAnalysisLoading(false);
     })();
 
     return () => { cancelled = true; controller.abort(); };
@@ -259,12 +272,24 @@ export default function SpecialistCabinet() {
 
   // ── Context selection ────────────────────────────────────
 
+  // Immediately clear all sensitive detail state — must not depend on useEffect timing
+  function clearSelectedClientDetail() {
+    setSelectedClient(null);
+    setClientDetail(null);
+    setClientDetailError(null);
+    setProfAnalysis(null);
+    setClientTab("overview");
+    detailGenerationRef.current++;
+  }
+
   function selectOrg(id) {
+    clearSelectedClientDetail();
     setOrgId(id);
     try { sessionStorage.setItem("specialist_org_id", id || ""); } catch {}
   }
 
   function selectModule(m) {
+    clearSelectedClientDetail();
     setModule(m);
     try { sessionStorage.setItem("specialist_module", m); } catch {}
   }
@@ -390,12 +415,14 @@ export default function SpecialistCabinet() {
             <div
               style={{ ...S.moduleBtn, ...(module === "support" ? S.moduleBtnActive : {}) }}
               onClick={() => selectModule("support")}
+              data-testid="module-support"
             >
               Точка Опоры
             </div>
             <div
               style={{ ...S.moduleBtn, ...(module === "body" ? S.moduleBtnActive : {}) }}
               onClick={() => selectModule("body")}
+              data-testid="module-body"
             >
               Здоровье & Стройность
             </div>
@@ -404,16 +431,25 @@ export default function SpecialistCabinet() {
 
         {/* Client detail or Client list */}
         {selectedClient ? (
-          <ClientDetail
-            detail={clientDetail}
-            loading={clientDetailLoading}
-            error={clientDetailError}
-            tab={clientTab}
-            onTabChange={setClientTab}
-            onBack={() => { setSelectedClient(null); setClientDetail(null); setProfAnalysis(null); setClientTab("overview"); }}
-            profAnalysis={profAnalysis}
-            profAnalysisLoading={profAnalysisLoading}
-          />
+          module === "body" ? (
+            <HealthClientDetail
+              detail={clientDetail}
+              loading={clientDetailLoading}
+              error={clientDetailError}
+              onBack={clearSelectedClientDetail}
+            />
+          ) : (
+            <ClientDetail
+              detail={clientDetail}
+              loading={clientDetailLoading}
+              error={clientDetailError}
+              tab={clientTab}
+              onTabChange={setClientTab}
+              onBack={clearSelectedClientDetail}
+              profAnalysis={profAnalysis}
+              profAnalysisLoading={profAnalysisLoading}
+            />
+          )
         ) : (
           <div style={S.card}>
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Мои клиенты</div>
@@ -432,7 +468,7 @@ export default function SpecialistCabinet() {
                 {clients.map((c) => (
                   <div
                     key={c.client_ref}
-                    onClick={() => setSelectedClient(c.client_ref)}
+                    onClick={() => { setSelectedClient(c.client_ref); setDetailRefreshKey((k) => k + 1); }}
                     style={{ padding: "12px 0", borderBottom: "1px solid rgba(46,42,37,.06)", cursor: "pointer" }}
                   >
                     <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>
@@ -685,6 +721,380 @@ function ClientDetail({ detail, loading, error, tab, onTabChange, onBack, profAn
             <p style={{ fontSize: 13, color: "#7A7268" }}>
               Профессиональный анализ пока недоступен.
             </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Health Client Detail Card (Body module, read-only) ────
+
+function HealthClientDetail({ detail, loading, error, onBack }) {
+  const [tab, setTab] = React.useState("overview");
+
+  const tabs = [
+    { id: "overview", label: "Обзор" },
+    { id: "diary", label: "Дневник" },
+    { id: "nutrition", label: "Питание" },
+    { id: "activity", label: "Активность" },
+    { id: "weight", label: "Вес и параметры" },
+    { id: "summaries", label: "AI-сводки" },
+    { id: "requests", label: "Запросы" },
+  ];
+
+  if (loading) {
+    return (
+      <div style={S.card} data-testid="health-client-detail">
+        <button onClick={onBack} style={{ ...S.btnSecondary, marginBottom: 16 }} data-testid="health-back-btn">← Мои клиенты</button>
+        <p style={{ fontSize: 13, color: "#7A7268" }}>Загрузка...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={S.card} data-testid="health-client-detail">
+        <button onClick={onBack} style={{ ...S.btnSecondary, marginBottom: 16 }} data-testid="health-back-btn">← Мои клиенты</button>
+        <p style={{ fontSize: 13, color: "#991B1B" }} data-testid="health-detail-error">{error}</p>
+      </div>
+    );
+  }
+
+  if (!detail) return null;
+
+  const { client, overview, recent_days, plate_summary, weekly_summaries, insights, service_requests } = detail;
+
+  return (
+    <div style={S.card} data-testid="health-client-detail">
+      <button onClick={onBack} style={{ ...S.btnSecondary, marginBottom: 16 }} data-testid="health-back-btn">← Мои клиенты</button>
+
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }} data-testid="health-client-name">{client.display_name}</div>
+      <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 16 }}>
+        {client.relationship === "primary" ? "Основной специалист" : "Совместный доступ"}
+        <span style={{ marginLeft: 8, padding: "2px 8px", borderRadius: 6, background: "rgba(184,92,74,.08)", fontSize: 11, fontWeight: 600, color: "#B85C4A" }}>Здоровье</span>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            style={{
+              padding: "6px 12px", borderRadius: 10, border: 0, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              background: tab === t.id ? "#B85C4A" : "rgba(46,42,37,.04)",
+              color: tab === t.id ? "#fff" : "#7A7268",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Обзор ──────────────────────────────────────── */}
+      {tab === "overview" && (
+        <div data-testid="health-overview">
+          {overview.goal && (
+            <div style={{ padding: "10px 14px", borderRadius: 12, background: "#F8F6F2", marginBottom: 12 }} data-testid="health-overview-goal">
+              <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 2 }}>Цель</div>
+              <div style={{ fontSize: 14 }}>{overview.goal}</div>
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16, fontSize: 13, color: "#7A7268" }}>
+            <div data-testid="health-overview-diary-days">
+              <div style={{ fontWeight: 600, color: "#2E2A25" }}>{overview.diary_days}</div>
+              {overview.diary_days === 1 ? "день" : "дней"} в дневнике
+            </div>
+            <div data-testid="health-overview-last-activity">
+              <div style={{ fontWeight: 600, color: "#2E2A25" }}>
+                {overview.last_activity_at ? new Date(overview.last_activity_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" }) : "—"}
+              </div>
+              последняя активность
+            </div>
+            {overview.latest_weight_kg && (
+              <div data-testid="health-overview-weight">
+                <div style={{ fontWeight: 600, color: "#2E2A25" }}>{overview.latest_weight_kg} кг</div>
+                последний вес
+              </div>
+            )}
+            {overview.latest_steps && (
+              <div data-testid="health-overview-steps">
+                <div style={{ fontWeight: 600, color: "#2E2A25" }}>{overview.latest_steps.toLocaleString()}</div>
+                шагов
+              </div>
+            )}
+            {overview.latest_sleep_hours && (
+              <div>
+                <div style={{ fontWeight: 600, color: "#2E2A25" }}>{overview.latest_sleep_hours} ч</div>
+                сон
+              </div>
+            )}
+          </div>
+
+          {overview.active_request_count > 0 && (
+            <div style={{ padding: "10px 14px", borderRadius: 12, background: "#FEF3C7", border: "1px solid #FDE68A", marginBottom: 12 }}>
+              <div style={{ fontSize: 13, color: "#92400E" }}>
+                Открытых запросов: {overview.active_request_count}
+              </div>
+            </div>
+          )}
+
+          {insights && insights.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Наблюдения</div>
+              {insights.map((ins, idx) => (
+                <div key={idx} style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(46,42,37,.08)", marginBottom: 6, fontSize: 13 }}>
+                  {ins.title && <div style={{ fontWeight: 600, marginBottom: 2 }}>{ins.title}</div>}
+                  <div style={{ color: "#7A7268" }}>{ins.insight_text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!overview.diary_days && !overview.active_request_count && (!insights || insights.length === 0) && (
+            <p style={{ fontSize: 13, color: "#7A7268" }}>Данных пока нет.</p>
+          )}
+        </div>
+      )}
+
+      {/* ── Дневник ────────────────────────────────────── */}
+      {tab === "diary" && (
+        <div>
+          {!recent_days || recent_days.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#7A7268" }}>Дневник пока не заполнен.</p>
+          ) : (
+            <div>
+              {recent_days.map((day) => (
+                <div key={day.log_date} style={{ padding: "12px 0", borderBottom: "1px solid rgba(46,42,37,.06)" }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>
+                    {new Date(day.log_date + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+                  </div>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 13, color: "#7A7268" }}>
+                    {day.weight_kg && <span>Вес: {day.weight_kg} кг</span>}
+                    {day.steps && <span>Шаги: {day.steps.toLocaleString()}</span>}
+                    {day.sleep_hours && <span>Сон: {day.sleep_hours} ч</span>}
+                    {day.mood_level && <span>Настроение: {day.mood_level}/5</span>}
+                    {day.energy_level && <span>Энергия: {day.energy_level}/5</span>}
+                    {day.workout_done && <span>Тренировка: {day.workout_type || "да"}{day.workout_minutes ? ` (${day.workout_minutes} мин)` : ""}</span>}
+                    {day.meals_count && <span>Приёмов пищи: {day.meals_count}</span>}
+                    {day.calories && <span>Калории: {day.calories}</span>}
+                    {day.water_l && <span>Вода: {day.water_l} л</span>}
+                  </div>
+                  {day.ai_day_summary && (
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#7A7268", fontStyle: "italic" }}>
+                      <span style={{ fontWeight: 600, fontStyle: "normal", color: "#B85C4A" }}>AI-сводка для клиента: </span>
+                      {day.ai_day_summary}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Питание ────────────────────────────────────── */}
+      {tab === "nutrition" && (
+        <div>
+          <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 12, fontStyle: "italic" }}>
+            Анализ питания приблизительный и основан на фото тарелки.
+          </div>
+          {!plate_summary || plate_summary.total_plates === 0 ? (
+            <p style={{ fontSize: 13, color: "#7A7268" }}>Данных о питании пока нет.</p>
+          ) : (
+            <div>
+              <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>Всего проанализировано тарелок: {plate_summary.total_plates}</div>
+              {plate_summary.recent_plates.map((plate, idx) => (
+                <div key={idx} style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)", marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 4 }}>
+                    {new Date(plate.log_date + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                    {plate.meal_type && ` · ${plate.meal_type}`}
+                  </div>
+                  {plate.balance_summary && <div style={{ fontSize: 13, marginBottom: 4 }}>{plate.balance_summary}</div>}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 12, color: "#7A7268" }}>
+                    {plate.vegetables_assessment && <span>Овощи: {plate.vegetables_assessment}</span>}
+                    {plate.protein_assessment && <span>Белок: {plate.protein_assessment}</span>}
+                    {plate.carbohydrate_assessment && <span>Углеводы: {plate.carbohydrate_assessment}</span>}
+                  </div>
+                  {plate.gentle_suggestion && (
+                    <div style={{ marginTop: 4, fontSize: 12, color: "#5F7D6C" }}>{plate.gentle_suggestion}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Активность ─────────────────────────────────── */}
+      {tab === "activity" && (
+        <div>
+          {!recent_days || recent_days.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#7A7268" }}>Данных об активности пока нет.</p>
+          ) : (
+            <div>
+              {recent_days.filter((d) => d.workout_done || d.steps).map((day) => (
+                <div key={day.log_date} style={{ padding: "10px 0", borderBottom: "1px solid rgba(46,42,37,.06)" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+                    {new Date(day.log_date + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+                  </div>
+                  <div style={{ display: "flex", gap: 12, fontSize: 13, color: "#7A7268" }}>
+                    {day.steps && <span>Шаги: {day.steps.toLocaleString()}</span>}
+                    {day.workout_done && <span>Тренировка: {day.workout_type || "да"}</span>}
+                    {day.workout_minutes && <span>Длительность: {day.workout_minutes} мин</span>}
+                    {day.workout_intensity && <span>Интенсивность: {day.workout_intensity}</span>}
+                  </div>
+                </div>
+              ))}
+              {recent_days.every((d) => !d.workout_done && !d.steps) && (
+                <p style={{ fontSize: 13, color: "#7A7268" }}>Данных об активности пока нет.</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Вес и параметры ────────────────────────────── */}
+      {tab === "weight" && (
+        <div>
+          {!recent_days || recent_days.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#7A7268" }}>Данных о весе пока нет.</p>
+          ) : (
+            <div>
+              {recent_days.filter((d) => d.weight_kg || d.waist_cm).map((day) => (
+                <div key={day.log_date} style={{ padding: "10px 0", borderBottom: "1px solid rgba(46,42,37,.06)", display: "flex", gap: 16, fontSize: 13 }}>
+                  <div style={{ color: "#7A7268", minWidth: 100 }}>
+                    {new Date(day.log_date + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                  </div>
+                  <div>
+                    {day.weight_kg && <span style={{ fontWeight: 600 }}>{day.weight_kg} кг</span>}
+                    {day.waist_cm && <span style={{ marginLeft: 12, color: "#7A7268" }}>Талия: {day.waist_cm} см</span>}
+                  </div>
+                </div>
+              ))}
+              {recent_days.every((d) => !d.weight_kg && !d.waist_cm) && (
+                <p style={{ fontSize: 13, color: "#7A7268" }}>Данных о весе пока нет.</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── AI-сводки ──────────────────────────────────── */}
+      {tab === "summaries" && (
+        <div>
+          {(!weekly_summaries || weekly_summaries.length === 0) && (!recent_days || recent_days.every((d) => !d.ai_day_summary)) ? (
+            <p style={{ fontSize: 13, color: "#7A7268" }}>Сводки пока не сформированы.</p>
+          ) : (
+            <div>
+              {/* Daily AI summaries */}
+              {recent_days && recent_days.some((d) => d.ai_day_summary) && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Ежедневные AI-сводки</div>
+                  <div style={{ fontSize: 11, color: "#7A7268", marginBottom: 8, fontStyle: "italic" }}>
+                    AI-сводка для клиента — не является заключением специалиста
+                  </div>
+                  {recent_days.filter((d) => d.ai_day_summary).map((day) => (
+                    <div key={day.log_date} style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)", marginBottom: 8 }}>
+                      <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 4 }}>
+                        {new Date(day.log_date + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+                      </div>
+                      <div style={{ fontSize: 13, lineHeight: 1.5 }}>{day.ai_day_summary}</div>
+                      {day.ai_positive_observation && (
+                        <div style={{ fontSize: 12, color: "#5F7D6C", marginTop: 4 }}>+ {day.ai_positive_observation}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Weekly summaries */}
+              {weekly_summaries && weekly_summaries.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Недельные итоги</div>
+                  <div style={{ fontSize: 11, color: "#7A7268", marginBottom: 8, fontStyle: "italic" }}>
+                    AI-сводка для клиента — не является заключением специалиста
+                  </div>
+                  {weekly_summaries.map((ws, idx) => (
+                    <div key={idx} style={{ padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)", marginBottom: 12 }}>
+                      <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 6 }}>
+                        {new Date(ws.period_start + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                        {" — "}
+                        {new Date(ws.period_end + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                        {ws.source_days ? ` · ${ws.source_days} дн.` : ""}
+                      </div>
+                      {ws.user_summary && (
+                        <div style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 8 }}>{ws.user_summary}</div>
+                      )}
+                      {ws.positive_changes && ws.positive_changes.length > 0 && (
+                        <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>
+                          <span style={{ fontWeight: 600 }}>Успехи:</span> {ws.positive_changes.join("; ")}
+                        </div>
+                      )}
+                      {ws.patterns && ws.patterns.length > 0 && (
+                        <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 4 }}>
+                          <span style={{ fontWeight: 600 }}>Паттерны:</span> {ws.patterns.join("; ")}
+                        </div>
+                      )}
+                      {ws.next_week_focus && ws.next_week_focus.length > 0 && (
+                        <div style={{ fontSize: 12, color: "#B85C4A", marginTop: 6 }}>
+                          <span style={{ fontWeight: 600 }}>Фокус на следующую неделю:</span> {ws.next_week_focus.join("; ")}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Запросы ────────────────────────────────────── */}
+      {tab === "requests" && (
+        <div>
+          {!service_requests || service_requests.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#7A7268" }}>Запросов специалисту пока нет.</p>
+          ) : (
+            <div>
+              {service_requests.map((sr) => {
+                const typeLabels = {
+                  text_question: "Онлайн-вопрос",
+                  phone_call: "Телефонный звонок",
+                  video_call: "Видеоконсультация",
+                  offline_visit: "Очная консультация",
+                  diary_review: "Разбор дневника",
+                  labs_medications_review: "Разбор анализов и препаратов",
+                  other: "Другой запрос",
+                };
+                const statusLabels = {
+                  submitted: "Новый",
+                  accepted: "Принят",
+                  needs_clarification: "Уточнение",
+                  scheduled: "Запланирован",
+                  answered: "Отвечен",
+                  completed: "Завершён",
+                  cancelled: "Отменён",
+                };
+                return (
+                  <div key={sr.request_ref} style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)", marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>{typeLabels[sr.request_type] || sr.request_type}</div>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: "#F3F4F6", color: "#6B7280" }}>
+                        {statusLabels[sr.status] || sr.status}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#7A7268" }}>
+                      {new Date(sr.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                      {sr.due_at && ` · Срок: ${new Date(sr.due_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}`}
+                      {sr.scheduled_at && ` · Назначено: ${new Date(sr.scheduled_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       )}

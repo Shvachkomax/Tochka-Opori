@@ -121,6 +121,8 @@ export default async function handler(req, res) {
         return await handleGetClientOverview(req, res);
       case "getClientProfessionalAnalysis":
         return await handleGetClientProfessionalAnalysis(req, res);
+      case "getBodyClientOverview":
+        return await handleGetBodyClientOverview(req, res);
       default:
         return res.status(400).json({ ok: false, error: "Unknown action" });
     }
@@ -426,12 +428,10 @@ async function handleListClients(req, res) {
 // ── CLIENT REF RESOLUTION ─────────────────────────────────
 
 async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRef, organizationId, module }) {
-  if (module !== "support") {
-    return { ok: false, error: "Модуль пока не поддерживается", status: 400 };
-  }
-
   const supabase = getSupabase();
   let publicCode = null;
+  let ownerType = null;
+  let ownerId = null;
   let relationship = null;
   let accessRole = null;
 
@@ -439,7 +439,7 @@ async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRe
     const assignmentId = clientRef.slice("assignment:".length);
     const { data: assignment } = await supabase
       .from("patient_assignments")
-      .select("id, public_code, status, module, organization_id, primary_expert_id")
+      .select("id, public_code, owner_type, owner_id, status, module, organization_id, primary_expert_id")
       .eq("id", assignmentId)
       .maybeSingle();
 
@@ -462,14 +462,23 @@ async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRe
     if (assignment.primary_expert_id !== expert.id) {
       return { ok: false, error: "Доступ запрещён", status: 403 };
     }
-    publicCode = assignment.public_code;
+    // Body module requires anonymous_profile owner
+    if (module === "body") {
+      if (assignment.owner_type !== "anonymous_profile" || !assignment.owner_id) {
+        return { ok: false, error: "Некорректный владелец", status: 403 };
+      }
+      ownerType = assignment.owner_type;
+      ownerId = assignment.owner_id;
+    } else {
+      publicCode = assignment.public_code;
+    }
     relationship = "primary";
     accessRole = "owner";
   } else if (clientRef.startsWith("access:")) {
     const accessId = clientRef.slice("access:".length);
     const { data: accessRow } = await supabase
       .from("patient_access")
-      .select("id, public_code, status, module, organization_id, expert_id, access_role")
+      .select("id, public_code, owner_type, owner_id, status, module, organization_id, expert_id, access_role")
       .eq("id", accessId)
       .maybeSingle();
 
@@ -491,14 +500,23 @@ async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRe
     if (accessRow.expert_id !== expert.id) {
       return { ok: false, error: "Доступ запрещён", status: 403 };
     }
-    publicCode = accessRow.public_code;
+    // Body module requires anonymous_profile owner
+    if (module === "body") {
+      if (accessRow.owner_type !== "anonymous_profile" || !accessRow.owner_id) {
+        return { ok: false, error: "Некорректный владелец", status: 403 };
+      }
+      ownerType = accessRow.owner_type;
+      ownerId = accessRow.owner_id;
+    } else {
+      publicCode = accessRow.public_code;
+    }
     relationship = "shared";
     accessRole = accessRow.access_role;
   } else {
     return { ok: false, error: "Некорректный client_ref", status: 400 };
   }
 
-  return { ok: true, publicCode, relationship, accessRole };
+  return { ok: true, publicCode, ownerType, ownerId, relationship, accessRole };
 }
 
 // ── GET CLIENT OVERVIEW ───────────────────────────────────
@@ -514,6 +532,11 @@ async function handleGetClientOverview(req, res) {
 
   if (!client_ref) {
     return res.status(400).json({ ok: false, error: "Укажите client_ref" });
+  }
+
+  // Body module has its own endpoint
+  if (module === "body") {
+    return res.status(400).json({ ok: false, error: "Используйте getBodyClientOverview" });
   }
 
   // Validate context
@@ -734,6 +757,208 @@ async function handleGetClientProfessionalAnalysis(req, res) {
       points: dynamicsPoints,
     },
     voice_observations: voiceObs,
+  });
+}
+
+// ── GET BODY CLIENT OVERVIEW ──────────────────────────────
+
+async function handleGetBodyClientOverview(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) {
+    return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  }
+
+  const { expert, memberships } = authResult;
+  const { client_ref, organization_id: orgId, module } = req.body || {};
+
+  if (!client_ref) {
+    return res.status(400).json({ ok: false, error: "Укажите client_ref" });
+  }
+  if (module !== "body") {
+    return res.status(400).json({ ok: false, error: "Некорректный модуль" });
+  }
+
+  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module });
+  if (!ctx.ok) {
+    return res.status(400).json({ ok: false, error: ctx.error });
+  }
+
+  const resolved = await resolveAuthorizedSpecialistClient({ expert, memberships, clientRef: client_ref, organizationId: orgId, module });
+  if (!resolved.ok) {
+    return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
+  }
+
+  const { ownerType, ownerId, relationship, accessRole } = resolved;
+  if (!ownerId) {
+    return res.status(403).json({ ok: false, error: "Владелец не определён" });
+  }
+
+  const supabase = getSupabase();
+
+  // ── Batch 1: body_clients for this owner ───────────────
+  const { data: bcRows } = await supabase
+    .from("body_clients")
+    .select("id, session_id, display_name, goal, status, created_at")
+    .eq("anonymous_owner_id", ownerId)
+    .order("created_at", { ascending: false });
+
+  const bodyClient = bcRows?.[0] || null;
+  const sessionIds = (bcRows || []).map((r) => r.session_id).filter(Boolean);
+
+  // ── Batch 2: recent daily logs (30 days, authorized sessions only) ──
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const sinceDate = thirtyDaysAgo.toISOString().slice(0, 10);
+
+  let dailyLogs = [];
+  if (sessionIds.length > 0) {
+    const { data: logs } = await supabase
+      .from("body_daily_logs")
+      .select("log_date, weight_kg, waist_cm, steps, sleep_hours, sleep_quality, mood_level, energy_level, workout_done, workout_type, workout_minutes, meals_count, calories, water_l, ai_day_summary, ai_positive_observation, created_at")
+      .in("session_id", sessionIds)
+      .gte("log_date", sinceDate)
+      .order("log_date", { ascending: false });
+    dailyLogs = logs || [];
+  }
+
+  // Deduplicate by date (keep most recent per date)
+  const seenDates = new Set();
+  const dedupedLogs = [];
+  for (const log of dailyLogs) {
+    if (!seenDates.has(log.log_date)) {
+      seenDates.add(log.log_date);
+      dedupedLogs.push(log);
+    }
+  }
+
+  // ── Batch 3: plate history (owner_id direct) ──────────
+  const { data: plateRows } = await supabase
+    .from("body_plate_history")
+    .select("log_date, meal_type, balance_summary, vegetables_assessment, protein_assessment, carbohydrate_assessment, gentle_suggestion, confidence")
+    .eq("owner_id", ownerId)
+    .gte("log_date", sinceDate)
+    .order("log_date", { ascending: false });
+
+  // ── Batch 4: weekly summaries (owner_id direct) ───────
+  // JSON-path projection: fetch only approved keys from summary_json, not the full blob.
+  const { data: weeklyRows } = await supabase
+    .from("body_weekly_summaries")
+    .select("period_start, period_end, user_summary, source_days, source_plate_count, positive_changes:summary_json->positive_changes, patterns:summary_json->patterns, nutrition_observations:summary_json->nutrition_observations, activity_observations:summary_json->activity_observations, sleep_observations:summary_json->sleep_observations, next_week_focus:summary_json->next_week_focus, questions_for_specialist:summary_json->questions_for_specialist")
+    .eq("owner_id", ownerId)
+    .eq("summary_type", "weekly")
+    .order("period_start", { ascending: false })
+    .limit(5);
+
+  // ── Batch 5: active insights (owner_id direct) ────────
+  const { data: insightRows } = await supabase
+    .from("body_insights")
+    .select("insight_type, title, insight_text, priority, insight_date")
+    .eq("owner_id", ownerId)
+    .eq("status", "active")
+    .order("priority", { ascending: true })
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  // ── Batch 6: service requests (owner_id direct) ───────
+  const { data: srRows } = await supabase
+    .from("service_requests")
+    .select("id, request_type, status, created_at, due_at, scheduled_at")
+    .eq("owner_id", ownerId)
+    .eq("module", "body")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  // ── Compute overview stats ─────────────────────────────
+  const latestLog = dedupedLogs[0] || null;
+  const firstLog = dedupedLogs.length > 0 ? dedupedLogs[dedupedLogs.length - 1] : null;
+  const activeRequestCount = (srRows || []).filter((r) => ["submitted", "accepted", "needs_clarification", "scheduled"].includes(r.status)).length;
+
+  // ── Build response (no owner_id, no session_id, no secrets) ──
+
+  return res.status(200).json({
+    ok: true,
+    client: {
+      client_ref,
+      module: "body",
+      display_name: bodyClient?.display_name || "Клиент без имени",
+      relationship,
+      access_role: accessRole,
+    },
+    overview: {
+      goal: bodyClient?.goal || null,
+      status: bodyClient?.status || null,
+      first_activity_at: firstLog?.created_at || bodyClient?.created_at || null,
+      last_activity_at: latestLog?.created_at || null,
+      diary_days: dedupedLogs.length,
+      latest_weight_kg: latestLog?.weight_kg || null,
+      latest_steps: latestLog?.steps || null,
+      latest_sleep_hours: latestLog?.sleep_hours || null,
+      latest_mood_level: latestLog?.mood_level || null,
+      latest_energy_level: latestLog?.energy_level || null,
+      active_request_count: activeRequestCount,
+    },
+    recent_days: dedupedLogs.map((l) => ({
+      log_date: l.log_date,
+      weight_kg: l.weight_kg,
+      waist_cm: l.waist_cm,
+      steps: l.steps,
+      sleep_hours: l.sleep_hours,
+      sleep_quality: l.sleep_quality,
+      mood_level: l.mood_level,
+      energy_level: l.energy_level,
+      workout_done: l.workout_done,
+      workout_type: l.workout_type,
+      workout_minutes: l.workout_minutes,
+      meals_count: l.meals_count,
+      calories: l.calories,
+      water_l: l.water_l,
+      ai_day_summary: l.ai_day_summary || null,
+      ai_positive_observation: l.ai_positive_observation || null,
+    })),
+    plate_summary: {
+      total_plates: (plateRows || []).length,
+      recent_plates: (plateRows || []).slice(0, 20).map((p) => ({
+        log_date: p.log_date,
+        meal_type: p.meal_type,
+        balance_summary: p.balance_summary || null,
+        vegetables_assessment: p.vegetables_assessment || null,
+        protein_assessment: p.protein_assessment || null,
+        carbohydrate_assessment: p.carbohydrate_assessment || null,
+        gentle_suggestion: p.gentle_suggestion || null,
+      })),
+    },
+    weekly_summaries: (weeklyRows || []).map((w) => ({
+      period_start: w.period_start,
+      period_end: w.period_end,
+      user_summary: w.user_summary || null,
+      source_days: w.source_days,
+      source_plate_count: w.source_plate_count,
+      positive_changes: w.positive_changes || [],
+      patterns: w.patterns || [],
+      nutrition_observations: w.nutrition_observations || [],
+      activity_observations: w.activity_observations || [],
+      sleep_observations: w.sleep_observations || [],
+      next_week_focus: w.next_week_focus || [],
+      questions_for_specialist: w.questions_for_specialist || [],
+    })),
+    insights: (insightRows || []).map((i) => ({
+      insight_type: i.insight_type,
+      title: i.title || null,
+      insight_text: i.insight_text,
+      priority: i.priority,
+      insight_date: i.insight_date,
+    })),
+    // request_ref is opaque to React — never parse back to UUID on client.
+    // Future Phase 5: React sends request_ref unchanged → server parses →
+    // server re-authorizes specialist → validates module/context/owner/request.
+    service_requests: (srRows || []).map((sr) => ({
+      request_ref: `service-request:${sr.id}`,
+      request_type: sr.request_type,
+      status: sr.status,
+      created_at: sr.created_at,
+      due_at: sr.due_at || null,
+      scheduled_at: sr.scheduled_at || null,
+    })),
   });
 }
 
