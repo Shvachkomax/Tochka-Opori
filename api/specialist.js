@@ -117,6 +117,10 @@ export default async function handler(req, res) {
         return await handleLogout(req, res);
       case "listClients":
         return await handleListClients(req, res);
+      case "getClientOverview":
+        return await handleGetClientOverview(req, res);
+      case "getClientProfessionalAnalysis":
+        return await handleGetClientProfessionalAnalysis(req, res);
       default:
         return res.status(400).json({ ok: false, error: "Unknown action" });
     }
@@ -417,6 +421,320 @@ async function handleListClients(req, res) {
   }
 
   return res.status(200).json({ ok: true, clients: result });
+}
+
+// ── CLIENT REF RESOLUTION ─────────────────────────────────
+
+async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRef, organizationId, module }) {
+  if (module !== "support") {
+    return { ok: false, error: "Модуль пока не поддерживается", status: 400 };
+  }
+
+  const supabase = getSupabase();
+  let publicCode = null;
+  let relationship = null;
+  let accessRole = null;
+
+  if (clientRef.startsWith("assignment:")) {
+    const assignmentId = clientRef.slice("assignment:".length);
+    const { data: assignment } = await supabase
+      .from("patient_assignments")
+      .select("id, public_code, status, module, organization_id, primary_expert_id")
+      .eq("id", assignmentId)
+      .maybeSingle();
+
+    if (!assignment || assignment.status !== "active") {
+      return { ok: false, error: "Назначение не найдено или неактивно", status: 404 };
+    }
+    if (assignment.module !== module) {
+      return { ok: false, error: "Несоответствие модуля", status: 403 };
+    }
+    // Organization context must match exactly
+    if (organizationId === null) {
+      if (assignment.organization_id !== null) {
+        return { ok: false, error: "Несоответствие контекста организации", status: 403 };
+      }
+    } else {
+      if (assignment.organization_id !== organizationId) {
+        return { ok: false, error: "Несоответствие контекста организации", status: 403 };
+      }
+    }
+    if (assignment.primary_expert_id !== expert.id) {
+      return { ok: false, error: "Доступ запрещён", status: 403 };
+    }
+    publicCode = assignment.public_code;
+    relationship = "primary";
+    accessRole = "owner";
+  } else if (clientRef.startsWith("access:")) {
+    const accessId = clientRef.slice("access:".length);
+    const { data: accessRow } = await supabase
+      .from("patient_access")
+      .select("id, public_code, status, module, organization_id, expert_id, access_role")
+      .eq("id", accessId)
+      .maybeSingle();
+
+    if (!accessRow || accessRow.status !== "active") {
+      return { ok: false, error: "Доступ не найден или неактивен", status: 404 };
+    }
+    if (accessRow.module !== module) {
+      return { ok: false, error: "Несоответствие модуля", status: 403 };
+    }
+    if (organizationId === null) {
+      if (accessRow.organization_id !== null) {
+        return { ok: false, error: "Несоответствие контекста организации", status: 403 };
+      }
+    } else {
+      if (accessRow.organization_id !== organizationId) {
+        return { ok: false, error: "Несоответствие контекста организации", status: 403 };
+      }
+    }
+    if (accessRow.expert_id !== expert.id) {
+      return { ok: false, error: "Доступ запрещён", status: 403 };
+    }
+    publicCode = accessRow.public_code;
+    relationship = "shared";
+    accessRole = accessRow.access_role;
+  } else {
+    return { ok: false, error: "Некорректный client_ref", status: 400 };
+  }
+
+  return { ok: true, publicCode, relationship, accessRole };
+}
+
+// ── GET CLIENT OVERVIEW ───────────────────────────────────
+
+async function handleGetClientOverview(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) {
+    return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  }
+
+  const { expert, memberships } = authResult;
+  const { client_ref, organization_id: orgId, module } = req.body || {};
+
+  if (!client_ref) {
+    return res.status(400).json({ ok: false, error: "Укажите client_ref" });
+  }
+
+  // Validate context
+  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module });
+  if (!ctx.ok) {
+    return res.status(400).json({ ok: false, error: ctx.error });
+  }
+
+  // Resolve and authorize client
+  const resolved = await resolveAuthorizedSpecialistClient({ expert, memberships, clientRef: client_ref, organizationId: orgId, module });
+  if (!resolved.ok) {
+    return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
+  }
+
+  const { publicCode, relationship, accessRole } = resolved;
+  const supabase = getSupabase();
+
+  // Resolve display name from assignment (no N+1 — single query)
+  let display_name = "Клиент без имени";
+  const { data: assignmentLabel } = await supabase
+    .from("patient_assignments")
+    .select("patient_label")
+    .eq("public_code", publicCode)
+    .eq("module", "support")
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (assignmentLabel?.patient_label) {
+    display_name = assignmentLabel.patient_label;
+  }
+
+  // Find the anonymous_owner_id from the session with this public_code
+  const { data: ownerSession } = await supabase
+    .from("sessions")
+    .select("anonymous_owner_id")
+    .eq("public_code", publicCode)
+    .eq("module", "support")
+    .limit(1)
+    .maybeSingle();
+
+  // Query ALL sessions for this owner (supports follow-up sessions with different public_codes)
+  const ownerId = ownerSession?.anonymous_owner_id;
+  const { data: sessions } = ownerId
+    ? await supabase
+        .from("sessions")
+        .select("id, created_at, updated_at, care_recommendation, doctor_report, report_generation_status")
+        .eq("anonymous_owner_id", ownerId)
+        .eq("module", "support")
+        .order("created_at", { ascending: false })
+    : { data: [] };
+
+  // Zero sessions is valid — return empty card
+  const sessionList = (sessions || []).map((s) => {
+    const careRec = s.care_recommendation;
+    const raw = s.doctor_report || "";
+    const clean = raw.replace(/\s+/g, " ").trim();
+    const summary = clean.length > 200 ? clean.slice(0, 197) + "..." : clean || null;
+    return {
+      session_ref: `support-session:${s.id}`,
+      started_at: s.created_at,
+      updated_at: s.updated_at,
+      status: s.report_generation_status || "unknown",
+      short_summary: summary,
+      safety_level: careRec?.level || null,
+    };
+  });
+
+  // Safety: overview reflects LATEST session (or null if no sessions)
+  const latestSession = sessions?.[0] || null;
+  const latestCareRec = latestSession?.care_recommendation || null;
+  const safetyLevel = latestCareRec?.level || null;
+  const hasActiveFlags = ["urgent_help", "professional_contact", "medical_consultation"].includes(safetyLevel);
+
+  return res.status(200).json({
+    ok: true,
+    client: {
+      client_ref,
+      display_name,
+      relationship,
+      access_role: accessRole,
+    },
+    overview: {
+      first_activity_at: sessions?.length > 0 ? sessions[sessions.length - 1].created_at : null,
+      last_activity_at: latestSession?.created_at || null,
+      session_count: sessions?.length || 0,
+      latest_session_at: latestSession?.created_at || null,
+      safety: {
+        level: safetyLevel,
+        has_active_flags: hasActiveFlags,
+        reasons: latestCareRec?.reasons || [],
+      },
+    },
+    sessions: sessionList,
+  });
+}
+
+// ── GET CLIENT PROFESSIONAL ANALYSIS ──────────────────────
+
+async function handleGetClientProfessionalAnalysis(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) {
+    return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  }
+
+  const { expert, memberships } = authResult;
+  const { client_ref, organization_id: orgId, module } = req.body || {};
+
+  if (!client_ref) {
+    return res.status(400).json({ ok: false, error: "Укажите client_ref" });
+  }
+
+  if (module !== "support") {
+    return res.status(400).json({ ok: false, error: "Модуль пока не поддерживается" });
+  }
+
+  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module });
+  if (!ctx.ok) {
+    return res.status(400).json({ ok: false, error: ctx.error });
+  }
+
+  const resolved = await resolveAuthorizedSpecialistClient({ expert, memberships, clientRef: client_ref, organizationId: orgId, module });
+  if (!resolved.ok) {
+    return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
+  }
+
+  const { publicCode } = resolved;
+  const supabase = getSupabase();
+
+  // Find owner from public_code
+  const { data: ownerSession } = await supabase
+    .from("sessions")
+    .select("anonymous_owner_id")
+    .eq("public_code", publicCode)
+    .eq("module", "support")
+    .limit(1)
+    .maybeSingle();
+
+  const ownerId = ownerSession?.anonymous_owner_id;
+  if (!ownerId) {
+    return res.status(200).json({ ok: true, latest_analysis: null, dynamics: { session_count: 0, points: [] }, voice_observations: [] });
+  }
+
+  // Query sessions — professional fields only, voice observations via JSON path projection
+  // Do NOT fetch full json_data; only extract the voiceObservations subtree.
+  const { data: sessions } = await supabase
+    .from("sessions")
+    .select("id, created_at, care_recommendation, doctor_report, report_generation_status, voiceObs:json_data->>voiceObservations")
+    .eq("anonymous_owner_id", ownerId)
+    .eq("module", "support")
+    .order("created_at", { ascending: false });
+
+  if (!sessions || sessions.length === 0) {
+    return res.status(200).json({ ok: true, latest_analysis: null, dynamics: { session_count: 0, points: [] }, voice_observations: [] });
+  }
+
+  // Build dynamics timeline (all sessions, chronological)
+  const dynamicsPoints = sessions.map((s) => {
+    const careRec = s.care_recommendation;
+    const raw = s.doctor_report || "";
+    const clean = raw.replace(/\s+/g, " ").trim();
+    const summary = clean.length > 150 ? clean.slice(0, 147) + "..." : clean || null;
+    return {
+      session_ref: `support-session:${s.id}`,
+      date: s.created_at,
+      safety_level: careRec?.level || null,
+      summary,
+      status: s.report_generation_status || "unknown",
+    };
+  }).reverse(); // chronological order
+
+  // Latest session = most recent
+  const latest = sessions[0];
+  const latestCareRec = latest.care_recommendation;
+  const latestReport = latest.doctor_report || "";
+  const latestStatus = latest.report_generation_status;
+
+  // Extract voice observations from json_data (batch — all sessions)
+  // Voice observations — whitelist only approved professional fields
+  const VOICE_FIELD_WHITELIST = ["tempo", "pauses", "volume", "prosody", "tension", "stability"];
+  const voiceObs = [];
+  for (const s of sessions) {
+    // voiceObs is the projected json_data->>voiceObservations (JSON string or null)
+    let vo = null;
+    try { vo = typeof s.voiceObs === "string" ? JSON.parse(s.voiceObs) : s.voiceObs; } catch {}
+    if (vo && vo.status === "completed" && vo.speech_features) {
+      const features = {};
+      for (const field of VOICE_FIELD_WHITELIST) {
+        features[field] = vo.speech_features[field]?.value || null;
+      }
+      voiceObs.push({
+        session_ref: `support-session:${s.id}`,
+        date: s.created_at,
+        ...features,
+        summary: vo.summary || null,
+      });
+    }
+  }
+
+  // Build latest analysis
+  const latestAnalysis = {
+    session_ref: `support-session:${latest.id}`,
+    date: latest.created_at,
+    status: latestStatus,
+    doctor_report: latestReport || null,
+    care_recommendation: latestCareRec || null,
+    safety: {
+      level: latestCareRec?.level || null,
+      reasons: latestCareRec?.reasons || [],
+    },
+  };
+
+  return res.status(200).json({
+    ok: true,
+    latest_analysis: latestAnalysis,
+    dynamics: {
+      session_count: sessions.length,
+      points: dynamicsPoints,
+    },
+    voice_observations: voiceObs,
+  });
 }
 
 // ── AUTHORIZATION HELPER ──────────────────────────────────
