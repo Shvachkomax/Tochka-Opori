@@ -1,0 +1,14 @@
+-- ============================================================================
+-- Preview/Test Seed Data
+-- ============================================================================
+--
+-- This file is a placeholder for Preview environment seed data.
+--
+-- IMPORTANT:
+-- - Never copy production patient data into this file.
+-- - Never include real public_codes, continuation credentials, or tokens.
+-- - Never include real phone/email data.
+-- - All data here must be clearly fake/test data.
+--
+-- Seed data will be added after baseline validation.
+-- ============================================================================
