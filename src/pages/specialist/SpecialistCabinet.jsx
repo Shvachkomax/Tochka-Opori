@@ -18,6 +18,7 @@ const S = {
   moduleBtn: { flex: 1, border: "1px solid rgba(46,42,37,.12)", borderRadius: 12, padding: "12px 14px", background: "#fff", cursor: "pointer", fontSize: 14, textAlign: "center" },
   moduleBtnActive: { border: "2px solid #B85C4A", background: "rgba(184,92,74,.04)", fontWeight: 700 },
   divider: { borderTop: "1px solid rgba(46,42,37,.08)", margin: "20px 0" },
+  actionBtn: { padding: "5px 12px", borderRadius: 8, border: "1px solid rgba(46,42,37,.15)", background: "#fff", color: "#2E2A25", cursor: "pointer", fontSize: 12, fontWeight: 600 },
 };
 
 // ── Component ─────────────────────────────────────────────
@@ -57,6 +58,12 @@ export default function SpecialistCabinet() {
   // Professional analysis state
   const [profAnalysis, setProfAnalysis] = useState(null);
   const [profAnalysisLoading, setProfAnalysisLoading] = useState(false);
+
+  // Service requests state
+  const [serviceRequests, setServiceRequests] = useState([]);
+  const [serviceRequestsLoading, setServiceRequestsLoading] = useState(false);
+  const [serviceRequestsFilter, setServiceRequestsFilter] = useState("all");
+  const [serviceRequestUpdating, setServiceRequestUpdating] = useState(null);
 
   // Stale-response guard: only the latest detail request result is applied
   const detailGenerationRef = useRef(0);
@@ -313,6 +320,50 @@ export default function SpecialistCabinet() {
     try { sessionStorage.setItem("specialist_module", m); } catch {}
   }
 
+  // ── Service Requests ─────────────────────────────────────
+
+  async function loadServiceRequests() {
+    setServiceRequestsLoading(true);
+    try {
+      const res = await fetch("/api/specialist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action: "listServiceRequests", module: module !== "all" ? module : undefined }),
+      });
+      const data = await res.json();
+      if (data.ok) setServiceRequests(data.requests || []);
+    } catch {}
+    setServiceRequestsLoading(false);
+  }
+
+  async function updateServiceRequest(requestRef, action, extra = {}) {
+    setServiceRequestUpdating(requestRef);
+    try {
+      const res = await fetch("/api/specialist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action: "updateServiceRequest", request_ref: requestRef, action, module, ...extra }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Статус обновлён");
+        await loadServiceRequests();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка сети", "error");
+    }
+    setServiceRequestUpdating(null);
+  }
+
+  // Load service requests when auth is ready
+  useEffect(() => {
+    if (auth) loadServiceRequests();
+  }, [auth, module]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Loading state ────────────────────────────────────────
 
   if (loading) {
@@ -463,6 +514,65 @@ export default function SpecialistCabinet() {
           })()}
         </div>
 
+        {/* ── Service Requests ─────────────────────────── */}
+        {!selectedClient && (
+          <div style={S.card} data-testid="service-requests-section">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Запросы</div>
+              <button onClick={loadServiceRequests} style={{ ...S.btnSecondary, fontSize: 12, padding: "4px 10px" }}>Обновить</button>
+            </div>
+
+            {/* Filters */}
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 12 }}>
+              {[
+                { id: "all", label: "Все" },
+                { id: "submitted", label: "Новые" },
+                { id: "accepted", label: "Принятые" },
+                { id: "needs_clarification", label: "Уточнение" },
+                { id: "scheduled", label: "Запланированные" },
+                { id: "answered", label: "Отвеченные" },
+                { id: "completed", label: "Завершённые" },
+                { id: "cancelled", label: "Отменённые" },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setServiceRequestsFilter(f.id)}
+                  style={{
+                    padding: "4px 10px", borderRadius: 8, border: 0, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                    background: serviceRequestsFilter === f.id ? "#B85C4A" : "rgba(46,42,37,.04)",
+                    color: serviceRequestsFilter === f.id ? "#fff" : "#7A7268",
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {serviceRequestsLoading ? (
+              <p style={{ fontSize: 13, color: "#7A7268" }}>Загрузка...</p>
+            ) : (
+              <div>
+                {serviceRequests
+                  .filter((r) => serviceRequestsFilter === "all" || r.status === serviceRequestsFilter)
+                  .length === 0 ? (
+                  <p style={{ fontSize: 13, color: "#7A7268" }}>Запросов пока нет.</p>
+                ) : (
+                  serviceRequests
+                    .filter((r) => serviceRequestsFilter === "all" || r.status === serviceRequestsFilter)
+                    .map((r) => (
+                      <ServiceRequestCard
+                        key={r.request_ref}
+                        request={r}
+                        onAction={updateServiceRequest}
+                        updating={serviceRequestUpdating === r.request_ref}
+                      />
+                    ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Client detail or Client list */}
         {selectedClient ? (
           module === "body" ? (
@@ -525,6 +635,153 @@ export default function SpecialistCabinet() {
       </div>
 
       {toast.message && <Toast message={toast.message} type={toast.type} />}
+    </div>
+  );
+}
+
+// ── Service Request Card ──────────────────────────────────
+
+const STATUS_LABELS = {
+  submitted: "Новый",
+  accepted: "Принят",
+  needs_clarification: "Уточнение",
+  scheduled: "Запланирован",
+  answered: "Отвечен",
+  completed: "Завершён",
+  cancelled: "Отменён",
+};
+
+const STATUS_COLORS = {
+  submitted: { bg: "#f0f0f0", text: "#666" },
+  accepted: { bg: "#E2EBE4", text: "#5F7D6C" },
+  needs_clarification: { bg: "#FEF3C7", text: "#92400E" },
+  scheduled: { bg: "#E8E4F0", text: "#6B5F8A" },
+  answered: { bg: "#E2EBE4", text: "#5F7D6C" },
+  completed: { bg: "#E2EBE4", text: "#5F7D6C" },
+  cancelled: { bg: "#f0e0e0", text: "#8B4A3A" },
+};
+
+const REQUEST_TYPE_LABELS = {
+  text_question: "Онлайн-вопрос",
+  phone_call: "Телефонный звонок",
+  video_call: "Видеоконсультация",
+  offline_visit: "Очная консультация",
+  diary_review: "Разбор дневника",
+  labs_medications_review: "Разбор анализов",
+  question: "Вопрос",
+  phone: "Звонок",
+  video: "Видео",
+  offline: "Встреча",
+  other: "Другое",
+};
+
+function ServiceRequestCard({ request: r, onAction, updating }) {
+  const [expanded, setExpanded] = useState(false);
+  const sc = STATUS_COLORS[r.status] || STATUS_COLORS.submitted;
+  const typeLabel = REQUEST_TYPE_LABELS[r.request_type] || r.request_type;
+  const created = r.created_at ? new Date(r.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+
+  const isActive = ["submitted", "accepted", "needs_clarification", "scheduled"].includes(r.status);
+
+  return (
+    <div style={{ padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)", marginBottom: 8, background: "#fff" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#2E2A25" }}>
+            {r.client_display_name}
+            <span style={{ fontSize: 12, fontWeight: 400, color: "#7A7268", marginLeft: 8 }}>
+              {typeLabel}{r.meeting_format ? ` · ${r.meeting_format}` : ""}
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: "#7A7268", marginTop: 2 }}>{created}</div>
+        </div>
+        <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 10, background: sc.bg, color: sc.text, whiteSpace: "nowrap" }}>
+          {STATUS_LABELS[r.status] || r.status}
+        </span>
+      </div>
+
+      {r.title && <div style={{ fontSize: 13, fontWeight: 600, marginTop: 8, color: "#2E2A25" }}>{r.title}</div>}
+
+      {!expanded && r.message && (
+        <div style={{ fontSize: 13, color: "#5F574F", marginTop: 6, cursor: "pointer" }} onClick={() => setExpanded(true)}>
+          {r.message.slice(0, 120)}{r.message.length > 120 ? "…" : ""}
+          <span style={{ fontSize: 11, color: "#B85C4A", marginLeft: 4 }}>подробнее</span>
+        </div>
+      )}
+
+      {expanded && (
+        <div style={{ marginTop: 8 }}>
+          {r.message && <div style={{ fontSize: 13, color: "#5F574F", marginBottom: 8, whiteSpace: "pre-wrap" }}>{r.message}</div>}
+
+          {r.client_contact && Object.keys(r.client_contact).length > 0 && (
+            <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 6 }}>
+              {r.client_contact.phone && <div>Телефон: {r.client_contact.phone}</div>}
+              {r.client_contact.email && <div>Email: {r.client_contact.email}</div>}
+              {r.client_contact.name && <div>Имя: {r.client_contact.name}</div>}
+            </div>
+          )}
+
+          {r.scheduled_at && (
+            <div style={{ fontSize: 12, color: "#6B5F8A", marginBottom: 6, padding: "6px 10px", background: "#F3F0F8", borderRadius: 8 }}>
+              Встреча: {new Date(r.scheduled_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              {r.scheduled_place && <span> · {r.scheduled_place}</span>}
+              {r.scheduled_comment && <div style={{ marginTop: 2 }}>{r.scheduled_comment}</div>}
+            </div>
+          )}
+
+          {r.specialist_response && (
+            <div style={{ fontSize: 13, color: "#5F7D6C", padding: "8px 12px", background: "#E2EBE4", borderRadius: 8, marginTop: 6 }}>
+              {r.specialist_response}
+            </div>
+          )}
+
+          <div style={{ fontSize: 11, color: "#7A7268", marginTop: 6 }} onClick={() => setExpanded(false)}>
+            свернуть
+          </div>
+        </div>
+      )}
+
+      {/* Actions */}
+      {isActive && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+          {r.status === "submitted" && (
+            <button disabled={updating} onClick={() => onAction(r.request_ref, "accept")} style={S.actionBtn}>
+              Принять
+            </button>
+          )}
+          {["submitted", "accepted"].includes(r.status) && (
+            <button disabled={updating} onClick={() => onAction(r.request_ref, "needs_clarification")} style={S.actionBtn}>
+              Уточнить
+            </button>
+          )}
+          {["accepted", "needs_clarification"].includes(r.status) && (
+            <button disabled={updating} onClick={() => {
+              const dt = prompt("Дата и время встречи (ДД.ММ.ГГГГ ЧЧ:ММ):");
+              if (dt) onAction(r.request_ref, "schedule", { scheduled_at: new Date(dt).toISOString(), scheduled_comment: prompt("Комментарий (необязательно):") || "" });
+            }} style={S.actionBtn}>
+              Назначить
+            </button>
+          )}
+          {["submitted", "accepted", "needs_clarification"].includes(r.status) && (
+            <button disabled={updating} onClick={() => {
+              const resp = prompt("Ответ клиенту:");
+              if (resp) onAction(r.request_ref, "answer", { specialist_response: resp });
+            }} style={S.actionBtn}>
+              Ответить
+            </button>
+          )}
+          {["answered", "scheduled"].includes(r.status) && (
+            <button disabled={updating} onClick={() => onAction(r.request_ref, "complete")} style={S.actionBtn}>
+              Завершить
+            </button>
+          )}
+          {!["completed", "cancelled"].includes(r.status) && (
+            <button disabled={updating} onClick={() => onAction(r.request_ref, "cancel")} style={{ ...S.actionBtn, color: "#B85C4A", borderColor: "rgba(184,92,74,.3)" }}>
+              Отменить
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

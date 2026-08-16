@@ -3245,20 +3245,32 @@ async function handleCreateBodyServiceRequest(req, res) {
 
     const supabase = getSupabase();
 
-    // Resolve specialist from body_clients
-    const { data: client } = await supabase
-      .from("body_clients")
-      .select("specialist_id, specialist_name, source")
-      .eq("session_id", session_id)
+    // Resolve specialist from patient_assignments (canonical expert.id)
+    let specialistId = null;
+    let specialistName = null;
+
+    const { data: assignment } = await supabase
+      .from("patient_assignments")
+      .select("primary_expert_id")
+      .eq("owner_type", "anonymous_profile")
+      .eq("owner_id", owner.ownerId)
+      .eq("module", "body")
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    let specialistId = client?.specialist_id || null;
-    let specialistName = client?.specialist_name || null;
-    if (!specialistId && client?.source === "alena_client") {
-      specialistId = "alena_zhukova";
-      specialistName = "Алена Жукова";
+    if (!assignment?.primary_expert_id) {
+      return res.status(400).json({ ok: false, error: "Нет активного назначения специалиста. Обратитесь к администратору." });
     }
-    if (!specialistName) specialistName = "Специалист";
+
+    specialistId = String(assignment.primary_expert_id);
+    const { data: expert } = await supabase
+      .from("experts")
+      .select("id, name")
+      .eq("id", assignment.primary_expert_id)
+      .maybeSingle();
+    specialistName = expert?.name || "Специалист";
 
     // Build safe context snapshot
     const contextSnapshot = {

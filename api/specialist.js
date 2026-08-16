@@ -123,6 +123,10 @@ export default async function handler(req, res) {
         return await handleGetClientProfessionalAnalysis(req, res);
       case "getBodyClientOverview":
         return await handleGetBodyClientOverview(req, res);
+      case "listServiceRequests":
+        return await handleListServiceRequests(req, res);
+      case "updateServiceRequest":
+        return await handleUpdateServiceRequest(req, res);
       default:
         return res.status(400).json({ ok: false, error: "Unknown action" });
     }
@@ -969,6 +973,217 @@ async function handleGetBodyClientOverview(req, res) {
       scheduled_at: sr.scheduled_at || null,
     })),
   });
+}
+
+// ── LIST SERVICE REQUESTS (specialist inbox) ──────────────
+
+async function handleListServiceRequests(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) {
+    return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  }
+
+  const { expert, memberships } = authResult;
+  const { module, status } = req.body || {};
+
+  // Validate module entitlement if module filter provided
+  if (module) {
+    const ctx = validateSpecialistContext({ memberships, organizationId: null, module, allowedModules: expert.allowed_modules });
+    if (!ctx.ok) {
+      return res.status(403).json({ ok: false, error: ctx.error });
+    }
+  }
+
+  const supabase = getSupabase();
+  const expertIdStr = String(expert.id);
+
+  // Always filter by modules the specialist is entitled to
+  const effectiveModules = module ? [module] : expert.allowed_modules;
+
+  let query = supabase
+    .from("service_requests")
+    .select("id, module, owner_type, owner_id, specialist_id, specialist_name, request_type, meeting_format, title, message, status, priority, due_at, scheduled_at, scheduled_place, scheduled_comment, specialist_response, client_contact, created_at, updated_at, answered_at, completed_at, cancelled_at")
+    .eq("specialist_id", expertIdStr)
+    .in("module", effectiveModules)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (status && status !== "all") {
+    query = query.eq("status", status);
+  }
+
+  const { data: requests, error } = await query;
+
+  if (error) {
+    console.error("[listServiceRequests] query error:", error.code);
+    return res.status(500).json({ ok: false, error: "Не удалось загрузить запросы." });
+  }
+
+  // Batch-resolve display names for clients
+  const ownerIds = [...new Set((requests || []).map((r) => r.owner_id).filter(Boolean))];
+  const ownerNames = new Map();
+  if (ownerIds.length > 0) {
+    // Body clients
+    const { data: bcRows } = await supabase
+      .from("body_clients")
+      .select("anonymous_owner_id, display_name")
+      .in("anonymous_owner_id", ownerIds);
+    for (const bc of bcRows || []) {
+      if (!ownerNames.has(bc.anonymous_owner_id) && bc.display_name) {
+        ownerNames.set(bc.anonymous_owner_id, bc.display_name);
+      }
+    }
+    // Support owner profiles
+    const { data: opRows } = await supabase
+      .from("support_owner_profiles")
+      .select("owner_id, display_name")
+      .in("owner_id", ownerIds);
+    for (const op of opRows || []) {
+      if (!ownerNames.has(op.owner_id) && op.display_name) {
+        ownerNames.set(op.owner_id, op.display_name);
+      }
+    }
+  }
+
+  const result = (requests || []).map((r) => ({
+    request_ref: `service-request:${r.id}`,
+    module: r.module,
+    client_display_name: ownerNames.get(r.owner_id) || "Клиент",
+    request_type: r.request_type,
+    meeting_format: r.meeting_format || null,
+    title: r.title || null,
+    message: r.message,
+    status: r.status,
+    priority: r.priority,
+    due_at: r.due_at || null,
+    scheduled_at: r.scheduled_at || null,
+    scheduled_place: r.scheduled_place || null,
+    scheduled_comment: r.scheduled_comment || null,
+    specialist_response: r.specialist_response || null,
+    client_contact: r.client_contact || {},
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+    answered_at: r.answered_at || null,
+    completed_at: r.completed_at || null,
+    cancelled_at: r.cancelled_at || null,
+  }));
+
+  return res.status(200).json({ ok: true, requests: result });
+}
+
+// ── UPDATE SERVICE REQUEST (specialist actions) ────────────
+
+async function handleUpdateServiceRequest(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) {
+    return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  }
+
+  const { expert, memberships } = authResult;
+  const { request_ref, action: updateAction, specialist_response, scheduled_at, scheduled_place, scheduled_comment } = req.body || {};
+
+  if (!request_ref || typeof request_ref !== "string") {
+    return res.status(400).json({ ok: false, error: "Укажите request_ref" });
+  }
+
+  // Parse opaque request_ref
+  if (!request_ref.startsWith("service-request:")) {
+    return res.status(400).json({ ok: false, error: "Некорректный request_ref" });
+  }
+  const requestId = request_ref.slice("service-request:".length);
+
+  const supabase = getSupabase();
+  const expertIdStr = String(expert.id);
+
+  // Fetch the request and verify ownership
+  const { data: request, error: findError } = await supabase
+    .from("service_requests")
+    .select("id, specialist_id, status, module, reserved_credits")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (findError || !request) {
+    return res.status(404).json({ ok: false, error: "Запрос не найден" });
+  }
+
+  // Ownership check: specialist can only update their own requests
+  if (request.specialist_id !== expertIdStr) {
+    return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+  }
+
+  // Module entitlement check: ALWAYS based on request.module from DB, not frontend param
+  if (!expert.allowed_modules.includes(request.module)) {
+    return res.status(403).json({ ok: false, error: "Нет доступа к модулю данного запроса" });
+  }
+
+  const now = new Date().toISOString();
+  const updates = { updated_at: now };
+
+  switch (updateAction) {
+    case "accept":
+      if (!["submitted", "needs_clarification"].includes(request.status)) {
+        return res.status(400).json({ ok: false, error: "Невозможно принять запрос в текущем статусе" });
+      }
+      updates.status = "accepted";
+      break;
+    case "needs_clarification":
+      if (!["submitted", "accepted"].includes(request.status)) {
+        return res.status(400).json({ ok: false, error: "Невозможно запросить уточнение в текущем статусе" });
+      }
+      updates.status = "needs_clarification";
+      break;
+    case "schedule":
+      if (!["accepted", "needs_clarification"].includes(request.status)) {
+        return res.status(400).json({ ok: false, error: "Невозможно запланировать в текущем статусе" });
+      }
+      if (!scheduled_at) {
+        return res.status(400).json({ ok: false, error: "Укажите дату/время" });
+      }
+      updates.status = "scheduled";
+      updates.scheduled_at = scheduled_at;
+      updates.scheduled_place = scheduled_place || null;
+      updates.scheduled_comment = scheduled_comment || null;
+      break;
+    case "answer":
+      if (!["submitted", "accepted", "needs_clarification"].includes(request.status)) {
+        return res.status(400).json({ ok: false, error: "Невозможно ответить в текущем статусе" });
+      }
+      if (!specialist_response) {
+        return res.status(400).json({ ok: false, error: "Укажите ответ" });
+      }
+      updates.status = "answered";
+      updates.specialist_response = specialist_response;
+      updates.answered_at = now;
+      break;
+    case "complete":
+      if (!["answered", "scheduled"].includes(request.status)) {
+        return res.status(400).json({ ok: false, error: "Невозможно завершить в текущем статусе" });
+      }
+      updates.status = "completed";
+      updates.completed_at = now;
+      break;
+    case "cancel":
+      if (["completed", "cancelled"].includes(request.status)) {
+        return res.status(400).json({ ok: false, error: "Невозможно отменить завершённый/отменённый запрос" });
+      }
+      updates.status = "cancelled";
+      updates.cancelled_at = now;
+      break;
+    default:
+      return res.status(400).json({ ok: false, error: "Неизвестное действие" });
+  }
+
+  const { error: updateError } = await supabase
+    .from("service_requests")
+    .update(updates)
+    .eq("id", requestId);
+
+  if (updateError) {
+    console.error("[updateServiceRequest] update error:", updateError.code);
+    return res.status(500).json({ ok: false, error: "Не удалось обновить запрос" });
+  }
+
+  return res.status(200).json({ ok: true, status: updates.status });
 }
 
 // ── AUTHORIZATION HELPER ──────────────────────────────────
