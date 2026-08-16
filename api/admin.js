@@ -2155,12 +2155,18 @@ async function handleAssignBodyClientToExpert(req, res) {
   // 2. Verify expert exists and is_active
   const { data: expert } = await supabase
     .from("experts")
-    .select("id, name, is_active")
+    .select("id, name, is_active, allowed_modules")
     .eq("id", expert_id)
     .maybeSingle();
 
   if (!expert || !expert.is_active) {
     return res.status(404).json({ ok: false, error: "Специалист не найден или неактивен" });
+  }
+
+  // 2b. Verify expert has body module entitlement
+  const expertModules = Array.isArray(expert.allowed_modules) ? expert.allowed_modules : [];
+  if (!expertModules.includes("body")) {
+    return res.status(400).json({ ok: false, error: "Специалист не имеет доступа к модулю Здоровье" });
   }
 
   // 3. If organization_id != null, verify expert has active membership
@@ -2274,12 +2280,18 @@ async function handleReassignBodyClientExpert(req, res) {
   // 2. Verify expert exists and is active (defense-in-depth; RPC also checks)
   const { data: expert } = await supabase
     .from("experts")
-    .select("id, name, is_active")
+    .select("id, name, is_active, allowed_modules")
     .eq("id", expert_id)
     .maybeSingle();
 
   if (!expert || !expert.is_active) {
     return res.status(404).json({ ok: false, error: "Специалист не найден или неактивен" });
+  }
+
+  // 2b. Verify expert has body module entitlement
+  const expertModules = Array.isArray(expert.allowed_modules) ? expert.allowed_modules : [];
+  if (!expertModules.includes("body")) {
+    return res.status(400).json({ ok: false, error: "Специалист не имеет доступа к модулю Здоровье" });
   }
 
   // 3. Verify org membership if needed (defense-in-depth; RPC also checks)

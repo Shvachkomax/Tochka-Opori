@@ -157,7 +157,7 @@ async function handleLogin(req, res) {
   // Find active expert by access_code
   const { data: expert, error: expertError } = await supabase
     .from("experts")
-    .select("id, name, role, specialty, city, is_active")
+    .select("id, name, role, specialty, city, is_active, allowed_modules")
     .eq("access_code", trimmed)
     .maybeSingle();
 
@@ -170,6 +170,13 @@ async function handleLogin(req, res) {
   if (!expert || !expert.is_active) {
     return res.status(401).json({ ok: false, error: GENERIC_AUTH_ERROR });
   }
+
+  // Normalize allowed_modules: only support/body, fail closed on empty/invalid
+  const VALID_MODULES = ["support", "body"];
+  const rawModules = expert.allowed_modules;
+  const allowedModules = Array.isArray(rawModules)
+    ? [...new Set(rawModules.filter((m) => VALID_MODULES.includes(m)))]
+    : [];
 
   // Generate opaque token
   const rawToken = crypto.randomBytes(TOKEN_BYTES).toString("hex");
@@ -223,6 +230,7 @@ async function handleLogin(req, res) {
       role: expert.role,
       specialty: expert.specialty,
       city: expert.city,
+      allowed_modules: allowedModules,
     },
     memberships: membershipsList,
   });
@@ -246,6 +254,7 @@ async function handleMe(req, res) {
       role: expert.role,
       specialty: expert.specialty,
       city: expert.city,
+      allowed_modules: expert.allowed_modules,
     },
     memberships,
     requires_context_selection: memberships.length > 1,
@@ -297,9 +306,9 @@ async function handleListClients(req, res) {
   const { organization_id: orgId, module } = req.body || {};
 
   // Validate working context
-  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module });
+  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module, allowedModules: expert.allowed_modules });
   if (!ctx.ok) {
-    return res.status(400).json({ ok: false, error: ctx.error });
+    return res.status(403).json({ ok: false, error: ctx.error });
   }
 
   const supabase = getSupabase();
@@ -540,9 +549,9 @@ async function handleGetClientOverview(req, res) {
   }
 
   // Validate context
-  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module });
+  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module, allowedModules: expert.allowed_modules });
   if (!ctx.ok) {
-    return res.status(400).json({ ok: false, error: ctx.error });
+    return res.status(403).json({ ok: false, error: ctx.error });
   }
 
   // Resolve and authorize client
@@ -653,9 +662,9 @@ async function handleGetClientProfessionalAnalysis(req, res) {
     return res.status(400).json({ ok: false, error: "Модуль пока не поддерживается" });
   }
 
-  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module });
+  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module, allowedModules: expert.allowed_modules });
   if (!ctx.ok) {
-    return res.status(400).json({ ok: false, error: ctx.error });
+    return res.status(403).json({ ok: false, error: ctx.error });
   }
 
   const resolved = await resolveAuthorizedSpecialistClient({ expert, memberships, clientRef: client_ref, organizationId: orgId, module });
@@ -778,9 +787,9 @@ async function handleGetBodyClientOverview(req, res) {
     return res.status(400).json({ ok: false, error: "Некорректный модуль" });
   }
 
-  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module });
+  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module, allowedModules: expert.allowed_modules });
   if (!ctx.ok) {
-    return res.status(400).json({ ok: false, error: ctx.error });
+    return res.status(403).json({ ok: false, error: ctx.error });
   }
 
   const resolved = await resolveAuthorizedSpecialistClient({ expert, memberships, clientRef: client_ref, organizationId: orgId, module });
@@ -1016,13 +1025,21 @@ export async function authorizeSpecialist(req) {
   // Verify expert is still active
   const { data: expert, error: expertError } = await supabase
     .from("experts")
-    .select("id, name, role, specialty, city, is_active")
+    .select("id, name, role, specialty, city, is_active, allowed_modules")
     .eq("id", session.expert_id)
     .maybeSingle();
 
   if (expertError || !expert || !expert.is_active) {
     return { status: 401, error: "Специалист не найден или неактивен" };
   }
+
+  // Normalize allowed_modules: only support/body, fail closed on empty/invalid
+  const VALID_MODULES = ["support", "body"];
+  const raw = expert.allowed_modules;
+  const allowedModules = Array.isArray(raw)
+    ? [...new Set(raw.filter((m) => VALID_MODULES.includes(m)))]
+    : [];
+  expert.allowed_modules = allowedModules;
 
   // Update last_seen_at (non-blocking, don't fail auth if this errors)
   supabase
@@ -1058,10 +1075,20 @@ export async function authorizeSpecialist(req) {
 
 // ── CONTEXT VALIDATION (for future patient queries) ───────
 
-export function validateSpecialistContext({ memberships, organizationId, module }) {
+export function validateSpecialistContext({ memberships, organizationId, module, allowedModules }) {
   const validModules = ["support", "body"];
   if (!validModules.includes(module)) {
     return { ok: false, error: "Некорректный модуль" };
+  }
+
+  // Fail closed: empty/undefined/invalid allowed_modules → deny all modules
+  if (!Array.isArray(allowedModules) || allowedModules.length === 0) {
+    return { ok: false, error: "Нет доступа к указанному модулю" };
+  }
+
+  // Check module entitlement
+  if (!allowedModules.includes(module)) {
+    return { ok: false, error: "Нет доступа к указанному модулю" };
   }
 
   // Private practice: organization_id is null

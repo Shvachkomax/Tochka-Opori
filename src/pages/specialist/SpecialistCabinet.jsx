@@ -86,6 +86,15 @@ export default function SpecialistCabinet() {
               try { sessionStorage.removeItem("specialist_org_id"); } catch {}
             }
           }
+          // Validate persisted module against allowed_modules
+          const allowed = data.expert?.allowed_modules || ["support"];
+          const stored = sessionStorage.getItem("specialist_module") || "support";
+          if (!allowed.includes(stored)) {
+            const fallback = allowed[0] || "support";
+            setModule(fallback);
+            try { sessionStorage.setItem("specialist_module", fallback); } catch {}
+            clearSelectedClientDetail();
+          }
         }
       } catch {}
       if (!cancelled) setLoading(false);
@@ -239,6 +248,14 @@ export default function SpecialistCabinet() {
       const data = await res.json();
       if (data.ok) {
         setAuth({ expert: data.expert, memberships: data.memberships });
+        // Validate stored module against allowed_modules
+        const allowed = data.expert?.allowed_modules || ["support"];
+        const stored = sessionStorage.getItem("specialist_module") || "support";
+        if (!allowed.includes(stored)) {
+          const fallback = allowed[0] || "support";
+          setModule(fallback);
+          try { sessionStorage.setItem("specialist_module", fallback); } catch {}
+        }
         setLoginCode("");
         showToast("Вход выполнен");
       } else {
@@ -289,6 +306,8 @@ export default function SpecialistCabinet() {
   }
 
   function selectModule(m) {
+    const allowed = auth?.expert?.allowed_modules || ["support"];
+    if (!allowed.includes(m)) return; // refuse forbidden module
     clearSelectedClientDetail();
     setModule(m);
     try { sessionStorage.setItem("specialist_module", m); } catch {}
@@ -411,22 +430,37 @@ export default function SpecialistCabinet() {
 
           {/* Module */}
           <label style={{ ...S.label, marginTop: 16 }}>Направление</label>
-          <div style={S.moduleRow}>
-            <div
-              style={{ ...S.moduleBtn, ...(module === "support" ? S.moduleBtnActive : {}) }}
-              onClick={() => selectModule("support")}
-              data-testid="module-support"
-            >
-              Точка Опоры
-            </div>
-            <div
-              style={{ ...S.moduleBtn, ...(module === "body" ? S.moduleBtnActive : {}) }}
-              onClick={() => selectModule("body")}
-              data-testid="module-body"
-            >
-              Здоровье & Стройность
-            </div>
-          </div>
+          {(() => {
+            const allowed = auth?.expert?.allowed_modules || ["support"];
+            if (allowed.length <= 1) {
+              // Single module — show as non-interactive label
+              const label = allowed[0] === "body" ? "Здоровье & Стройность" : "Точка Опоры";
+              return (
+                <div style={{ ...S.moduleBtn, ...S.moduleBtnActive, cursor: "default", opacity: 0.85 }} data-testid="module-single">
+                  {label}
+                </div>
+              );
+            }
+            // Multi-module — show switcher
+            return (
+              <div style={S.moduleRow}>
+                <div
+                  style={{ ...S.moduleBtn, ...(module === "support" ? S.moduleBtnActive : {}) }}
+                  onClick={() => selectModule("support")}
+                  data-testid="module-support"
+                >
+                  Точка Опоры
+                </div>
+                <div
+                  style={{ ...S.moduleBtn, ...(module === "body" ? S.moduleBtnActive : {}) }}
+                  onClick={() => selectModule("body")}
+                  data-testid="module-body"
+                >
+                  Здоровье & Стройность
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Client detail or Client list */}
