@@ -30,6 +30,21 @@ const SERVICE_ACTION_COPY = {
   cancel: { pending: "Отменяем…", success: "Запрос отменён" },
 };
 
+const SERVICE_TOPIC_LABELS = {
+  labs: "Анализы",
+  medications_supplements: "Лекарства и БАДы",
+  diary_nutrition: "Питание / дневник",
+  general_health: "Общий вопрос о здоровье",
+  other: "Другой вопрос",
+};
+
+const SERVICE_FORMAT_LABELS = {
+  text: "Письменно",
+  phone: "Телефон",
+  video: "Онлайн",
+  offline: "Очно",
+};
+
 // ── Component ─────────────────────────────────────────────
 
 export default function SpecialistCabinet() {
@@ -877,7 +892,7 @@ function ServiceRequestCard({ request: r, onAction, updating, pendingAction, fee
           <div style={{ fontSize: 14, fontWeight: 600, color: "#2E2A25" }}>
             {r.client_display_name}
             <span style={{ fontSize: 12, fontWeight: 400, color: "#7A7268", marginLeft: 8 }}>
-              {typeLabel}{r.meeting_format ? ` · ${r.meeting_format}` : ""}
+              {typeLabel}{r.meeting_format ? ` · ${SERVICE_FORMAT_LABELS[r.meeting_format] || r.meeting_format}` : ""}
             </span>
           </div>
           <div style={{ fontSize: 12, color: "#7A7268", marginTop: 2 }}>{created}</div>
@@ -888,6 +903,7 @@ function ServiceRequestCard({ request: r, onAction, updating, pendingAction, fee
       </div>
 
       {r.title && <div style={{ fontSize: 13, fontWeight: 600, marginTop: 8, color: "#2E2A25" }}>{r.title}</div>}
+      {r.service_topic && <div style={{ fontSize: 12, color: "#7A7268", marginTop: 4 }}>Тема: {SERVICE_TOPIC_LABELS[r.service_topic] || r.service_topic}</div>}
 
       {r.price_credits > 0 && (
         <div style={{ fontSize: 12, color: "#7D9A89", marginTop: 4, fontWeight: 600 }}>
@@ -1689,13 +1705,16 @@ function HealthClientDetail({ detail, loading, error, onBack }) {
                 return (
                   <div key={sr.request_ref} style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)", marginBottom: 8 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600 }}>{typeLabels[sr.request_type] || sr.request_type}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>{sr.title || typeLabels[sr.request_type] || sr.request_type}</div>
                       <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: "#F3F4F6", color: "#6B7280" }}>
                         {statusLabels[sr.status] || sr.status}
                       </span>
                     </div>
                     <div style={{ fontSize: 12, color: "#7A7268" }}>
                       {new Date(sr.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                      {sr.service_topic && ` · тема: ${sr.service_topic}`}
+                      {sr.meeting_format && ` · формат: ${sr.meeting_format}`}
+                      {sr.price_credits != null && ` · Стоимость: ${sr.price_credits.toLocaleString("ru-RU")} кредитов`}
                       {sr.due_at && ` · Срок: ${new Date(sr.due_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}`}
                       {sr.scheduled_at && ` · Назначено: ${new Date(sr.scheduled_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}`}
                     </div>

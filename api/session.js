@@ -345,7 +345,9 @@ export default async function handler(req, res) {
       case "saveBodyHealthContext":
         return await handleSaveBodyHealthContext(req, res);
       case "createBodyServiceRequest":
-        return await handleCreateBodyServiceRequest(req, res);
+        return await handleCreateBodyServiceRequest(req, res, { legacy: false });
+      case "createLegacyBodyServiceRequest":
+        return await handleCreateBodyServiceRequest(req, res, { legacy: true });
       case "getBodyServiceRequests":
         return await handleGetBodyServiceRequests(req, res);
       case "getBodyServiceRequest":
@@ -3247,9 +3249,30 @@ const REQUEST_TYPE_CONFIG = {
   other: { label: "Другой запрос", meeting_format: "text", sla_hours: 24, reserved_credits: 300 },
 };
 
-async function handleCreateBodyServiceRequest(req, res) {
+const BODY_TOPICS = ["labs", "medications_supplements", "diary_nutrition", "general_health", "other"];
+const BODY_REQUEST_TYPE_BY_FORMAT = {
+  text: "text_question",
+  phone: "phone_call",
+  video: "video_call",
+  offline: "offline_visit",
+};
+
+function validateBodyPricingTopic(serviceCode, tariff, serviceTopic) {
+  if (!BODY_TOPICS.includes(serviceTopic)) return "Укажите корректную тему обращения.";
+
+  if (!tariff.service_topic) return null; // Universal phone/video/offline product.
+  if (serviceCode === "health_written_consultation" && serviceTopic === "other") return null;
+  if (tariff.service_topic !== serviceTopic) return "Эта услуга недоступна для выбранной темы.";
+  return null;
+}
+
+async function handleCreateBodyServiceRequest(req, res, { legacy = false } = {}) {
   try {
-    const { session_id, access_token, request_type, message, context_options, client_contact } = req.body || {};
+    const {
+      session_id, access_token, request_type, service_code, service_topic,
+      message, context_options, client_contact,
+      price_credits, credits, reserved_credits, meeting_format: clientMeetingFormat,
+    } = req.body || {};
     const owner = await resolveBodyOwner(session_id, access_token);
     if (!owner) {
       return res.status(401).json({ ok: false, error: "Требуется авторизация." });
@@ -3262,12 +3285,58 @@ async function handleCreateBodyServiceRequest(req, res) {
       return res.status(400).json({ ok: false, error: "Слишком длинное сообщение (максимум 3000 символов)." });
     }
 
-    const config = REQUEST_TYPE_CONFIG[request_type];
-    if (!config) {
-      return res.status(400).json({ ok: false, error: "Неверный тип запроса." });
-    }
-
     const supabase = getSupabase();
+
+    let config;
+    let requestType = request_type;
+    let effectiveMeetingFormat;
+    let effectiveServiceCode = typeof service_code === "string" && service_code.trim() ? service_code.trim() : null;
+    let effectiveServiceTopic = null;
+    let priceSnapshot = null;
+    let reservedCredits = 0;
+    let pricingNote = null;
+
+    if (effectiveServiceCode) {
+      const { data: tariff, error: pricingError } = await supabase
+        .from("service_pricing")
+        .select("service_code, module, label, service_topic, meeting_format, credits, active")
+        .eq("service_code", effectiveServiceCode)
+        .eq("module", "body")
+        .eq("active", true)
+        .maybeSingle();
+
+      if (pricingError || !tariff) {
+        return res.status(400).json({ ok: false, error: "Неизвестный тип услуги." });
+      }
+      if (!tariff.meeting_format || !BODY_REQUEST_TYPE_BY_FORMAT[tariff.meeting_format]) {
+        return res.status(400).json({ ok: false, error: "У услуги не настроен формат консультации." });
+      }
+      const topicError = validateBodyPricingTopic(effectiveServiceCode, tariff, service_topic);
+      if (topicError) return res.status(400).json({ ok: false, error: topicError });
+
+      effectiveServiceTopic = service_topic;
+      effectiveMeetingFormat = tariff.meeting_format;
+      requestType = BODY_REQUEST_TYPE_BY_FORMAT[tariff.meeting_format];
+      config = {
+        label: tariff.label,
+        meeting_format: tariff.meeting_format,
+        sla_hours: tariff.meeting_format === "text" ? 24 : tariff.meeting_format === "offline" ? 48 : 24,
+      };
+      priceSnapshot = tariff.credits;
+    } else {
+      if (!legacy) {
+        return res.status(400).json({ ok: false, error: "Укажите canonical service_code услуги." });
+      }
+      // Legacy Body clients may still send request_type. Keep this path
+      // separate: it does not create a new pricing snapshot.
+      config = REQUEST_TYPE_CONFIG[request_type];
+      if (!config) {
+        return res.status(400).json({ ok: false, error: "Неверный тип запроса." });
+      }
+      effectiveMeetingFormat = config.meeting_format;
+      reservedCredits = config.reserved_credits;
+      pricingNote = config.pricing_note || null;
+    }
 
     // Resolve specialist from patient_assignments (canonical expert.id)
     let specialistId = null;
@@ -3346,22 +3415,26 @@ async function handleCreateBodyServiceRequest(req, res) {
         session_id,
         specialist_id: specialistId,
         specialist_name: specialistName,
-        request_type,
-        meeting_format: config.meeting_format,
+        request_type: requestType,
+        service_code: effectiveServiceCode,
+        service_topic: effectiveServiceTopic,
+        meeting_format: effectiveMeetingFormat,
         title: config.label,
         message: message.trim(),
         status: "submitted",
         priority: "normal",
         sla_hours: config.sla_hours,
         due_at: dueAt,
-        reserved_credits: config.reserved_credits,
-        pricing_note: config.pricing_note || null,
+        reserved_credits: reservedCredits,
+        charged_credits: 0,
+        price_credits: priceSnapshot,
+        pricing_note: pricingNote,
         context_snapshot: contextSnapshot,
         client_contact: client_contact || {},
         created_at: now,
         updated_at: now,
       })
-      .select("id, request_type, status, reserved_credits, due_at, created_at")
+      .select("id, request_type, service_code, service_topic, meeting_format, price_credits, status, reserved_credits, charged_credits, due_at, created_at")
       .single();
 
     if (insertError) {
@@ -3387,7 +3460,7 @@ async function handleGetBodyServiceRequests(req, res) {
     const supabase = getSupabase();
     const { data: requests, error } = await supabase
       .from("service_requests")
-      .select("id, request_type, meeting_format, title, message, status, priority, sla_hours, due_at, reserved_credits, pricing_note, specialist_name, specialist_response, client_contact, scheduled_at, scheduled_comment, created_at, answered_at, completed_at, cancelled_at")
+      .select("id, request_type, service_code, service_topic, meeting_format, title, message, status, priority, sla_hours, due_at, price_credits, reserved_credits, charged_credits, pricing_note, specialist_name, specialist_response, client_contact, scheduled_at, scheduled_comment, created_at, answered_at, completed_at, cancelled_at")
       .eq("owner_type", "anonymous_profile")
       .eq("owner_id", owner.ownerId)
       .order("created_at", { ascending: false })
@@ -3497,7 +3570,7 @@ async function handleGetServicePricing(req, res) {
 
     let query = supabase
       .from("service_pricing")
-      .select("service_code, module, label, credits, active")
+      .select("service_code, module, label, service_topic, meeting_format, credits, active")
       .eq("active", true)
       .order("credits", { ascending: true });
 

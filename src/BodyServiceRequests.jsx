@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { getClientToken } from "./lib/clientToken.js";
 import { getBodySession } from "./lib/sessionAccess.js";
 
-const REQUEST_TYPES = [
-  { value: "text_question", label: "Онлайн-вопрос", desc: "Ответ текстом в течение 24 часов", credits: 300 },
-  { value: "phone_call", label: "Телефонный звонок", desc: "Специалист согласует время", credits: 700 },
-  { value: "video_call", label: "Видеоконсультация", desc: "Для подробного разговора", credits: 1500 },
-  { value: "offline_visit", label: "Очная консультация", desc: "Время и стоимость уточнит специалист", credits: null },
-  { value: "diary_review", label: "Разбор дневника", desc: "Специалист посмотрит последние записи", credits: 500 },
-  { value: "labs_medications_review", label: "Разбор анализов и препаратов", desc: "Для вопросов по анализам, лекарствам и БАДам", credits: 700 },
-  { value: "other", label: "Другой запрос", desc: "", credits: 300 },
+const BODY_TOPICS = [
+  { value: "labs", label: "Анализы" },
+  { value: "medications_supplements", label: "Лекарства и БАДы" },
+  { value: "diary_nutrition", label: "Питание / дневник" },
+  { value: "other", label: "Другой вопрос" },
 ];
+
+const TOPIC_LABELS = Object.fromEntries(BODY_TOPICS.map((topic) => [topic.value, topic.label]));
+const FORMAT_LABELS = { text: "письменно", phone: "по телефону", video: "онлайн", offline: "очно" };
 
 const STATUS_LABELS = {
   submitted: "Отправлен",
@@ -36,13 +35,9 @@ function getLocalDateString() {
 }
 
 async function apiCall(action, body) {
-  let token;
-  try { token = await getClientToken("body", "session"); } catch {}
-  const hdrs = { "Content-Type": "application/json" };
-  if (token) hdrs["Authorization"] = `Bearer ${token}`;
   const saved = getBodySession();
   const res = await fetch("/api/session", {
-    method: "POST", headers: hdrs,
+    method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action, session_id: saved.sessionId, access_token: saved.accessToken, ...body }),
   });
   return res.json();
@@ -55,7 +50,10 @@ export default function BodyServiceRequests({ onBack }) {
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   // New request form
-  const [requestType, setRequestType] = useState("");
+  const [serviceTopic, setServiceTopic] = useState("");
+  const [serviceCode, setServiceCode] = useState("");
+  const [pricing, setPricing] = useState([]);
+  const [pricingLoading, setPricingLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [includeDiary, setIncludeDiary] = useState(true);
   const [includePlates, setIncludePlates] = useState(false);
@@ -71,7 +69,17 @@ export default function BodyServiceRequests({ onBack }) {
 
   useEffect(() => {
     loadRequests();
+    loadPricing();
   }, []);
+
+  async function loadPricing() {
+    setPricingLoading(true);
+    try {
+      const data = await apiCall("getServicePricing", { module: "body" });
+      if (data.ok) setPricing(data.pricing || []);
+    } catch {}
+    setPricingLoading(false);
+  }
 
   async function loadRequests() {
     setLoading(true);
@@ -83,15 +91,16 @@ export default function BodyServiceRequests({ onBack }) {
   }
 
   async function handleSubmit() {
-    if (!requestType || !message.trim()) {
-      setSubmitError("Выберите тип запроса и укажите сообщение.");
+    if (!serviceTopic || !serviceCode || !message.trim()) {
+      setSubmitError("Выберите тему, услугу и укажите сообщение.");
       return;
     }
     setSubmitting(true);
     setSubmitError("");
     try {
       const data = await apiCall("createBodyServiceRequest", {
-        request_type: requestType,
+        service_code: serviceCode,
+        service_topic: serviceTopic,
         message: message.trim(),
         context_options: {
           include_recent_diary: includeDiary,
@@ -110,7 +119,8 @@ export default function BodyServiceRequests({ onBack }) {
       if (!data.ok) throw new Error(data.error || "Не удалось отправить.");
       setView("list");
       setMessage("");
-      setRequestType("");
+      setServiceTopic("");
+      setServiceCode("");
       loadRequests();
     } catch (e) {
       setSubmitError(e.message);
@@ -127,8 +137,14 @@ export default function BodyServiceRequests({ onBack }) {
     } catch {}
   }
 
-  const config = REQUEST_TYPES.find(r => r.value === requestType);
-  const needContact = config && ["phone_call", "video_call", "offline_visit"].includes(config.value);
+  const selectedService = pricing.find((item) => item.service_code === serviceCode);
+  const availableServices = pricing.filter((item) => {
+    if (!serviceTopic) return false;
+    if (!item.service_topic) return true;
+    if (item.service_code === "health_written_consultation" && serviceTopic === "other") return true;
+    return item.service_topic === serviceTopic;
+  });
+  const needContact = selectedService && ["phone", "video", "offline"].includes(selectedService.meeting_format);
 
   return (
     <div style={{ maxWidth: 780, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" }}>
@@ -159,7 +175,7 @@ export default function BodyServiceRequests({ onBack }) {
               {requests.map(r => (
                 <div key={r.id} onClick={() => { setSelectedRequest(r); setView("detail"); }} style={{ padding: "12px 16px", borderRadius: 12, border: `1px solid ${r.status === "answered" ? "#c4d0c6" : "#e8e2d8"}`, background: r.status === "answered" ? "#f0f5f1" : "#faf6ef", cursor: "pointer" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{r.title || REQUEST_TYPES.find(t => t.value === r.request_type)?.label || r.request_type}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{r.title || r.request_type}</div>
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       {r.status === "answered" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#e8f0ea", color: "#5f8b7a", fontWeight: 600 }}>Есть ответ</span>}
                       {r.status === "scheduled" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#e8f0ea", color: "#6b8fc7", fontWeight: 600 }}>Запланировано</span>}
@@ -169,7 +185,7 @@ export default function BodyServiceRequests({ onBack }) {
                   <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.message}</div>
                   <div style={{ fontSize: 12, color: "#8a7e72" }}>
                     {new Date(r.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
-                    {r.reserved_credits > 0 && ` · ${r.reserved_credits} кредитов`}
+                    {r.price_credits != null ? ` · ${r.price_credits.toLocaleString("ru-RU")} кредитов` : " · Legacy"}
                   </div>
                 </div>
               ))}
@@ -181,22 +197,44 @@ export default function BodyServiceRequests({ onBack }) {
       {/* New request form */}
       {view === "new" && (
         <div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: "#2f2925", marginBottom: 12 }}>Какой запрос отправить специалисту?</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: "#2f2925", marginBottom: 12 }}>С чем хотите обратиться?</div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-            {REQUEST_TYPES.map(rt => (
-              <button key={rt.value} onClick={() => setRequestType(rt.value)} style={{
-                padding: "12px 16px", borderRadius: 12, border: `1px solid ${requestType === rt.value ? "#7D9A89" : "#e8e2d8"}`,
-                background: requestType === rt.value ? "#e8f0ea" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+            {BODY_TOPICS.map((topic) => (
+              <button key={topic.value} onClick={() => { setServiceTopic(topic.value); setServiceCode(""); setSubmitError(""); }} style={{
+                padding: "12px 16px", borderRadius: 12, border: `1px solid ${serviceTopic === topic.value ? "#7D9A89" : "#e8e2d8"}`,
+                background: serviceTopic === topic.value ? "#e8f0ea" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
               }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{rt.label}</div>
-                <div style={{ fontSize: 13, color: "#8a7e72" }}>{rt.desc}</div>
-                {rt.credits != null && <div style={{ fontSize: 12, color: "#7D9A89", marginTop: 2 }}>{rt.credits} кредитов</div>}
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{topic.label}</div>
               </button>
             ))}
           </div>
 
-          {requestType === "labs_medications_review" && (
+          {serviceTopic && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Как удобнее получить консультацию?</div>
+              {pricingLoading ? (
+                <div style={{ fontSize: 13, color: "#8a7e72", padding: 12 }}>Загрузка актуальных тарифов...</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {availableServices.map((service) => (
+                    <button key={service.service_code} onClick={() => setServiceCode(service.service_code)} style={{
+                      padding: "12px 16px", borderRadius: 12, border: `1px solid ${serviceCode === service.service_code ? "#7D9A89" : "#e8e2d8"}`,
+                      background: serviceCode === service.service_code ? "#e8f0ea" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{service.label}</div>
+                        <div style={{ fontSize: 13, color: "#5f8b7a", fontWeight: 700, whiteSpace: "nowrap" }}>{service.credits.toLocaleString("ru-RU")} кредитов</div>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 3 }}>Формат: {FORMAT_LABELS[service.meeting_format] || service.meeting_format}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {serviceTopic === "medications_supplements" && (
             <div style={{ padding: 12, borderRadius: 10, background: "#fdf6ee", border: "1px solid #e8d5b8", marginBottom: 16, fontSize: 13, color: "#92400e" }}>
               Специалист не заменяет врача. Не меняйте лекарства и дозировки без назначения врача.
             </div>
@@ -240,7 +278,7 @@ export default function BodyServiceRequests({ onBack }) {
           )}
 
           <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 12, lineHeight: 1.5 }}>
-            Кредиты списываются только после ответа специалиста. Сейчас списание не выполняется автоматически — это тестовый режим.
+             Стоимость фиксируется в запросе. Сейчас резервирование и списание кредитов не выполняются — это тестовый режим.
           </div>
 
           {submitError && <div style={{ color: "#b5473f", fontSize: 14, marginBottom: 12 }}>{submitError}</div>}
@@ -273,7 +311,9 @@ export default function BodyServiceRequests({ onBack }) {
             <div style={{ fontSize: 13, color: "#8a7e72", marginBottom: 8 }}>
               {new Date(selectedRequest.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
               {selectedRequest.specialist_name && ` · ${selectedRequest.specialist_name}`}
-              {selectedRequest.reserved_credits > 0 && ` · ${selectedRequest.reserved_credits} кредитов`}
+              {selectedRequest.service_topic && ` · тема: ${TOPIC_LABELS[selectedRequest.service_topic] || selectedRequest.service_topic}`}
+              {selectedRequest.meeting_format && ` · формат: ${FORMAT_LABELS[selectedRequest.meeting_format] || selectedRequest.meeting_format}`}
+              {selectedRequest.price_credits != null ? ` · Стоимость: ${selectedRequest.price_credits.toLocaleString("ru-RU")} кредитов` : " · Legacy без snapshot-цены"}
             </div>
             <div style={{ fontSize: 14, color: "#2f2925", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{selectedRequest.message}</div>
             {/* Contact info */}

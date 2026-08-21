@@ -3507,7 +3507,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const res = await fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "updateBodyServiceRequest", password: adminPassword, id, action: action, ...extra }),
+        body: JSON.stringify({ action: "updateBodyServiceRequest", password: adminPassword, id, update_action: action, ...extra }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -6501,14 +6501,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       Запросы клиентов ({adminServiceRequests.length})
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
-                      {["all", "submitted", "accepted", "scheduled", "answered", "completed", "cancelled"].map(f => (
+                      {["all", "submitted", "accepted", "needs_clarification", "scheduled", "answered", "completed", "cancelled"].map(f => (
                         <button key={f} onClick={() => { setAdminServiceRequestsFilter(f); }} style={{
                           padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`,
                           background: adminServiceRequestsFilter === f ? t.tabActive : t.tabBg,
                           color: adminServiceRequestsFilter === f ? t.tabActiveText : t.text,
                           cursor: "pointer", fontSize: 12, fontWeight: 600,
                         }}>
-                          {f === "all" ? "Все" : f === "submitted" ? "Новые" : f === "accepted" ? "Принятые" : f === "scheduled" ? "Запланированы" : f === "answered" ? "Отвечены" : f === "completed" ? "Завершены" : "Отменены"}
+                          {f === "all" ? "Все" : f === "submitted" ? "Новые" : f === "accepted" ? "Принятые" : f === "needs_clarification" ? "Уточнение" : f === "scheduled" ? "Запланированы" : f === "answered" ? "Отвечены" : f === "completed" ? "Завершены" : "Отменены"}
                         </button>
                       ))}
                     </div>
@@ -6552,9 +6552,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           </div>
                           <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 8 }}>{r.message?.slice(0, 200)}</div>
                             <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>
-                            {r.specialist_name} · {new Date(r.created_at).toLocaleDateString("ru-RU")}
-                            {r.service_code && ` · ${r.service_code}`}
-                            {r.price_credits > 0 ? ` · ${r.price_credits.toLocaleString("ru-RU")} кредитов` : (r.reserved_credits > 0 ? ` · ${r.reserved_credits} кредитов` : "")}
+                             {r.specialist_name} · {new Date(r.created_at).toLocaleDateString("ru-RU")}
+                             {r.service_code && ` · ${r.service_code}`}
+                             {r.service_topic && ` · тема: ${r.service_topic}`}
+                             {r.meeting_format && ` · формат: ${r.meeting_format}`}
+                             {r.price_credits != null ? ` · Стоимость: ${r.price_credits.toLocaleString("ru-RU")} кредитов` : " · Legacy без snapshot-цены"}
+                             {` · Зарезервировано: ${r.reserved_credits || 0}`}
+                             {` · Списано: ${r.charged_credits || 0}`}
                             {r.due_at && ` · срок: ${new Date(r.due_at).toLocaleDateString("ru-RU")}`}
                           </div>
                           {/* Contact info for phone/video/offline */}

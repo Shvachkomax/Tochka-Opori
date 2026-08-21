@@ -1955,7 +1955,7 @@ async function handleListBodyServiceRequests(req, res) {
 
   let query = supabase
     .from("service_requests")
-    .select("id, owner_id, session_id, specialist_id, specialist_name, request_type, meeting_format, title, message, status, priority, sla_hours, due_at, reserved_credits, charged_credits, pricing_note, context_snapshot, client_contact, specialist_response, scheduled_at, scheduled_comment, created_at, answered_at, completed_at, cancelled_at")
+    .select("id, owner_id, session_id, specialist_id, specialist_name, request_type, service_code, service_topic, meeting_format, title, message, status, priority, sla_hours, due_at, price_credits, reserved_credits, charged_credits, pricing_note, context_snapshot, client_contact, specialist_response, scheduled_at, scheduled_comment, created_at, answered_at, completed_at, cancelled_at")
     .eq("module", "body")
     .order("created_at", { ascending: false })
     .limit(maxCount || 100);
@@ -1980,7 +1980,7 @@ async function handleUpdateBodyServiceRequest(req, res) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
 
-  const { id, action: updateAction, specialist_response, scheduled_at, scheduled_comment, charged_credits } = req.body || {};
+  const { id, update_action: updateAction, specialist_response, scheduled_at, scheduled_comment, charged_credits } = req.body || {};
   if (!id) {
     return res.status(400).json({ ok: false, error: "Missing id" });
   }
@@ -1988,7 +1988,7 @@ async function handleUpdateBodyServiceRequest(req, res) {
   const supabase = getSupabase();
   const { data: request, error: findError } = await supabase
     .from("service_requests")
-    .select("id, status, reserved_credits")
+    .select("id, status, service_code, price_credits, reserved_credits, charged_credits")
     .eq("id", id)
     .maybeSingle();
 
@@ -2017,7 +2017,11 @@ async function handleUpdateBodyServiceRequest(req, res) {
     case "complete":
       updates.status = "completed";
       updates.completed_at = now;
-      updates.charged_credits = charged_credits != null ? charged_credits : request.reserved_credits;
+      // Phase 11D is not implemented. Never turn a canonical price snapshot
+      // into a charge; preserve the old fallback only for legacy requests.
+      updates.charged_credits = request.service_code
+        ? (request.charged_credits || 0)
+        : (charged_credits != null ? charged_credits : request.reserved_credits);
       break;
     case "complete_no_charge":
       updates.status = "completed";

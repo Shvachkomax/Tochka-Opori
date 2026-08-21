@@ -123,12 +123,8 @@ function ServiceRequestsCard({ sessionId, accessToken, onOpen }) {
   useEffect(() => {
     async function load() {
       try {
-        let token;
-        try { token = await getClientToken("body", "session"); } catch {}
-        const hdrs = { "Content-Type": "application/json" };
-        if (token) hdrs["Authorization"] = `Bearer ${token}`;
         const res = await fetch("/api/session", {
-          method: "POST", headers: hdrs,
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "getBodyServiceRequests", session_id: sessionId, access_token: accessToken }),
         });
         const data = await res.json();

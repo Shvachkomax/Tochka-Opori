@@ -900,7 +900,7 @@ async function handleGetBodyClientOverview(req, res) {
   // ── Batch 6: service requests (owner_id direct) ───────
   const { data: srRows } = await supabase
     .from("service_requests")
-    .select("id, request_type, status, created_at, due_at, scheduled_at")
+    .select("id, request_type, service_code, service_topic, price_credits, meeting_format, title, status, created_at, due_at, scheduled_at")
     .eq("owner_id", ownerId)
     .eq("module", "body")
     .order("created_at", { ascending: false })
@@ -992,6 +992,11 @@ async function handleGetBodyClientOverview(req, res) {
     service_requests: (srRows || []).map((sr) => ({
       request_ref: `service-request:${sr.id}`,
       request_type: sr.request_type,
+      service_code: sr.service_code || null,
+      service_topic: sr.service_topic || null,
+      price_credits: sr.price_credits ?? null,
+      meeting_format: sr.meeting_format || null,
+      title: sr.title || null,
       status: sr.status,
       created_at: sr.created_at,
       due_at: sr.due_at || null,
@@ -1027,7 +1032,7 @@ async function handleListServiceRequests(req, res) {
 
   let query = supabase
     .from("service_requests")
-    .select("id, module, owner_type, owner_id, specialist_id, specialist_name, request_type, meeting_format, title, message, status, priority, due_at, scheduled_at, scheduled_place, scheduled_comment, specialist_response, client_contact, service_code, price_credits, created_at, updated_at, answered_at, completed_at, cancelled_at")
+    .select("id, module, owner_type, owner_id, specialist_id, specialist_name, request_type, service_code, service_topic, meeting_format, title, message, status, priority, due_at, scheduled_at, scheduled_place, scheduled_comment, specialist_response, client_contact, price_credits, reserved_credits, charged_credits, created_at, updated_at, answered_at, completed_at, cancelled_at")
     .eq("specialist_id", expertIdStr)
     .in("module", effectiveModules)
     .order("created_at", { ascending: false })
@@ -1075,6 +1080,8 @@ async function handleListServiceRequests(req, res) {
     module: r.module,
     client_display_name: ownerNames.get(r.owner_id) || "Клиент",
     request_type: r.request_type,
+    service_code: r.service_code || null,
+    service_topic: r.service_topic || null,
     meeting_format: r.meeting_format || null,
     title: r.title || null,
     message: r.message,
@@ -1086,8 +1093,7 @@ async function handleListServiceRequests(req, res) {
     scheduled_comment: r.scheduled_comment || null,
     specialist_response: r.specialist_response || null,
     client_contact: r.client_contact || {},
-    service_code: r.service_code || null,
-    price_credits: r.price_credits || null,
+    price_credits: r.price_credits ?? null,
     created_at: r.created_at,
     updated_at: r.updated_at,
     answered_at: r.answered_at || null,
