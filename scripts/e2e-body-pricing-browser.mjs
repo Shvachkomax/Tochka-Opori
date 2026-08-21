@@ -291,6 +291,7 @@ async function main() {
     if (cleanup.onboardingId) await supabase.from("body_onboarding").delete().eq("id", cleanup.onboardingId);
     if (cleanup.bodyClientId) await supabase.from("body_clients").delete().eq("id", cleanup.bodyClientId);
     if (cleanup.sessionId) await supabase.from("sessions").delete().eq("session_id", cleanup.sessionId);
+    if (cleanup.walletId) await supabase.from("usage_ledger").delete().eq("wallet_id", cleanup.walletId);
     if (cleanup.walletId) await supabase.from("usage_wallets").delete().eq("id", cleanup.walletId);
     if (cleanup.specialistSessionId) await supabase.from("specialist_sessions").delete().eq("id", cleanup.specialistSessionId);
     if (cleanup.expertId) {
