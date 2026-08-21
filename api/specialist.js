@@ -3,6 +3,7 @@ import { getSupabase } from "../lib/supabase.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { hashToken } from "../lib/security/council-token.js";
+import { getInviteUrl } from "../lib/config/site-url.js";
 
 // ── Constants ─────────────────────────────────────────────
 
@@ -15,11 +16,25 @@ const COOKIE_PATH = "/api/specialist";
 
 // ── Allowed origins for cookie-authenticated requests ─────
 
-const ALLOWED_ORIGINS = [
+const BASE_ALLOWED_ORIGINS = [
   "https://tochka-opori.online",
   "https://www.tochka-opori.online",
   "https://health.tochka-opori.online",
 ];
+
+function buildAllowedOrigins() {
+  const origins = [...BASE_ALLOWED_ORIGINS];
+  if (process.env.SITE_URL) {
+    try {
+      const u = new URL(process.env.SITE_URL);
+      const origin = `${u.protocol}//${u.host}`;
+      if (!origins.includes(origin)) origins.push(origin);
+    } catch {}
+  }
+  return origins;
+}
+
+const ALLOWED_ORIGINS = buildAllowedOrigins();
 
 function isLocalhostOrigin(origin) {
   try {
@@ -127,6 +142,16 @@ export default async function handler(req, res) {
         return await handleListServiceRequests(req, res);
       case "updateServiceRequest":
         return await handleUpdateServiceRequest(req, res);
+      case "createInvitation":
+        return await handleCreateInvitation(req, res);
+      case "listInvitations":
+        return await handleListInvitations(req, res);
+      case "revokeInvitation":
+        return await handleRevokeInvitation(req, res);
+      case "acceptPatientInvitation":
+        return await handleAcceptPatientInvitation(req, res);
+      case "declinePatientInvitation":
+        return await handleDeclinePatientInvitation(req, res);
       default:
         return res.status(400).json({ ok: false, error: "Unknown action" });
     }
@@ -1002,7 +1027,7 @@ async function handleListServiceRequests(req, res) {
 
   let query = supabase
     .from("service_requests")
-    .select("id, module, owner_type, owner_id, specialist_id, specialist_name, request_type, meeting_format, title, message, status, priority, due_at, scheduled_at, scheduled_place, scheduled_comment, specialist_response, client_contact, created_at, updated_at, answered_at, completed_at, cancelled_at")
+    .select("id, module, owner_type, owner_id, specialist_id, specialist_name, request_type, meeting_format, title, message, status, priority, due_at, scheduled_at, scheduled_place, scheduled_comment, specialist_response, client_contact, service_code, price_credits, created_at, updated_at, answered_at, completed_at, cancelled_at")
     .eq("specialist_id", expertIdStr)
     .in("module", effectiveModules)
     .order("created_at", { ascending: false })
@@ -1061,6 +1086,8 @@ async function handleListServiceRequests(req, res) {
     scheduled_comment: r.scheduled_comment || null,
     specialist_response: r.specialist_response || null,
     client_contact: r.client_contact || {},
+    service_code: r.service_code || null,
+    price_credits: r.price_credits || null,
     created_at: r.created_at,
     updated_at: r.updated_at,
     answered_at: r.answered_at || null,
@@ -1080,7 +1107,7 @@ async function handleUpdateServiceRequest(req, res) {
   }
 
   const { expert, memberships } = authResult;
-  const { request_ref, action: updateAction, specialist_response, scheduled_at, scheduled_place, scheduled_comment } = req.body || {};
+  const { request_ref, update_action: updateAction, specialist_response, scheduled_at, scheduled_place, scheduled_comment } = req.body || {};
 
   if (!request_ref || typeof request_ref !== "string") {
     return res.status(400).json({ ok: false, error: "Укажите request_ref" });
@@ -1121,7 +1148,7 @@ async function handleUpdateServiceRequest(req, res) {
 
   switch (updateAction) {
     case "accept":
-      if (!["submitted", "needs_clarification"].includes(request.status)) {
+      if (request.status !== "submitted") {
         return res.status(400).json({ ok: false, error: "Невозможно принять запрос в текущем статусе" });
       }
       updates.status = "accepted";
@@ -1131,6 +1158,7 @@ async function handleUpdateServiceRequest(req, res) {
         return res.status(400).json({ ok: false, error: "Невозможно запросить уточнение в текущем статусе" });
       }
       updates.status = "needs_clarification";
+      if (specialist_response?.trim()) updates.specialist_response = specialist_response.trim();
       break;
     case "schedule":
       if (!["accepted", "needs_clarification"].includes(request.status)) {
@@ -1184,6 +1212,256 @@ async function handleUpdateServiceRequest(req, res) {
   }
 
   return res.status(200).json({ ok: true, status: updates.status });
+}
+
+// ── CREATE INVITATION (specialist → patient) ──────────────
+
+async function handleCreateInvitation(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) {
+    return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  }
+
+  const { expert, memberships } = authResult;
+  const { module: reqModule, organization_id: orgId, patient_label } = req.body || {};
+
+  const module = reqModule || "support";
+  if (module !== "support") {
+    return res.status(400).json({ ok: false, error: "Приглашения доступны только для модуля поддержки." });
+  }
+  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module, allowedModules: expert.allowed_modules });
+  if (!ctx.ok) {
+    return res.status(403).json({ ok: false, error: ctx.error });
+  }
+
+  const supabase = getSupabase();
+  const crypto = await import("node:crypto");
+
+  // Generate opaque token and hash it
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+
+  const { data: invitation, error } = await supabase
+    .from("patient_specialist_invitations")
+    .insert({
+      token_hash: tokenHash,
+      direction: "specialist_to_patient",
+      module,
+      inviter_expert_id: expert.id,
+      organization_id: orgId || null,
+      patient_label: patient_label || null,
+      status: "pending",
+      expires_at: expiresAt,
+    })
+    .select("id, direction, module, status, expires_at, created_at")
+    .single();
+
+  if (error) {
+    console.error("[createInvitation] insert error:", error.code);
+    return res.status(500).json({ ok: false, error: "Не удалось создать приглашение" });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    invitation: {
+      ...invitation,
+      token: rawToken, // shown once, never stored
+      url: getInviteUrl(rawToken),
+    },
+  });
+}
+
+// ── LIST INVITATIONS (specialist) ─────────────────────────
+
+async function handleListInvitations(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) {
+    return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  }
+
+  const { expert } = authResult;
+  const supabase = getSupabase();
+
+  const { data: invitations, error } = await supabase
+    .from("patient_specialist_invitations")
+    .select("id, direction, module, status, patient_label, organization_id, target_expert_id, expires_at, created_at, accepted_at, declined_at, revoked_at")
+    .or(`inviter_expert_id.eq.${expert.id},target_expert_id.eq.${expert.id}`)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error("[listInvitations] query error:", error.code);
+    return res.status(500).json({ ok: false, error: "Не удалось загрузить приглашения" });
+  }
+
+  return res.status(200).json({ ok: true, invitations: invitations || [] });
+}
+
+async function resolveInvitationPatientOwner(supabase, invitation) {
+  if (invitation.inviter_owner_type !== "anonymous_case" || !invitation.inviter_owner_id) return null;
+  const { data: session, error } = await supabase
+    .from("sessions")
+    .select("session_id, public_code, anonymous_owner_id")
+    .eq("anonymous_owner_id", invitation.inviter_owner_id)
+    .eq("module", "support")
+    .not("public_code", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !session?.public_code) return null;
+  return { ownerId: invitation.inviter_owner_id, publicCode: session.public_code };
+}
+
+function invitationAcceptStatus(code) {
+  return {
+    NOT_FOUND: 404,
+    INVALID_DIRECTION: 400,
+    ALREADY_PROCESSED: 400,
+    EXPIRED: 400,
+    MODULE_MISMATCH: 400,
+    FORBIDDEN: 403,
+    OWNER_MISMATCH: 403,
+    EXPERT_UNAVAILABLE: 400,
+    NO_MODULE_ENTITLEMENT: 400,
+    ASSIGNMENT_CONFLICT: 409,
+  }[code] || 400;
+}
+
+async function handleAcceptPatientInvitation(req, res) {
+  try {
+    const authResult = await authorizeSpecialist(req);
+    if (authResult.error) return res.status(authResult.status).json({ ok: false, error: authResult.error });
+
+    const { invitation_id } = req.body || {};
+    if (!invitation_id || typeof invitation_id !== "string") {
+      return res.status(400).json({ ok: false, error: "Укажите invitation_id" });
+    }
+
+    const supabase = getSupabase();
+    const { data: invitation, error } = await supabase
+      .from("patient_specialist_invitations")
+      .select("id, token_hash, direction, module, status, expires_at, inviter_owner_type, inviter_owner_id, target_expert_id")
+      .eq("id", invitation_id)
+      .maybeSingle();
+
+    if (error || !invitation) return res.status(404).json({ ok: false, error: "Приглашение не найдено" });
+    if (invitation.direction !== "patient_to_specialist" || invitation.module !== "support") {
+      return res.status(400).json({ ok: false, error: "Некорректное приглашение" });
+    }
+    if (String(invitation.target_expert_id) !== String(authResult.expert.id)) {
+      return res.status(403).json({ ok: false, error: "Приглашение адресовано другому специалисту" });
+    }
+    if (invitation.status !== "pending") return res.status(400).json({ ok: false, error: "Приглашение уже обработано" });
+    if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
+      return res.status(400).json({ ok: false, error: "Приглашение истекло" });
+    }
+
+    const owner = await resolveInvitationPatientOwner(supabase, invitation);
+    if (!owner) return res.status(409).json({ ok: false, error: "У пациента ещё нет активной Support-сессии" });
+
+    const { data: result, error: rpcError } = await supabase.rpc("accept_specialist_invitation", {
+      p_token_hash: invitation.token_hash,
+      p_owner_id: owner.ownerId,
+      p_public_code: owner.publicCode,
+    });
+    if (rpcError) {
+      console.error("[acceptPatientInvitation] RPC error:", rpcError.code, rpcError.message);
+      return res.status(500).json({ ok: false, error: "Ошибка сервера" });
+    }
+    if (!result?.ok) {
+      return res.status(invitationAcceptStatus(result?.code)).json({ ok: false, error: result?.error || "Ошибка", code: result?.code || "UNKNOWN" });
+    }
+    return res.status(200).json({ ok: true, message: result.message || "Пациент подключён" });
+  } catch (error) {
+    console.error("[acceptPatientInvitation] error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сервера" });
+  }
+}
+
+async function handleDeclinePatientInvitation(req, res) {
+  try {
+    const authResult = await authorizeSpecialist(req);
+    if (authResult.error) return res.status(authResult.status).json({ ok: false, error: authResult.error });
+
+    const { invitation_id } = req.body || {};
+    if (!invitation_id || typeof invitation_id !== "string") {
+      return res.status(400).json({ ok: false, error: "Укажите invitation_id" });
+    }
+
+    const now = new Date().toISOString();
+    const { data: updated, error } = await getSupabase()
+      .from("patient_specialist_invitations")
+      .update({ status: "declined", declined_at: now, updated_at: now })
+      .eq("id", invitation_id)
+      .eq("direction", "patient_to_specialist")
+      .eq("target_expert_id", authResult.expert.id)
+      .eq("status", "pending")
+      .gt("expires_at", now)
+      .select("id")
+      .maybeSingle();
+
+    if (error) return res.status(500).json({ ok: false, error: "Не удалось обработать приглашение" });
+    if (!updated) return res.status(400).json({ ok: false, error: "Приглашение не найдено или уже обработано" });
+    return res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error("[declinePatientInvitation] error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сервера" });
+  }
+}
+
+// ── REVOKE INVITATION (specialist) ────────────────────────
+
+async function handleRevokeInvitation(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) {
+    return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  }
+
+  const { expert } = authResult;
+  const { invitation_id } = req.body || {};
+
+  if (!invitation_id) {
+    return res.status(400).json({ ok: false, error: "Укажите invitation_id" });
+  }
+
+  const supabase = getSupabase();
+
+  // Fetch and verify ownership
+  const { data: invitation, error: findError } = await supabase
+    .from("patient_specialist_invitations")
+    .select("id, inviter_expert_id, status")
+    .eq("id", invitation_id)
+    .maybeSingle();
+
+  if (findError || !invitation) {
+    return res.status(404).json({ ok: false, error: "Приглашение не найдено" });
+  }
+
+  if (invitation.inviter_expert_id !== String(expert.id)) {
+    return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+  }
+
+  if (invitation.status !== "pending") {
+    return res.status(400).json({ ok: false, error: "Невозможно отозвать приглашение в текущем статусе" });
+  }
+
+  const { error: updateError } = await supabase
+    .from("patient_specialist_invitations")
+    .update({
+      status: "revoked",
+      revoked_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", invitation_id);
+
+  if (updateError) {
+    console.error("[revokeInvitation] update error:", updateError.code);
+    return res.status(500).json({ ok: false, error: "Не удалось отозвать приглашение" });
+  }
+
+  return res.status(200).json({ ok: true });
 }
 
 // ── AUTHORIZATION HELPER ──────────────────────────────────

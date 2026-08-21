@@ -20,6 +20,7 @@ import {
 } from "../lib/session/continuation-store.js";
 import { createReportArtifacts, REPORT_STATUS } from "../lib/report/finalize.js";
 import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
+import { getInviteUrl } from "../lib/config/site-url.js";
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -351,6 +352,8 @@ export default async function handler(req, res) {
         return await handleGetBodyServiceRequest(req, res);
       case "cancelBodyServiceRequest":
         return await handleCancelBodyServiceRequest(req, res);
+      case "getServicePricing":
+        return await handleGetServicePricing(req, res);
       case "createSupportServiceRequest":
         return await handleCreateSupportServiceRequest(req, res);
       case "listSupportServiceRequests":
@@ -377,6 +380,22 @@ export default async function handler(req, res) {
         return await handleGetSupportChat(req, res);
       case "sendSupportMessage":
         return await handleSendSupportMessage(req, res);
+      case "acceptSpecialistInvitation":
+        return await handleAcceptSpecialistInvitation(req, res);
+      case "declineSpecialistInvitation":
+        return await handleDeclineSpecialistInvitation(req, res);
+      case "acceptPatientInvitationById":
+        return await handleAcceptPatientInvitationById(req, res);
+      case "declinePatientInvitationById":
+        return await handleDeclinePatientInvitationById(req, res);
+      case "createPatientInvitation":
+        return await handleCreatePatientInvitation(req, res);
+      case "listPatientInvitations":
+        return await handleListPatientInvitations(req, res);
+      case "createMatchRequest":
+        return await handleCreateMatchRequest(req, res);
+      case "submitOnboardingRequest":
+        return await handleSubmitOnboardingRequest(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -1367,9 +1386,14 @@ async function handleValidateInviteToken(req, res) {
       ok: true,
       valid: true,
       invite: {
-        id: invite.id,
-        organization_id: invite.organization_id,
-        expert_id: invite.expert_id,
+        invitation_id: invite.id || null,
+        invite_kind: invite.invite_kind,
+        direction: invite.direction || null,
+        module: invite.module || null,
+        status: invite.status || null,
+        expires_at: invite.expires_at || null,
+        expert_name: invite.expert_name || null,
+        organization_id: invite.organization_id || null,
       },
     });
   } catch (error) {
@@ -3463,14 +3487,467 @@ async function handleCancelBodyServiceRequest(req, res) {
 }
 
 // ============================================================
+// Service Pricing (public endpoint)
+// ============================================================
+
+async function handleGetServicePricing(req, res) {
+  try {
+    const { module: reqModule } = req.body || {};
+    const supabase = getSupabase();
+
+    let query = supabase
+      .from("service_pricing")
+      .select("service_code, module, label, credits, active")
+      .eq("active", true)
+      .order("credits", { ascending: true });
+
+    if (reqModule) {
+      query = query.eq("module", reqModule);
+    }
+
+    const { data: pricing, error } = await query;
+
+    if (error) {
+      console.error("[getServicePricing] query error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить тарифы." });
+    }
+
+    return res.status(200).json({ ok: true, pricing: pricing || [] });
+  } catch (error) {
+    console.error("handleGetServicePricing error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка загрузки тарифов." });
+  }
+}
+
+// ============================================================
+// Patient ↔ Specialist Linking
+// ============================================================
+
+// Accept specialist's invitation (patient side)
+// Uses atomic RPC to guarantee invitation status and patient_assignment consistency.
+async function handleAcceptSpecialistInvitation(req, res) {
+  try {
+    const { session_id, access_token, invitation_token } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!invitation_token || typeof invitation_token !== "string") {
+      return res.status(400).json({ ok: false, error: "Укажите invitation_token" });
+    }
+
+    const supabase = getSupabase();
+    const tokenHash = hashToken(invitation_token);
+    return sendInvitationAcceptResult(res, await executeInvitationAccept({ supabase, tokenHash, owner }));
+  } catch (error) {
+    console.error("handleAcceptSpecialistInvitation error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сервера" });
+  }
+}
+
+async function handleAcceptPatientInvitationById(req, res) {
+  try {
+    const { session_id, access_token, invitation_id } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    if (!invitation_id || typeof invitation_id !== "string") {
+      return res.status(400).json({ ok: false, error: "Укажите invitation_id" });
+    }
+
+    const supabase = getSupabase();
+    const { data: invitation, error } = await supabase
+      .from("patient_specialist_invitations")
+      .select("id, token_hash, direction, module, status, expires_at, target_owner_id")
+      .eq("id", invitation_id)
+      .maybeSingle();
+
+    if (error || !invitation) return res.status(404).json({ ok: false, error: "Приглашение не найдено" });
+    if (invitation.direction !== "specialist_to_patient") {
+      return res.status(400).json({ ok: false, error: "Некорректное приглашение" });
+    }
+    if (invitation.target_owner_id !== owner.ownerId) {
+      return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+    }
+
+    return sendInvitationAcceptResult(res, await executeInvitationAccept({
+      supabase,
+      tokenHash: invitation.token_hash,
+      owner,
+    }));
+  } catch (error) {
+    console.error("handleAcceptPatientInvitationById error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сервера" });
+  }
+}
+
+async function executeInvitationAccept({ supabase, tokenHash, owner }) {
+  const { data: result, error: rpcError } = await supabase
+    .rpc("accept_specialist_invitation", {
+      p_token_hash: tokenHash,
+      p_owner_id: owner.ownerId,
+      p_public_code: owner.publicCode,
+    });
+
+  if (rpcError) {
+    console.error("[acceptSpecialistInvitation] RPC error:", rpcError.code, rpcError.message);
+    return { status: 500, body: { ok: false, error: "Ошибка сервера" } };
+  }
+
+  if (!result || !result.ok) {
+    const statusMap = {
+      NOT_FOUND: 404,
+      INVALID_DIRECTION: 400,
+      ALREADY_PROCESSED: 400,
+      EXPIRED: 400,
+      MODULE_MISMATCH: 400,
+      FORBIDDEN: 403,
+      EXPERT_UNAVAILABLE: 400,
+      NO_MODULE_ENTITLEMENT: 400,
+      ASSIGNMENT_CONFLICT: 409,
+      OWNER_MISMATCH: 403,
+    };
+    return {
+      status: statusMap[result?.code] || 400,
+      body: { ok: false, error: result?.error || "Ошибка", code: result?.code || "UNKNOWN" },
+    };
+  }
+
+  return { status: 200, body: { ok: true, message: result.message || "Специалист назначен" } };
+}
+
+function sendInvitationAcceptResult(res, result) {
+  return res.status(result.status).json(result.body);
+}
+
+// Decline specialist's invitation (patient side)
+async function handleDeclineSpecialistInvitation(req, res) {
+  try {
+    const { session_id, access_token, invitation_token } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    if (!invitation_token) {
+      return res.status(400).json({ ok: false, error: "Укажите invitation_token" });
+    }
+
+    const supabase = getSupabase();
+    const tokenHash = hashToken(invitation_token);
+
+    const { data: invitation, error: findError } = await supabase
+      .from("patient_specialist_invitations")
+      .select("id, direction, status, expires_at, target_owner_id")
+      .eq("token_hash", tokenHash)
+      .maybeSingle();
+
+    if (findError || !invitation) return res.status(404).json({ ok: false, error: "Приглашение не найдено" });
+    if (invitation.direction !== "specialist_to_patient") {
+      return res.status(400).json({ ok: false, error: "Некорректное приглашение" });
+    }
+    if (invitation.status !== "pending") {
+      return res.status(400).json({ ok: false, error: "Приглашение уже обработано" });
+    }
+    if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
+      return res.status(400).json({ ok: false, error: "Приглашение истекло" });
+    }
+    if (invitation.target_owner_id && invitation.target_owner_id !== owner.ownerId) {
+      return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+    }
+
+    // Atomic conditional transition: pending → declined
+    const now = new Date().toISOString();
+    const { data: updated, error: updateError } = await supabase
+      .from("patient_specialist_invitations")
+      .update({
+        status: "declined",
+        declined_at: now,
+        target_owner_id: owner.ownerId,
+        target_owner_type: "anonymous_case",
+        updated_at: now,
+      })
+      .eq("id", invitation.id)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+
+    if (updateError) {
+      console.error("[declineSpecialistInvitation] update error:", updateError.code);
+      return res.status(500).json({ ok: false, error: "Не удалось обработать приглашение" });
+    }
+
+    if (!updated) {
+      return res.status(400).json({ ok: false, error: "Приглашение не найдено или уже обработано" });
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error("handleDeclineSpecialistInvitation error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сервера" });
+  }
+}
+
+async function handleDeclinePatientInvitationById(req, res) {
+  try {
+    const { session_id, access_token, invitation_id } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    if (!invitation_id || typeof invitation_id !== "string") {
+      return res.status(400).json({ ok: false, error: "Укажите invitation_id" });
+    }
+
+    const supabase = getSupabase();
+    const now = new Date().toISOString();
+    const { data: updated, error } = await supabase
+      .from("patient_specialist_invitations")
+      .update({ status: "declined", declined_at: now, updated_at: now })
+      .eq("id", invitation_id)
+      .eq("direction", "specialist_to_patient")
+      .eq("target_owner_id", owner.ownerId)
+      .eq("status", "pending")
+      .gt("expires_at", now)
+      .select("id")
+      .maybeSingle();
+
+    if (error) return res.status(500).json({ ok: false, error: "Не удалось обработать приглашение" });
+    if (!updated) return res.status(400).json({ ok: false, error: "Приглашение не найдено или уже обработано" });
+    return res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error("handleDeclinePatientInvitationById error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сервера" });
+  }
+}
+
+// Create patient invitation (patient → specialist)
+async function handleCreatePatientInvitation(req, res) {
+  try {
+    const { session_id, access_token, message } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(); // 14 days
+
+    const { data: invitation, error } = await supabase
+      .from("patient_specialist_invitations")
+      .insert({
+        token_hash: tokenHash,
+        direction: "patient_to_specialist",
+        module: "support",
+        inviter_owner_type: "anonymous_case",
+        inviter_owner_id: owner.ownerId,
+        // target_owner_id/expert_id left null — doctor is unknown at creation time
+        status: "pending",
+        expires_at: expiresAt,
+      })
+      .select("id, direction, module, status, expires_at, created_at")
+      .single();
+
+    if (error) {
+      console.error("[createPatientInvitation] insert error:", error.code);
+      return res.status(500).json({ ok: false, error: "Не удалось создать приглашение" });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      invitation: {
+        ...invitation,
+        token: rawToken,
+        url: getInviteUrl(rawToken),
+      },
+    });
+  } catch (error) {
+    console.error("handleCreatePatientInvitation error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сервера" });
+  }
+}
+
+// List patient invitations
+async function handleListPatientInvitations(req, res) {
+  try {
+    const { session_id, access_token } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+    const { data: invitations, error } = await supabase
+      .from("patient_specialist_invitations")
+      .select("id, direction, module, status, expires_at, created_at, accepted_at, declined_at, revoked_at")
+      .or(`target_owner_id.eq.${owner.ownerId},inviter_owner_id.eq.${owner.ownerId}`)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить приглашения" });
+    }
+
+    return res.status(200).json({ ok: true, invitations: invitations || [] });
+  } catch (error) {
+    console.error("handleListPatientInvitations error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сервера" });
+  }
+}
+
+// Create match request (patient asks platform to assign specialist)
+async function handleCreateMatchRequest(req, res) {
+  try {
+    const { session_id, access_token, message } = req.body || {};
+    const owner = await resolveSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+
+    // Check no active assignment exists
+    const { data: existing } = await supabase
+      .from("patient_assignments")
+      .select("id")
+      .eq("public_code", owner.publicCode)
+      .eq("module", "support")
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (existing) {
+      return res.status(400).json({ ok: false, error: "У вас уже есть закреплённый специалист" });
+    }
+
+    const { data: request, error } = await supabase
+      .from("specialist_match_requests")
+      .insert({
+        owner_type: "anonymous_case",
+        owner_id: owner.ownerId,
+        module: "support",
+        message: message || null,
+        status: "submitted",
+      })
+      .select("id, status, created_at")
+      .single();
+
+    if (error) {
+      return res.status(500).json({ ok: false, error: "Не удалось создать заявку" });
+    }
+
+    return res.status(200).json({ ok: true, request });
+  } catch (error) {
+    console.error("handleCreateMatchRequest error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сервера" });
+  }
+}
+
+// Submit onboarding request (unknown doctor opens patient→specialist invitation)
+// This is public/unauthenticated — the token is the only credential.
+// Doctor does NOT receive any patient clinical data.
+async function handleSubmitOnboardingRequest(req, res) {
+  try {
+    const { invitation_token, name, contact_email, contact_phone, comment } = req.body || {};
+
+    if (!invitation_token || typeof invitation_token !== "string") {
+      return res.status(400).json({ ok: false, error: "Укажите invitation_token" });
+    }
+    if (!name || typeof name !== "string" || name.trim().length < 2) {
+      return res.status(400).json({ ok: false, error: "Укажите имя (минимум 2 символа)" });
+    }
+
+    const supabase = getSupabase();
+    const tokenHash = hashToken(invitation_token);
+
+    // Find invitation by token hash
+    const { data: invitation, error: findError } = await supabase
+      .from("patient_specialist_invitations")
+      .select("id, direction, module, organization_id, status, expires_at")
+      .eq("token_hash", tokenHash)
+      .maybeSingle();
+
+    if (findError || !invitation) {
+      return res.status(404).json({ ok: false, error: "Приглашение не найдено" });
+    }
+
+    // Validate invitation
+    if (invitation.direction !== "patient_to_specialist") {
+      return res.status(400).json({ ok: false, error: "Некорректное приглашение" });
+    }
+    if (invitation.status !== "pending") {
+      return res.status(400).json({ ok: false, error: "Приглашение уже обработано" });
+    }
+    if (new Date(invitation.expires_at) < new Date()) {
+      return res.status(400).json({ ok: false, error: "Приглашение истекло" });
+    }
+
+    // Check for existing onboarding request for this invitation (prevent spam)
+    const { data: existingRequest } = await supabase
+      .from("specialist_onboarding_requests")
+      .select("id, status")
+      .eq("invitation_id", invitation.id)
+      .maybeSingle();
+
+    if (existingRequest) {
+      if (existingRequest.status === "submitted") {
+        return res.status(200).json({ ok: true, message: "Заявка уже отправлена", status: "submitted" });
+      }
+      if (existingRequest.status === "approved") {
+        return res.status(200).json({ ok: true, message: "Заявка уже одобрена", status: "approved" });
+      }
+      return res.status(400).json({ ok: false, error: "Заявка по этому приглашению уже обработана" });
+    }
+
+    // Create onboarding request (no patient data exposed)
+    const { data: request, error: insertError } = await supabase
+      .from("specialist_onboarding_requests")
+      .insert({
+        invitation_id: invitation.id,
+        module: invitation.module,
+        organization_id: invitation.organization_id || null,
+        name: name.trim(),
+        contact_email: contact_email || null,
+        contact_phone: contact_phone || null,
+        comment: comment || null,
+        status: "submitted",
+      })
+      .select("id, status, created_at")
+      .single();
+
+    if (insertError) {
+      console.error("[submitOnboardingRequest] insert error:", insertError.code);
+      return res.status(500).json({ ok: false, error: "Не удалось отправить заявку" });
+    }
+
+    return res.status(200).json({ ok: true, request });
+  } catch (error) {
+    console.error("handleSubmitOnboardingRequest error:", error.message);
+    return res.status(500).json({ ok: false, error: "Ошибка сервера" });
+  }
+}
+
+// ============================================================
 // Support Service Requests
 // ============================================================
 
 const SUPPORT_REQUEST_TYPE_CONFIG = {
   question: { label: "Онлайн-вопрос", meeting_format: "text", sla_hours: 24 },
   phone: { label: "Телефонный звонок", meeting_format: "phone", sla_hours: 24 },
+  urgent: { label: "Срочная связь", meeting_format: "phone", sla_hours: 4 },
   video: { label: "Видеоконсультация", meeting_format: "video", sla_hours: 48 },
   offline: { label: "Очная встреча", meeting_format: "offline", sla_hours: 48 },
+};
+
+// Canonical service_code → request_type mapping (validated server-side)
+const SERVICE_CODE_MAP = {
+  short_followup: { request_type: "question", meeting_format: "text" },
+  therapy_review: { request_type: "question", meeting_format: "text" },
+  written_consultation: { request_type: "question", meeting_format: "text" },
+  phone_consultation: { request_type: "phone", meeting_format: "phone" },
+  urgent_contact: { request_type: "urgent", meeting_format: "phone" },
+  online_consultation: { request_type: "video", meeting_format: "video" },
+  offline_consultation: { request_type: "offline", meeting_format: "offline" },
 };
 
 const SUPPORT_REASON_LABELS = {
@@ -3482,7 +3959,7 @@ const SUPPORT_REASON_LABELS = {
 
 async function handleCreateSupportServiceRequest(req, res) {
   try {
-    const { session_id, access_token, request_type, reason, message, preferred_date, time_from, time_to, comment } = req.body || {};
+    const { session_id, access_token, service_code: clientServiceCode, request_type: clientRequestType, reason, message, preferred_date, time_from, time_to, comment } = req.body || {};
     const owner = await resolveSupportOwner(session_id, access_token);
     if (!owner) {
       return res.status(401).json({ ok: false, error: "Требуется авторизация." });
@@ -3495,14 +3972,54 @@ async function handleCreateSupportServiceRequest(req, res) {
       return res.status(400).json({ ok: false, error: "Слишком длинное сообщение (максимум 3000 символов)." });
     }
 
-    const config = SUPPORT_REQUEST_TYPE_CONFIG[request_type];
+    const supabase = getSupabase();
+
+    // ── Resolve service_code and validate ──────────────────
+    let serviceCode = clientServiceCode || null;
+    let requestType = clientRequestType;
+    let meetingFormat;
+
+    if (serviceCode) {
+      // Validate service_code against canonical pricing
+      const { data: pricing, error: pricingError } = await supabase
+        .from("service_pricing")
+        .select("service_code, module, label, credits, active")
+        .eq("service_code", serviceCode)
+        .maybeSingle();
+
+      if (pricingError || !pricing) {
+        return res.status(400).json({ ok: false, error: "Неизвестный тип услуги." });
+      }
+      if (!pricing.active) {
+        return res.status(400).json({ ok: false, error: "Данная услуга временно недоступна." });
+      }
+      if (pricing.module !== "support") {
+        return res.status(400).json({ ok: false, error: "Данная услуга не доступна в модуле Support." });
+      }
+
+      // Derive request_type from canonical mapping
+      const mapping = SERVICE_CODE_MAP[serviceCode];
+      if (!mapping) {
+        return res.status(400).json({ ok: false, error: "Неизвестный тип услуги." });
+      }
+      requestType = mapping.request_type;
+      meetingFormat = mapping.meeting_format;
+    } else {
+      // Legacy: use request_type directly (backward compat)
+      const config = SUPPORT_REQUEST_TYPE_CONFIG[clientRequestType];
+      if (!config) {
+        return res.status(400).json({ ok: false, error: "Укажите тип услуги." });
+      }
+      requestType = clientRequestType;
+      meetingFormat = config.meeting_format;
+    }
+
+    const config = SUPPORT_REQUEST_TYPE_CONFIG[requestType];
     if (!config) {
       return res.status(400).json({ ok: false, error: "Неверный тип запроса." });
     }
 
-    const supabase = getSupabase();
-
-    // Resolve specialist from relation
+    // ── Resolve specialist from relation ───────────────────
     const specialist = await resolveSupportSpecialistRelation(owner.ownerId);
 
     const reasonLabel = SUPPORT_REASON_LABELS[reason] || reason || "";
@@ -3522,8 +4039,8 @@ async function handleCreateSupportServiceRequest(req, res) {
         session_id: owner.sessionId,
         specialist_id: specialist?.expertId || null,
         specialist_name: specialist?.expertName || null,
-        request_type,
-        meeting_format: config.meeting_format,
+        request_type: requestType,
+        meeting_format: meetingFormat,
         title,
         message: message.trim(),
         status: "submitted",
@@ -3531,6 +4048,8 @@ async function handleCreateSupportServiceRequest(req, res) {
         sla_hours: config.sla_hours,
         due_at: dueAt,
         reserved_credits: 0,
+        service_code: serviceCode,
+        price_credits: serviceCode ? (await supabase.from("service_pricing").select("credits").eq("service_code", serviceCode).maybeSingle()).data?.credits || null : null,
         context_snapshot: {
           reason: reason || null,
           preferred_date: preferred_date || null,
@@ -3542,7 +4061,7 @@ async function handleCreateSupportServiceRequest(req, res) {
         created_at: now,
         updated_at: now,
       })
-      .select("id, request_type, meeting_format, title, status, specialist_name, due_at, created_at")
+      .select("id, request_type, meeting_format, title, status, specialist_name, due_at, service_code, price_credits, created_at")
       .single();
 
     if (insertError) {

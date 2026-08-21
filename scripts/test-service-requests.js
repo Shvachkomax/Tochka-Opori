@@ -56,10 +56,25 @@ console.log("\n2. Invalid status transitions");
 
 assert(!canTransition("completed", "accept"), "completed → accept blocked");
 assert(!canTransition("cancelled", "accept"), "cancelled → accept blocked");
+assert(!canTransition("needs_clarification", "accept"), "needs_clarification → accept blocked");
 assert(!canTransition("submitted", "complete"), "submitted → complete blocked");
 assert(!canTransition("submitted", "schedule"), "submitted → schedule blocked");
 assert(!canTransition("completed", "cancel"), "completed → cancel blocked");
 assert(!canTransition("cancelled", "cancel"), "cancelled → cancel blocked");
+
+// ── Test 2b: frontend/backend action wire contract ─────────
+console.log("\n2b. Frontend/backend action wire contract");
+
+function buildUpdateRequestBody(updateAction, extra = {}) {
+  return { action: "updateServiceRequest", update_action: updateAction, ...extra };
+}
+
+const acceptBody = buildUpdateRequestBody("accept");
+assert(acceptBody.action === "updateServiceRequest", "dispatcher action is preserved");
+assert(acceptBody.update_action === "accept", "backend receives accept as update_action");
+const clarificationBody = buildUpdateRequestBody("needs_clarification", { specialist_response: "Уточните дату" });
+assert(clarificationBody.update_action === "needs_clarification", "backend receives clarification transition");
+assert(clarificationBody.specialist_response === "Уточните дату", "clarification text stays a lightweight request field");
 
 // ── Test 3: Ownership check logic ──────────────────────────
 console.log("\n3. Ownership check");

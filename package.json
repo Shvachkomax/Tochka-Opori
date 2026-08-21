@@ -8,7 +8,9 @@
     "dev:api": "node --env-file=.env.local local-api-server.js",
     "dev:all": "concurrently \"npm run dev:api\" \"npm run dev\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e:phase11c1": "node scripts/e2e-phase11c1-browser.mjs",
+    "e2e:service-requests": "node scripts/e2e-service-requests-browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

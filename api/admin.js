@@ -27,8 +27,8 @@ function extractPassword(req) {
   // Prefer Authorization header, fall back to body field
   const headerToken = getAdminTokenFromHeader(req);
   if (headerToken) return headerToken;
-  const { password } = req.body || {};
-  return password || null;
+  const { password, admin_secret } = req.body || {};
+  return password || admin_secret || null;
 }
 
 export default async function handler(req, res) {
@@ -147,6 +147,16 @@ export default async function handler(req, res) {
         return await handleAssignBodyClientToExpert(req, res);
       case "reassignBodyClientExpert":
         return await handleReassignBodyClientExpert(req, res);
+      // Specialist onboarding requests
+      case "listOnboardingRequests":
+        return await handleListOnboardingRequests(req, res);
+      case "reviewOnboardingRequest":
+        return await handleReviewOnboardingRequest(req, res);
+      // Specialist match requests
+      case "listMatchRequests":
+        return await handleListMatchRequests(req, res);
+      case "assignMatchRequest":
+        return await handleAssignMatchRequest(req, res);
       default:
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
@@ -2360,4 +2370,254 @@ async function handleReassignBodyClientExpert(req, res) {
     noop: rpcResult.noop || false,
     message: rpcResult.message || null,
   });
+}
+
+// ============================================================
+// Specialist Onboarding Requests
+// ============================================================
+
+async function handleListOnboardingRequests(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "support")) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+
+  const { status } = req.body || {};
+  const supabase = getSupabase();
+
+  let query = supabase
+    .from("specialist_onboarding_requests")
+    .select("id, invitation_id, module, organization_id, name, contact_email, contact_phone, comment, status, expert_id, created_at, reviewed_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (status && status !== "all") {
+    query = query.eq("status", status);
+  }
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ ok: false, error: error.message });
+
+  return res.json({ ok: true, requests: data || [] });
+}
+
+async function handleReviewOnboardingRequest(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "support")) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+
+  const { id, review_action: reviewAction, expert_id } = req.body || {};
+  if (!id || !reviewAction) return res.status(400).json({ ok: false, error: "Missing id or review_action" });
+
+  const supabase = getSupabase();
+  const { data: request, error: findError } = await supabase
+    .from("specialist_onboarding_requests")
+    .select("id, status, invitation_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (findError || !request) return res.status(404).json({ ok: false, error: "Заявка не найдена" });
+  if (request.status !== "submitted") return res.status(400).json({ ok: false, error: "Заявка уже обработана" });
+
+  const now = new Date().toISOString();
+  const updates = { reviewed_at: now, updated_at: now };
+
+  if (reviewAction === "approve") {
+    if (!expert_id) return res.status(400).json({ ok: false, error: "Укажите expert_id для привязки" });
+
+    const { data: invitation, error: invitationError } = await supabase
+      .from("patient_specialist_invitations")
+      .select("id, direction, module, status, expires_at")
+      .eq("id", request.invitation_id)
+      .maybeSingle();
+    if (invitationError || !invitation) return res.status(404).json({ ok: false, error: "Приглашение не найдено" });
+    if (invitation.direction !== "patient_to_specialist" || invitation.status !== "pending") {
+      return res.status(400).json({ ok: false, error: "Приглашение уже обработано или имеет неверное направление" });
+    }
+    if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
+      return res.status(400).json({ ok: false, error: "Приглашение истекло" });
+    }
+
+    const { data: expert } = await supabase
+      .from("experts")
+      .select("id, is_active, allowed_modules")
+      .eq("id", expert_id)
+      .maybeSingle();
+    if (!expert || !expert.is_active) return res.status(400).json({ ok: false, error: "Специалист не найден или неактивен" });
+    if (!Array.isArray(expert.allowed_modules) || !expert.allowed_modules.includes(invitation.module)) {
+      return res.status(400).json({ ok: false, error: "Специалист не имеет доступа к модулю приглашения" });
+    }
+
+    updates.status = "approved";
+    updates.expert_id = expert_id;
+
+    const { data: targetedInvitation, error: targetError } = await supabase
+      .from("patient_specialist_invitations")
+      .update({ target_expert_id: expert_id, updated_at: now })
+      .eq("id", request.invitation_id)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (targetError) return res.status(500).json({ ok: false, error: targetError.message });
+    if (!targetedInvitation) return res.status(400).json({ ok: false, error: "Приглашение уже обработано" });
+  } else if (reviewAction === "reject") {
+    updates.status = "rejected";
+  } else if (reviewAction === "cancel") {
+    updates.status = "cancelled";
+  } else {
+    return res.status(400).json({ ok: false, error: "Неизвестное действие" });
+  }
+
+  const { data: updatedRequest, error: updateError } = await supabase
+    .from("specialist_onboarding_requests")
+    .update(updates)
+    .eq("id", id)
+    .eq("status", "submitted")
+    .select("id")
+    .maybeSingle();
+
+  if (updateError) {
+    if (reviewAction === "approve") {
+      await supabase
+        .from("patient_specialist_invitations")
+        .update({ target_expert_id: null, updated_at: now })
+        .eq("id", request.invitation_id)
+        .eq("status", "pending");
+    }
+    return res.status(500).json({ ok: false, error: updateError.message });
+  }
+  if (!updatedRequest) {
+    if (reviewAction === "approve") {
+      await supabase
+        .from("patient_specialist_invitations")
+        .update({ target_expert_id: null, updated_at: now })
+        .eq("id", request.invitation_id)
+        .eq("status", "pending");
+    }
+    return res.status(400).json({ ok: false, error: "Заявка уже обработана" });
+  }
+
+  await logAdminAction(role, "review_onboarding_request", {
+    targetType: "specialist_onboarding_request",
+    targetId: id,
+    ipAddress: getClientIp(req),
+    details: { action: reviewAction, expert_id: expert_id || null },
+  });
+
+  return res.json({ ok: true, status: updates.status });
+}
+
+// ============================================================
+// Specialist Match Requests
+// ============================================================
+
+async function handleListMatchRequests(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "support")) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+
+  const { status } = req.body || {};
+  const supabase = getSupabase();
+
+  let query = supabase
+    .from("specialist_match_requests")
+    .select("id, owner_type, owner_id, module, organization_id, message, status, assigned_expert_id, created_at, assigned_at")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (status && status !== "all") {
+    query = query.eq("status", status);
+  }
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ ok: false, error: error.message });
+
+  return res.json({ ok: true, requests: data || [] });
+}
+
+async function handleAssignMatchRequest(req, res) {
+  const password = extractPassword(req);
+  const role = resolveRole(password);
+  if (!checkAccess(role, "support")) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+
+  const { id, expert_id, organization_id } = req.body || {};
+  if (!id || !expert_id) return res.status(400).json({ ok: false, error: "Missing id or expert_id" });
+
+  const supabase = getSupabase();
+  const { data: request, error: findError } = await supabase
+    .from("specialist_match_requests")
+    .select("id, status, owner_type, owner_id, module")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (findError || !request) return res.status(404).json({ ok: false, error: "Заявка не найдена" });
+  if (request.status !== "submitted") return res.status(400).json({ ok: false, error: "Заявка уже обработана" });
+
+  // Verify expert exists and has module entitlement
+  const { data: expert } = await supabase
+    .from("experts")
+    .select("id, name, is_active, allowed_modules")
+    .eq("id", expert_id)
+    .maybeSingle();
+
+  if (!expert || !expert.is_active) return res.status(400).json({ ok: false, error: "Специалист не найден" });
+
+  const expertModules = Array.isArray(expert.allowed_modules) ? expert.allowed_modules : [];
+  if (!expertModules.includes(request.module)) {
+    return res.status(400).json({ ok: false, error: "Специалист не имеет доступа к данному модулю" });
+  }
+
+  // Check existing active assignment
+  const { data: existing } = await supabase
+    .from("patient_assignments")
+    .select("id, primary_expert_id")
+    .eq("owner_type", request.owner_type)
+    .eq("owner_id", request.owner_id)
+    .eq("module", request.module)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (existing) {
+    if (existing.primary_expert_id === expert_id) {
+      return res.json({ ok: true, message: "Уже назначено", noop: true });
+    }
+    return res.status(409).json({ ok: false, error: "Пациент уже назначен другому специалисту. Используйте reassign." });
+  }
+
+  // Create canonical patient_assignment
+  const { error: assignError } = await supabase
+    .from("patient_assignments")
+    .insert({
+      owner_type: request.owner_type,
+      owner_id: request.owner_id,
+      primary_expert_id: expert_id,
+      organization_id: organization_id || null,
+      module: request.module,
+      status: "active",
+      source: "match_request",
+      assigned_by_expert_id: null,
+      assigned_by_expert_name: role,
+    });
+
+  if (assignError) return res.status(500).json({ ok: false, error: assignError.message });
+
+  // Update match request
+  const now = new Date().toISOString();
+  await supabase
+    .from("specialist_match_requests")
+    .update({
+      status: "assigned",
+      assigned_expert_id: expert_id,
+      assigned_at: now,
+      updated_at: now,
+    })
+    .eq("id", id);
+
+  await logAdminAction(role, "assign_match_request", {
+    targetType: "specialist_match_request",
+    targetId: id,
+    ipAddress: getClientIp(req),
+    details: { expert_id, expert_name: expert.name },
+  });
+
+  return res.json({ ok: true, expert_name: expert.name });
 }

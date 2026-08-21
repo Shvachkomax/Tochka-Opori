@@ -26,6 +26,7 @@ const S = {
 export default function SpecialistCabinet() {
   const [auth, setAuth] = useState(null); // { expert, memberships }
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null); // null | { kind: "server" | "network", message }
   const [loginCode, setLoginCode] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [toast, setToast] = useState({ message: "", type: "" });
@@ -65,6 +66,11 @@ export default function SpecialistCabinet() {
   const [serviceRequestsFilter, setServiceRequestsFilter] = useState("all");
   const [serviceRequestUpdating, setServiceRequestUpdating] = useState(null);
 
+  // Invitations state
+  const [invitations, setInvitations] = useState([]);
+  const [invitationsLoading, setInvitationsLoading] = useState(false);
+  const [invitationTab, setInvitationTab] = useState("list"); // list | create
+
   // Stale-response guard: only the latest detail request result is applied
   const detailGenerationRef = useRef(0);
   // Refresh key: incremented on re-click to force re-fetch even for same client_ref
@@ -85,6 +91,7 @@ export default function SpecialistCabinet() {
         const data = await res.json();
         if (!cancelled && data.ok) {
           setAuth({ expert: data.expert, memberships: data.memberships });
+          setAuthError(null);
           // Validate persisted org_id against current memberships
           if (orgId) {
             const valid = data.memberships.some((m) => m.organization_id === orgId);
@@ -102,8 +109,12 @@ export default function SpecialistCabinet() {
             try { sessionStorage.setItem("specialist_module", fallback); } catch {}
             clearSelectedClientDetail();
           }
+        } else if (!cancelled && res.status !== 401 && res.status !== 403) {
+          setAuthError({ kind: "server", message: data.error || "Не удалось загрузить кабинет специалиста." });
         }
-      } catch {}
+      } catch {
+        if (!cancelled) setAuthError({ kind: "network", message: "Не удалось связаться с кабинетом специалиста." });
+      }
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -344,7 +355,7 @@ export default function SpecialistCabinet() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ action: "updateServiceRequest", request_ref: requestRef, action, module, ...extra }),
+        body: JSON.stringify({ action: "updateServiceRequest", request_ref: requestRef, update_action: action, module, ...extra }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -364,13 +375,111 @@ export default function SpecialistCabinet() {
     if (auth) loadServiceRequests();
   }, [auth, module]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Invitations ──────────────────────────────────────────
+
+  async function loadInvitations() {
+    setInvitationsLoading(true);
+    try {
+      const res = await fetch("/api/specialist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action: "listInvitations" }),
+      });
+      const data = await res.json();
+      if (data.ok) setInvitations(data.invitations || []);
+    } catch {}
+    setInvitationsLoading(false);
+  }
+
+  async function createInvitation(patientLabel) {
+    try {
+      const res = await fetch("/api/specialist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action: "createInvitation", module, organization_id: orgId || null, patient_label: patientLabel }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Приглашение создано");
+        await loadInvitations();
+        return data.invitation;
+      } else {
+        showToast(data.error || "Ошибка", "error");
+        return null;
+      }
+    } catch {
+      showToast("Ошибка сети", "error");
+      return null;
+    }
+  }
+
+  async function revokeInvitation(invitationId) {
+    try {
+      const res = await fetch("/api/specialist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action: "revokeInvitation", invitation_id: invitationId }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Приглашение отозвано");
+        await loadInvitations();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка сети", "error");
+    }
+  }
+
+  async function respondToPatientInvitation(invitationId, action) {
+    try {
+      const res = await fetch("/api/specialist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action, invitation_id: invitationId }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(action === "acceptPatientInvitation" ? "Пациент подключён" : "Приглашение отклонено");
+        await loadInvitations();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch {
+      showToast("Ошибка сети", "error");
+    }
+  }
+
+  useEffect(() => {
+    if (auth) loadInvitations();
+  }, [auth]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Loading state ────────────────────────────────────────
 
   if (loading) {
     return (
-      <div style={S.page}>
+      <div style={S.page} data-testid="specialist-loading">
         <div style={{ maxWidth: 800, margin: "0 auto", paddingTop: 80, textAlign: "center", color: "#7A7268" }}>
           Загрузка...
+        </div>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div style={S.page} data-testid="specialist-auth-error">
+        <div style={{ maxWidth: 800, margin: "0 auto", paddingTop: 80, textAlign: "center" }}>
+          <div style={{ ...S.card, maxWidth: 520, margin: "0 auto" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10 }}>Кабинет специалиста недоступен</div>
+            <div style={{ ...S.small, marginBottom: 18 }}>{authError.message}</div>
+            <button style={S.btnSecondary} onClick={() => window.location.reload()}>Повторить</button>
+          </div>
         </div>
       </div>
     );
@@ -380,7 +489,7 @@ export default function SpecialistCabinet() {
 
   if (!auth) {
     return (
-      <div style={S.page}>
+      <div style={S.page} data-testid="specialist-login">
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
             <img src="/logo-tochka-opory-header.png" alt="Точка опоры" style={{ height: 72, display: "block" }} />
@@ -429,7 +538,7 @@ export default function SpecialistCabinet() {
     : "Частная практика";
 
   return (
-    <div style={S.page}>
+    <div style={S.page} data-testid="specialist-cabinet">
       <div style={{ maxWidth: 800, margin: "0 auto" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32 }}>
@@ -573,6 +682,42 @@ export default function SpecialistCabinet() {
           </div>
         )}
 
+        {/* ── Invitations ──────────────────────────────── */}
+        {!selectedClient && module === "support" && (
+          <div style={S.card} data-testid="invitations-section">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Приглашения</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={loadInvitations} style={{ ...S.btnSecondary, fontSize: 12, padding: "4px 10px" }}>Обновить</button>
+                <button onClick={() => setInvitationTab(invitationTab === "list" ? "create" : "list")} style={{ ...S.btnSecondary, fontSize: 12, padding: "4px 10px" }}>
+                  {invitationTab === "list" ? "Пригласить пациента" : "Список"}
+                </button>
+              </div>
+            </div>
+
+            {invitationTab === "create" ? (
+              <InvitationCreateForm onSubmit={createInvitation} onDone={() => setInvitationTab("list")} />
+            ) : (
+              invitationsLoading ? (
+                <p style={{ fontSize: 13, color: "#7A7268" }}>Загрузка...</p>
+              ) : invitations.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#7A7268" }}>Приглашений пока нет.</p>
+              ) : (
+                <div>
+                  {invitations.map((inv) => (
+                    <InvitationCard
+                      key={inv.id}
+                      invitation={inv}
+                      onRevoke={revokeInvitation}
+                      onRespond={respondToPatientInvitation}
+                    />
+                  ))}
+                </div>
+              )
+            )}
+          </div>
+        )}
+
         {/* Client detail or Client list */}
         {selectedClient ? (
           module === "body" ? (
@@ -681,10 +826,10 @@ function ServiceRequestCard({ request: r, onAction, updating }) {
   const typeLabel = REQUEST_TYPE_LABELS[r.request_type] || r.request_type;
   const created = r.created_at ? new Date(r.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 
-  const isActive = ["submitted", "accepted", "needs_clarification", "scheduled"].includes(r.status);
+  const isActive = ["submitted", "accepted", "needs_clarification", "scheduled", "answered"].includes(r.status);
 
   return (
-    <div style={{ padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)", marginBottom: 8, background: "#fff" }}>
+    <div data-testid="service-request-card" style={{ padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)", marginBottom: 8, background: "#fff" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#2E2A25" }}>
@@ -701,6 +846,17 @@ function ServiceRequestCard({ request: r, onAction, updating }) {
       </div>
 
       {r.title && <div style={{ fontSize: 13, fontWeight: 600, marginTop: 8, color: "#2E2A25" }}>{r.title}</div>}
+
+      {r.price_credits > 0 && (
+        <div style={{ fontSize: 12, color: "#7D9A89", marginTop: 4, fontWeight: 600 }}>
+          Стоимость: {r.price_credits.toLocaleString("ru-RU")} кредитов
+        </div>
+      )}
+      {r.price_credits === null && r.service_code === null && (
+        <div style={{ fontSize: 12, color: "#7A7268", marginTop: 4, fontStyle: "italic" }}>
+          Стоимость не зафиксирована (legacy)
+        </div>
+      )}
 
       {!expanded && r.message && (
         <div style={{ fontSize: 13, color: "#5F574F", marginTop: 6, cursor: "pointer" }} onClick={() => setExpanded(true)}>
@@ -750,7 +906,10 @@ function ServiceRequestCard({ request: r, onAction, updating }) {
             </button>
           )}
           {["submitted", "accepted"].includes(r.status) && (
-            <button disabled={updating} onClick={() => onAction(r.request_ref, "needs_clarification")} style={S.actionBtn}>
+            <button disabled={updating} onClick={() => {
+              const clarification = prompt("Что нужно уточнить у клиента?");
+              if (clarification) onAction(r.request_ref, "needs_clarification", { specialist_response: clarification });
+            }} style={S.actionBtn}>
               Уточнить
             </button>
           )}
@@ -780,6 +939,111 @@ function ServiceRequestCard({ request: r, onAction, updating }) {
               Отменить
             </button>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Invitation Create Form ────────────────────────────────
+
+function InvitationCreateForm({ onSubmit, onDone }) {
+  const [label, setLabel] = useState("");
+  const [created, setCreated] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    const result = await onSubmit(label || null);
+    setSubmitting(false);
+    if (result) setCreated(result);
+  }
+
+  if (created) {
+    return (
+      <div style={{ padding: "12px 14px", borderRadius: 12, border: "1px solid #E2EBE4", background: "#F8FAF8" }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "#2E2A25", marginBottom: 8 }}>Приглашение создано</div>
+        <div style={{ fontSize: 13, color: "#5F574F", marginBottom: 8, wordBreak: "break-all" }}>
+          Ссылка: {created.url}
+        </div>
+        <button onClick={() => { navigator.clipboard?.writeText(created.url); }} style={{ ...S.actionBtn, marginBottom: 8 }}>
+          Скопировать ссылку
+        </button>
+        <div style={{ fontSize: 12, color: "#7A7268" }}>
+          Срок действия: 7 дней. Статус: {created.status}
+        </div>
+        <button onClick={onDone} style={{ ...S.btnSecondary, marginTop: 8 }}>Готово</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)" }}>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Пригласить пациента</div>
+      <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 8 }}>
+        Создайте ссылку и отправьте пациенту. После принятия он появится в ваших пациентах.
+      </div>
+      <input
+        style={{ ...S.input, marginBottom: 8 }}
+        placeholder="Метка пациента (необязательно)"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+      />
+      <button onClick={handleSubmit} disabled={submitting} style={{ ...S.actionBtn }}>
+        {submitting ? "Создание..." : "Создать ссылку"}
+      </button>
+    </div>
+  );
+}
+
+// ── Invitation Card ───────────────────────────────────────
+
+const INVITATION_STATUS_LABELS = {
+  pending: "Ожидает",
+  accepted: "Принято",
+  declined: "Отклонено",
+  expired: "Истекло",
+  revoked: "Отозвано",
+};
+
+const INVITATION_STATUS_COLORS = {
+  pending: { bg: "#FEF3C7", text: "#92400E" },
+  accepted: { bg: "#E2EBE4", text: "#5F7D6C" },
+  declined: { bg: "#f0e0e0", text: "#8B4A3A" },
+  expired: { bg: "#f0f0f0", text: "#666" },
+  revoked: { bg: "#f0e0e0", text: "#8B4A3A" },
+};
+
+function InvitationCard({ invitation: inv, onRevoke, onRespond }) {
+  const sc = INVITATION_STATUS_COLORS[inv.status] || INVITATION_STATUS_COLORS.pending;
+  const created = inv.created_at ? new Date(inv.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+  const expires = inv.expires_at ? new Date(inv.expires_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+
+  return (
+    <div style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)", marginBottom: 8, background: "#fff" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>
+            {inv.direction === "patient_to_specialist" ? "Входящее приглашение пациента" : (inv.patient_label || "Пациент")}
+          </span>
+          <span style={{ fontSize: 12, color: "#7A7268", marginLeft: 8 }}>{created}</span>
+        </div>
+        <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 10, background: sc.bg, color: sc.text }}>
+          {INVITATION_STATUS_LABELS[inv.status] || inv.status}
+        </span>
+      </div>
+      {inv.status === "pending" && inv.direction === "patient_to_specialist" && (
+        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+          <button onClick={() => onRespond(inv.id, "acceptPatientInvitation")} style={S.actionBtn}>Принять</button>
+          <button onClick={() => onRespond(inv.id, "declinePatientInvitation")} style={{ ...S.actionBtn, color: "#B85C4A" }}>Отклонить</button>
+        </div>
+      )}
+      {inv.status === "pending" && inv.direction !== "patient_to_specialist" && (
+        <div style={{ marginTop: 8, fontSize: 12, color: "#7A7268" }}>
+          Истекает: {expires}
+          <button onClick={() => onRevoke(inv.id)} style={{ ...S.actionBtn, marginLeft: 8, color: "#B85C4A", borderColor: "rgba(184,92,74,.3)" }}>
+            Отозвать
+          </button>
         </div>
       )}
     </div>

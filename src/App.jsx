@@ -116,6 +116,11 @@ export default function App() {
 
   // Support Cabinet MVP
   const [supportCabinet, setSupportCabinet] = useState(null);
+  const [patientInvitations, setPatientInvitations] = useState([]);
+  const [patientInvitationsLoading, setPatientInvitationsLoading] = useState(false);
+  const [patientInviteModalOpen, setPatientInviteModalOpen] = useState(false);
+  const [patientInviteCreated, setPatientInviteCreated] = useState(null);
+  const [matchRequestSending, setMatchRequestSending] = useState(false);
   const [cabinetLoading, setCabinetLoading] = useState(false);
   const [followUpAnswers, setFollowUpAnswers] = useState({});
   const [reportSource, setReportSource] = useState(null); // "generated" | "cabinet"
@@ -125,7 +130,7 @@ export default function App() {
   const [supportViewingSessionData, setSupportViewingSessionData] = useState(null);
   const [supportSessionLoading, setSupportSessionLoading] = useState(false);
   const [supportNewRequestOpen, setSupportNewRequestOpen] = useState(false);
-  const [supportNewRequest, setSupportNewRequest] = useState({ request_type: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
+  const [supportNewRequest, setSupportNewRequest] = useState({ service_code: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
   const [supportRequestSubmitting, setSupportRequestSubmitting] = useState(false);
   const [accessExpanded, setAccessExpanded] = useState(false);
   const [profileExpanded, setProfileExpanded] = useState(false);
@@ -429,6 +434,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   });
   const [inviteInfo, setInviteInfo] = useState(null);
   const [inviteChecking, setInviteChecking] = useState(false);
+  const [inviteSpecialistAuth, setInviteSpecialistAuth] = useState({ loading: false, authenticated: false, error: null });
+  const [onboardingForm, setOnboardingForm] = useState({ name: "", contact_email: "", contact_phone: "", comment: "" });
+  const [onboardingSubmitting, setOnboardingSubmitting] = useState(false);
 
   // Validate invite token on mount
   React.useEffect(() => {
@@ -443,7 +451,27 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         .then((r) => r.json())
         .then((d) => {
           if (d.valid && d.invite) {
-            setInviteInfo({ valid: true, expert_name: d.invite.expert_name, organization_name: d.invite.organization_name });
+            setInviteInfo({ valid: true, ...d.invite });
+            if (d.invite.direction === "patient_to_specialist") {
+              setInviteSpecialistAuth({ loading: true, authenticated: false, error: null });
+              fetch("/api/specialist", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "same-origin",
+                body: JSON.stringify({ action: "me" }),
+              })
+                .then(async (response) => ({ response, data: await response.json() }))
+                .then(({ response, data }) => {
+                  if (data.ok) {
+                    setInviteSpecialistAuth({ loading: false, authenticated: true, error: null });
+                  } else if (response.status === 401 || response.status === 403) {
+                    setInviteSpecialistAuth({ loading: false, authenticated: false, error: null });
+                  } else {
+                    setInviteSpecialistAuth({ loading: false, authenticated: false, error: "Не удалось проверить вход специалиста." });
+                  }
+                })
+                .catch(() => setInviteSpecialistAuth({ loading: false, authenticated: false, error: "Не удалось проверить вход специалиста." }));
+            }
           } else {
             setInviteInfo({ valid: false, error: d.error || "Ссылка недействительна" });
           }
@@ -537,6 +565,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [bodyExpertReviewFormOpen, setBodyExpertReviewFormOpen] = useState(false);
   const [bodyExpertReviewForm, setBodyExpertReviewForm] = useState(null);
   const [bodyExpertReviewSaving, setBodyExpertReviewSaving] = useState(false);
+
+  // Admin specialist onboarding/match state
+  const [onboardingRequests, setOnboardingRequests] = useState([]);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [matchRequests, setMatchRequests] = useState([]);
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [matchExpertSelector, setMatchExpertSelector] = useState(null); // request id being assigned
+  const [matchExpertList, setMatchExpertList] = useState([]);
+  const [matchAssigning, setMatchAssigning] = useState(false);
   const [bodyExportingCases, setBodyExportingCases] = useState(false);
   // Body client assignment
   const [bodyAssignments, setBodyAssignments] = useState([]);
@@ -1242,6 +1279,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       // Optional loads — non-blocking
       loadSupportCheckins().catch(() => {});
       loadSupportPractices().catch(() => {});
+      loadPatientInvitations().catch(() => {});
       // Don't auto-load chat — show fresh composer
       setQuickChatMessages([]);
       setQuickChatInput("");
@@ -1588,8 +1626,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       showToast("Нужен код доступа.", "error");
       return;
     }
-    if (!supportNewRequest.request_type) {
-      showToast("Выберите способ связи.", "error");
+    if (!supportNewRequest.service_code) {
+      showToast("Выберите услугу.", "error");
       return;
     }
     if (!supportNewRequest.message || supportNewRequest.message.trim().length < 2) {
@@ -1605,7 +1643,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           action: "createSupportServiceRequest",
           session_id: saved.sessionId,
           access_token: saved.accessToken,
-          request_type: supportNewRequest.request_type,
+          service_code: supportNewRequest.service_code,
           reason: supportNewRequest.reason,
           message: supportNewRequest.message,
           preferred_date: supportNewRequest.preferred_date,
@@ -1620,7 +1658,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       }
       showToast("Запрос отправлен специалисту.", "success");
       setSupportNewRequestOpen(false);
-      setSupportNewRequest({ request_type: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
+      setSupportNewRequest({ service_code: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
       // Refresh cabinet to show new request
       await refreshSupportCabinet();
     } catch (e) {
@@ -1681,6 +1719,220 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         if (data.display_name) setSupportDisplayName(data.display_name);
       }
     } catch { /* silent */ }
+  }
+
+  // ── Patient Invitations ──────────────────────────────────
+  async function loadPatientInvitations() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    setPatientInvitationsLoading(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listPatientInvitations", session_id: saved.sessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) setPatientInvitations(data.invitations || []);
+    } catch {}
+    setPatientInvitationsLoading(false);
+  }
+
+  async function acceptPatientInvitationById(invitationId) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "acceptPatientInvitationById", session_id: saved.sessionId, access_token: saved.accessToken, invitation_id: invitationId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("Специалист назначен");
+        await refreshSupportCabinet();
+        await loadPatientInvitations();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch { showToast("Ошибка сети", "error"); }
+  }
+
+  async function declinePatientInvitationById(invitationId) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "declinePatientInvitationById", session_id: saved.sessionId, access_token: saved.accessToken, invitation_id: invitationId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("Приглашение отклонено");
+        await loadPatientInvitations();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch { showToast("Ошибка сети", "error"); }
+  }
+
+  async function acceptPublicSpecialistInvitation(token) {
+    let saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      try {
+        await ensureStartSession();
+        saved = getSupportSession();
+      } catch (error) {
+        showToast(error.message || "Не удалось создать защищённую сессию", "error");
+        return;
+      }
+    }
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("Не удалось подготовить защищённую сессию", "error");
+      return;
+    }
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "acceptSpecialistInvitation", session_id: saved.sessionId, access_token: saved.accessToken, invitation_token: token }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("Специалист назначен");
+        localStorage.removeItem("tochka_invite_token");
+        setInviteInfo(null);
+        await loadSupportCabinet();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch { showToast("Ошибка сети", "error"); }
+  }
+
+  async function declinePublicSpecialistInvitation(token) {
+    let saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      try {
+        await ensureStartSession();
+        saved = getSupportSession();
+      } catch (error) {
+        showToast(error.message || "Не удалось создать защищённую сессию", "error");
+        return;
+      }
+    }
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "declineSpecialistInvitation", session_id: saved.sessionId, access_token: saved.accessToken, invitation_token: token }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("Приглашение отклонено");
+        localStorage.removeItem("tochka_invite_token");
+        setInviteInfo(null);
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch { showToast("Ошибка сети", "error"); }
+  }
+
+  async function declineSpecialistInvitation(token) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "declineSpecialistInvitation", session_id: saved.sessionId, access_token: saved.accessToken, invitation_token: token }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("Приглашение отклонено");
+        await loadPatientInvitations();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch { showToast("Ошибка сети", "error"); }
+  }
+
+  async function submitPatientSpecialistOnboarding() {
+    if (!onboardingForm.name.trim()) return;
+    setOnboardingSubmitting(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "submitOnboardingRequest", invitation_token: inviteToken, ...onboardingForm, name: onboardingForm.name.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast(data.message || "Заявка отправлена");
+        setInviteInfo({ ...inviteInfo, status: "onboarding_submitted" });
+      } else {
+        showToast(data.error || "Не удалось отправить заявку", "error");
+      }
+    } catch { showToast("Ошибка сети", "error"); }
+    setOnboardingSubmitting(false);
+  }
+
+  async function respondToPatientInvitationAsSpecialist(action) {
+    try {
+      const res = await fetch("/api/specialist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action, invitation_id: inviteInfo?.invitation_id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast(action === "acceptPatientInvitation" ? "Пациент подключён" : "Приглашение отклонено");
+        localStorage.removeItem("tochka_invite_token");
+        setInviteInfo(null);
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch { showToast("Ошибка сети", "error"); }
+  }
+
+  async function createPatientInvitation() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "createPatientInvitation", session_id: saved.sessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setPatientInviteCreated(data.invitation);
+        await loadPatientInvitations();
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch { showToast("Ошибка сети", "error"); }
+  }
+
+  async function createMatchRequest(message) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    setMatchRequestSending(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "createMatchRequest", session_id: saved.sessionId, access_token: saved.accessToken, message }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("Заявка отправлена. Администратор подберёт специалиста.");
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch { showToast("Ошибка сети", "error"); }
+    setMatchRequestSending(false);
   }
 
   // Load daily check-ins
@@ -3678,6 +3930,92 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     } catch {
       showToast("Ошибка выгрузки", "error");
     }
+  }
+
+  // ── Admin Onboarding Requests ─────────────────────────────
+  async function adminLoadOnboardingRequests(status) {
+    setOnboardingLoading(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listOnboardingRequests", status: status || "all", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) setOnboardingRequests(data.requests || []);
+    } catch {}
+    setOnboardingLoading(false);
+  }
+
+  async function adminReviewOnboardingRequest(id, action, expertId) {
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reviewOnboardingRequest", id, review_action: action, expert_id: expertId, admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(action === "approve" ? "Заявка одобрена" : "Заявка отклонена");
+        adminLoadOnboardingRequests("all");
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch { showToast("Ошибка", "error"); }
+  }
+
+  // ── Admin Match Requests ──────────────────────────────────
+  async function adminLoadMatchRequests(status) {
+    setMatchLoading(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listMatchRequests", status: status || "all", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) setMatchRequests(data.requests || []);
+    } catch {}
+    setMatchLoading(false);
+  }
+
+  async function adminAssignMatchRequest(requestId, expertId) {
+    setMatchAssigning(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "assignMatchRequest", id: requestId, expert_id: expertId, admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(`Назначен: ${expertId}`);
+        setMatchExpertSelector(null);
+        adminLoadMatchRequests("all");
+      } else {
+        showToast(data.error || "Ошибка", "error");
+      }
+    } catch { showToast("Ошибка", "error"); }
+    setMatchAssigning(false);
+  }
+
+  async function adminLoadEligibleExperts(module) {
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listAllExperts", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const experts = (data.experts || []).filter(e => {
+          if (!e.is_active) return false;
+          const modules = Array.isArray(e.allowed_modules) ? e.allowed_modules : [];
+          return modules.includes(module || "support");
+        });
+        setMatchExpertList(experts);
+      }
+    } catch {}
   }
 
   async function loadQualityStats() {
@@ -6213,8 +6551,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             </div>
                           </div>
                           <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 8 }}>{r.message?.slice(0, 200)}</div>
-                          <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>
-                            {r.specialist_name} · {new Date(r.created_at).toLocaleDateString("ru-RU")} · {r.reserved_credits || 0} кредитов
+                            <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>
+                            {r.specialist_name} · {new Date(r.created_at).toLocaleDateString("ru-RU")}
+                            {r.service_code && ` · ${r.service_code}`}
+                            {r.price_credits > 0 ? ` · ${r.price_credits.toLocaleString("ru-RU")} кредитов` : (r.reserved_credits > 0 ? ` · ${r.reserved_credits} кредитов` : "")}
                             {r.due_at && ` · срок: ${new Date(r.due_at).toLocaleDateString("ru-RU")}`}
                           </div>
                           {/* Contact info for phone/video/offline */}
@@ -7098,6 +7438,26 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   onClick={() => { setAdminReqTab("organizations"); adminLoadOrganizations(); }}
                 >
                   Организации
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "onboarding" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "onboarding" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setAdminReqTab("onboarding"); adminLoadOnboardingRequests("all"); }}
+                >
+                  Заявки на подключение
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "match" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "match" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setAdminReqTab("match"); adminLoadMatchRequests("all"); }}
+                >
+                  Подбор специалиста
                 </button>
                 {adminRole === "super" && (
                   <button
@@ -8037,6 +8397,178 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           </button>
                         </div>
                       </div>
+                    </div>
+                  )}
+                </>
+              ) : adminReqTab === "onboarding" ? (
+                <>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 20px 0" }}>Заявки на подключение специалистов</h2>
+                  <div style={{ display: "flex", gap: 12, marginBottom: 24, alignItems: "center" }}>
+                    <button
+                      onClick={() => adminLoadOnboardingRequests("all")}
+                      style={{ border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg, color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}
+                    >
+                      {onboardingLoading ? "Загрузка..." : `Обновить (${onboardingRequests.length})`}
+                    </button>
+                  </div>
+                  {onboardingLoading ? (
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Загрузка...</div>
+                  ) : onboardingRequests.length === 0 ? (
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Нет заявок</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      {onboardingRequests.map((req) => (
+                        <div key={req.id} style={{ border: `1px solid ${t.cardBorder}`, borderRadius: 20, background: t.cardBg, padding: 20 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: 16 }}>{req.name}</div>
+                              <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>
+                                {req.contact_email && <span>{req.contact_email} · </span>}
+                                {req.contact_phone && <span>{req.contact_phone} · </span>}
+                                Модуль: {req.module} · {req.status}
+                              </div>
+                              <div style={{ color: t.muted, fontSize: 12, marginTop: 2 }}>
+                                {new Date(req.created_at).toLocaleString("ru-RU")}
+                                {req.reviewed_at && ` · Рассмотрено: ${new Date(req.reviewed_at).toLocaleString("ru-RU")}`}
+                              </div>
+                            </div>
+                            <span style={{
+                              fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                              background: req.status === "submitted" ? "#FEF3C7" : req.status === "approved" ? "#E2EBE4" : "#f0e0e0",
+                              color: req.status === "submitted" ? "#92400E" : req.status === "approved" ? "#5F7D6C" : "#8B4A3A",
+                            }}>
+                              {req.status === "submitted" ? "Ожидает" : req.status === "approved" ? "Одобрена" : req.status === "rejected" ? "Отклонена" : req.status}
+                            </span>
+                          </div>
+                          {req.comment && (
+                            <div style={{ fontSize: 13, color: t.text, marginBottom: 8, padding: 8, background: t.filterBg, borderRadius: 8 }}>
+                              {req.comment}
+                            </div>
+                          )}
+                          {req.status === "submitted" && (
+                            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                              <button
+                                onClick={async () => {
+                                  const experts = await adminListAllExperts();
+                                  const eligible = experts.filter(e => e.is_active && Array.isArray(e.allowed_modules) && e.allowed_modules.includes(req.module));
+                                  if (eligible.length === 0) { showToast("Нет доступных специалистов", "error"); return; }
+                                  setMatchExpertList(eligible);
+                                  setMatchExpertSelector(`onboarding-${req.id}`);
+                                }}
+                                style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                              >
+                                Одобрить и привязать
+                              </button>
+                              <button
+                                onClick={() => adminReviewOnboardingRequest(req.id, "reject")}
+                                style={{ border: `1px solid #ef4444`, borderRadius: 10, background: "transparent", color: "#ef4444", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                              >
+                                Отклонить
+                              </button>
+                            </div>
+                          )}
+                          {matchExpertSelector === `onboarding-${req.id}` && (
+                            <div style={{ marginTop: 12, padding: 12, border: `1px solid ${t.border}`, borderRadius: 12, background: t.filterBg }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Выберите специалиста:</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                {matchExpertList.map((exp) => (
+                                  <button
+                                    key={exp.id}
+                                    onClick={() => adminReviewOnboardingRequest(req.id, "approve", exp.id)}
+                                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.cardBg, color: t.text, padding: "8px 12px", textAlign: "left", cursor: "pointer", fontSize: 13 }}
+                                  >
+                                    {exp.name} ({exp.role})
+                                  </button>
+                                ))}
+                              </div>
+                              <button onClick={() => setMatchExpertSelector(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: "transparent", color: t.muted, padding: "6px 12px", fontSize: 12, cursor: "pointer", marginTop: 8 }}>
+                                Отмена
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : adminReqTab === "match" ? (
+                <>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 20px 0" }}>Заявки на подбор специалиста</h2>
+                  <div style={{ display: "flex", gap: 12, marginBottom: 24, alignItems: "center" }}>
+                    <button
+                      onClick={() => adminLoadMatchRequests("all")}
+                      style={{ border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg, color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}
+                    >
+                      {matchLoading ? "Загрузка..." : `Обновить (${matchRequests.length})`}
+                    </button>
+                  </div>
+                  {matchLoading ? (
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Загрузка...</div>
+                  ) : matchRequests.length === 0 ? (
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Нет заявок</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      {matchRequests.map((req) => (
+                        <div key={req.id} style={{ border: `1px solid ${t.cardBorder}`, borderRadius: 20, background: t.cardBg, padding: 20 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: 16 }}>Пациент: {req.owner_id?.slice(0, 8)}...</div>
+                              <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>
+                                Модуль: {req.module} · {req.status}
+                              </div>
+                              <div style={{ color: t.muted, fontSize: 12, marginTop: 2 }}>
+                                {new Date(req.created_at).toLocaleString("ru-RU")}
+                                {req.assigned_at && ` · Назначено: ${new Date(req.assigned_at).toLocaleString("ru-RU")}`}
+                              </div>
+                            </div>
+                            <span style={{
+                              fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                              background: req.status === "submitted" ? "#FEF3C7" : req.status === "assigned" ? "#E2EBE4" : "#f0f0f0",
+                              color: req.status === "submitted" ? "#92400E" : req.status === "assigned" ? "#5F7D6C" : "#666",
+                            }}>
+                              {req.status === "submitted" ? "Ожидает" : req.status === "assigned" ? "Назначен" : req.status}
+                            </span>
+                          </div>
+                          {req.message && (
+                            <div style={{ fontSize: 13, color: t.text, marginBottom: 8, padding: 8, background: t.filterBg, borderRadius: 8 }}>
+                              {req.message}
+                            </div>
+                          )}
+                          {req.status === "submitted" && (
+                            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                              <button
+                                onClick={async () => {
+                                  await adminLoadEligibleExperts(req.module);
+                                  setMatchExpertSelector(req.id);
+                                }}
+                                style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                              >
+                                Назначить специалиста
+                              </button>
+                            </div>
+                          )}
+                          {matchExpertSelector === req.id && (
+                            <div style={{ marginTop: 12, padding: 12, border: `1px solid ${t.border}`, borderRadius: 12, background: t.filterBg }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Выберите специалиста:</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                {matchExpertList.map((exp) => (
+                                  <button
+                                    key={exp.id}
+                                    onClick={() => adminAssignMatchRequest(req.id, exp.id)}
+                                    disabled={matchAssigning}
+                                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.cardBg, color: t.text, padding: "8px 12px", textAlign: "left", cursor: "pointer", fontSize: 13 }}
+                                  >
+                                    {exp.name} ({exp.role})
+                                  </button>
+                                ))}
+                              </div>
+                              <button onClick={() => setMatchExpertSelector(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: "transparent", color: t.muted, padding: "6px 12px", fontSize: 12, cursor: "pointer", marginTop: 8 }}>
+                                Отмена
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </>
@@ -9073,6 +9605,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     return <ExpertCabinet />;
   }
 
+  const isNewLinkingInvite = Boolean(
+    phase !== "cabinet" &&
+    supportScreen === "landing" &&
+    inviteInfo?.valid &&
+    inviteInfo.invite_kind === "patient_specialist" &&
+    ["specialist_to_patient", "patient_to_specialist"].includes(inviteInfo.direction)
+  );
+
   return (
     <div style={s.page} className="app-page">
       <style>{`
@@ -9203,47 +9743,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            {expertData && (
-              <div style={{
-                background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
-                borderRadius: 22, padding: "8px 16px", fontSize: 13, color: "#5F7D6C",
-                display: "flex", alignItems: "center", gap: 8,
-              }}>
-                <span>
-                  {expertData.name}, {roleMap[expertData.role] || expertData.role}
-                  {expertData.membership?.organization_name && (
-                    <span style={{ marginLeft: 6, opacity: 0.7 }}>· {expertData.membership.organization_name}</span>
-                  )}
-                </span>
-                {expertData && (
-                  <button
-                    onClick={() => loadMyPatients()}
-                    style={{
-                      background: "none", border: "1px solid rgba(46,42,37,.15)", borderRadius: 10,
-                      color: "#5F7D6C", padding: "4px 10px", fontSize: 11, cursor: "pointer",
-                    }}
-                  >
-                    Мои пациенты
-                  </button>
-                )}
-                <button
-                  onClick={handleExpertLogout}
-                  style={{
-                    background: "none", border: "1px solid rgba(46,42,37,.15)", borderRadius: 10,
-                    color: "#7A7268", padding: "4px 10px", fontSize: 11, cursor: "pointer",
-                  }}
-                >
-                  Выйти
-                </button>
-              </div>
-            )}
             {!isDedicatedSubdomain && (<>
             {!(activeModule === "support" && supportScreen !== "landing") && (
             <button
               style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
-              onClick={() => setExpertModalOpen(true)}
+              onClick={() => { window.location.href = "/specialist"; }}
             >
-              Для специалистов
+              Кабинет специалиста
             </button>
             )}
             <button
@@ -9256,12 +9762,80 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           </div>
         </header>
 
-        {inviteChecking && (
-          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: t.cardBg, border: `1px solid ${t.cardBorder}`, textAlign: "center", color: t.muted, fontSize: 14 }}>
+        {/* Invite banners — only on landing page, never overlay cabinet */}
+        {phase !== "cabinet" && supportScreen === "landing" && inviteChecking && (
+          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", textAlign: "center", color: "#7A7268", fontSize: 14 }}>
             Проверка ссылки...
           </div>
         )}
-        {inviteInfo && inviteInfo.valid && (
+        {/* NEW patient_specialist invitation — Accept/Decline */}
+        {phase !== "cabinet" && supportScreen === "landing" && inviteInfo && inviteInfo.valid && inviteInfo.invite_kind === "patient_specialist" && inviteInfo.direction === "specialist_to_patient" && (
+          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "18px 24px", borderRadius: 16, background: "rgba(46,125,50,0.08)", border: "1px solid rgba(46,125,50,0.2)", textAlign: "center" }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#2e7d32", marginBottom: 6 }}>
+              Вас приглашает специалист {inviteInfo.expert_name || ""}
+            </div>
+            {inviteInfo.expires_at && (
+              <div style={{ fontSize: 12, color: "#4a7c4c", marginBottom: 12 }}>
+                Ссылка действительна до {new Date(inviteInfo.expires_at).toLocaleDateString("ru-RU")}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button
+                onClick={() => acceptPublicSpecialistInvitation(inviteToken)}
+                style={{ padding: "10px 24px", borderRadius: 12, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+              >
+                Принять
+              </button>
+              <button
+                onClick={() => declinePublicSpecialistInvitation(inviteToken)}
+                style={{ padding: "10px 24px", borderRadius: 12, border: "1px solid rgba(46,42,37,.15)", background: "transparent", color: "#7A7268", fontWeight: 600, fontSize: 14, cursor: "pointer" }}
+              >
+                Отклонить
+              </button>
+            </div>
+          </div>
+        )}
+        {/* NEW patient → specialist invitation: authenticated specialist or onboarding */}
+        {phase !== "cabinet" && supportScreen === "landing" && inviteInfo && inviteInfo.valid && inviteInfo.invite_kind === "patient_specialist" && inviteInfo.direction === "patient_to_specialist" && (
+          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "18px 24px", borderRadius: 16, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.12)", textAlign: "center" }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#5F574F", marginBottom: 8 }}>
+              Пациент приглашает специалиста подключиться
+            </div>
+            {inviteSpecialistAuth.loading ? (
+              <div style={{ fontSize: 13, color: "#7A7268" }}>Проверка входа специалиста...</div>
+            ) : inviteSpecialistAuth.error ? (
+              <div style={{ fontSize: 13, color: "#B85C4A" }}>{inviteSpecialistAuth.error}</div>
+            ) : inviteInfo.status === "onboarding_submitted" ? (
+              <div style={{ fontSize: 13, color: "#5F7D6C" }}>Заявка отправлена. Администратор рассмотрит её отдельно.</div>
+            ) : inviteSpecialistAuth.authenticated ? (
+              <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                <button onClick={() => respondToPatientInvitationAsSpecialist("acceptPatientInvitation")} style={{ padding: "10px 24px", borderRadius: 12, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                  Принять
+                </button>
+                <button onClick={() => respondToPatientInvitationAsSpecialist("declinePatientInvitation")} style={{ padding: "10px 24px", borderRadius: 12, border: "1px solid rgba(46,42,37,.15)", background: "transparent", color: "#7A7268", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                  Отклонить
+                </button>
+              </div>
+            ) : (
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
+                  Если у вас ещё нет кабинета специалиста, оставьте контактные данные для подключения. Клинические данные пациента по этой ссылке не открываются.
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <input style={s.answerInput} placeholder="Имя специалиста" value={onboardingForm.name} onChange={(e) => setOnboardingForm({ ...onboardingForm, name: e.target.value })} />
+                  <input style={s.answerInput} type="email" placeholder="Email (необязательно)" value={onboardingForm.contact_email} onChange={(e) => setOnboardingForm({ ...onboardingForm, contact_email: e.target.value })} />
+                  <input style={s.answerInput} placeholder="Телефон (необязательно)" value={onboardingForm.contact_phone} onChange={(e) => setOnboardingForm({ ...onboardingForm, contact_phone: e.target.value })} />
+                  <textarea style={{ ...s.answerInput, minHeight: 70 }} placeholder="Комментарий (необязательно)" value={onboardingForm.comment} onChange={(e) => setOnboardingForm({ ...onboardingForm, comment: e.target.value })} />
+                </div>
+                <button onClick={submitPatientSpecialistOnboarding} disabled={onboardingSubmitting || onboardingForm.name.trim().length < 2} style={{ ...s.primary, marginTop: 12, width: "100%" }}>
+                  {onboardingSubmitting ? "Отправка..." : "Подключиться как специалист"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {/* LEGACY doctor invite — anonymous conversation */}
+        {phase !== "cabinet" && supportScreen === "landing" && inviteInfo && inviteInfo.valid && inviteInfo.invite_kind === "legacy_doctor_invite" && (
           <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: "rgba(46,125,50,0.08)", border: "1px solid rgba(46,125,50,0.2)", textAlign: "center" }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: "#2e7d32", marginBottom: 4 }}>🔗 Вы открыли ссылку специалиста</div>
             <div style={{ fontSize: 13, color: "#4a7c4c", lineHeight: 1.5 }}>
@@ -9269,7 +9843,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </div>
           </div>
         )}
-        {inviteInfo && !inviteInfo.valid && !inviteChecking && (
+        {phase !== "cabinet" && supportScreen === "landing" && inviteInfo && !inviteInfo.valid && !inviteChecking && (
           <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: "rgba(255,152,0,0.08)", border: "1px solid rgba(255,152,0,0.2)", textAlign: "center" }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: "#e65100", marginBottom: 4 }}>⚠️ {inviteInfo.error || "Ссылка недействительна"}</div>
             <div style={{ fontSize: 13, color: "#bf5f00", lineHeight: 1.5 }}>
@@ -9279,6 +9853,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         )}
 
         {(() => {
+          if (isNewLinkingInvite) return null;
           const isBodyCabinet = activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding", "health_context", "service_requests"].includes(bodyScreen);
           const isSupportCabinet = activeModule === "support" && supportScreen !== "landing";
           const bodyMaxWidth = activeModule === "body" && bodyScreen === "cabinet" ? 1120
@@ -11175,15 +11750,52 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       <div style={{ fontSize: 14, color: "#5F574F", marginBottom: 6 }}>
                         У вас пока нет закреплённого специалиста.
                       </div>
-                      <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
-                        Вы можете отправить запрос на консультацию.
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => { setPatientInviteModalOpen(true); setPatientInviteCreated(null); }}>
+                          Пригласить своего специалиста
+                        </button>
+                        <button
+                          style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }}
+                          onClick={async () => { await createMatchRequest(); }}
+                          disabled={matchRequestSending}
+                        >
+                          {matchRequestSending ? "Отправка..." : "Подобрать специалиста"}
+                        </button>
                       </div>
-                      <button style={{ ...s.primary, fontSize: 13, padding: "10px 16px" }} onClick={() => setSupportNewRequestOpen(true)}>
-                        Связаться со специалистом
-                      </button>
                     </div>
                   )}
                 </div>
+
+                {/* ROW: Приглашения от специалистов */}
+                {!supportCabinet.specialist && patientInvitations.filter(i => i.direction === "specialist_to_patient" && i.status === "pending").length > 0 && (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Входящие приглашения</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {patientInvitations.filter(i => i.direction === "specialist_to_patient" && i.status === "pending").map((inv) => (
+                        <div key={inv.id} style={{ background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", borderRadius: 14, padding: 16 }}>
+                          <div style={{ fontSize: 14, color: "#5F574F", marginBottom: 8 }}>
+                            Вас приглашает специалист
+                            {inv.expires_at && <span style={{ fontSize: 12, color: "#8a7e72", marginLeft: 8 }}>до {new Date(inv.expires_at).toLocaleDateString("ru-RU")}</span>}
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              onClick={() => acceptPatientInvitationById(inv.id)}
+                              style={{ ...s.primary, fontSize: 13, padding: "8px 14px" }}
+                            >
+                              Принять
+                            </button>
+                            <button
+                              onClick={() => declinePatientInvitationById(inv.id)}
+                              style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }}
+                            >
+                              Отклонить
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* ROW: Запросы специалисту — no duplicate "Новый запрос" button */}
                 <div style={{ marginBottom: 24 }}>
@@ -11429,21 +12041,25 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   <button style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#7A7268" }} onClick={() => setSupportNewRequestOpen(false)}>&times;</button>
                 </div>
 
-                <label style={{ ...s.label, fontWeight: 700 }}>Способ связи</label>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                <label style={{ ...s.label, fontWeight: 700 }}>Услуга</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
                   {[
-                    { value: "question", label: "Вопрос" },
-                    { value: "phone", label: "Телефон" },
-                    { value: "video", label: "Видео" },
-                    { value: "offline", label: "Очная" },
+                    { code: "short_followup", label: "Короткий follow-up", credits: 10000 },
+                    { code: "therapy_review", label: "Разбор терапии / повторная консультация по лечению", credits: 20000 },
+                    { code: "written_consultation", label: "Письменная консультация", credits: 25000 },
+                    { code: "phone_consultation", label: "Телефонный разговор со специалистом", credits: 30000 },
+                    { code: "urgent_contact", label: "Срочная связь со специалистом", credits: 40000 },
+                    { code: "online_consultation", label: "Онлайн-консультация", credits: 50000 },
+                    { code: "offline_consultation", label: "Очная консультация", credits: 75000 },
                   ].map((opt) => (
-                    <button key={opt.value} style={{
-                      padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer",
-                      border: `1px solid ${supportNewRequest.request_type === opt.value ? "#7D9A89" : "rgba(46,42,37,.15)"}`,
-                      background: supportNewRequest.request_type === opt.value ? "#E2EBE4" : "#fff",
-                      color: supportNewRequest.request_type === opt.value ? "#5F7D6C" : "#2E2A25",
-                    }} onClick={() => setSupportNewRequest({ ...supportNewRequest, request_type: opt.value })}>
-                      {opt.label}
+                    <button key={opt.code} style={{
+                      padding: "10px 14px", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left",
+                      border: `1px solid ${supportNewRequest.service_code === opt.code ? "#7D9A89" : "rgba(46,42,37,.15)"}`,
+                      background: supportNewRequest.service_code === opt.code ? "#E2EBE4" : "#fff",
+                      color: supportNewRequest.service_code === opt.code ? "#5F7D6C" : "#2E2A25",
+                    }} onClick={() => setSupportNewRequest({ ...supportNewRequest, service_code: opt.code })}>
+                      <span>{opt.label}</span>
+                      <span style={{ float: "right", fontSize: 12, color: "#7D9A89" }}>{opt.credits.toLocaleString("ru-RU")} кредитов</span>
                     </button>
                   ))}
                 </div>
@@ -11475,7 +12091,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   placeholder="Опишите, что хотите обсудить со специалистом..."
                 />
 
-                {(supportNewRequest.request_type === "phone" || supportNewRequest.request_type === "video" || supportNewRequest.request_type === "offline") && (
+                {(supportNewRequest.service_code === "phone_consultation" || supportNewRequest.service_code === "urgent_contact" || supportNewRequest.service_code === "online_consultation" || supportNewRequest.service_code === "offline_consultation") && (
                   <>
                     <label style={s.label}>Предпочтительная дата</label>
                     <input
@@ -11517,6 +12133,60 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     Отмена
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Patient invite specialist modal */}
+          {patientInviteModalOpen && (
+            <div style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,.4)", zIndex: 1000,
+              display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+            }} onClick={(e) => { if (e.target === e.currentTarget) setPatientInviteModalOpen(false); }}>
+              <div style={{
+                background: "#fff", borderRadius: 18, padding: 24, maxWidth: 480, width: "100%",
+                maxHeight: "90vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,.15)",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <h3 style={{ margin: 0, fontFamily: "Georgia, serif", fontSize: 18 }}>Пригласить специалиста</h3>
+                  <button style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#7A7268" }} onClick={() => setPatientInviteModalOpen(false)}>&times;</button>
+                </div>
+
+                {patientInviteCreated ? (
+                  <div style={{ padding: 12, borderRadius: 12, border: "1px solid #E2EBE4", background: "#F8FAF8" }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#2E2A25", marginBottom: 8 }}>Приглашение создано</div>
+                    <div style={{ fontSize: 13, color: "#5F574F", marginBottom: 8, wordBreak: "break-all" }}>
+                      Ссылка: {patientInviteCreated.url}
+                    </div>
+                    <button onClick={() => { navigator.clipboard?.writeText(patientInviteCreated.url); showToast("Скопировано"); }} style={{ ...s.primary, marginBottom: 8, fontSize: 13, padding: "8px 14px" }}>
+                      Скопировать ссылку
+                    </button>
+                    <div style={{ fontSize: 12, color: "#7A7268" }}>
+                      Срок действия: 14 дней. Отправьте эту ссылку вашему специалисту.
+                    </div>
+                    <button onClick={() => setPatientInviteModalOpen(false)} style={{ ...s.secondary, marginTop: 12, fontSize: 13 }}>
+                      Готово
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ fontSize: 13, color: "#5F574F", marginBottom: 16 }}>
+                      Создайте ссылку и отправьте вашему специалисту. После того как специалист подключится, он появится в вашем кабинете.
+                    </div>
+                    <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 16, padding: 12, background: "#FAF6EF", borderRadius: 10 }}>
+                      Если у вашего специалиста уже есть аккаунт в системе, он сможет принять приглашение сразу. Если нет — потребуется одобрение администратора.
+                    </div>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      <button onClick={createPatientInvitation} style={{ ...s.primary, fontSize: 13, padding: "10px 16px" }}>
+                        Создать ссылку
+                      </button>
+                      <button onClick={() => setPatientInviteModalOpen(false)} style={{ ...s.secondary, fontSize: 13 }}>
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

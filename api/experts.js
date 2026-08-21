@@ -1156,6 +1156,47 @@ async function handleCheckInviteToken(req, res) {
 export async function validateInviteToken(token) {
   if (!token) return null;
   const supabase = getSupabase();
+
+  // First check new patient_specialist_invitations table (hashed tokens)
+  const crypto = await import("node:crypto");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+  const { data: newInvitation } = await supabase
+    .from("patient_specialist_invitations")
+    .select("id, direction, module, status, expires_at, inviter_expert_id, patient_label")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  if (newInvitation) {
+    if (newInvitation.status !== "pending") return null;
+    if (newInvitation.expires_at && new Date(newInvitation.expires_at) < new Date()) return null;
+
+    // Fetch expert display name for UI
+    let expertName = null;
+    if (newInvitation.inviter_expert_id) {
+      const { data: expert } = await supabase
+        .from("experts")
+        .select("name")
+        .eq("id", newInvitation.inviter_expert_id)
+        .maybeSingle();
+      expertName = expert?.name || null;
+    }
+
+    return {
+      id: newInvitation.id,
+      invite_kind: "patient_specialist",
+      direction: newInvitation.direction,
+      module: newInvitation.module,
+      status: newInvitation.status,
+      expires_at: newInvitation.expires_at,
+      expert_id: newInvitation.inviter_expert_id,
+      expert_name: expertName,
+      patient_label: newInvitation.patient_label,
+      organization_id: null,
+    };
+  }
+
+  // Fallback to legacy doctor_invite_links table (plaintext tokens)
   const { data } = await supabase
     .from("doctor_invite_links")
     .select("id, organization_id, expert_id, status, max_uses, used_count, expires_at")
@@ -1167,7 +1208,10 @@ export async function validateInviteToken(token) {
   if (data.expires_at && new Date(data.expires_at) < new Date()) return null;
   if (data.max_uses && data.used_count >= data.max_uses) return null;
 
-  return data;
+  return {
+    ...data,
+    invite_kind: "legacy_doctor_invite",
+  };
 }
 
 export async function useInviteToken(token) {
