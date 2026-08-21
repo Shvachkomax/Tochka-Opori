@@ -39,3 +39,16 @@ textarea { width: 100%; min-height: 225px; resize: none; border-radius: 22px; bo
 .crisis p { margin: 0; color: #fecaca; line-height: 1.6; }
 @media (max-width: 900px) { .hero, .cards, .bottom-cards { grid-template-columns: 1fr; } .header { flex-direction: column; align-items: flex-start; } }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Specialist Cabinet service-request feedback */
+.specialist-action-btn { transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .08s ease, opacity .15s ease; }
+.specialist-action-btn:hover:not(:disabled) { background: #FAF6EF !important; border-color: #7D9A89 !important; }
+.specialist-action-btn:active:not(:disabled) { transform: translateY(1px); }
+.specialist-action-btn:focus-visible { outline: 3px solid rgba(125,154,137,.35); outline-offset: 2px; }
+.specialist-action-btn:disabled { opacity: .58; cursor: wait; transform: none; }
+.specialist-action-btn.is-loading { background: #F3F7F3 !important; color: #5F7D6C !important; }
+.service-request-feedback { display: flex; align-items: center; gap: 7px; margin-top: 9px; padding: 7px 10px; border-radius: 8px; font-size: 12px; line-height: 1.35; }
+.service-request-feedback-pending { background: #F3F7F3; color: #5F7D6C; }
+.service-request-feedback-success { background: #E2EBE4; color: #5F7D6C; }
+.service-request-feedback-error { background: #FCEEEE; color: #9B4B3E; }
+.service-request-spinner { width: 11px; height: 11px; flex: 0 0 11px; border: 2px solid rgba(95,125,108,.25); border-top-color: #5F7D6C; border-radius: 50%; animation: spin .7s linear infinite; }

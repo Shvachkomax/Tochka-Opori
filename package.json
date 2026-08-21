@@ -10,7 +10,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "e2e:phase11c1": "node scripts/e2e-phase11c1-browser.mjs",
-    "e2e:service-requests": "node scripts/e2e-service-requests-browser.mjs"
+    "e2e:service-requests": "node scripts/e2e-service-requests-browser.mjs",
+    "e2e:continuation": "node scripts/e2e-continuation-browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

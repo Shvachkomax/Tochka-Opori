@@ -21,6 +21,15 @@ const S = {
   actionBtn: { padding: "5px 12px", borderRadius: 8, border: "1px solid rgba(46,42,37,.15)", background: "#fff", color: "#2E2A25", cursor: "pointer", fontSize: 12, fontWeight: 600 },
 };
 
+const SERVICE_ACTION_COPY = {
+  accept: { pending: "Принимаем…", success: "Запрос принят" },
+  needs_clarification: { pending: "Уточняем…", success: "Запрос на уточнение отправлен" },
+  answer: { pending: "Отправляем…", success: "Ответ отправлен" },
+  schedule: { pending: "Назначаем…", success: "Встреча назначена" },
+  complete: { pending: "Завершаем…", success: "Запрос завершён" },
+  cancel: { pending: "Отменяем…", success: "Запрос отменён" },
+};
+
 // ── Component ─────────────────────────────────────────────
 
 export default function SpecialistCabinet() {
@@ -65,6 +74,8 @@ export default function SpecialistCabinet() {
   const [serviceRequestsLoading, setServiceRequestsLoading] = useState(false);
   const [serviceRequestsFilter, setServiceRequestsFilter] = useState("all");
   const [serviceRequestUpdating, setServiceRequestUpdating] = useState(null);
+  const [serviceRequestPendingAction, setServiceRequestPendingAction] = useState(null);
+  const [serviceRequestFeedback, setServiceRequestFeedback] = useState({});
 
   // Invitations state
   const [invitations, setInvitations] = useState([]);
@@ -350,6 +361,12 @@ export default function SpecialistCabinet() {
 
   async function updateServiceRequest(requestRef, action, extra = {}) {
     setServiceRequestUpdating(requestRef);
+    setServiceRequestPendingAction({ requestRef, action });
+    const copy = SERVICE_ACTION_COPY[action] || { pending: "Обрабатываем…", success: "Запрос обновлён" };
+    setServiceRequestFeedback((previous) => ({
+      ...previous,
+      [requestRef]: { type: "pending", message: copy.pending },
+    }));
     try {
       const res = await fetch("/api/specialist", {
         method: "POST",
@@ -359,15 +376,30 @@ export default function SpecialistCabinet() {
       });
       const data = await res.json();
       if (data.ok) {
-        showToast("Статус обновлён");
         await loadServiceRequests();
+        setServiceRequestFeedback((previous) => ({
+          ...previous,
+          [requestRef]: { type: "success", message: copy.success },
+        }));
+        showToast(copy.success);
       } else {
-        showToast(data.error || "Ошибка", "error");
+        const message = data.error || "Не удалось обновить запрос";
+        setServiceRequestFeedback((previous) => ({
+          ...previous,
+          [requestRef]: { type: "error", message },
+        }));
+        showToast(message, "error");
       }
     } catch {
-      showToast("Ошибка сети", "error");
+      const message = "Ошибка сети. Попробуйте ещё раз.";
+      setServiceRequestFeedback((previous) => ({
+        ...previous,
+        [requestRef]: { type: "error", message },
+      }));
+      showToast(message, "error");
     }
     setServiceRequestUpdating(null);
+    setServiceRequestPendingAction(null);
   }
 
   // Load service requests when auth is ready
@@ -674,6 +706,8 @@ export default function SpecialistCabinet() {
                         request={r}
                         onAction={updateServiceRequest}
                         updating={serviceRequestUpdating === r.request_ref}
+                        pendingAction={serviceRequestPendingAction?.requestRef === r.request_ref ? serviceRequestPendingAction.action : null}
+                        feedback={serviceRequestFeedback[r.request_ref]}
                       />
                     ))
                 )}
@@ -820,13 +854,21 @@ const REQUEST_TYPE_LABELS = {
   other: "Другое",
 };
 
-function ServiceRequestCard({ request: r, onAction, updating }) {
+function ServiceRequestCard({ request: r, onAction, updating, pendingAction, feedback }) {
   const [expanded, setExpanded] = useState(false);
   const sc = STATUS_COLORS[r.status] || STATUS_COLORS.submitted;
   const typeLabel = REQUEST_TYPE_LABELS[r.request_type] || r.request_type;
   const created = r.created_at ? new Date(r.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 
   const isActive = ["submitted", "accepted", "needs_clarification", "scheduled", "answered"].includes(r.status);
+
+  function actionLabel(action, idleLabel) {
+    return pendingAction === action ? SERVICE_ACTION_COPY[action]?.pending || "Обрабатываем…" : idleLabel;
+  }
+
+  function actionClass(action) {
+    return `specialist-action-btn${pendingAction === action ? " is-loading" : ""}`;
+  }
 
   return (
     <div data-testid="service-request-card" style={{ padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)", marginBottom: 8, background: "#fff" }}>
@@ -897,46 +939,57 @@ function ServiceRequestCard({ request: r, onAction, updating }) {
         </div>
       )}
 
+      {feedback && (
+        <div
+          data-testid="service-request-feedback"
+          className={`service-request-feedback service-request-feedback-${feedback.type}`}
+          role={feedback.type === "error" ? "alert" : "status"}
+        >
+          {feedback.type === "pending" && <span className="service-request-spinner" aria-hidden="true" />}
+          {feedback.message}
+        </div>
+      )}
+
       {/* Actions */}
       {isActive && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
           {r.status === "submitted" && (
-            <button disabled={updating} onClick={() => onAction(r.request_ref, "accept")} style={S.actionBtn}>
-              Принять
+            <button className={actionClass("accept")} disabled={updating} onClick={() => onAction(r.request_ref, "accept")} style={S.actionBtn}>
+              {actionLabel("accept", "Принять")}
             </button>
           )}
           {["submitted", "accepted"].includes(r.status) && (
-            <button disabled={updating} onClick={() => {
+            <button className={actionClass("needs_clarification")} disabled={updating} onClick={() => {
               const clarification = prompt("Что нужно уточнить у клиента?");
               if (clarification) onAction(r.request_ref, "needs_clarification", { specialist_response: clarification });
             }} style={S.actionBtn}>
-              Уточнить
+              {actionLabel("needs_clarification", "Уточнить")}
             </button>
           )}
           {["accepted", "needs_clarification"].includes(r.status) && (
-            <button disabled={updating} onClick={() => {
+            <button className={actionClass("schedule")} disabled={updating} onClick={() => {
               const dt = prompt("Дата и время встречи (ДД.ММ.ГГГГ ЧЧ:ММ):");
               if (dt) onAction(r.request_ref, "schedule", { scheduled_at: new Date(dt).toISOString(), scheduled_comment: prompt("Комментарий (необязательно):") || "" });
             }} style={S.actionBtn}>
-              Назначить
+              {actionLabel("schedule", "Назначить")}
             </button>
           )}
           {["submitted", "accepted", "needs_clarification"].includes(r.status) && (
-            <button disabled={updating} onClick={() => {
+            <button className={actionClass("answer")} disabled={updating} onClick={() => {
               const resp = prompt("Ответ клиенту:");
               if (resp) onAction(r.request_ref, "answer", { specialist_response: resp });
             }} style={S.actionBtn}>
-              Ответить
+              {actionLabel("answer", "Ответить")}
             </button>
           )}
           {["answered", "scheduled"].includes(r.status) && (
-            <button disabled={updating} onClick={() => onAction(r.request_ref, "complete")} style={S.actionBtn}>
-              Завершить
+            <button className={actionClass("complete")} disabled={updating} onClick={() => onAction(r.request_ref, "complete")} style={S.actionBtn}>
+              {actionLabel("complete", "Завершить")}
             </button>
           )}
           {!["completed", "cancelled"].includes(r.status) && (
-            <button disabled={updating} onClick={() => onAction(r.request_ref, "cancel")} style={{ ...S.actionBtn, color: "#B85C4A", borderColor: "rgba(184,92,74,.3)" }}>
-              Отменить
+            <button className={actionClass("cancel")} disabled={updating} onClick={() => onAction(r.request_ref, "cancel")} style={{ ...S.actionBtn, color: "#B85C4A", borderColor: "rgba(184,92,74,.3)" }}>
+              {actionLabel("cancel", "Отменить")}
             </button>
           )}
         </div>
