@@ -974,7 +974,7 @@ function ServiceRequestCard({ request: r, onAction, updating, pendingAction, fee
               {actionLabel("accept", "Принять")}
             </button>
           )}
-          {["submitted", "accepted"].includes(r.status) && (
+          {r.status === "accepted" && (
             <button className={actionClass("needs_clarification")} disabled={updating} onClick={() => {
               const clarification = prompt("Что нужно уточнить у клиента?");
               if (clarification) onAction(r.request_ref, "needs_clarification", { specialist_response: clarification });
@@ -990,7 +990,7 @@ function ServiceRequestCard({ request: r, onAction, updating, pendingAction, fee
               {actionLabel("schedule", "Назначить")}
             </button>
           )}
-          {["submitted", "accepted", "needs_clarification"].includes(r.status) && (
+          {["accepted", "needs_clarification"].includes(r.status) && (
             <button className={actionClass("answer")} disabled={updating} onClick={() => {
               const resp = prompt("Ответ клиенту:");
               if (resp) onAction(r.request_ref, "answer", { specialist_response: resp });
@@ -1004,7 +1004,7 @@ function ServiceRequestCard({ request: r, onAction, updating, pendingAction, fee
             </button>
           )}
           {!["completed", "cancelled"].includes(r.status) && (
-            <button className={actionClass("cancel")} disabled={updating} onClick={() => onAction(r.request_ref, "cancel")} style={{ ...S.actionBtn, color: "#B85C4A", borderColor: "rgba(184,92,74,.3)" }}>
+            <button className={actionClass("cancel")} hidden={r.status === "answered"} disabled={updating} onClick={() => onAction(r.request_ref, "cancel")} style={{ ...S.actionBtn, color: "#B85C4A", borderColor: "rgba(184,92,74,.3)" }}>
               {actionLabel("cancel", "Отменить")}
             </button>
           )}

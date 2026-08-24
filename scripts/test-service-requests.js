@@ -17,11 +17,11 @@ function assert(condition, label) {
 // ── Status transition logic (mirrors specialist.js) ───────
 
 const VALID_TRANSITIONS = {
-  submitted:     ["accept", "needs_clarification", "answer", "cancel"],
+  submitted:     ["accept", "cancel"],
   accepted:      ["needs_clarification", "schedule", "answer", "cancel"],
   needs_clarification: ["schedule", "answer", "cancel"],
   scheduled:     ["complete", "cancel"],
-  answered:      ["complete", "cancel"],
+  answered:      ["complete"],
   completed:     [],
   cancelled:     [],
 };
@@ -34,8 +34,6 @@ function canTransition(currentStatus, action) {
 console.log("1. Valid status transitions");
 
 assert(canTransition("submitted", "accept"), "submitted → accept");
-assert(canTransition("submitted", "needs_clarification"), "submitted → needs_clarification");
-assert(canTransition("submitted", "answer"), "submitted → answer");
 assert(canTransition("submitted", "cancel"), "submitted → cancel");
 
 assert(canTransition("accepted", "schedule"), "accepted → schedule");
@@ -49,14 +47,16 @@ assert(canTransition("scheduled", "complete"), "scheduled → complete");
 assert(canTransition("scheduled", "cancel"), "scheduled → cancel");
 
 assert(canTransition("answered", "complete"), "answered → complete");
-assert(canTransition("answered", "cancel"), "answered → cancel");
 
 // ── Test 2: Invalid transitions ────────────────────────────
 console.log("\n2. Invalid status transitions");
 
 assert(!canTransition("completed", "accept"), "completed → accept blocked");
 assert(!canTransition("cancelled", "accept"), "cancelled → accept blocked");
+assert(!canTransition("submitted", "needs_clarification"), "submitted → needs_clarification blocked");
+assert(!canTransition("submitted", "answer"), "submitted → answer blocked");
 assert(!canTransition("needs_clarification", "accept"), "needs_clarification → accept blocked");
+assert(!canTransition("answered", "cancel"), "answered → cancel blocked");
 assert(!canTransition("submitted", "complete"), "submitted → complete blocked");
 assert(!canTransition("submitted", "schedule"), "submitted → schedule blocked");
 assert(!canTransition("completed", "cancel"), "completed → cancel blocked");

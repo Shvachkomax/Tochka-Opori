@@ -1980,7 +1980,7 @@ async function handleUpdateBodyServiceRequest(req, res) {
     return res.status(403).json({ ok: false, error: "Нет доступа" });
   }
 
-  const { id, update_action: updateAction, specialist_response, scheduled_at, scheduled_comment, charged_credits } = req.body || {};
+  const { id, update_action: updateAction, specialist_response, scheduled_at, scheduled_place, scheduled_comment } = req.body || {};
   if (!id) {
     return res.status(400).json({ ok: false, error: "Missing id" });
   }
@@ -1988,12 +1988,46 @@ async function handleUpdateBodyServiceRequest(req, res) {
   const supabase = getSupabase();
   const { data: request, error: findError } = await supabase
     .from("service_requests")
-    .select("id, status, service_code, price_credits, reserved_credits, charged_credits")
+    .select("id, module, status, service_code, price_credits, reserved_credits, charged_credits")
     .eq("id", id)
     .maybeSingle();
 
   if (findError || !request) {
     return res.status(404).json({ ok: false, error: "Запрос не найден" });
+  }
+  if (request.module !== "body") {
+    return res.status(403).json({ ok: false, error: "Этот endpoint предназначен только для Body-запросов" });
+  }
+
+  // Any pricing-shaped row must use the canonical RPC. This also prevents a
+  // malformed partial snapshot from falling through to the legacy updater.
+  const financialRequest = request.service_code !== null || request.price_credits !== null;
+  if (financialRequest) {
+    if (updateAction === "complete_no_charge") {
+      return res.status(400).json({ ok: false, error: "Канонический запрос нельзя завершить без финансового перехода" });
+    }
+    const { data: result, error: transitionError } = await supabase.rpc("transition_service_request", {
+      p_request_id: id,
+      p_transition: updateAction,
+      p_specialist_response: specialist_response || null,
+      p_scheduled_at: scheduled_at || null,
+      p_scheduled_place: scheduled_place || null,
+      p_scheduled_comment: scheduled_comment || null,
+    });
+    if (transitionError) return res.status(500).json({ ok: false, error: "Не удалось обновить запрос" });
+    if (!result?.ok) {
+      const status = result.code === "INSUFFICIENT_CREDITS" || result.code === "WALLET_NOT_ACTIVE" ? 409
+        : result.code === "REQUEST_NOT_FOUND" ? 404 : 400;
+      return res.status(status).json({ ok: false, error: result.error || "Не удалось обновить запрос", code: result.code || "TRANSITION_FAILED" });
+    }
+    await logAdminAction(role, "update_service_request", {
+      targetType: "service_request",
+      targetId: id,
+      module: "body",
+      ipAddress: getClientIp(req),
+      details: { updateAction, status: result.status, financial: true },
+    });
+    return res.json(result);
   }
 
   const now = new Date().toISOString();
@@ -2017,11 +2051,9 @@ async function handleUpdateBodyServiceRequest(req, res) {
     case "complete":
       updates.status = "completed";
       updates.completed_at = now;
-      // Phase 11D is not implemented. Never turn a canonical price snapshot
-      // into a charge; preserve the old fallback only for legacy requests.
-      updates.charged_credits = request.service_code
-        ? (request.charged_credits || 0)
-        : (charged_credits != null ? charged_credits : request.reserved_credits);
+      // Legacy rows only: derive the value from the stored row, never from
+      // client-provided financial fields.
+      updates.charged_credits = request.charged_credits || request.reserved_credits || 0;
       break;
     case "complete_no_charge":
       updates.status = "completed";

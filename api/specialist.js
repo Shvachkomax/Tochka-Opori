@@ -898,11 +898,12 @@ async function handleGetBodyClientOverview(req, res) {
     .limit(5);
 
   // ── Batch 6: service requests (owner_id direct) ───────
-  const { data: srRows } = await supabase
-    .from("service_requests")
-    .select("id, request_type, service_code, service_topic, price_credits, meeting_format, title, status, created_at, due_at, scheduled_at")
-    .eq("owner_id", ownerId)
-    .eq("module", "body")
+    const { data: srRows } = await supabase
+      .from("service_requests")
+      .select("id, request_type, service_code, service_topic, price_credits, meeting_format, title, status, created_at, due_at, scheduled_at")
+      .eq("owner_id", ownerId)
+      .eq("owner_type", "anonymous_profile")
+      .eq("module", "body")
     .order("created_at", { ascending: false })
     .limit(10);
 
@@ -1035,6 +1036,7 @@ async function handleListServiceRequests(req, res) {
     .select("id, module, owner_type, owner_id, specialist_id, specialist_name, request_type, service_code, service_topic, meeting_format, title, message, status, priority, due_at, scheduled_at, scheduled_place, scheduled_comment, specialist_response, client_contact, price_credits, reserved_credits, charged_credits, created_at, updated_at, answered_at, completed_at, cancelled_at")
     .eq("specialist_id", expertIdStr)
     .in("module", effectiveModules)
+    .in("owner_type", effectiveModules.map((item) => item === "body" ? "anonymous_profile" : "anonymous_case"))
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -1094,6 +1096,8 @@ async function handleListServiceRequests(req, res) {
     specialist_response: r.specialist_response || null,
     client_contact: r.client_contact || {},
     price_credits: r.price_credits ?? null,
+    reserved_credits: r.reserved_credits ?? 0,
+    charged_credits: r.charged_credits ?? 0,
     created_at: r.created_at,
     updated_at: r.updated_at,
     answered_at: r.answered_at || null,
@@ -1131,7 +1135,7 @@ async function handleUpdateServiceRequest(req, res) {
   // Fetch the request and verify ownership
   const { data: request, error: findError } = await supabase
     .from("service_requests")
-    .select("id, specialist_id, status, module, reserved_credits")
+    .select("id, specialist_id, status, module, owner_type, reserved_credits")
     .eq("id", requestId)
     .maybeSingle();
 
@@ -1144,14 +1148,40 @@ async function handleUpdateServiceRequest(req, res) {
     return res.status(403).json({ ok: false, error: "Доступ запрещён" });
   }
 
+  const expectedOwnerType = request.module === "body" ? "anonymous_profile" : "anonymous_case";
+  if (request.owner_type !== expectedOwnerType) {
+    return res.status(403).json({ ok: false, error: "Некорректный владелец запроса" });
+  }
+
   // Module entitlement check: ALWAYS based on request.module from DB, not frontend param
   if (!expert.allowed_modules.includes(request.module)) {
     return res.status(403).json({ ok: false, error: "Нет доступа к модулю данного запроса" });
   }
 
-  const now = new Date().toISOString();
-  const updates = { updated_at: now };
+  const transitionPayload = {
+    p_request_id: requestId,
+    p_transition: updateAction,
+    p_specialist_response: specialist_response || null,
+    p_scheduled_at: scheduled_at || null,
+    p_scheduled_place: scheduled_place || null,
+    p_scheduled_comment: scheduled_comment || null,
+  };
 
+  const { data: result, error: transitionError } = await supabase.rpc("transition_service_request", transitionPayload);
+
+  if (transitionError) {
+    console.error("[updateServiceRequest] transition RPC error:", transitionError.code, transitionError.message);
+    return res.status(500).json({ ok: false, error: "Не удалось обновить запрос" });
+  }
+  if (!result?.ok) {
+    const status = result?.code === "INSUFFICIENT_CREDITS" ? 409
+      : result?.code === "REQUEST_NOT_FOUND" ? 404
+        : result?.code === "WALLET_NOT_ACTIVE" ? 409 : 400;
+    return res.status(status).json({ ok: false, error: result?.error || "Не удалось обновить запрос", code: result?.code || "TRANSITION_FAILED" });
+  }
+
+  return res.status(200).json(result);
+  /*
   switch (updateAction) {
     case "accept":
       if (request.status !== "submitted") {
@@ -1218,6 +1248,7 @@ async function handleUpdateServiceRequest(req, res) {
   }
 
   return res.status(200).json({ ok: true, status: updates.status });
+  */
 }
 
 // ── CREATE INVITATION (specialist → patient) ──────────────

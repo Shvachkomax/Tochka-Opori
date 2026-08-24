@@ -1860,10 +1860,13 @@ async function handleGetBodyCabinet(req, res) {
     // 4. Wallet
     const { data: wallet } = await supabase
       .from("usage_wallets")
-      .select("balance, total_used")
+      .select("id, balance, total_used, status")
+      .eq("owner_type", "anonymous_profile")
       .eq("owner_id", ownerId)
       .eq("module", "body")
       .maybeSingle();
+    const { getWalletSummary } = await import("../lib/usage/wallet.js");
+    const walletSummary = wallet ? await getWalletSummary({ walletId: wallet.id, wallet }) : null;
 
     // 5. Owner-level diary history (all sessions, last 90 days, deduplicated by date)
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -1931,7 +1934,13 @@ async function handleGetBodyCabinet(req, res) {
       session_id: sessionId,
       display_name: client.display_name || null,
       profile,
-      wallet: wallet ? { balance: wallet.balance, total_used: wallet.total_used } : null,
+      wallet: walletSummary ? {
+        balance: walletSummary.available_credits,
+        available_credits: walletSummary.available_credits,
+        reserved_credits: walletSummary.reserved_credits,
+        balance_total: walletSummary.balance_total,
+        total_used: walletSummary.total_used,
+      } : null,
       today_log: todayLog || null,
       history: dedupedHistory.map((l) => ({
         date: l.log_date,
@@ -3495,6 +3504,7 @@ async function handleGetBodyServiceRequest(req, res) {
       .from("service_requests")
       .select("*")
       .eq("id", request_id)
+      .eq("owner_type", "anonymous_profile")
       .eq("owner_id", owner.ownerId)
       .maybeSingle();
 
@@ -3528,8 +3538,10 @@ async function handleCancelBodyServiceRequest(req, res) {
     const supabase = getSupabase();
     const { data: request, error: findError } = await supabase
       .from("service_requests")
-      .select("id, status")
+      .select("id, status, owner_type, owner_id")
       .eq("id", request_id)
+      .eq("module", "body")
+      .eq("owner_type", "anonymous_profile")
       .eq("owner_id", owner.ownerId)
       .maybeSingle();
 
@@ -3542,17 +3554,16 @@ async function handleCancelBodyServiceRequest(req, res) {
       return res.status(400).json({ ok: false, error: "Невозможно отменить запрос в текущем статусе." });
     }
 
-    const { error: updateError } = await supabase
-      .from("service_requests")
-      .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq("id", request_id);
-
-    if (updateError) {
-      console.error("[cancelBodyServiceRequest] update error:", updateError.code);
+    const { data: result, error: transitionError } = await supabase.rpc("transition_service_request", {
+      p_request_id: request_id,
+      p_transition: "cancel",
+    });
+    if (transitionError) {
+      console.error("[cancelBodyServiceRequest] transition error:", transitionError.code);
       return res.status(500).json({ ok: false, error: "Не удалось отменить запрос." });
     }
-
-    return res.status(200).json({ ok: true });
+    if (!result?.ok) return res.status(400).json({ ok: false, error: result.error || "Не удалось отменить запрос.", code: result.code || "TRANSITION_FAILED" });
+    return res.status(200).json(result);
   } catch (error) {
     console.error("handleCancelBodyServiceRequest error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка отмены запроса." });
@@ -4048,9 +4059,12 @@ async function handleCreateSupportServiceRequest(req, res) {
     const supabase = getSupabase();
 
     // ── Resolve service_code and validate ──────────────────
-    let serviceCode = clientServiceCode || null;
+    let serviceCode = typeof clientServiceCode === "string" && clientServiceCode.trim()
+      ? clientServiceCode.trim()
+      : null;
     let requestType = clientRequestType;
     let meetingFormat;
+    let priceSnapshot = null;
 
     if (serviceCode) {
       // Validate service_code against canonical pricing
@@ -4058,6 +4072,7 @@ async function handleCreateSupportServiceRequest(req, res) {
         .from("service_pricing")
         .select("service_code, module, label, credits, active")
         .eq("service_code", serviceCode)
+        .eq("module", "support")
         .maybeSingle();
 
       if (pricingError || !pricing) {
@@ -4077,6 +4092,7 @@ async function handleCreateSupportServiceRequest(req, res) {
       }
       requestType = mapping.request_type;
       meetingFormat = mapping.meeting_format;
+      priceSnapshot = pricing.credits;
     } else {
       // Legacy: use request_type directly (backward compat)
       const config = SUPPORT_REQUEST_TYPE_CONFIG[clientRequestType];
@@ -4122,7 +4138,7 @@ async function handleCreateSupportServiceRequest(req, res) {
         due_at: dueAt,
         reserved_credits: 0,
         service_code: serviceCode,
-        price_credits: serviceCode ? (await supabase.from("service_pricing").select("credits").eq("service_code", serviceCode).maybeSingle()).data?.credits || null : null,
+        price_credits: priceSnapshot,
         context_snapshot: {
           reason: reason || null,
           preferred_date: preferred_date || null,
@@ -4197,6 +4213,7 @@ async function handleGetSupportServiceRequest(req, res) {
       .select("*")
       .eq("id", request_id)
       .eq("module", "support")
+      .eq("owner_type", "anonymous_case")
       .eq("owner_id", owner.ownerId)
       .maybeSingle();
 
@@ -4230,9 +4247,10 @@ async function handleCancelSupportServiceRequest(req, res) {
     const supabase = getSupabase();
     const { data: request, error: findError } = await supabase
       .from("service_requests")
-      .select("id, status, owner_id")
+      .select("id, status, owner_type, owner_id")
       .eq("id", request_id)
       .eq("module", "support")
+      .eq("owner_type", "anonymous_case")
       .eq("owner_id", owner.ownerId)
       .maybeSingle();
 
@@ -4245,18 +4263,16 @@ async function handleCancelSupportServiceRequest(req, res) {
       return res.status(400).json({ ok: false, error: "Невозможно отменить запрос в текущем статусе." });
     }
 
-    const { error: updateError } = await supabase
-      .from("service_requests")
-      .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq("id", request_id)
-      .eq("owner_id", owner.ownerId);
-
-    if (updateError) {
-      console.error("[cancelSupportServiceRequest] update error:", updateError.code);
+    const { data: result, error: transitionError } = await supabase.rpc("transition_service_request", {
+      p_request_id: request_id,
+      p_transition: "cancel",
+    });
+    if (transitionError) {
+      console.error("[cancelSupportServiceRequest] transition error:", transitionError.code);
       return res.status(500).json({ ok: false, error: "Не удалось отменить запрос." });
     }
-
-    return res.status(200).json({ ok: true });
+    if (!result?.ok) return res.status(400).json({ ok: false, error: result.error || "Не удалось отменить запрос.", code: result.code || "TRANSITION_FAILED" });
+    return res.status(200).json(result);
   } catch (error) {
     console.error("handleCancelSupportServiceRequest error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка отмены запроса." });

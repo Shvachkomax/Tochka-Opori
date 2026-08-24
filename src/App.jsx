@@ -6522,7 +6522,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     <div style={{ textAlign: "center", padding: 40, color: t.muted }}>Нет запросов</div>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {adminServiceRequests.map(r => (
+                      {adminServiceRequests.map(r => {
+                        // Pricing-shaped rows must never be offered the legacy
+                        // no-charge action, even if their snapshot is malformed.
+                        const canonical = r.service_code != null || r.price_credits != null;
+                        const clarificationStatuses = canonical ? ["accepted"] : [];
+                        const answerStatuses = canonical ? ["accepted", "needs_clarification"] : ["submitted", "accepted"];
+                        const scheduleStatuses = canonical ? ["accepted", "needs_clarification"] : ["submitted", "accepted"];
+                        const completeStatuses = canonical ? ["answered", "scheduled"] : ["submitted", "accepted", "answered", "scheduled"];
+                        const cancelStatuses = ["submitted", "accepted", "needs_clarification", "scheduled"];
+                        return (
                         <div key={r.id} style={{ padding: "12px 16px", borderRadius: 12, border: `1px solid ${t.border}`, background: t.cardBg }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                             <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{r.title || r.request_type}</div>
@@ -6585,29 +6594,36 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             {r.status === "submitted" && (
                               <button onClick={() => adminUpdateServiceRequest(r.id, "accept")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>Принять</button>
                             )}
-                            {["submitted", "accepted"].includes(r.status) && (
+                            {clarificationStatuses.includes(r.status) && (
+                              <button onClick={() => {
+                                const resp = window.prompt("Что нужно уточнить у клиента?");
+                                if (resp) adminUpdateServiceRequest(r.id, "needs_clarification", { specialist_response: resp });
+                              }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #e8a857", background: "#fff7e8", color: "#6b4b1f", cursor: "pointer", fontSize: 12 }}>Уточнить</button>
+                            )}
+                            {answerStatuses.includes(r.status) || scheduleStatuses.includes(r.status) ? (
                               <>
-                                <button onClick={() => {
+                                {answerStatuses.includes(r.status) && <button onClick={() => {
                                   const resp = window.prompt("Ответ специалиста:");
                                   if (resp) adminUpdateServiceRequest(r.id, "answer", { specialist_response: resp });
-                                }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>Ответить</button>
-                                <button onClick={() => {
+                                }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>Ответить</button>}
+                                {scheduleStatuses.includes(r.status) && <button onClick={() => {
                                   const dt = window.prompt("Дата и время (YYYY-MM-DD HH:MM):");
                                   const comment = window.prompt("Комментарий (необязательно):");
                                   if (dt) adminUpdateServiceRequest(r.id, "schedule", { scheduled_at: dt, scheduled_comment: comment });
-                                }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #6b8fc7", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>Запланировать</button>
+                                }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #6b8fc7", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>Запланировать</button>}
                               </>
-                            )}
-                            {r.status !== "completed" && r.status !== "cancelled" && (
+                            ) : null}
+                            {completeStatuses.includes(r.status) && (
                               <>
                                 <button onClick={() => adminUpdateServiceRequest(r.id, "complete")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>Завершить</button>
-                                <button onClick={() => adminUpdateServiceRequest(r.id, "complete_no_charge")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d8cec1", background: "#fff", color: "#5f574f", cursor: "pointer", fontSize: 12 }}>Закрыть без списания</button>
-                                <button onClick={() => adminUpdateServiceRequest(r.id, "cancel")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #b5473f", background: "#fff", color: "#b5473f", cursor: "pointer", fontSize: 12 }}>Отменить</button>
+                                {!canonical && <button onClick={() => adminUpdateServiceRequest(r.id, "complete_no_charge")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d8cec1", background: "#fff", color: "#5f574f", cursor: "pointer", fontSize: 12 }}>Закрыть без списания</button>}
                               </>
                             )}
+                            {cancelStatuses.includes(r.status) && <button onClick={() => adminUpdateServiceRequest(r.id, "cancel")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #b5473f", background: "#fff", color: "#b5473f", cursor: "pointer", fontSize: 12 }}>Отменить</button>}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </>
@@ -10668,12 +10684,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 )}
 
-                {usageBalance && usageBalance.visible && (
-                  <div style={{ padding: "8px 12px", background: "#f0fdf4", borderRadius: 8, marginBottom: 16, fontSize: 13, color: "#166534" }}>
-                    Доступный ресурс: {usageBalance.balance.toLocaleString("ru-RU")} кредитов<br />
-                    <span style={{ fontSize: 11, color: "#6b7280" }}>Тестовый баланс. Деньги не списываются.</span>
-                  </div>
-                )}
+                {usageBalance && usageBalance.visible && (() => {
+                  const available = Number(usageBalance.available_credits ?? 0);
+                  const reserved = Number(usageBalance.reserved_credits ?? 0);
+                  const total = Number(usageBalance.balance_total ?? 0);
+                  return (
+                    <div style={{ padding: "8px 12px", background: "#f0fdf4", borderRadius: 8, marginBottom: 16, fontSize: 13, color: "#166534" }}>
+                      Баланс: {total.toLocaleString("ru-RU")} кредитов · Зарезервировано: {reserved.toLocaleString("ru-RU")} · Доступно: {available.toLocaleString("ru-RU")}<br />
+                      <span style={{ fontSize: 11, color: "#6b7280" }}>Тестовый баланс. Деньги не списываются.</span>
+                    </div>
+                  );
+                })()}
 
                 <div style={s.tabs} className="tabs">
                   <button
@@ -11178,7 +11199,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             const latestDate = latestSession?.createdAt
               ? new Date(latestSession.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
               : "—";
-            const walletBalance = supportCabinet.wallet?.visible ? supportCabinet.wallet.balance : null;
+            const wallet = supportCabinet.wallet?.visible ? supportCabinet.wallet : null;
 
             return (
               <section style={{ width: "100%" }} className="app-card-support">
@@ -11188,9 +11209,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     <span style={{ fontSize: 15, fontWeight: 600, color: "#2E2A25" }}>
                       Личный кабинет{supportDisplayName ? ` ${supportDisplayName}` : ""}
                     </span>
-                    {walletBalance !== null && (
+                    {wallet && (
                       <span style={{ fontSize: 13, color: "#5F7D6C", fontWeight: 600 }}>
-                        {walletBalance.toLocaleString("ru-RU")} кредитов
+                        Баланс {Number(wallet.balance_total ?? 0).toLocaleString("ru-RU")} · доступно {Number(wallet.available_credits ?? 0).toLocaleString("ru-RU")}
                       </span>
                     )}
                     <button

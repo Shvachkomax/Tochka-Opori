@@ -155,7 +155,9 @@ async function cleanup(prefix) {
     .like("session_id", `${prefix}%`);
   for (const s of sessions || []) {
     if (s.anonymous_owner_id) {
-      await supabase.from("usage_ledger").delete().eq("wallet_id", (await getWalletForSession(s.session_id))?.id);
+      const wallet = await getWalletForSession(s.session_id);
+      if (wallet?.id) await supabase.from("usage_reservations").delete().eq("wallet_id", wallet.id);
+      if (wallet?.id) await supabase.from("usage_ledger").delete().eq("wallet_id", wallet.id);
       await supabase.from("usage_wallets").delete().eq("owner_id", s.anonymous_owner_id);
     }
     await supabase.from("sessions").delete().eq("session_id", s.session_id);

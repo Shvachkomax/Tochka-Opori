@@ -79,6 +79,26 @@ async function invokeSessionHandler(body) {
 async function cleanup() {
   await supabase.from("continuation_credentials").delete().like("lookup_code", "E2E-%");
   await supabase.from("continuation_failed_attempts").delete().like("attempt_key", "%");
+  const { data: sessions } = await supabase
+    .from("sessions")
+    .select("anonymous_owner_id, module")
+    .like("session_id", "e2e-%");
+  for (const session of sessions || []) {
+    if (!session.anonymous_owner_id) continue;
+    const ownerType = session.module === "body" ? "anonymous_profile" : "anonymous_case";
+    const { data: wallets } = await supabase
+      .from("usage_wallets")
+      .select("id")
+      .eq("owner_type", ownerType)
+      .eq("owner_id", session.anonymous_owner_id)
+      .eq("module", session.module || "support");
+    for (const wallet of wallets || []) {
+      const reservations = await supabase.from("usage_reservations").delete().eq("wallet_id", wallet.id);
+      if (reservations.error && !["PGRST205", "42P01"].includes(reservations.error.code)) throw reservations.error;
+      await supabase.from("usage_ledger").delete().eq("wallet_id", wallet.id);
+      await supabase.from("usage_wallets").delete().eq("id", wallet.id);
+    }
+  }
   await supabase.from("sessions").delete().like("session_id", "e2e-%");
 }
 

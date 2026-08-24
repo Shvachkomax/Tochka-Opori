@@ -664,7 +664,9 @@ export default function HealthCabinet({
           {wallet && (
             <div style={{ fontSize: 13, color: "#5f574f" }}>
               <span style={{ color: "#8a7e72" }}>Баланс </span>
-              <span style={{ fontWeight: 700 }}>{wallet.balance?.toLocaleString()}</span>
+              <span style={{ fontWeight: 700 }}>{Number(wallet.balance_total ?? 0).toLocaleString()}</span>
+              <span style={{ color: "#8a7e72", marginLeft: 8 }}>Доступно {Number(wallet.available_credits ?? 0).toLocaleString()}</span>
+              {(wallet.reserved_credits ?? 0) > 0 && <span style={{ color: "#8a7e72", marginLeft: 8 }}>Резерв {Number(wallet.reserved_credits).toLocaleString()}</span>}
             </div>
           )}
           <div style={{ fontSize: 13, color: "#8a7e72" }}>

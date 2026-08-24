@@ -147,7 +147,13 @@ async function main() {
 
   const wallet = await ensureWallet({ ownerType: "anonymous_profile", ownerId: cleanup.ownerId, module: "body" });
   cleanup.walletId = wallet?.id || null;
-  const walletBefore = wallet ? { balance: wallet.balance, total_used: wallet.total_used } : null;
+  if (cleanup.walletId) {
+    await supabase.from("usage_wallets").update({ balance: 100000, total_refilled: 100000, refill_mode: "disabled" }).eq("id", cleanup.walletId);
+  }
+  const walletBeforeRow = cleanup.walletId
+    ? await supabase.from("usage_wallets").select("balance, total_used").eq("id", cleanup.walletId).single()
+    : { data: null };
+  const walletBefore = walletBeforeRow.data;
 
   const browser = await chromium.launch({ headless: true, channel: "chrome" });
   try {
@@ -205,13 +211,18 @@ async function main() {
       const card = specialist.locator('[data-testid="service-request-card"]').filter({ hasText: request.title }).first();
       await card.getByRole("button", { name: "Принять" }).click();
       await waitForRequest(request.id, "accepted");
+      const reservation = await supabase.from("usage_reservations").select("amount, status").eq("service_request_id", request.id).single();
+      assert(reservation.data?.amount === request.price_credits && reservation.data.status === "active", `${request.service_code}: active reserve created`);
       pagePrompt(specialist, `Ответ по запросу ${request.service_code}`);
       await card.getByRole("button", { name: "Ответить" }).click();
       await waitForRequest(request.id, "answered");
       const currentCard = specialist.locator('[data-testid="service-request-card"]').filter({ hasText: request.title }).first();
       await currentCard.getByRole("button", { name: "Завершить" }).click();
       await waitForRequest(request.id, "completed");
-      assert((await supabase.from("service_requests").select("charged_credits").eq("id", request.id).single()).data?.charged_credits === 0, `${request.service_code}: completion keeps charged_credits zero`);
+      const completed = await supabase.from("service_requests").select("reserved_credits, charged_credits").eq("id", request.id).single();
+      const captured = await supabase.from("usage_reservations").select("status").eq("service_request_id", request.id).single();
+      assert(completed.data?.reserved_credits === 0 && completed.data?.charged_credits === request.price_credits, `${request.service_code}: completion captures exact price`);
+      assert(captured.data?.status === "captured", `${request.service_code}: reservation captured`);
     }
 
     await patient.reload({ waitUntil: "networkidle" });
@@ -279,19 +290,21 @@ async function main() {
     const { data: walletAfter } = cleanup.walletId
       ? await supabase.from("usage_wallets").select("balance, total_used").eq("id", cleanup.walletId).single()
       : { data: null };
-    assert(JSON.stringify(walletAfter && { balance: walletAfter.balance, total_used: walletAfter.total_used }) === JSON.stringify(walletBefore && { balance: walletBefore.balance, total_used: walletBefore.total_used }), "wallet remains unchanged");
+    const capturedAmount = 15000 + 20000 + 40000;
+    assert(walletAfter?.balance === (walletBefore?.balance || 0) - capturedAmount && walletAfter?.total_used === capturedAmount, "wallet reflects captures without reserve double-charge");
 
     await specialistContext.close();
     await patientContext.close();
   } finally {
     await browser.close();
+    if (cleanup.walletId) await supabase.from("usage_reservations").delete().eq("wallet_id", cleanup.walletId);
+    if (cleanup.walletId) await supabase.from("usage_ledger").delete().eq("wallet_id", cleanup.walletId);
     for (const id of cleanup.requestIds) await supabase.from("service_requests").delete().eq("id", id);
     for (const code of cleanup.serviceCodes) await supabase.from("service_pricing").delete().eq("service_code", code);
     if (cleanup.assignmentId) await supabase.from("patient_assignments").delete().eq("id", cleanup.assignmentId);
     if (cleanup.onboardingId) await supabase.from("body_onboarding").delete().eq("id", cleanup.onboardingId);
     if (cleanup.bodyClientId) await supabase.from("body_clients").delete().eq("id", cleanup.bodyClientId);
     if (cleanup.sessionId) await supabase.from("sessions").delete().eq("session_id", cleanup.sessionId);
-    if (cleanup.walletId) await supabase.from("usage_ledger").delete().eq("wallet_id", cleanup.walletId);
     if (cleanup.walletId) await supabase.from("usage_wallets").delete().eq("id", cleanup.walletId);
     if (cleanup.specialistSessionId) await supabase.from("specialist_sessions").delete().eq("id", cleanup.specialistSessionId);
     if (cleanup.expertId) {
