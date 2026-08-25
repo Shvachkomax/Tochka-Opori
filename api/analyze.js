@@ -11,6 +11,8 @@ import { ensureWallet, setWalletVisible } from "../lib/usage/wallet.js";
 import { getOrCreateContinuationCredential } from "../lib/session/continuation-store.js";
 import { generateSessionAccessToken } from "../lib/security/access-token.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
+import { buildHealthDiaryLogicalSourceId, buildHealthDiaryObservationSnapshot } from "../lib/clinical/observation-mappings.js";
+import { recordClinicalObservation } from "../lib/clinical/projection.js";
 import {
   REPORT_STATUS,
   getStableReportRequestId,
@@ -1015,18 +1017,41 @@ async function handleDailyLogAnalysis(req, res) {
       .eq("session_id", session_id)
       .maybeSingle();
     if (ownerClient?.anonymous_owner_id) {
-      await recordClinicalEvent({
+      const observationSet = buildHealthDiaryObservationSnapshot(daily_log);
+      const logicalSourceId = buildHealthDiaryLogicalSourceId(session_id, logDate);
+      const diaryEventId = await recordClinicalEvent({
         module: "body",
         ownerType: "anonymous_profile",
         ownerId: ownerClient.anonymous_owner_id,
         eventType: "diary_entry",
         occurredAt: savedLog.updated_at || savedLog.created_at || new Date().toISOString(),
         sourceType: "body_daily_log",
-        sourceId: savedLog.id,
-        sourceEventKey: logDate,
+        sourceId: logicalSourceId,
+        sourceEventKey: observationSet.sourceEventKey,
         provenance: "patient_reported",
-        payload: { daily_log_id: savedLog.id, log_date: logDate },
+        payload: { log_date: logDate, revision_hash: observationSet.revisionHash },
       });
+      if (diaryEventId) {
+        for (const observation of observationSet.observations) {
+          await recordClinicalObservation({
+            clinicalEventId: diaryEventId,
+            module: "body",
+            ownerType: "anonymous_profile",
+            ownerId: ownerClient.anonymous_owner_id,
+            concept: observation.concept,
+            valueNumeric: observation.valueNumeric,
+            unit: observation.unit,
+            metadata: observation.metadata,
+            observedAt: `${logDate}T00:00:00.000Z`,
+            sourceType: "body_daily_log",
+            sourceId: logicalSourceId,
+            sourceEventKey: observationSet.sourceEventKey,
+            provenance: "patient_reported",
+            validationStatus: "unreviewed",
+            qualityLevel: 0,
+          });
+        }
+      }
     }
 
     // Save plate history (structured per-photo observations)

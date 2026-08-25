@@ -2,11 +2,19 @@ import {
   recordClinicalEvent,
   getProjectionFingerprint,
   logProjectionFailure,
+  recordClinicalObservation,
   validateClinicalEventInput,
   validateClinicalObservationInput,
   validateClinicianDecisionInput,
   validateClinicalOutcomeInput,
 } from "../lib/clinical/projection.js";
+import {
+  buildHealthDiaryObservationSnapshot,
+  buildHealthDiaryLogicalSourceId,
+  buildSupportCheckinLogicalSourceId,
+  buildSupportCheckinObservationSnapshot,
+  hashClinicalSnapshot,
+} from "../lib/clinical/observation-mappings.js";
 
 let passed = 0;
 let failed = 0;
@@ -115,6 +123,9 @@ const baseObservation = {
 assert(validateClinicalObservationInput(baseObservation) === null, "valid structured observation accepted");
 assert(validateClinicalObservationInput({ ...baseObservation, valueText: "92.4" }) === "invalid_observation_value", "multiple observation values rejected");
 assert(validateClinicalObservationInput({ ...baseObservation, valueNumeric: null }) === "invalid_observation_value", "missing observation value rejected");
+assert(validateClinicalObservationInput({ ...baseObservation, valueNumeric: "92.4" }) === "invalid_numeric_value", "numeric observation type is enforced");
+assert(validateClinicalObservationInput({ ...baseObservation, valueNumeric: null, valueText: 92.4 }) === "invalid_text_value", "text observation type is enforced");
+assert(validateClinicalObservationInput({ ...baseObservation, valueNumeric: null, valueBoolean: "true" }) === "invalid_boolean_value", "boolean observation type is enforced");
 assert(validateClinicalObservationInput({ ...baseObservation, concept: "" }) === "missing_concept", "missing observation concept rejected");
 assert(validateClinicalObservationInput({ ...baseObservation, observedAt: "invalid" }) === "invalid_occurred_at", "invalid observation time rejected");
 
@@ -144,6 +155,140 @@ const baseOutcome = {
 assert(validateClinicalOutcomeInput(baseOutcome) === null, "valid clinical outcome accepted");
 assert(validateClinicalOutcomeInput({ ...baseOutcome, direction: "diagnosed" }) === "invalid_direction", "unknown outcome direction rejected");
 assert(validateClinicalOutcomeInput({ ...baseOutcome, assessedAt: "invalid" }) === "invalid_occurred_at", "invalid outcome time rejected");
+
+console.log("\n5. Canonical observation snapshots");
+const healthLogicalSourceA = buildHealthDiaryLogicalSourceId("session-c1", "2026-02-15");
+const healthLogicalSourceRecreated = buildHealthDiaryLogicalSourceId("session-c1", "2026-02-15");
+const healthLogicalSourceOtherDate = buildHealthDiaryLogicalSourceId("session-c1", "2026-02-16");
+assert(healthLogicalSourceA === healthLogicalSourceRecreated, "recreated Health source row keeps the same logical source id");
+assert(healthLogicalSourceA !== healthLogicalSourceOtherDate, "different Health diary dates have different source lineages");
+assert(!healthLogicalSourceA.includes("session-c1") && healthLogicalSourceA.startsWith("logical:"), "Health logical source id is privacy-safe");
+const supportLogicalSourceA = buildSupportCheckinLogicalSourceId("anonymous_case", supportOwner, "2026-02-15");
+const supportLogicalSourceRecreated = buildSupportCheckinLogicalSourceId("anonymous_case", supportOwner, "2026-02-15");
+const supportLogicalSourceOtherDate = buildSupportCheckinLogicalSourceId("anonymous_case", supportOwner, "2026-02-16");
+assert(supportLogicalSourceA === supportLogicalSourceRecreated, "recreated Support check-in keeps the same logical source id");
+assert(supportLogicalSourceA !== supportLogicalSourceOtherDate, "different Support check-in dates have different source lineages");
+assert(!supportLogicalSourceA.includes(supportOwner), "Support logical source id does not expose owner id");
+const diaryA = buildHealthDiaryObservationSnapshot({
+  weight_kg: 92.4,
+  waist_cm: 98,
+  steps: 7000,
+  sleep_hours: 6.5,
+  calories: 1800,
+  meals_count: 3,
+  water_l: 1.8,
+  workout_done: false,
+  day_text: "Первый текст",
+  energy_level: 5,
+});
+const diaryTextChanged = buildHealthDiaryObservationSnapshot({
+  weight_kg: 92.4,
+  waist_cm: 98,
+  steps: 7000,
+  sleep_hours: 6.5,
+  calories: 1800,
+  meals_count: 3,
+  water_l: 1.8,
+  workout_done: false,
+  day_text: "Другой текст",
+  energy_level: 9,
+});
+assert(diaryA.revisionHash === diaryTextChanged.revisionHash, "excluded free text/default fields do not change diary revision");
+assert(diaryA.observations.length === 7, "diary maps only seven approved numeric fields");
+assert(diaryA.observations.find(row => row.concept === "weight").unit === "kg", "weight unit is kg");
+assert(diaryA.observations.find(row => row.concept === "sleep_duration").unit === "hours/night", "sleep unit is hours/night");
+assert(buildHealthDiaryObservationSnapshot({ ...diaryA.snapshot, weight_kg: 91 }).revisionHash !== diaryA.revisionHash, "approved field change creates a new diary revision");
+assert(buildHealthDiaryObservationSnapshot({ weight_kg: 0 }).observations.some(row => row.concept === "weight"), "explicit zero is distinguishable from missing weight");
+assert(buildHealthDiaryObservationSnapshot({ workout_done: false, workout_minutes: 30 }).observations.every(row => row.concept !== "exercise_duration"), "ambiguous incomplete workout is excluded");
+assert(buildHealthDiaryObservationSnapshot({ workout_done: true, workout_minutes: 30 }).observations.some(row => row.concept === "exercise_duration"), "explicit completed workout duration is mapped");
+
+const checkinA = buildSupportCheckinObservationSnapshot({ wellbeing_score: -2, anxiety_score: 7 });
+const checkinB = buildSupportCheckinObservationSnapshot({ wellbeing_score: -2, anxiety_score: 6 });
+assert(checkinA.observations.length === 2, "Support check-in maps wellbeing and anxiety");
+assert(checkinA.observations.find(row => row.concept === "subjective_wellbeing").metadata.scale_min === -5, "wellbeing scale minimum preserved");
+assert(checkinA.observations.find(row => row.concept === "subjective_anxiety").metadata.scale_max === 10, "anxiety scale maximum preserved");
+assert(checkinA.revisionHash !== checkinB.revisionHash, "changed check-in score creates a new revision");
+assert(buildSupportCheckinObservationSnapshot({ wellbeing_score: 0, anxiety_score: null }).observations.length === 1, "NULL anxiety is not projected");
+assert(hashClinicalSnapshot({ b: 2, a: 1 }) === hashClinicalSnapshot({ a: 1, b: 2 }), "snapshot hashing uses canonical key ordering");
+
+console.log("\n6. Observation writer idempotency and supersession");
+function observationMock() {
+  const rows = [];
+  const calls = [];
+  return {
+    rows,
+    calls,
+    from() {
+      let mode = "select";
+      let inserted = null;
+      const filters = [];
+      const query = {
+        insert(row) { mode = "insert"; inserted = row; return query; },
+        select() { return query; },
+        eq(field, value) { filters.push([field, "eq", value]); return query; },
+        neq(field, value) { filters.push([field, "neq", value]); return query; },
+        is(field, value) { filters.push([field, "is", value]); return query; },
+        order() { return query; },
+        limit() { return query; },
+        async maybeSingle() {
+          if (mode === "insert") {
+            const duplicate = rows.find(row => row.source_type === inserted.source_type
+              && row.source_id === inserted.source_id
+              && row.concept === inserted.concept
+              && row.source_event_key === inserted.source_event_key);
+            if (duplicate) return { data: null, error: { code: "23505" } };
+            const row = { ...inserted, id: `observation-${rows.length + 1}` };
+            rows.push(row);
+            return { data: { id: row.id }, error: null };
+          }
+          const matches = rows.filter(row => filters.every(([field, operator, value]) => {
+            if (operator === "is") return row[field] === null;
+            if (operator === "neq") return row[field] !== value;
+            return row[field] === value;
+          }));
+          return { data: matches[0] || null, error: null };
+        },
+      };
+      calls.push({ filters });
+      return query;
+    },
+  };
+}
+
+const observationInput = {
+  clinicalEventId: "66666666-6666-4666-8666-666666666666",
+  module: "body",
+  ownerType: "anonymous_profile",
+  ownerId: bodyOwner,
+  concept: "weight",
+  valueNumeric: 92.4,
+  unit: "kg",
+  observedAt: "2026-01-01T00:00:00.000Z",
+  sourceType: "body_daily_log",
+  sourceId: "daily-log-1",
+  sourceEventKey: "rev:aaa",
+  provenance: "patient_reported",
+  validationStatus: "unreviewed",
+  qualityLevel: 0,
+  metadata: {},
+};
+const writerMock = observationMock();
+const firstObservation = await recordClinicalObservation(observationInput, { supabase: writerMock });
+const firstObservationCount = writerMock.rows.length;
+const retryObservation = await recordClinicalObservation(observationInput, { supabase: writerMock });
+const retryObservationCount = writerMock.rows.length;
+const secondRevision = await recordClinicalObservation({ ...observationInput, valueNumeric: 91.2, sourceEventKey: "rev:bbb" }, { supabase: writerMock });
+const differentConcept = await recordClinicalObservation({ ...observationInput, concept: "waist_circumference", valueNumeric: 98, sourceEventKey: "rev:bbb" }, { supabase: writerMock });
+assert(firstObservation === "observation-1", "first observation is inserted");
+assert(retryObservation === firstObservation && firstObservationCount === 1 && retryObservationCount === 1, "identical observation retry is idempotent");
+assert(secondRevision === "observation-2" && writerMock.rows[1].supersedes_observation_id === firstObservation, "new revision supersedes prior observation");
+assert(differentConcept === "observation-3" && writerMock.rows.length === 3, "different concepts share a revision without collision");
+const nullSourceMock = observationMock();
+const nullSourceInput = { ...observationInput, sourceId: null, sourceEventKey: "rev:null" };
+const nullFirst = await recordClinicalObservation(nullSourceInput, { supabase: nullSourceMock });
+const nullObservationRetry = await recordClinicalObservation(nullSourceInput, { supabase: nullSourceMock });
+assert(nullObservationRetry === nullFirst && nullSourceMock.rows.length === 1, "NULL source_id observation retry is idempotent");
+assert(nullSourceMock.calls.some(call => call.filters.some(([field, operator]) => field === "source_id" && operator === "is")), "NULL source_id observation lookup uses IS NULL");
 
 console.log("\n4. Failure-open projection behavior");
 delete process.env.SUPABASE_URL;

@@ -22,6 +22,8 @@ import { createReportArtifacts, REPORT_STATUS } from "../lib/report/finalize.js"
 import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
 import { getInviteUrl } from "../lib/config/site-url.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
+import { buildSupportCheckinLogicalSourceId, buildSupportCheckinObservationSnapshot } from "../lib/clinical/observation-mappings.js";
+import { recordClinicalObservation } from "../lib/clinical/projection.js";
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -4426,6 +4428,42 @@ async function handleSaveSupportCheckin(req, res) {
     if (error) {
       console.error("[saveSupportCheckin] upsert error:", error.code);
       return res.status(500).json({ ok: false, error: "Не удалось сохранить." });
+    }
+
+    const observationSet = buildSupportCheckinObservationSnapshot(saved);
+    const logicalSourceId = buildSupportCheckinLogicalSourceId("anonymous_case", owner.ownerId, saved.checkin_date);
+    const checkinEventId = await recordClinicalEvent({
+      module: "support",
+      ownerType: "anonymous_case",
+      ownerId: owner.ownerId,
+      eventType: "checkin_recorded",
+      occurredAt: `${saved.checkin_date}T00:00:00.000Z`,
+      sourceType: "support_daily_checkin",
+      sourceId: logicalSourceId,
+      sourceEventKey: observationSet.sourceEventKey,
+      provenance: "patient_reported",
+      payload: { checkin_date: saved.checkin_date, revision_hash: observationSet.revisionHash },
+    });
+    if (checkinEventId) {
+      for (const observation of observationSet.observations) {
+        await recordClinicalObservation({
+          clinicalEventId: checkinEventId,
+          module: "support",
+          ownerType: "anonymous_case",
+          ownerId: owner.ownerId,
+          concept: observation.concept,
+          valueNumeric: observation.valueNumeric,
+          unit: observation.unit,
+          metadata: observation.metadata,
+          observedAt: `${saved.checkin_date}T00:00:00.000Z`,
+          sourceType: "support_daily_checkin",
+          sourceId: logicalSourceId,
+          sourceEventKey: observationSet.sourceEventKey,
+          provenance: "patient_reported",
+          validationStatus: "unreviewed",
+          qualityLevel: 0,
+        });
+      }
     }
 
     return res.status(200).json({ ok: true, checkin: saved });

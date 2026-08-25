@@ -38,7 +38,7 @@ C1 projection points are:
 - Support and Body service request creation: `service_request_created`.
 - Specialist, admin, and client transition paths: `service_request_status_changed`.
 
-The Health diary projection uses the canonical `body_clients` owner registry. C1 does not extract observations from free text or AI output. Structured diary values are intentionally deferred until their ownership and revision semantics are explicit.
+The Health diary projection uses the canonical `body_clients` owner registry. C1 does not extract observations from free text or AI output. C1.1 adds only the explicitly documented structured mappings below.
 
 Operational mutation success plus Clinical projection failure is a known C1 tradeoff. The Clinical Layer is eventually reconcilable, not transactionally atomic with operational storage.
 
@@ -64,6 +64,33 @@ No ordering constraint is imposed between these timestamps. Delayed documentatio
 ## Decisions and Outcomes
 
 The C1 schema supports clinician decisions and later outcomes, but no automatic decision or outcome population is enabled. Technical request transitions are not assumed to be clinical decisions, and request completion is not fabricated as outcome evidence.
+
+## C1.1 Structured Observations
+
+C1.1 projects only explicitly structured, patient-entered values. Free text, AI output, reports, transcripts, plate analysis, defaults with ambiguous missing semantics, intake categories, and mutable health-context arrays remain excluded.
+
+The observation revision schema is added by `20260825154115_clinical_c1_1_observation_idempotency.sql`; it stores a required `source_event_key`, an append-only `supersedes_observation_id`, and a race-safe observation identity index.
+
+The observation convention is a stable concept plus a separate unit or scale. Direct diary and check-in values use `provenance = patient_reported`, `validation_status = unreviewed`, and `quality_level = 0`. They are not clinician-confirmed and are never promoted to L3-L5 automatically.
+
+| Concept | Operational source | Field | Value/unit or scale | Observed at | Revision identity |
+| --- | --- | --- | --- | --- | --- |
+| `weight` | `body_daily_logs` | `weight_kg` | numeric, `kg` | `log_date` | logical `session_id + log_date` + content hash |
+| `waist_circumference` | `body_daily_logs` | `waist_cm` | numeric, `cm` | `log_date` | logical `session_id + log_date` + content hash |
+| `daily_steps` | `body_daily_logs` | `steps` | integer, `count/day` | `log_date` | logical `session_id + log_date` + content hash |
+| `sleep_duration` | `body_daily_logs` | `sleep_hours` | numeric, `hours/night` | `log_date` | logical `session_id + log_date` + content hash |
+| `energy_intake` | `body_daily_logs` | `calories` | numeric, `kcal/day` | `log_date` | logical `session_id + log_date` + content hash |
+| `meal_count` | `body_daily_logs` | `meals_count` | integer, `count/day` | `log_date` | logical `session_id + log_date` + content hash |
+| `fluid_intake` | `body_daily_logs` | `water_l` | numeric, `L/day` | `log_date` | logical `session_id + log_date` + content hash |
+| `exercise_duration` | `body_daily_logs` | `workout_minutes` | integer, `min/day` | `log_date` | logical source + content hash, only when `workout_done = true` |
+| `subjective_wellbeing` | `support_daily_checkins` | `wellbeing_score` | integer, `-5..5` self-report | `checkin_date` | logical `owner identity + checkin_date` + content hash |
+| `subjective_anxiety` | `support_daily_checkins` | `anxiety_score` | integer, `0..10` self-report | `checkin_date` | logical `owner identity + checkin_date` + content hash |
+
+Each mutable source is normalized into a canonical approved snapshot and hashed with SHA-256. The logical source ID is independent of an accidentally recreated operational row: Health uses `session_id + log_date`, while Support uses owner identity + `checkin_date`; both are stored as privacy-safe deterministic hashes. The revision is stored as `rev:<hash>` in `source_event_key`. Identical retries return the existing event/observation; a changed approved value creates a new event and a complete approved observation set. New observations point to the previous observation for the same logical source and concept through `supersedes_observation_id`; old rows are never overwritten.
+
+The current observation is derived as the latest observation without a later superseding row in its source/concept lineage. No mutable `is_current` flag is used. `source_id` remains heterogeneous provenance metadata rather than a universal FK.
+
+Observation writers are not enabled for future sources until a stable source identity, revision semantics, and race-safe uniqueness contract are defined for that source.
 
 ## Security and Tenant Boundaries
 
