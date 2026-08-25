@@ -21,6 +21,7 @@ import {
 import { createReportArtifacts, REPORT_STATUS } from "../lib/report/finalize.js";
 import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
 import { getInviteUrl } from "../lib/config/site-url.js";
+import { recordClinicalEvent } from "../lib/clinical/projection.js";
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -3451,6 +3452,24 @@ async function handleCreateBodyServiceRequest(req, res, { legacy = false } = {})
       return res.status(500).json({ ok: false, error: "Не удалось отправить запрос." });
     }
 
+    await recordClinicalEvent({
+      module: "body",
+      ownerType: "anonymous_profile",
+      ownerId: owner.ownerId,
+      eventType: "service_request_created",
+      occurredAt: inserted.created_at || now,
+      sourceType: "service_request",
+      sourceId: inserted.id,
+      sourceEventKey: "created",
+      provenance: "patient_reported",
+      payload: {
+        request_type: requestType,
+        service_code: effectiveServiceCode,
+        service_topic: effectiveServiceTopic,
+        meeting_format: effectiveMeetingFormat,
+      },
+    });
+
     return res.status(200).json({ ok: true, request: inserted });
   } catch (error) {
     console.error("handleCreateBodyServiceRequest error:", error.message);
@@ -3563,6 +3582,19 @@ async function handleCancelBodyServiceRequest(req, res) {
       return res.status(500).json({ ok: false, error: "Не удалось отменить запрос." });
     }
     if (!result?.ok) return res.status(400).json({ ok: false, error: result.error || "Не удалось отменить запрос.", code: result.code || "TRANSITION_FAILED" });
+    if (!result.idempotent_replay) {
+      await recordClinicalEvent({
+        module: "body",
+        ownerType: request.owner_type,
+        ownerId: request.owner_id,
+        eventType: "service_request_status_changed",
+        sourceType: "service_request",
+        sourceId: request_id,
+        sourceEventKey: `${request.status}->${result.status}`,
+        provenance: "system_generated",
+        payload: { from_status: request.status, to_status: result.status },
+      });
+    }
     return res.status(200).json(result);
   } catch (error) {
     console.error("handleCancelBodyServiceRequest error:", error.message);
@@ -4158,6 +4190,23 @@ async function handleCreateSupportServiceRequest(req, res) {
       return res.status(500).json({ ok: false, error: "Не удалось отправить запрос." });
     }
 
+    await recordClinicalEvent({
+      module: "support",
+      ownerType: "anonymous_case",
+      ownerId: owner.ownerId,
+      eventType: "service_request_created",
+      occurredAt: inserted.created_at || now,
+      sourceType: "service_request",
+      sourceId: inserted.id,
+      sourceEventKey: "created",
+      provenance: "patient_reported",
+      payload: {
+        request_type: requestType,
+        service_code: serviceCode,
+        meeting_format: meetingFormat,
+      },
+    });
+
     return res.status(200).json({ ok: true, request: inserted });
   } catch (error) {
     console.error("handleCreateSupportServiceRequest error:", error.message);
@@ -4272,6 +4321,19 @@ async function handleCancelSupportServiceRequest(req, res) {
       return res.status(500).json({ ok: false, error: "Не удалось отменить запрос." });
     }
     if (!result?.ok) return res.status(400).json({ ok: false, error: result.error || "Не удалось отменить запрос.", code: result.code || "TRANSITION_FAILED" });
+    if (!result.idempotent_replay) {
+      await recordClinicalEvent({
+        module: "support",
+        ownerType: request.owner_type,
+        ownerId: request.owner_id,
+        eventType: "service_request_status_changed",
+        sourceType: "service_request",
+        sourceId: request_id,
+        sourceEventKey: `${request.status}->${result.status}`,
+        provenance: "system_generated",
+        payload: { from_status: request.status, to_status: result.status },
+      });
+    }
     return res.status(200).json(result);
   } catch (error) {
     console.error("handleCancelSupportServiceRequest error:", error.message);

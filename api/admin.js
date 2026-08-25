@@ -4,6 +4,7 @@ import { rateLimit } from "../lib/security/rate-limit.js";
 import { logAdminAction, getClientIp } from "../lib/security/audit.js";
 import { generateInviteToken, generateExpertAccessToken, hashToken } from "../lib/security/council-token.js";
 import { sendEmail } from "../lib/email/provider.js";
+import { recordClinicalEvent } from "../lib/clinical/projection.js";
 
 function resolveRole(token) {
   if (!token) return null;
@@ -1988,7 +1989,7 @@ async function handleUpdateBodyServiceRequest(req, res) {
   const supabase = getSupabase();
   const { data: request, error: findError } = await supabase
     .from("service_requests")
-    .select("id, module, status, service_code, price_credits, reserved_credits, charged_credits")
+    .select("id, module, owner_type, owner_id, status, service_code, price_credits, reserved_credits, charged_credits")
     .eq("id", id)
     .maybeSingle();
 
@@ -2027,6 +2028,19 @@ async function handleUpdateBodyServiceRequest(req, res) {
       ipAddress: getClientIp(req),
       details: { updateAction, status: result.status, financial: true },
     });
+    if (!result.idempotent_replay) {
+      await recordClinicalEvent({
+        module: request.module,
+        ownerType: request.owner_type,
+        ownerId: request.owner_id,
+        eventType: "service_request_status_changed",
+        sourceType: "service_request",
+        sourceId: id,
+        sourceEventKey: `${request.status}->${result.status}`,
+        provenance: "system_generated",
+        payload: { from_status: request.status, to_status: result.status },
+      });
+    }
     return res.json(result);
   }
 
@@ -2084,6 +2098,20 @@ async function handleUpdateBodyServiceRequest(req, res) {
     ipAddress: getClientIp(req),
     details: { updateAction, status: updates.status },
   });
+
+  if (request.status !== updates.status) {
+    await recordClinicalEvent({
+      module: request.module,
+      ownerType: request.owner_type,
+      ownerId: request.owner_id,
+      eventType: "service_request_status_changed",
+      sourceType: "service_request",
+      sourceId: id,
+      sourceEventKey: `${request.status}->${updates.status}`,
+      provenance: "system_generated",
+      payload: { from_status: request.status, to_status: updates.status },
+    });
+  }
 
   return res.json({ ok: true, status: updates.status });
 }

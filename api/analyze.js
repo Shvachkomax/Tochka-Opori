@@ -10,6 +10,7 @@ import { debitCreditsForSession, setSessionVisibleAfterCode } from "../lib/usage
 import { ensureWallet, setWalletVisible } from "../lib/usage/wallet.js";
 import { getOrCreateContinuationCredential } from "../lib/session/continuation-store.js";
 import { generateSessionAccessToken } from "../lib/security/access-token.js";
+import { recordClinicalEvent } from "../lib/clinical/projection.js";
 import {
   REPORT_STATUS,
   getStableReportRequestId,
@@ -1008,16 +1009,31 @@ async function handleDailyLogAnalysis(req, res) {
       console.log("Body client check skipped:", clientErr.message);
     }
 
+    const { data: ownerClient } = await supabase
+      .from("body_clients")
+      .select("anonymous_owner_id")
+      .eq("session_id", session_id)
+      .maybeSingle();
+    if (ownerClient?.anonymous_owner_id) {
+      await recordClinicalEvent({
+        module: "body",
+        ownerType: "anonymous_profile",
+        ownerId: ownerClient.anonymous_owner_id,
+        eventType: "diary_entry",
+        occurredAt: savedLog.updated_at || savedLog.created_at || new Date().toISOString(),
+        sourceType: "body_daily_log",
+        sourceId: savedLog.id,
+        sourceEventKey: logDate,
+        provenance: "patient_reported",
+        payload: { daily_log_id: savedLog.id, log_date: logDate },
+      });
+    }
+
     // Save plate history (structured per-photo observations)
     if (savedLog.id && Array.isArray(daily_log.plate_analysis) && daily_log.plate_analysis.length > 0) {
       try {
         const { fingerprint: fpFn } = await import("../lib/session/continuation-store.js");
         // Resolve owner_id from body_clients
-        const { data: ownerClient } = await supabase
-          .from("body_clients")
-          .select("anonymous_owner_id")
-          .eq("session_id", session_id)
-          .maybeSingle();
         const ownerId = ownerClient?.anonymous_owner_id;
         if (ownerId) {
           const now = new Date().toISOString();
@@ -1864,6 +1880,18 @@ ${antiRepeatBlock}
         module: activeModule,
         anonymousOwnerId: finalSession.anonymous_owner_id,
       });
+      await recordClinicalEvent({
+        module: "support",
+        ownerType: "anonymous_case",
+        ownerId: finalSession.anonymous_owner_id,
+        eventType: "session_completed",
+        occurredAt: statusCheck.data.report_completed_at || new Date().toISOString(),
+        sourceType: "support_session",
+        sourceId: session_id,
+        sourceEventKey: finalReportRequestId,
+        provenance: "system_generated",
+        payload: { report_status: REPORT_STATUS.READY },
+      });
       const cachedPayload = buildReportResponsePayload({
         userReport: statusCheck.data.user_report,
         doctorReport: statusCheck.data.doctor_report,
@@ -2143,6 +2171,19 @@ ${antiRepeatBlock}
           report_request_id: reportRequestId,
         });
       }
+
+      await recordClinicalEvent({
+        module: "support",
+        ownerType: "anonymous_case",
+        ownerId: session.anonymous_owner_id,
+        eventType: "session_completed",
+        occurredAt: new Date().toISOString(),
+        sourceType: "support_session",
+        sourceId: session_id,
+        sourceEventKey: reportRequestId,
+        provenance: "system_generated",
+        payload: { report_status: REPORT_STATUS.READY },
+      });
 
       // 1b. Sync practices from report (non-blocking, after durable save).
       if (activeModule === "support" && session.anonymous_owner_id) {

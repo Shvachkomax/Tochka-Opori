@@ -4,6 +4,7 @@ import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { hashToken } from "../lib/security/council-token.js";
 import { getInviteUrl } from "../lib/config/site-url.js";
+import { recordClinicalEvent } from "../lib/clinical/projection.js";
 
 // ── Constants ─────────────────────────────────────────────
 
@@ -1135,7 +1136,7 @@ async function handleUpdateServiceRequest(req, res) {
   // Fetch the request and verify ownership
   const { data: request, error: findError } = await supabase
     .from("service_requests")
-    .select("id, specialist_id, status, module, owner_type, reserved_credits")
+    .select("id, specialist_id, status, module, owner_type, owner_id, reserved_credits")
     .eq("id", requestId)
     .maybeSingle();
 
@@ -1178,6 +1179,21 @@ async function handleUpdateServiceRequest(req, res) {
       : result?.code === "REQUEST_NOT_FOUND" ? 404
         : result?.code === "WALLET_NOT_ACTIVE" ? 409 : 400;
     return res.status(status).json({ ok: false, error: result?.error || "Не удалось обновить запрос", code: result?.code || "TRANSITION_FAILED" });
+  }
+
+  if (!result.idempotent_replay) {
+    await recordClinicalEvent({
+      module: request.module,
+      ownerType: request.owner_type,
+      ownerId: request.owner_id,
+      expertId: expert.id,
+      eventType: "service_request_status_changed",
+      sourceType: "service_request",
+      sourceId: requestId,
+      sourceEventKey: `${request.status}->${result.status}`,
+      provenance: "system_generated",
+      payload: { from_status: request.status, to_status: result.status },
+    });
   }
 
   return res.status(200).json(result);
