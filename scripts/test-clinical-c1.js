@@ -232,7 +232,10 @@ function observationMock() {
         limit() { return query; },
         async maybeSingle() {
           if (mode === "insert") {
-            const duplicate = rows.find(row => row.source_type === inserted.source_type
+            const duplicate = rows.find(row => row.module === inserted.module
+              && row.owner_type === inserted.owner_type
+              && row.owner_id === inserted.owner_id
+              && row.source_type === inserted.source_type
               && row.source_id === inserted.source_id
               && row.concept === inserted.concept
               && row.source_event_key === inserted.source_event_key);
@@ -289,6 +292,51 @@ const nullFirst = await recordClinicalObservation(nullSourceInput, { supabase: n
 const nullObservationRetry = await recordClinicalObservation(nullSourceInput, { supabase: nullSourceMock });
 assert(nullObservationRetry === nullFirst && nullSourceMock.rows.length === 1, "NULL source_id observation retry is idempotent");
 assert(nullSourceMock.calls.some(call => call.filters.some(([field, operator]) => field === "source_id" && operator === "is")), "NULL source_id observation lookup uses IS NULL");
+
+console.log("\n7. Ownership-safe observation lineage");
+const ownerBCollisionInput = { ...observationInput, ownerId: "77777777-7777-4777-8777-777777777777", sourceType: "test_collision", sourceId: "shared-source", concept: "subjective_anxiety", sourceEventKey: "rev:owner-b" };
+const ownerACollisionInput = { ...ownerBCollisionInput, ownerId: bodyOwner, sourceEventKey: "rev:owner-a" };
+const ownershipMock = observationMock();
+const ownerAObservation = await recordClinicalObservation(ownerACollisionInput, { supabase: ownershipMock });
+const ownerBObservation = await recordClinicalObservation(ownerBCollisionInput, { supabase: ownershipMock });
+assert(ownerAObservation === "observation-1" && ownerBObservation === "observation-2", "same source identity can be inserted for different owners");
+assert(ownershipMock.rows[1].supersedes_observation_id === null, "cross-owner collision does not create supersession");
+assert(ownershipMock.calls.some(call => call.filters.some(([field, operator, value]) => field === "owner_id" && operator === "eq" && value === ownerBCollisionInput.ownerId)), "predecessor lookup scopes owner_id");
+
+const ownerBSecond = await recordClinicalObservation({ ...ownerBCollisionInput, valueNumeric: 8, sourceEventKey: "rev:owner-b-2" }, { supabase: ownershipMock });
+assert(ownerBSecond === "observation-3" && ownershipMock.rows[2].supersedes_observation_id === ownerBObservation, "same-owner revision supersedes only its own predecessor");
+
+const sameRevisionMock = observationMock();
+const sameRevisionOwnerA = await recordClinicalObservation({ ...ownerACollisionInput, sourceEventKey: "rev:shared" }, { supabase: sameRevisionMock });
+const sameRevisionOwnerB = await recordClinicalObservation({ ...ownerBCollisionInput, sourceEventKey: "rev:shared" }, { supabase: sameRevisionMock });
+assert(sameRevisionOwnerA !== sameRevisionOwnerB, "identical revisions coexist for different owners");
+assert(sameRevisionMock.rows[1].supersedes_observation_id === null, "identical cross-owner revision does not recover or supersede another owner");
+
+const crossModuleInput = { ...ownerBCollisionInput, module: "support", ownerType: "anonymous_case", ownerId: "88888888-8888-4888-8888-888888888888" };
+const crossModuleMock = observationMock();
+const bodyModuleObservation = await recordClinicalObservation({ ...ownerBCollisionInput, sourceEventKey: "rev:cross-module" }, { supabase: crossModuleMock });
+const supportModuleObservation = await recordClinicalObservation({ ...crossModuleInput, sourceEventKey: "rev:cross-module" }, { supabase: crossModuleMock });
+assert(bodyModuleObservation === "observation-1" && supportModuleObservation === "observation-2", "valid Body and Support scopes do not collide");
+assert(crossModuleMock.rows[1].supersedes_observation_id === null, "cross-module collision does not create supersession");
+
+const nullOwnershipMock = observationMock();
+const nullOwnerA = { ...observationInput, ownerId: bodyOwner, sourceType: "test_null_collision", sourceId: null, concept: "weight", sourceEventKey: "rev:null-a" };
+const nullOwnerB = { ...nullOwnerA, ownerId: "99999999-9999-4999-8999-999999999999" };
+const nullOwnerAId = await recordClinicalObservation(nullOwnerA, { supabase: nullOwnershipMock });
+const nullOwnerBId = await recordClinicalObservation(nullOwnerB, { supabase: nullOwnershipMock });
+assert(nullOwnerAId === "observation-1" && nullOwnerBId === "observation-2", "NULL source_id does not cross owner boundaries");
+assert(nullOwnershipMock.rows[1].supersedes_observation_id === null, "NULL source_id cross-owner collision does not supersede");
+const nullOwnerARevision = await recordClinicalObservation({ ...nullOwnerA, valueNumeric: 91.2, sourceEventKey: "rev:null-a-2" }, { supabase: nullOwnershipMock });
+assert(nullOwnerARevision === "observation-3" && nullOwnershipMock.rows[2].supersedes_observation_id === nullOwnerAId, "NULL source_id same-owner revision supersedes correctly");
+
+const lineageMock = observationMock();
+const weightRevisionA = await recordClinicalObservation({ ...observationInput, sourceType: "test_lineage", sourceId: "day-1", concept: "weight", sourceEventKey: "rev:weight-a" }, { supabase: lineageMock });
+const sleepRevisionA = await recordClinicalObservation({ ...observationInput, sourceType: "test_lineage", sourceId: "day-1", concept: "sleep_duration", sourceEventKey: "rev:sleep-a" }, { supabase: lineageMock });
+const weightRevisionB = await recordClinicalObservation({ ...observationInput, sourceType: "test_lineage", sourceId: "day-1", concept: "weight", valueNumeric: 91.2, sourceEventKey: "rev:weight-b" }, { supabase: lineageMock });
+const weightOtherSource = await recordClinicalObservation({ ...observationInput, sourceType: "test_lineage", sourceId: "day-2", concept: "weight", sourceEventKey: "rev:weight-day-2" }, { supabase: lineageMock });
+assert(lineageMock.rows.find(row => row.id === weightRevisionB)?.supersedes_observation_id === weightRevisionA, "a revision supersedes only the same concept lineage");
+assert(lineageMock.rows.find(row => row.id === sleepRevisionA)?.supersedes_observation_id === null, "different concepts do not share a supersession chain");
+assert(lineageMock.rows.find(row => row.id === weightOtherSource)?.supersedes_observation_id === null, "different source ids do not share a supersession chain");
 
 console.log("\n4. Failure-open projection behavior");
 delete process.env.SUPABASE_URL;
