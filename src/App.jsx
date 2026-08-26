@@ -7,6 +7,7 @@ import BodyOnboarding from "./BodyOnboarding.jsx";
 import BodyDayView from "./BodyDayView.jsx";
 import BodyHealthContext from "./BodyHealthContext.jsx";
 import BodyServiceRequests from "./BodyServiceRequests.jsx";
+import MedicationCard from "./MedicationCard.jsx";
 import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
 import { saveBodySession, saveSupportSession, getBodySession, getSupportSession, clearBodySession, clearSupportSession, withAccessToken } from "./lib/sessionAccess.js";
 import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
@@ -1270,6 +1271,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         service_requests: cabinetData.service_requests || [],
         unread_message_count: cabinetData.unread_message_count || 0,
         display_name: cabinetData.display_name || null,
+        medication_cards: cabinetData.medication_cards || [],
       });
       setSupportDisplayName(cabinetData.display_name || null);
       setSessionId(effectiveSessionId);
@@ -1715,6 +1717,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           service_requests: data.service_requests || [],
           unread_message_count: data.unread_message_count || 0,
           display_name: data.display_name || null,
+          medication_cards: data.medication_cards || [],
         });
         if (data.display_name) setSupportDisplayName(data.display_name);
       }
@@ -11222,6 +11225,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     </button>
                   </div>
                 </div>
+
+                <MedicationCard cards={supportCabinet.medication_cards} />
 
                 {/* ROW 1: Последний разговор + Следующий шаг */}
                 {latestSession && (

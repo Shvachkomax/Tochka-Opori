@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import SpecialistMedicationOrders from "../../SpecialistMedicationOrders.jsx";
 
 // ── Styles ────────────────────────────────────────────────
 
@@ -97,8 +98,13 @@ export default function SpecialistCabinet() {
   const [invitationsLoading, setInvitationsLoading] = useState(false);
   const [invitationTab, setInvitationTab] = useState("list"); // list | create
 
+  // C2 v0.1 medication foundation — Support runtime only.
+  const [medicationData, setMedicationData] = useState(null);
+  const [medicationLoading, setMedicationLoading] = useState(false);
+
   // Stale-response guard: only the latest detail request result is applied
   const detailGenerationRef = useRef(0);
+  const medicationGenerationRef = useRef(0);
   // Refresh key: incremented on re-click to force re-fetch even for same client_ref
   const [detailRefreshKey, setDetailRefreshKey] = useState(0);
 
@@ -160,6 +166,8 @@ export default function SpecialistCabinet() {
     setSelectedClient(null);
     setClientDetail(null);
     setProfAnalysis(null);
+    setMedicationData(null);
+    medicationGenerationRef.current++;
     setClientTab("overview");
 
     (async () => {
@@ -506,6 +514,49 @@ export default function SpecialistCabinet() {
     if (auth) loadInvitations();
   }, [auth]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  async function loadMedicationOrders() {
+    if (!auth || !selectedClient || module !== "support") {
+      setMedicationData(null);
+      return;
+    }
+    setMedicationLoading(true);
+    const generation = ++medicationGenerationRef.current;
+    try {
+      const res = await fetch("/api/specialist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action: "listPatientMedicationOrders", client_ref: selectedClient, organization_id: orgId, module: "support" }),
+      });
+      const data = await res.json();
+      if (generation !== medicationGenerationRef.current) return;
+      if (data.ok) setMedicationData(data);
+      else setMedicationData({ orders: [], concepts: [], can_manage: false, error: data.error || "Не удалось загрузить назначения." });
+    } catch {
+      if (generation === medicationGenerationRef.current) setMedicationData({ orders: [], concepts: [], can_manage: false, error: "Ошибка сети." });
+    } finally {
+      if (generation === medicationGenerationRef.current) setMedicationLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadMedicationOrders();
+  }, [auth, selectedClient, orgId, module]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function mutateMedication(action, payload = {}) {
+    const res = await fetch("/api/specialist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ action, client_ref: selectedClient, organization_id: orgId, module: "support", ...payload }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "Не удалось изменить назначение.");
+    await loadMedicationOrders();
+    showToast(action === "revokeMedicationOrder" ? "Назначение отозвано" : "Назначение сохранено");
+    return data;
+  }
+
   // ── Loading state ────────────────────────────────────────
 
   if (loading) {
@@ -786,6 +837,11 @@ export default function SpecialistCabinet() {
               onBack={clearSelectedClientDetail}
               profAnalysis={profAnalysis}
               profAnalysisLoading={profAnalysisLoading}
+              medicationData={medicationData || { orders: [], concepts: [], can_manage: false }}
+              medicationLoading={medicationLoading}
+              onCreateMedication={(payload) => mutateMedication("createMedicationOrder", payload)}
+              onSupersedeMedication={(order, payload) => mutateMedication("supersedeMedicationOrder", { ...payload, order_ref: order.order_ref })}
+              onRevokeMedication={(order) => mutateMedication("revokeMedicationOrder", { order_ref: order.order_ref, reason_code: "clinician_decision", creation_idempotency_key: globalThis.crypto?.randomUUID?.() || `revoke-${Date.now()}` })}
             />
           )
         ) : (
@@ -1121,12 +1177,13 @@ function InvitationCard({ invitation: inv, onRevoke, onRespond }) {
 
 // ── Client Detail Card ────────────────────────────────────
 
-function ClientDetail({ detail, loading, error, tab, onTabChange, onBack, profAnalysis, profAnalysisLoading }) {
+function ClientDetail({ detail, loading, error, tab, onTabChange, onBack, profAnalysis, profAnalysisLoading, medicationData, medicationLoading, onCreateMedication, onSupersedeMedication, onRevokeMedication }) {
   const tabs = [
     { id: "overview", label: "Обзор" },
     { id: "sessions", label: "Сессии" },
     { id: "dynamics", label: "Динамика" },
     { id: "analysis", label: "AI-анализ" },
+    { id: "medications", label: "Назначения" },
   ];
 
   if (loading) {
@@ -1345,6 +1402,23 @@ function ClientDetail({ detail, loading, error, tab, onTabChange, onBack, profAn
             <p style={{ fontSize: 13, color: "#7A7268" }}>
               Профессиональный анализ пока недоступен.
             </p>
+          )}
+        </div>
+      )}
+
+      {tab === "medications" && (
+        <div>
+          {medicationLoading ? (
+            <p style={{ fontSize: 13, color: "#7A7268" }}>Загрузка назначений...</p>
+          ) : medicationData?.error ? (
+            <p style={{ fontSize: 13, color: "#991B1B" }}>{medicationData.error}</p>
+          ) : (
+            <SpecialistMedicationOrders
+              data={medicationData}
+              onCreate={onCreateMedication}
+              onSupersede={onSupersedeMedication}
+              onRevoke={onRevokeMedication}
+            />
           )}
         </div>
       )}

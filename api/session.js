@@ -24,6 +24,7 @@ import { getInviteUrl } from "../lib/config/site-url.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
 import { buildSupportCheckinLogicalSourceId, buildSupportCheckinObservationSnapshot } from "../lib/clinical/observation-mappings.js";
 import { recordClinicalObservation } from "../lib/clinical/projection.js";
+import { getMedicationCardsForOwner, isMedicationSessionEligible } from "../lib/clinical/medication.js";
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -50,6 +51,23 @@ async function resolveSupportOwner(sessionId, accessToken) {
     .eq("module", "support")
     .maybeSingle();
   if (error || !session || !session.anonymous_owner_id) return null;
+  return { ownerId: session.anonymous_owner_id, sessionId: session.session_id, publicCode: session.public_code };
+}
+
+// Medication cards require a non-legacy session token. Legacy access remains
+// available to unrelated historical cabinet flows, but cannot expose C2 data.
+async function resolveMedicationSupportOwner(sessionId, accessToken) {
+  if (!sessionId || !accessToken) return null;
+  const valid = await validateSessionAccess(sessionId, accessToken);
+  if (!valid) return null;
+  const supabase = getSupabase();
+  const { data: session, error } = await supabase
+    .from("sessions")
+    .select("session_id, public_code, anonymous_owner_id, module, legacy_access")
+    .eq("session_id", sessionId)
+    .eq("module", "support")
+    .maybeSingle();
+  if (error || !isMedicationSessionEligible(session) || !session.anonymous_owner_id) return null;
   return { ownerId: session.anonymous_owner_id, sessionId: session.session_id, publicCode: session.public_code };
 }
 
@@ -297,6 +315,8 @@ export default async function handler(req, res) {
         return await handleLoad(req, res);
       case "getCabinet":
         return await handleGetCabinet(req, res);
+      case "getMedicationCard":
+        return await handleGetMedicationCard(req, res);
       case "getReport":
         return await handleGetReport(req, res);
       case "updateSupportPlan":
@@ -821,7 +841,7 @@ async function handleGetCabinet(req, res) {
 
     const { data: currentSession, error: currentError } = await supabase
       .from("sessions")
-      .select("session_id, public_code, anonymous_owner_id, module, created_at, json_data")
+      .select("session_id, public_code, anonymous_owner_id, module, legacy_access, created_at, json_data")
       .eq("session_id", effectiveSessionId)
       .maybeSingle();
 
@@ -929,6 +949,20 @@ async function handleGetCabinet(req, res) {
       console.error("[getCabinet] profile error (non-blocking):", profileError.message);
     }
 
+    let medicationCards = [];
+    if (isMedicationSessionEligible(currentSession)) {
+      try {
+        medicationCards = await getMedicationCardsForOwner({
+          supabase,
+          ownerType: "anonymous_case",
+          ownerId,
+          module: "support",
+        });
+      } catch (medicationError) {
+        console.error("[getCabinet] medication card error (non-blocking):", medicationError.code || medicationError.message);
+      }
+    }
+
     return res.status(200).json({
       ok: true,
       public_code: currentSession.public_code,
@@ -946,10 +980,33 @@ async function handleGetCabinet(req, res) {
       service_requests: serviceRequests,
       unread_message_count: 0,
       display_name: ownerDisplayName,
+      medication_cards: medicationCards,
     });
   } catch (error) {
     console.error("handleGetCabinet error", error);
     return res.status(500).json({ ok: false, error: error.message || "Ошибка кабинета" });
+  }
+}
+
+async function handleGetMedicationCard(req, res) {
+  try {
+    const { session_id, access_token } = req.body || {};
+    const owner = await resolveMedicationSupportOwner(session_id, access_token);
+    if (!owner) {
+      return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+    }
+
+    const supabase = getSupabase();
+    const cards = await getMedicationCardsForOwner({
+      supabase,
+      ownerType: "anonymous_case",
+      ownerId: owner.ownerId,
+      module: "support",
+    });
+    return res.status(200).json({ ok: true, cards, patient_medication_ai_enabled: false });
+  } catch (error) {
+    console.error("handleGetMedicationCard error:", error.code || error.message);
+    return res.status(500).json({ ok: false, error: "Не удалось загрузить назначения." });
   }
 }
 
@@ -1140,7 +1197,7 @@ async function handleCreateFollowUpSession(req, res) {
 
 async function handleGenerateAccessToken(req, res) {
   try {
-    const { sessionId, publicCode } = req.body || {};
+    const { sessionId, publicCode, access_token } = req.body || {};
 
     if (!sessionId && !publicCode) {
       return res.status(400).json({ ok: false, error: "Missing sessionId or publicCode" });
@@ -1162,6 +1219,12 @@ async function handleGenerateAccessToken(req, res) {
     }
     if (!data) {
       return res.status(404).json({ ok: false, error: "Сессия не найдена" });
+    }
+    if (data.legacy_access === true) {
+      return res.status(403).json({ ok: false, error: "Для этой сессии требуется защищённый вход по коду продолжения." });
+    }
+    if (!access_token || !(await validateSessionAccess(data.session_id, access_token))) {
+      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
     }
 
     const rawToken = await generateSessionAccessToken(data.session_id);

@@ -5,6 +5,13 @@ import { rateLimit } from "../lib/security/rate-limit.js";
 import { hashToken } from "../lib/security/council-token.js";
 import { getInviteUrl } from "../lib/config/site-url.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
+import {
+  SAFE_MEDICATION_PERMISSION_KEYS,
+  getMedicationOrderForOwner,
+  listMedicationOrdersForOwner,
+  normalizeMedicationPermissionKeys,
+  parseMedicationOrderRef,
+} from "../lib/clinical/medication.js";
 
 // ── Constants ─────────────────────────────────────────────
 
@@ -139,6 +146,18 @@ export default async function handler(req, res) {
         return await handleGetClientProfessionalAnalysis(req, res);
       case "getBodyClientOverview":
         return await handleGetBodyClientOverview(req, res);
+      case "listMedicationConcepts":
+        return await handleListMedicationConcepts(req, res);
+      case "listPatientMedicationOrders":
+        return await handleListPatientMedicationOrders(req, res);
+      case "getMedicationOrder":
+        return await handleGetMedicationOrder(req, res);
+      case "createMedicationOrder":
+        return await handleCreateMedicationOrder(req, res);
+      case "supersedeMedicationOrder":
+        return await handleSupersedeMedicationOrder(req, res);
+      case "revokeMedicationOrder":
+        return await handleRevokeMedicationOrder(req, res);
       case "listServiceRequests":
         return await handleListServiceRequests(req, res);
       case "updateServiceRequest":
@@ -160,6 +179,292 @@ export default async function handler(req, res) {
     console.error("[specialist] error:", error);
     return res.status(500).json({ ok: false, error: "Внутренняя ошибка сервера" });
   }
+}
+
+// ── MEDICATION C2 v0.1 (Support runtime only) ─────────────
+
+function medicationErrorResponse(res, error, fallback = "Не удалось обработать назначение.") {
+  const code = error?.code || error?.details?.code;
+  const status = code === "42501" ? 403 : code === "23505" || code === "P0001" ? 409 : 400;
+  return res.status(status).json({ ok: false, error: fallback, code: code || "MEDICATION_REQUEST_FAILED" });
+}
+
+function requireSupportMedicationContext({ expert, memberships, organizationId, module }) {
+  if (module !== "support") return { ok: false, status: 403, error: "Назначения в этом модуле пока недоступны." };
+  const context = validateSpecialistContext({ memberships, organizationId, module, allowedModules: expert.allowed_modules });
+  return context.ok ? { ok: true } : { ...context, status: 403 };
+}
+
+async function resolveSupportMedicationClient({ expert, memberships, clientRef, organizationId }) {
+  const context = requireSupportMedicationContext({ expert, memberships, organizationId, module: "support" });
+  if (!context.ok) return context;
+  const resolved = await resolveAuthorizedSpecialistClient({
+    expert,
+    memberships,
+    clientRef,
+    organizationId,
+    module: "support",
+  });
+  if (!resolved.ok) return resolved;
+  if (!resolved.publicCode) return { ok: false, status: 403, error: "Владелец клиента не определён." };
+
+  const { data: session, error } = await getSupabase()
+    .from("sessions")
+    .select("anonymous_owner_id")
+    .eq("public_code", resolved.publicCode)
+    .eq("module", "support")
+    .maybeSingle();
+  if (error || !session?.anonymous_owner_id) return { ok: false, status: 404, error: "Пациент не найден." };
+  return { ...resolved, ownerType: "anonymous_case", ownerId: session.anonymous_owner_id };
+}
+
+async function getVerifiedMedicationAuthorizationId({ expertId, organizationId }) {
+  let query = getSupabase()
+    .from("clinician_medication_authorizations")
+    .select("id, valid_until")
+    .eq("expert_id", expertId)
+    .eq("jurisdiction", "RU")
+    .eq("authorization_scope", "prescribe_medications")
+    .eq("verification_status", "verified")
+    .lte("valid_from", new Date().toISOString())
+    .is("revoked_at", null)
+    .limit(1);
+  query = organizationId === null || organizationId === undefined
+    ? query.is("organization_id", null)
+    : query.eq("organization_id", organizationId);
+  const { data, error } = await query;
+  const current = (data || []).find((authorization) => !authorization.valid_until || new Date(authorization.valid_until) > new Date());
+  return !error ? current?.id || null : null;
+}
+
+async function hasVerifiedMedicationAuthorization({ expertId, organizationId }) {
+  return !!(await getVerifiedMedicationAuthorizationId({ expertId, organizationId }));
+}
+
+function toSpecialistMedicationOrder(order) {
+  return {
+    order_ref: order.order_ref,
+    version_number: order.version_number,
+    supersedes_order_ref: order.supersedes_order_ref,
+    medication_concept_id: order.medication_concept_id,
+    medication_name: order.medication_name,
+    formulation: order.formulation,
+    strength_value: order.strength_value,
+    strength_unit: order.strength_unit,
+    route_code: order.route_code,
+    indication_code: order.indication_code,
+    clinician_instruction: order.clinician_instruction,
+    issued_at: order.issued_at,
+    valid_from: order.valid_from,
+    valid_until: order.valid_until,
+    effective_state: order.effective_state,
+    schedules: order.schedules,
+    ai_permission_keys: order.ai_permission_keys,
+    created_at: order.created_at,
+  };
+}
+
+async function handleListMedicationConcepts(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  const { organization_id: organizationId, module } = req.body || {};
+  const context = requireSupportMedicationContext({ ...authResult, organizationId, module });
+  if (!context.ok) return res.status(context.status).json({ ok: false, error: context.error });
+
+  const { data, error } = await getSupabase()
+    .from("medication_concepts")
+    .select("id, concept_code, display_name, canonical_name, concept_kind")
+    .eq("source_system", "internal")
+    .eq("jurisdiction", "RU")
+    .eq("status", "active")
+    .order("display_name");
+  if (error) return medicationErrorResponse(res, error, "Не удалось загрузить справочник препаратов.");
+  return res.status(200).json({
+    ok: true,
+    concepts: data || [],
+    can_manage: await hasVerifiedMedicationAuthorization({ expertId: authResult.expert.id, organizationId }),
+    runtime_module: "support",
+    body_runtime_enabled: false,
+    safe_permission_keys: SAFE_MEDICATION_PERMISSION_KEYS,
+  });
+}
+
+async function handleListPatientMedicationOrders(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  const { client_ref: clientRef, organization_id: organizationId, module } = req.body || {};
+  if (module !== "support") return res.status(403).json({ ok: false, error: "Назначения в этом модуле пока недоступны." });
+  if (!clientRef) return res.status(400).json({ ok: false, error: "Укажите client_ref." });
+  const resolved = await resolveSupportMedicationClient({ ...authResult, clientRef, organizationId });
+  if (!resolved.ok) return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
+  try {
+    const orders = await listMedicationOrdersForOwner({
+      supabase: getSupabase(), ownerType: resolved.ownerType, ownerId: resolved.ownerId,
+      module: "support", organizationId,
+    });
+    const expertIds = [...new Set(orders.map((order) => order.prescriber_expert_id).filter(Boolean))];
+    const { data: experts } = expertIds.length
+      ? await getSupabase().from("experts").select("id, name, specialty").in("id", expertIds)
+      : { data: [] };
+    const expertMap = new Map((experts || []).map((expert) => [expert.id, expert]));
+    const { data: concepts } = await getSupabase()
+      .from("medication_concepts")
+      .select("id, concept_code, display_name, canonical_name, concept_kind")
+      .eq("source_system", "internal")
+      .eq("jurisdiction", "RU")
+      .eq("status", "active")
+      .order("display_name");
+    return res.status(200).json({
+      ok: true,
+      orders: orders.map((order) => ({
+        ...toSpecialistMedicationOrder(order),
+        prescriber: expertMap.get(order.prescriber_expert_id) ? {
+          name: expertMap.get(order.prescriber_expert_id).name,
+          specialty: expertMap.get(order.prescriber_expert_id).specialty,
+        } : null,
+      })),
+      concepts: concepts || [],
+      can_manage: (resolved.relationship === "primary" || ["owner", "clinician", "supervisor", "admin"].includes(resolved.accessRole))
+        && await hasVerifiedMedicationAuthorization({ expertId: authResult.expert.id, organizationId }),
+      access_role: resolved.accessRole,
+      patient_medication_ai_enabled: false,
+    });
+  } catch (error) {
+    return medicationErrorResponse(res, error, "Не удалось загрузить назначения.");
+  }
+}
+
+async function handleGetMedicationOrder(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  const { client_ref: clientRef, order_ref: orderRef, organization_id: organizationId, module } = req.body || {};
+  if (module !== "support") return res.status(403).json({ ok: false, error: "Назначения в этом модуле пока недоступны." });
+  const orderId = parseMedicationOrderRef(orderRef);
+  if (!clientRef || !orderId) return res.status(400).json({ ok: false, error: "Некорректная ссылка на назначение." });
+  const resolved = await resolveSupportMedicationClient({ ...authResult, clientRef, organizationId });
+  if (!resolved.ok) return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
+  try {
+    const order = await getMedicationOrderForOwner({
+      supabase: getSupabase(), ownerType: resolved.ownerType, ownerId: resolved.ownerId,
+      module: "support", organizationId, orderId,
+    });
+    if (!order) return res.status(404).json({ ok: false, error: "Назначение не найдено." });
+    return res.status(200).json({ ok: true, order: toSpecialistMedicationOrder(order), patient_medication_ai_enabled: false });
+  } catch (error) {
+    return medicationErrorResponse(res, error, "Не удалось загрузить назначение.");
+  }
+}
+
+function validateMedicationMutationPayload(body = {}) {
+  const permissionResult = normalizeMedicationPermissionKeys(body.permission_keys);
+  if (!permissionResult.ok) return permissionResult;
+  if (!body.medication_concept_id || !body.strength_value || !body.strength_unit || !body.route_code) {
+    return { ok: false, error: "Заполните препарат, дозировку и способ применения." };
+  }
+  if (!Array.isArray(body.schedules) || body.schedules.length === 0 || body.schedules.length > 12) {
+    return { ok: false, error: "Добавьте корректное расписание." };
+  }
+  if (typeof body.valid_from !== "string" || !body.valid_from.trim()) {
+    return { ok: false, error: "Укажите дату начала назначения." };
+  }
+  if (typeof body.creation_idempotency_key !== "string" || body.creation_idempotency_key.trim().length < 8 || body.creation_idempotency_key.length > 160) {
+    return { ok: false, error: "Некорректный ключ операции." };
+  }
+  if (typeof body.decision_text !== "string" || body.decision_text.trim().length < 2) {
+    return { ok: false, error: "Укажите клиническое решение специалиста." };
+  }
+  return { ok: true, permissionKeys: permissionResult.keys };
+}
+
+function medicationRpcParams(body, resolved, expertId, authorizationId, permissionKeys) {
+  const issuedAt = body.issued_at || body.valid_from;
+  return {
+    p_owner_type: resolved.ownerType,
+    p_owner_id: resolved.ownerId,
+    p_organization_id: body.organization_id ?? null,
+    p_authorization_id: authorizationId,
+    p_medication_concept_id: body.medication_concept_id,
+    p_medication_name_snapshot: null,
+    p_formulation_snapshot: body.formulation_snapshot || null,
+    p_strength_value: body.strength_value,
+    p_strength_unit: body.strength_unit,
+    p_route_code: body.route_code,
+    p_indication_code: body.indication_code || null,
+    p_clinician_instruction: body.clinician_instruction || null,
+    p_issued_at: issuedAt,
+    p_valid_from: body.valid_from,
+    p_valid_until: body.valid_until || null,
+    p_schedules: body.schedules,
+    p_permission_keys: permissionKeys,
+    p_decision_text: body.decision_text,
+    p_decision_rationale: body.decision_rationale || null,
+    p_creation_idempotency_key: body.creation_idempotency_key,
+    p_actor_expert_id: expertId,
+  };
+}
+
+async function executeMedicationMutation(req, res, { action, rpcName, previousOrderId = null } = {}) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  const body = req.body || {};
+  if (body.module !== "support") return res.status(403).json({ ok: false, error: "Назначения в этом модуле пока недоступны." });
+  const { client_ref: clientRef, organization_id: organizationId, module } = body;
+  if (module !== "support") return res.status(403).json({ ok: false, error: "Назначения в этом модуле пока недоступны." });
+  if (!clientRef) return res.status(400).json({ ok: false, error: "Укажите client_ref." });
+  const resolved = await resolveSupportMedicationClient({ ...authResult, clientRef, organizationId });
+  if (!resolved.ok) return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
+  const payload = validateMedicationMutationPayload(body);
+  if (!payload.ok) return res.status(400).json({ ok: false, error: payload.error });
+  const authorizationId = await getVerifiedMedicationAuthorizationId({ expertId: authResult.expert.id, organizationId });
+  if (!authorizationId) return res.status(403).json({ ok: false, error: "Нет подтвержденного права на назначение." });
+  const params = medicationRpcParams(body, resolved, authResult.expert.id, authorizationId, payload.permissionKeys);
+  if (previousOrderId) params.p_previous_order_id = previousOrderId;
+  const { data, error } = await getSupabase().rpc(rpcName, params);
+  if (error) return medicationErrorResponse(res, error);
+  const orderId = data?.order_id || previousOrderId;
+  const order = orderId ? await getMedicationOrderForOwner({
+    supabase: getSupabase(), ownerType: resolved.ownerType, ownerId: resolved.ownerId,
+    module: "support", organizationId, orderId,
+  }) : null;
+  return res.status(200).json({ ok: true, action, result: data, order: order ? toSpecialistMedicationOrder(order) : null, patient_medication_ai_enabled: false });
+}
+
+async function handleCreateMedicationOrder(req, res) {
+  return executeMedicationMutation(req, res, { action: "activate", rpcName: "activate_medication_order" });
+}
+
+async function handleSupersedeMedicationOrder(req, res) {
+  const orderId = parseMedicationOrderRef(req.body?.order_ref);
+  if (!orderId) return res.status(400).json({ ok: false, error: "Некорректная ссылка на назначение." });
+  return executeMedicationMutation(req, res, { action: "supersede", rpcName: "supersede_medication_order", previousOrderId: orderId });
+}
+
+async function handleRevokeMedicationOrder(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  const body = req.body || {};
+  if (body.module !== "support") return res.status(403).json({ ok: false, error: "Назначения в этом модуле пока недоступны." });
+  const orderId = parseMedicationOrderRef(body.order_ref);
+  if (!orderId || !body.client_ref || !body.creation_idempotency_key) {
+    return res.status(400).json({ ok: false, error: "Некорректные данные отзыва назначения." });
+  }
+  const resolved = await resolveSupportMedicationClient({ ...authResult, clientRef: body.client_ref, organizationId: body.organization_id ?? null });
+  if (!resolved.ok) return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
+  const authorizationId = await getVerifiedMedicationAuthorizationId({ expertId: authResult.expert.id, organizationId: body.organization_id ?? null });
+  if (!authorizationId) return res.status(403).json({ ok: false, error: "Нет подтвержденного права на отзыв назначения." });
+  const { data, error } = await getSupabase().rpc("revoke_medication_order", {
+    p_order_id: orderId,
+    p_owner_type: resolved.ownerType,
+    p_owner_id: resolved.ownerId,
+    p_organization_id: body.organization_id ?? null,
+    p_authorization_id: authorizationId,
+    p_reason_code: body.reason_code || "clinician_decision",
+    p_reason_text: body.reason_text || null,
+    p_idempotency_key: body.creation_idempotency_key,
+    p_actor_expert_id: authResult.expert.id,
+  });
+  if (error) return medicationErrorResponse(res, error);
+  return res.status(200).json({ ok: true, action: "revoke", result: data, patient_medication_ai_enabled: false });
 }
 
 // ── LOGIN ─────────────────────────────────────────────────
