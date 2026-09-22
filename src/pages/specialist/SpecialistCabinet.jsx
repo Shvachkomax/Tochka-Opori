@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import SpecialistMedicationOrders from "../../SpecialistMedicationOrders.jsx";
+import { buildSpecialistContextKey, isCurrentSpecialistContext } from "./specialistContext.js";
 
 // ── Styles ────────────────────────────────────────────────
 
@@ -105,8 +106,43 @@ export default function SpecialistCabinet() {
   // Stale-response guard: only the latest detail request result is applied
   const detailGenerationRef = useRef(0);
   const medicationGenerationRef = useRef(0);
+  const contextGenerationRef = useRef(0);
+  const serviceRequestGenerationRef = useRef(0);
+  const invitationGenerationRef = useRef(0);
+  const contextKeyRef = useRef("anonymous|none|private");
   // Refresh key: incremented on re-click to force re-fetch even for same client_ref
   const [detailRefreshKey, setDetailRefreshKey] = useState(0);
+
+  function getCurrentContextKey() {
+    return buildSpecialistContextKey({
+      expertId: auth?.expert?.id,
+      module,
+      organizationId: orgId,
+    });
+  }
+
+  // Invalidate every context-scoped response before switching identity/workspace.
+  function invalidateSpecialistContext() {
+    contextGenerationRef.current++;
+    serviceRequestGenerationRef.current++;
+    invitationGenerationRef.current++;
+    contextKeyRef.current = getCurrentContextKey();
+    setServiceRequests([]);
+    setServiceRequestsLoading(false);
+    setServiceRequestUpdating(null);
+    setServiceRequestPendingAction(null);
+    setServiceRequestFeedback({});
+    setServiceRequestsFilter("all");
+    setClients([]);
+    setClientsLoading(false);
+    setClientsError(null);
+    setInvitations([]);
+    setInvitationsLoading(false);
+    setMedicationData(null);
+    setMedicationLoading(false);
+    medicationGenerationRef.current++;
+    clearSelectedClientDetail();
+  }
 
   // ── Session restore on mount ─────────────────────────────
 
@@ -156,6 +192,7 @@ export default function SpecialistCabinet() {
 
   useEffect(() => {
     if (!auth) return;
+    invalidateSpecialistContext();
     let cancelled = false;
     const controller = new AbortController();
 
@@ -299,6 +336,7 @@ export default function SpecialistCabinet() {
       });
       const data = await res.json();
       if (data.ok) {
+        invalidateSpecialistContext();
         setAuth({ expert: data.expert, memberships: data.memberships });
         // Validate stored module against allowed_modules
         const allowed = data.expert?.allowed_modules || ["support"];
@@ -322,6 +360,7 @@ export default function SpecialistCabinet() {
   // ── Logout ───────────────────────────────────────────────
 
   async function doLogout() {
+    invalidateSpecialistContext();
     try {
       await fetch("/api/specialist", {
         method: "POST",
@@ -345,14 +384,16 @@ export default function SpecialistCabinet() {
   function clearSelectedClientDetail() {
     setSelectedClient(null);
     setClientDetail(null);
+    setClientDetailLoading(false);
     setClientDetailError(null);
     setProfAnalysis(null);
+    setProfAnalysisLoading(false);
     setClientTab("overview");
     detailGenerationRef.current++;
   }
 
   function selectOrg(id) {
-    clearSelectedClientDetail();
+    invalidateSpecialistContext();
     setOrgId(id);
     try { sessionStorage.setItem("specialist_org_id", id || ""); } catch {}
   }
@@ -360,7 +401,7 @@ export default function SpecialistCabinet() {
   function selectModule(m) {
     const allowed = auth?.expert?.allowed_modules || ["support"];
     if (!allowed.includes(m)) return; // refuse forbidden module
-    clearSelectedClientDetail();
+    invalidateSpecialistContext();
     setModule(m);
     try { sessionStorage.setItem("specialist_module", m); } catch {}
   }
@@ -368,6 +409,10 @@ export default function SpecialistCabinet() {
   // ── Service Requests ─────────────────────────────────────
 
   async function loadServiceRequests() {
+    const requestGeneration = ++serviceRequestGenerationRef.current;
+    const requestContextKey = getCurrentContextKey();
+    const contextGeneration = contextGenerationRef.current;
+    contextKeyRef.current = requestContextKey;
     setServiceRequestsLoading(true);
     try {
       const res = await fetch("/api/specialist", {
@@ -377,12 +422,28 @@ export default function SpecialistCabinet() {
         body: JSON.stringify({ action: "listServiceRequests", module: module !== "all" ? module : undefined }),
       });
       const data = await res.json();
-      if (data.ok) setServiceRequests(data.requests || []);
+      if (isCurrentSpecialistContext({
+        requestGeneration,
+        currentGeneration: serviceRequestGenerationRef.current,
+        requestContextKey,
+        currentContextKey: contextKeyRef.current,
+      }) && contextGeneration === contextGenerationRef.current && data.ok) {
+        setServiceRequests(data.requests || []);
+      }
     } catch {}
-    setServiceRequestsLoading(false);
+    if (isCurrentSpecialistContext({
+      requestGeneration,
+      currentGeneration: serviceRequestGenerationRef.current,
+      requestContextKey,
+      currentContextKey: contextKeyRef.current,
+    }) && contextGeneration === contextGenerationRef.current) {
+      setServiceRequestsLoading(false);
+    }
   }
 
   async function updateServiceRequest(requestRef, action, extra = {}) {
+    const actionContextKey = getCurrentContextKey();
+    const actionContextGeneration = contextGenerationRef.current;
     setServiceRequestUpdating(requestRef);
     setServiceRequestPendingAction({ requestRef, action });
     const copy = SERVICE_ACTION_COPY[action] || { pending: "Обрабатываем…", success: "Запрос обновлён" };
@@ -398,14 +459,17 @@ export default function SpecialistCabinet() {
         body: JSON.stringify({ action: "updateServiceRequest", request_ref: requestRef, update_action: action, module, ...extra }),
       });
       const data = await res.json();
-      if (data.ok) {
+      const isCurrent = actionContextGeneration === contextGenerationRef.current && actionContextKey === contextKeyRef.current;
+      if (data.ok && isCurrent) {
         await loadServiceRequests();
-        setServiceRequestFeedback((previous) => ({
-          ...previous,
-          [requestRef]: { type: "success", message: copy.success },
-        }));
+        if (actionContextGeneration === contextGenerationRef.current && actionContextKey === contextKeyRef.current) {
+          setServiceRequestFeedback((previous) => ({
+            ...previous,
+            [requestRef]: { type: "success", message: copy.success },
+          }));
+        }
         showToast(copy.success);
-      } else {
+      } else if (!data.ok && isCurrent) {
         const message = data.error || "Не удалось обновить запрос";
         setServiceRequestFeedback((previous) => ({
           ...previous,
@@ -414,15 +478,19 @@ export default function SpecialistCabinet() {
         showToast(message, "error");
       }
     } catch {
-      const message = "Ошибка сети. Попробуйте ещё раз.";
-      setServiceRequestFeedback((previous) => ({
-        ...previous,
-        [requestRef]: { type: "error", message },
-      }));
-      showToast(message, "error");
+      if (actionContextGeneration === contextGenerationRef.current && actionContextKey === contextKeyRef.current) {
+        const message = "Ошибка сети. Попробуйте ещё раз.";
+        setServiceRequestFeedback((previous) => ({
+          ...previous,
+          [requestRef]: { type: "error", message },
+        }));
+        showToast(message, "error");
+      }
     }
-    setServiceRequestUpdating(null);
-    setServiceRequestPendingAction(null);
+    if (actionContextGeneration === contextGenerationRef.current && actionContextKey === contextKeyRef.current) {
+      setServiceRequestUpdating(null);
+      setServiceRequestPendingAction(null);
+    }
   }
 
   // Load service requests when auth is ready
@@ -433,6 +501,9 @@ export default function SpecialistCabinet() {
   // ── Invitations ──────────────────────────────────────────
 
   async function loadInvitations() {
+    const requestGeneration = ++invitationGenerationRef.current;
+    const requestContextKey = getCurrentContextKey();
+    const contextGeneration = contextGenerationRef.current;
     setInvitationsLoading(true);
     try {
       const res = await fetch("/api/specialist", {
@@ -442,9 +513,23 @@ export default function SpecialistCabinet() {
         body: JSON.stringify({ action: "listInvitations" }),
       });
       const data = await res.json();
-      if (data.ok) setInvitations(data.invitations || []);
+      if (isCurrentSpecialistContext({
+        requestGeneration,
+        currentGeneration: invitationGenerationRef.current,
+        requestContextKey,
+        currentContextKey: contextKeyRef.current,
+      }) && contextGeneration === contextGenerationRef.current && data.ok) {
+        setInvitations(data.invitations || []);
+      }
     } catch {}
-    setInvitationsLoading(false);
+    if (isCurrentSpecialistContext({
+      requestGeneration,
+      currentGeneration: invitationGenerationRef.current,
+      requestContextKey,
+      currentContextKey: contextKeyRef.current,
+    }) && contextGeneration === contextGenerationRef.current) {
+      setInvitationsLoading(false);
+    }
   }
 
   async function createInvitation(patientLabel) {
@@ -655,6 +740,9 @@ export default function SpecialistCabinet() {
           <div style={{ fontSize: 13, color: "#7A7268" }}>
             {expert.specialty && <span>{expert.specialty}</span>}
             {expert.city && <span> · {expert.city}</span>}
+          </div>
+          <div data-testid="active-specialist-context" style={{ fontSize: 13, color: "#5F7D6C", marginTop: 10, fontWeight: 600 }}>
+            Рабочее пространство: {module === "body" ? "Здоровье & Стройность" : "Точка Опоры"}
           </div>
         </div>
 
