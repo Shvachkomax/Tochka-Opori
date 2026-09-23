@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, Component } from "react";
+import { appendVoiceText } from "./supportVoice.js";
 import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback, buildConversationPairs } from "../lib/conversation.js";
 import BodyIntake from "./BodyIntake.jsx";
 import BodyDiary from "./BodyDiary.jsx";
@@ -76,6 +77,28 @@ export default function App() {
   const voiceMsgCounterRef = useRef(0);
   const sessionRef = useRef(null);
   const startSessionPromiseRef = useRef(null);
+
+  // Support cabinet speech-to-text input uses the same transcribe endpoint,
+  // but keeps its recorder state separate from intake/question/crisis flows.
+  const cabinetVoiceRecorderRef = useRef(null);
+  const cabinetVoiceStreamRef = useRef(null);
+  const cabinetVoiceChunksRef = useRef([]);
+  const cabinetVoiceTimerRef = useRef(null);
+  const cabinetVoiceIgnoreStopRef = useRef(false);
+  const [cabinetVoiceRecording, setCabinetVoiceRecording] = useState(false);
+  const [cabinetVoiceTranscribing, setCabinetVoiceTranscribing] = useState(false);
+  const [cabinetVoiceTarget, setCabinetVoiceTarget] = useState(null);
+  const [cabinetVoiceTime, setCabinetVoiceTime] = useState(0);
+  const [cabinetVoiceError, setCabinetVoiceError] = useState("");
+
+  useEffect(() => () => {
+    cabinetVoiceIgnoreStopRef.current = true;
+    if (cabinetVoiceTimerRef.current) clearInterval(cabinetVoiceTimerRef.current);
+    cabinetVoiceStreamRef.current?.getTracks().forEach((track) => track.stop());
+    if (cabinetVoiceRecorderRef.current?.state === "recording") {
+      cabinetVoiceRecorderRef.current.stop();
+    }
+  }, []);
 
   const [sessionReviewOpen, setSessionReviewOpen] = useState(false);
   const [patientRating, setPatientRating] = useState(0);
@@ -2254,6 +2277,165 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }
 
+  async function transcribeSupportAudio(audioBlob, currentSession) {
+    const mod = "support";
+    let token;
+    try { token = await getClientToken(mod, "transcribe"); } catch {}
+    const tHeaders = {
+      "Content-Type": "audio/webm",
+      "X-Session-Id": currentSession.sessionId,
+      "X-Module": "support",
+      "X-Access-Token": currentSession.accessToken,
+    };
+    if (token) tHeaders.Authorization = `Bearer ${token}`;
+
+    let response = await fetch("/api/transcribe", {
+      method: "POST",
+      headers: tHeaders,
+      body: audioBlob,
+    });
+
+    // Retry once when only the short-lived client token has expired.
+    if (response.status === 401 && token) {
+      try { token = await getClientToken(mod, "transcribe"); } catch {}
+      tHeaders.Authorization = `Bearer ${token}`;
+      response = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: tHeaders,
+        body: audioBlob,
+      });
+    }
+
+    const responseText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      throw new Error("Сервер вернул пустой ответ (попробуйте перезапустить сервер)");
+    }
+    if (!response.ok) throw new Error(data.error || "Не удалось расшифровать голос");
+    return data;
+  }
+
+  function stopSupportCabinetVoice() {
+    if (cabinetVoiceTimerRef.current) {
+      clearInterval(cabinetVoiceTimerRef.current);
+      cabinetVoiceTimerRef.current = null;
+    }
+    if (cabinetVoiceRecorderRef.current?.state === "recording") {
+      cabinetVoiceRecorderRef.current.stop();
+    }
+    setCabinetVoiceRecording(false);
+  }
+
+  async function startSupportCabinetVoice(target) {
+    if (cabinetVoiceRecording || cabinetVoiceTranscribing) return;
+    if (recording || transcribing || recordingQuestionIndex !== null || questionTranscribingIndex !== null || crisisRecording || crisisTranscribing) {
+      setCabinetVoiceError("Сначала завершите другую запись голосом.");
+      setCabinetVoiceTarget(target);
+      return;
+    }
+
+    setCabinetVoiceError("");
+    setCabinetVoiceTarget(target);
+    cabinetVoiceIgnoreStopRef.current = false;
+
+    try {
+      const saved = getSupportSession();
+      if (!saved.sessionId || !saved.accessToken) {
+        throw new Error("Сессия истекла. Войдите снова по коду продолжения.");
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      cabinetVoiceStreamRef.current = stream;
+      cabinetVoiceRecorderRef.current = recorder;
+      cabinetVoiceChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) cabinetVoiceChunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        cabinetVoiceStreamRef.current = null;
+        cabinetVoiceRecorderRef.current = null;
+        if (cabinetVoiceTimerRef.current) {
+          clearInterval(cabinetVoiceTimerRef.current);
+          cabinetVoiceTimerRef.current = null;
+        }
+        if (cabinetVoiceIgnoreStopRef.current) return;
+
+        const audioBlob = new Blob(cabinetVoiceChunksRef.current, { type: "audio/webm" });
+        setCabinetVoiceTranscribing(true);
+        try {
+          const data = await transcribeSupportAudio(audioBlob, saved);
+          const transcript = data.text || "";
+          if (target === "quick_chat") {
+            setQuickChatInput((previous) => appendVoiceText(previous, transcript));
+          } else {
+            setFollowUpAnswers((previous) => ({
+              ...previous,
+              [target]: appendVoiceText(previous[target], transcript),
+            }));
+          }
+        } catch (error) {
+          setCabinetVoiceError(error.message || "Ошибка расшифровки");
+        } finally {
+          setCabinetVoiceTranscribing(false);
+          setCabinetVoiceTarget(null);
+          setCabinetVoiceTime(0);
+        }
+      };
+
+      recorder.start();
+      setCabinetVoiceRecording(true);
+      setCabinetVoiceTime(0);
+      cabinetVoiceTimerRef.current = setInterval(() => {
+        setCabinetVoiceTime((previous) => {
+          const next = previous + 1;
+          if (next >= 60) {
+            stopSupportCabinetVoice();
+            return 60;
+          }
+          return next;
+        });
+      }, 1000);
+    } catch (error) {
+      cabinetVoiceStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cabinetVoiceStreamRef.current = null;
+      cabinetVoiceRecorderRef.current = null;
+      setCabinetVoiceRecording(false);
+      setCabinetVoiceError(error.message || "Не удалось получить доступ к микрофону");
+    }
+  }
+
+  function renderSupportCabinetVoice(target, idleLabel) {
+    const active = cabinetVoiceTarget === target;
+    const anotherBusy = (cabinetVoiceRecording || cabinetVoiceTranscribing) && !active;
+    return (
+      <div style={{ marginTop: 6 }}>
+        <button
+          type="button"
+          style={{ ...s.secondary, fontSize: 12, padding: "7px 12px", opacity: anotherBusy ? 0.5 : 1 }}
+          onClick={() => active && cabinetVoiceRecording ? stopSupportCabinetVoice() : startSupportCabinetVoice(target)}
+          disabled={anotherBusy || (active && cabinetVoiceTranscribing)}
+        >
+          {active && cabinetVoiceTranscribing
+            ? "Расшифровываем..."
+            : active && cabinetVoiceRecording
+              ? "■ Остановить и расшифровать"
+              : `🎙 ${idleLabel}`}
+        </button>
+        {active && cabinetVoiceRecording && (
+          <div style={{ marginTop: 5, color: cabinetVoiceTime > 45 ? "#B85C4A" : "#7A7268", fontSize: 12 }}>
+            Запись: {cabinetVoiceTime} сек / 60 сек
+          </div>
+        )}
+        {active && cabinetVoiceError && <div style={{ marginTop: 5, color: "#991B1B", fontSize: 12 }}>{cabinetVoiceError}</div>}
+      </div>
+    );
+  }
+
   async function startRecording() {
     setVoiceError("");
 
@@ -2285,49 +2467,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
         setTranscribing(true);
 
-        try {
-          const mod = "support";
-          let token;
-          try { token = await getClientToken(mod, "transcribe"); } catch {}
-          const tHeaders = {
-            "Content-Type": "audio/webm",
-            "X-Session-Id": currentSession.sessionId,
-            "X-Module": "support",
-            "X-Access-Token": currentSession.accessToken,
-          };
-          if (token) tHeaders["Authorization"] = `Bearer ${token}`;
+         try {
+           const data = await transcribeSupportAudio(audioBlob, currentSession);
 
-          let response = await fetch("/api/transcribe", {
-            method: "POST",
-            headers: tHeaders,
-            body: audioBlob,
-          });
-
-          // Retry once on 401 (client token only)
-          if (response.status === 401 && token) {
-            try { token = await getClientToken(mod, "transcribe"); } catch {}
-            tHeaders["Authorization"] = `Bearer ${token}`;
-            response = await fetch("/api/transcribe", {
-              method: "POST",
-              headers: tHeaders,
-              body: audioBlob,
-            });
-          }
-
-          let data;
-          const responseText = await response.text();
-          try {
-            data = JSON.parse(responseText);
-          } catch {
-            console.error("Transcribe: non-JSON response", response.status, responseText.slice(0, 200));
-            throw new Error("Сервер вернул пустой ответ (попробуйте перезапустить сервер)");
-          }
-
-          if (!response.ok) {
-            throw new Error(data.error || "Не удалось расшифровать голос");
-          }
-
-          const transcript = data.text || "";
+           const transcript = data.text || "";
           setText(transcript);
           if (data.voice_observations) {
             const msgId = `voice-${Date.now()}-${++voiceMsgCounterRef.current}`;
@@ -2418,48 +2561,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
         setQuestionTranscribingIndex(index);
 
-        try {
-          const mod = "support";
-          let token;
-          try { token = await getClientToken(mod, "transcribe"); } catch {}
-          const tHeaders = {
-            "Content-Type": "audio/webm",
-            "X-Session-Id": currentSession.sessionId,
-            "X-Module": "support",
-            "X-Access-Token": currentSession.accessToken,
-          };
-          if (token) tHeaders["Authorization"] = `Bearer ${token}`;
+         try {
+           const data = await transcribeSupportAudio(audioBlob, currentSession);
 
-          let response = await fetch("/api/transcribe", {
-            method: "POST",
-            headers: tHeaders,
-            body: audioBlob,
-          });
-
-          if (response.status === 401 && token) {
-            try { token = await getClientToken(mod, "transcribe"); } catch {}
-            tHeaders["Authorization"] = `Bearer ${token}`;
-            response = await fetch("/api/transcribe", {
-              method: "POST",
-              headers: tHeaders,
-              body: audioBlob,
-            });
-          }
-
-          const responseText = await response.text();
-          let data;
-          try {
-            data = JSON.parse(responseText);
-          } catch {
-            console.error("Transcribe: non-JSON response", response.status, responseText.slice(0, 200));
-            throw new Error("Сервер вернул пустой ответ (попробуйте перезапустить сервер)");
-          }
-
-          if (!response.ok) {
-            throw new Error(data.error || "Не удалось расшифровать голос");
-          }
-
-          setAnswers((prev) => ({
+           setAnswers((prev) => ({
             ...prev,
             [index]: data.text || "",
           }));
@@ -11330,10 +11435,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         value={quickChatInput}
                         onChange={(e) => setQuickChatInput(e.target.value)}
                         placeholder="Что у вас сегодня? Можно спросить о чём угодно…"
-                        rows={2}
-                        onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); sendQuickChatMessage(); } }}
-                      />
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                         rows={2}
+                         onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); sendQuickChatMessage(); } }}
+                       />
+                       {renderSupportCabinetVoice("quick_chat", "Рассказать голосом")}
+                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: 11, color: "#8a7e72" }}>⌘/Ctrl + Enter — отправить</span>
                         <button
                           style={{ ...s.primary, fontSize: 13, padding: "10px 20px", opacity: quickChatLoading || !quickChatInput.trim() ? 0.5 : 1 }}
@@ -12254,11 +12360,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   <textarea
                     style={s.answerInput}
                     value={followUpAnswers[q.key] || ""}
-                    onChange={(e) => setFollowUpAnswers({ ...followUpAnswers, [q.key]: e.target.value })}
-                    placeholder={q.placeholder}
-                    rows={3}
-                  />
-                </div>
+                     onChange={(e) => setFollowUpAnswers({ ...followUpAnswers, [q.key]: e.target.value })}
+                     placeholder={q.placeholder}
+                     rows={3}
+                   />
+                   {renderSupportCabinetVoice(q.key, "Ответить голосом")}
+                 </div>
               ))}
 
               <div style={{ marginBottom: 20 }}>
@@ -12272,11 +12379,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   style={{ ...s.answerInput, minHeight: 120 }}
                   value={followUpAnswers.free_text || ""}
                   onChange={(e) => setFollowUpAnswers({ ...followUpAnswers, free_text: e.target.value })}
-                  placeholder="Напишите здесь всё, что хотите..."
-                  rows={5}
-                  onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submitFollowUp(); } }}
-                />
-              </div>
+                   placeholder="Напишите здесь всё, что хотите..."
+                   rows={5}
+                   onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submitFollowUp(); } }}
+                 />
+                 {renderSupportCabinetVoice("free_text", "Ответить голосом")}
+               </div>
 
               <button
                 style={s.wide}
