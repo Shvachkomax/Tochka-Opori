@@ -2,6 +2,7 @@ import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { getSupabase } from "../lib/supabase.js";
 import { validateSessionAccess } from "../lib/security/access-token.js";
+import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
@@ -97,6 +98,11 @@ async function resolveSessionByCode(publicCode) {
 async function handleGetUsageBalance(req, res) {
   const { sessionId, module, publicCode, access_token } = req.body || {};
 
+  if (rejectUnavailableModule(res, module)) return;
+  if (isAnMedSupportOnlyDeployment() && hasBodySessionReference({ sessionId, publicCode })) {
+    return res.status(403).json({ ok: false, error: "Модуль недоступен в этой сборке" });
+  }
+
   if (!module || !["support", "body"].includes(module)) {
     return res.status(400).json({ ok: false, error: "Invalid module" });
   }
@@ -135,6 +141,11 @@ async function handleGetUsageBalance(req, res) {
 
 async function handleGetRecentUsage(req, res) {
   const { sessionId, module, publicCode, access_token } = req.body || {};
+
+  if (rejectUnavailableModule(res, module)) return;
+  if (isAnMedSupportOnlyDeployment() && hasBodySessionReference({ sessionId, publicCode })) {
+    return res.status(403).json({ ok: false, error: "Модуль недоступен в этой сборке" });
+  }
 
   if (!module || !["support", "body"].includes(module)) {
     return res.status(400).json({ ok: false, error: "Invalid module" });

@@ -14,6 +14,7 @@
     "e2e:continuation": "node scripts/e2e-continuation-browser.mjs",
     "test:body-pricing": "node scripts/test-body-pricing.js",
     "test:service-request-finance": "node scripts/test-service-request-finance.js",
+    "test:analyze-session-access": "node scripts/test-analyze-session-access.js",
     "e2e:service-request-finance": "node scripts/e2e-service-request-finance-browser.mjs"
   },
   "dependencies": {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import SpecialistMedicationOrders from "../../SpecialistMedicationOrders.jsx";
 import { buildSpecialistContextKey, isCurrentSpecialistContext } from "./specialistContext.js";
+import { APP_BRAND } from "../../lib/appBrand.js";
 
 // ── Styles ────────────────────────────────────────────────
 
@@ -46,6 +47,30 @@ const SERVICE_FORMAT_LABELS = {
   video: "Онлайн",
   offline: "Очно",
 };
+
+function SpecialistBrand() {
+  if (!APP_BRAND.isAnMed) {
+    return <img src="/logo-tochka-opory-header.png" alt="Точка опоры" style={{ height: 72, display: "block" }} />;
+  }
+
+  return (
+    <div aria-label={APP_BRAND.name}>
+      <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: "-0.04em", color: "#14264A" }}>
+        Ан<span style={{ color: "#E63E4B" }}>Мед</span>
+      </div>
+      <div style={{ fontSize: 12, color: "#7A7268" }}>{APP_BRAND.subtitle}</div>
+    </div>
+  );
+}
+
+function SpecialistPilotNotice() {
+  if (!APP_BRAND.isAnMed) return null;
+  return (
+    <div role="note" style={{ maxWidth: 800, margin: "0 auto 20px", padding: "12px 16px", borderRadius: 12, background: "#FFF1F1", border: "1px solid #E9B4B8", color: "#7D2530", fontSize: 14, lineHeight: 1.5 }}>
+      {APP_BRAND.pilotNotice}
+    </div>
+  );
+}
 
 // ── Component ─────────────────────────────────────────────
 
@@ -647,6 +672,7 @@ export default function SpecialistCabinet() {
   if (loading) {
     return (
       <div style={S.page} data-testid="specialist-loading">
+        <SpecialistPilotNotice />
         <div style={{ maxWidth: 800, margin: "0 auto", paddingTop: 80, textAlign: "center", color: "#7A7268" }}>
           Загрузка...
         </div>
@@ -657,6 +683,7 @@ export default function SpecialistCabinet() {
   if (authError) {
     return (
       <div style={S.page} data-testid="specialist-auth-error">
+        <SpecialistPilotNotice />
         <div style={{ maxWidth: 800, margin: "0 auto", paddingTop: 80, textAlign: "center" }}>
           <div style={{ ...S.card, maxWidth: 520, margin: "0 auto" }}>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10 }}>Кабинет специалиста недоступен</div>
@@ -673,9 +700,10 @@ export default function SpecialistCabinet() {
   if (!auth) {
     return (
       <div style={S.page} data-testid="specialist-login">
+        <SpecialistPilotNotice />
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32 }}>
-            <img src="/logo-tochka-opory-header.png" alt="Точка опоры" style={{ height: 72, display: "block" }} />
+            <SpecialistBrand />
             <div>
               <div style={{ fontSize: 22, fontWeight: 800 }}>Кабинет специалиста</div>
             </div>
@@ -716,17 +744,19 @@ export default function SpecialistCabinet() {
   // ── Authenticated cabinet ────────────────────────────────
 
   const { expert, memberships } = auth;
+  const supportWorkspaceName = APP_BRAND.isAnMed ? APP_BRAND.name : "Точка Опоры";
   const orgName = orgId
     ? memberships.find((m) => m.organization_id === orgId)?.organization_name || "Организация"
     : "Частная практика";
 
   return (
     <div style={S.page} data-testid="specialist-cabinet">
+      <SpecialistPilotNotice />
       <div style={{ maxWidth: 800, margin: "0 auto" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <img src="/logo-tochka-opory-header.png" alt="Точка опоры" style={{ height: 72, display: "block" }} />
+            <SpecialistBrand />
             <div>
               <div style={{ fontSize: 22, fontWeight: 800 }}>Кабинет специалиста</div>
             </div>
@@ -742,7 +772,7 @@ export default function SpecialistCabinet() {
             {expert.city && <span> · {expert.city}</span>}
           </div>
           <div data-testid="active-specialist-context" style={{ fontSize: 13, color: "#5F7D6C", marginTop: 10, fontWeight: 600 }}>
-            Рабочее пространство: {module === "body" ? "Здоровье & Стройность" : "Точка Опоры"}
+            Рабочее пространство: {module === "body" ? "Здоровье & Стройность" : supportWorkspaceName}
           </div>
         </div>
 
@@ -780,7 +810,7 @@ export default function SpecialistCabinet() {
             const allowed = auth?.expert?.allowed_modules || ["support"];
             if (allowed.length <= 1) {
               // Single module — show as non-interactive label
-              const label = allowed[0] === "body" ? "Здоровье & Стройность" : "Точка Опоры";
+              const label = allowed[0] === "body" ? "Здоровье & Стройность" : supportWorkspaceName;
               return (
                 <div style={{ ...S.moduleBtn, ...S.moduleBtnActive, cursor: "default", opacity: 0.85 }} data-testid="module-single">
                   {label}
@@ -795,7 +825,7 @@ export default function SpecialistCabinet() {
                   onClick={() => selectModule("support")}
                   data-testid="module-support"
                 >
-                  Точка Опоры
+                  {supportWorkspaceName}
                 </div>
                 <div
                   style={{ ...S.moduleBtn, ...(module === "body" ? S.moduleBtnActive : {}) }}

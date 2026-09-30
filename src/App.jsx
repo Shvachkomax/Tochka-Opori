@@ -10,11 +10,12 @@ import BodyHealthContext from "./BodyHealthContext.jsx";
 import BodyServiceRequests from "./BodyServiceRequests.jsx";
 import MedicationCard from "./MedicationCard.jsx";
 import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
-import { saveBodySession, saveSupportSession, getBodySession, getSupportSession, clearBodySession, clearSupportSession, withAccessToken } from "./lib/sessionAccess.js";
+import { saveBodySession, saveSupportSession, getBodySession, getSupportSession, clearBodySession, clearSupportSession, withAccessToken, withSessionAccess } from "./lib/sessionAccess.js";
 import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
 import ExpertInvitePage from "./pages/expert/ExpertInvitePage.jsx";
 import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
 import SpecialistCabinet from "./pages/specialist/SpecialistCabinet.jsx";
+import { APP_BRAND } from "./lib/appBrand.js";
 
 class AdminErrorBoundary extends Component {
   constructor(props) {
@@ -183,7 +184,7 @@ export default function App() {
   const [displayNameInput, setDisplayNameInput] = useState("");
 
   const [activeModule, setActiveModule] = useState(() => {
-    if (typeof window !== "undefined") {
+    if (!APP_BRAND.isAnMed && typeof window !== "undefined") {
       const host = window.location.hostname;
       if (host === "health.tochka-opori.online" || host.startsWith("health.")) return "body";
       const params = new URLSearchParams(window.location.search);
@@ -2749,10 +2750,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setError("");
     setQuestions(null);
 
-    // Ensure session exists before first analyze call
-    if (!sessionId && activeModule === "support") {
+    let analyzeSessionId = sessionId;
+    let analyzeSessionAccess = null;
+
+    // Use the returned session context immediately; React state updates are asynchronous.
+    if (activeModule === "support" && !analyzeSessionId) {
       try {
         const sessionData = await ensureStartSession();
+        analyzeSessionId = sessionData.sessionId;
+        analyzeSessionAccess = sessionData;
         setSessionId(sessionData.sessionId);
 
         // Save display_name immediately after session creation
@@ -2768,6 +2774,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         setLoading(false);
         return;
       }
+    } else if (activeModule === "support") {
+      const current = sessionRef.current?.sessionId === analyzeSessionId
+        ? sessionRef.current
+        : getSupportSession();
+      if (current.sessionId === analyzeSessionId) analyzeSessionAccess = current;
     }
 
     if (dialogDepth >= 3 && activeModule === "support") {
@@ -2784,7 +2795,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const res = await fetchWithClientToken("/api/analyze", mod, "analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withSessionAccess({
           text: inputText,
           answers: dialogDepth === 0 ? {} : answers,
           conversationHistory,
@@ -2797,9 +2808,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           supportPlan,
           voiceObservations,
           module: mod,
-          session_id: sessionId || undefined,
           followup_answered_topics: followupAnsweredTopics || undefined,
-        }),
+        }, analyzeSessionId ? {
+          sessionId: analyzeSessionId,
+          accessToken: analyzeSessionAccess?.accessToken,
+        } : null)),
       });
 
       if (!res.ok) {
@@ -4728,7 +4741,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const adminModuleRoute = adminSubPage || (typeof window !== "undefined"
     ? window.location.pathname === "/admin/body" ? "body" : window.location.pathname === "/admin/council" ? "council" : "support"
     : "support");
-  const isDedicatedSubdomain = typeof window !== "undefined" && (
+  const isDedicatedSubdomain = !APP_BRAND.isAnMed && typeof window !== "undefined" && (
     window.location.hostname === "health.tochka-opori.online" || window.location.hostname.startsWith("health.") ||
     new URLSearchParams(window.location.search).get("module") === "body"
   );
@@ -4737,9 +4750,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   );
   const showModuleSwitcher = isDev || adminRole === "super";
 
-  // Update document title based on subdomain
+  // Keep the AnMed pilot's presentation separate from the module selection.
   useEffect(() => {
-    document.title = isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : "Точка опоры";
+    document.title = APP_BRAND.isAnMed
+      ? APP_BRAND.title
+      : isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.title;
   }, [isDedicatedSubdomain]);
 
   const s = {
@@ -9728,6 +9743,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     return <SpecialistCabinet />;
   }
 
+  // Keep the legacy expert surface out of the AnMed pilot; its staff entry is /specialist.
+  if (APP_BRAND.isAnMed && typeof window !== "undefined" && window.location.pathname.match(/^\/expert\/?$/)) {
+    window.location.replace("/specialist");
+    return null;
+  }
+
   // --- Expert Cabinet page (/expert) ---
   if (typeof window !== "undefined" && window.location.pathname.match(/^\/expert\/?$/)) {
     return <ExpertCabinet />;
@@ -9853,22 +9874,33 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 `}</style>
           <div style={s.wrap}>
-        <header style={{ ...s.header, marginBottom: (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
+        <header style={{ ...s.header, marginBottom: APP_BRAND.isAnMed ? 28 : (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
           <div
             style={{ display: "flex", alignItems: "center", gap: 12, cursor: activeModule === "support" && supportScreen !== "landing" ? "pointer" : "default" }}
             onClick={activeModule === "support" && supportScreen !== "landing" ? goToSupportLanding : undefined}
             title={activeModule === "support" && supportScreen !== "landing" ? "На главную" : undefined}
           >
-            <img
-              src="/logo-tochka-opory-header.png"
-              alt={isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : "Точка опоры"}
-              className="app-logo"
-              style={{ display: "block", flexShrink: 0, objectFit: "contain", height: 96, width: "auto" }}
-            />
-            <div>
-              <div style={s.logo}>{isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : "Точка опоры"}</div>
-              {!isDedicatedSubdomain && <div style={s.sub}>Анонимно. Безопасно. Можно просто поговорить.</div>}
-            </div>
+            {APP_BRAND.isAnMed ? (
+              <div aria-label={APP_BRAND.name} style={{ minWidth: 190 }}>
+                <div style={{ ...s.logo, color: "#14264A", fontSize: 34, fontWeight: 900, letterSpacing: "-0.04em" }}>
+                  Ан<span style={{ color: "#E63E4B" }}>Мед</span>
+                </div>
+                <div style={s.sub}>{APP_BRAND.subtitle}</div>
+              </div>
+            ) : (
+              <>
+                <img
+                  src="/logo-tochka-opory-header.png"
+                  alt={isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.name}
+                  className="app-logo"
+                  style={{ display: "block", flexShrink: 0, objectFit: "contain", height: 96, width: "auto" }}
+                />
+                <div>
+                  <div style={s.logo}>{isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.name}</div>
+                  {!isDedicatedSubdomain && <div style={s.sub}>{APP_BRAND.subtitle}</div>}
+                </div>
+              </>
+            )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {!isDedicatedSubdomain && (<>
@@ -9889,6 +9921,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </>)}
           </div>
         </header>
+
+        {APP_BRAND.isAnMed && (
+          <div role="note" style={{ margin: "0 0 32px", padding: "12px 16px", borderRadius: 12, background: "#FFF1F1", border: "1px solid #E9B4B8", color: "#7D2530", fontSize: 14, lineHeight: 1.5 }}>
+            {APP_BRAND.pilotNotice}
+          </div>
+        )}
 
         {/* Invite banners — only on landing page, never overlay cabinet */}
         {phase !== "cabinet" && supportScreen === "landing" && inviteChecking && (

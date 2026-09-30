@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { getClientToken } from "./lib/clientToken.js";
-import { withAccessToken, getBodySession } from "./lib/sessionAccess.js";
+import { withSessionAccess, getBodySession } from "./lib/sessionAccess.js";
 
 function getLocalDateString() {
   const d = new Date();
@@ -8,6 +8,11 @@ function getLocalDateString() {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function getBodySessionAccess(sessionId) {
+  const session = getBodySession();
+  return session.sessionId === sessionId ? session : null;
 }
 
 const OVER_EATING = [
@@ -345,13 +350,13 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       let res = await fetch("/api/analyze", {
         method: "POST",
         headers: hdrs,
-        body: JSON.stringify({
+        body: JSON.stringify(withSessionAccess({
           module: "body",
           stage: "plate_photo_analysis",
           session_id: sessionId,
           photos: photos.map(p => p.dataUrl),
           request_id: requestId,
-        }),
+        }, getBodySessionAccess(sessionId))),
       });
 
       if (res.status === 401 && token) {
@@ -360,13 +365,13 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
         res = await fetch("/api/analyze", {
           method: "POST",
           headers: hdrs,
-          body: JSON.stringify({
+          body: JSON.stringify(withSessionAccess({
             module: "body",
             stage: "plate_photo_analysis",
             session_id: sessionId,
             photos: photos.map(p => p.dataUrl),
             request_id: requestId,
-          }),
+          }, getBodySessionAccess(sessionId))),
         });
       }
 
@@ -460,12 +465,12 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       let res = await fetch("/api/analyze", {
         method: "POST",
         headers: hdrs,
-        body: JSON.stringify({
+        body: JSON.stringify(withSessionAccess({
           module: "body",
           stage: "daily_log_submitted",
           session_id: sessionId,
           daily_log: log,
-        }),
+        }, getBodySessionAccess(sessionId))),
       });
 
       if (res.status === 401 && token) {
@@ -474,12 +479,12 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
         res = await fetch("/api/analyze", {
           method: "POST",
           headers: hdrs,
-          body: JSON.stringify({
+          body: JSON.stringify(withSessionAccess({
             module: "body",
             stage: "daily_log_submitted",
             session_id: sessionId,
             daily_log: log,
-          }),
+          }, getBodySessionAccess(sessionId))),
         });
       }
 

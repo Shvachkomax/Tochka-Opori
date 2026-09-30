@@ -25,6 +25,31 @@ import { recordClinicalEvent } from "../lib/clinical/projection.js";
 import { buildSupportCheckinLogicalSourceId, buildSupportCheckinObservationSnapshot } from "../lib/clinical/observation-mappings.js";
 import { recordClinicalObservation } from "../lib/clinical/projection.js";
 import { getMedicationCardsForOwner, isMedicationSessionEligible } from "../lib/clinical/medication.js";
+import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
+
+const BODY_SESSION_ACTIONS = new Set([
+  "listBodyDailyLogs",
+  "getBodyCabinet",
+  "getBodyOnboarding",
+  "saveBodyOnboarding",
+  "updateBodyDisplayName",
+  "getBodyDiaryDay",
+  "savePlateHistory",
+  "getBodyPlateHistory",
+  "getBodyInsights",
+  "dismissBodyInsight",
+  "getBodyWeeklySummary",
+  "generateBodyWeeklySummary",
+  "getBodyAiChat",
+  "sendBodyAiMessage",
+  "getBodyHealthContext",
+  "saveBodyHealthContext",
+  "createBodyServiceRequest",
+  "createLegacyBodyServiceRequest",
+  "getBodyServiceRequests",
+  "getBodyServiceRequest",
+  "cancelBodyServiceRequest",
+]);
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -305,7 +330,11 @@ export default async function handler(req, res) {
   const limited = await limit(req, res);
   if (limited) return;
 
-  const { action } = req.body || {};
+  const { action, module } = req.body || {};
+  if (rejectUnavailableModule(res, module)) return;
+  if (isAnMedSupportOnlyDeployment() && (BODY_SESSION_ACTIONS.has(action) || hasBodySessionReference(req.body))) {
+    return res.status(403).json({ ok: false, error: "Модуль недоступен в этой сборке" });
+  }
 
   try {
     switch (action) {

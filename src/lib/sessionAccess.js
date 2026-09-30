@@ -42,6 +42,13 @@ export function getSupportSession() {
   }
 }
 
+export function withSessionAccess(body, session) {
+  if (!session?.sessionId) return body;
+  const request = { ...body, session_id: session.sessionId };
+  if (session.accessToken) request.access_token = session.accessToken;
+  return request;
+}
+
 export function clearBodySession() {
   try {
     localStorage.removeItem(BODY_SESSION_KEY);

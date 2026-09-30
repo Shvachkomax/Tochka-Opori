@@ -1,6 +1,7 @@
 import { applyCors, handleOptions, assertAllowedOrigin } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { generateClientToken } from "../lib/security/client-token.js";
+import { rejectUnavailableModule } from "../lib/security/module-availability.js";
 
 const ALLOWED_MODULES = ["body", "support"];
 
@@ -26,6 +27,7 @@ export default async function handler(req, res) {
     if (!ALLOWED_MODULES.includes(module)) {
       return res.status(400).json({ error: "Invalid or missing module" });
     }
+    if (rejectUnavailableModule(res, module)) return;
 
     const result = generateClientToken(action, module);
     if (!result) {

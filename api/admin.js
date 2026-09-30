@@ -5,6 +5,7 @@ import { logAdminAction, getClientIp } from "../lib/security/audit.js";
 import { generateInviteToken, generateExpertAccessToken, hashToken } from "../lib/security/council-token.js";
 import { sendEmail } from "../lib/email/provider.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
+import { isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 
 function resolveRole(token) {
   if (!token) return null;
@@ -46,6 +47,10 @@ export default async function handler(req, res) {
   if (limited) return;
 
   const { action } = req.body || {};
+  if (rejectUnavailableModule(res, req.body?.module)) return;
+  if (isAnMedSupportOnlyDeployment() && typeof action === "string" && /body/i.test(action)) {
+    return res.status(403).json({ ok: false, error: "Модуль недоступен в этой сборке" });
+  }
 
   try {
     switch (action) {

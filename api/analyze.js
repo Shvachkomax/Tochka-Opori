@@ -6,6 +6,8 @@ import { readModulePrompt, readCorePrompt } from "../lib/prompts.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
+import { validateAnalyzeSessionAccess } from "../lib/security/analyze-session-access.js";
+import { rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { debitCreditsForSession, setSessionVisibleAfterCode } from "../lib/usage/debit.js";
 import { ensureWallet, setWalletVisible } from "../lib/usage/wallet.js";
 import { getOrCreateContinuationCredential } from "../lib/session/continuation-store.js";
@@ -1446,6 +1448,7 @@ export default async function handler(req, res) {
   if (!tokenCheck) return;
 
   const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations, module: reqModule, stage, intake: intakeData, session_id, daily_log, followup_answered_topics } = req.body || {};
+  const accessToken = typeof req.body?.access_token === "string" ? req.body.access_token.trim() : "";
 
   const activeModule = isValidModule(reqModule) ? reqModule : DEFAULT_MODULE;
 
@@ -1453,10 +1456,24 @@ export default async function handler(req, res) {
   if (reqModule && !isValidModule(reqModule)) {
     return res.status(400).json({ error: "Invalid module" });
   }
+  if (rejectUnavailableModule(res, activeModule)) return;
 
   // Validate stage
   if (stage && !VALID_STAGES.includes(stage)) {
     return res.status(400).json({ error: "Invalid stage" });
+  }
+
+  const sessionAccess = await validateAnalyzeSessionAccess({
+    sessionId: session_id,
+    module: activeModule,
+    stage,
+    depth,
+    accessToken,
+  });
+  if (!sessionAccess.allowed) {
+    return res.status(sessionAccess.missingSession ? 400 : 403).json({
+      error: sessionAccess.missingSession ? "Missing session_id" : "Session not found or access denied",
+    });
   }
 
   // Body intake stage: one-shot analysis from completed intake form

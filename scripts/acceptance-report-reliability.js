@@ -38,6 +38,7 @@ const { generateClientToken } = await import("../lib/security/client-token.js");
 const { registerProvider } = await import("../lib/providers/index.js");
 const { setProvider } = await import("../lib/modelRouter.js");
 const analyzeHandler = (await import("../api/analyze.js")).default;
+const startSessionHandler = (await import("../api/start-session.js")).default;
 const sessionHandler = (await import("../api/session.js")).default;
 const {
   getStableReportRequestId,
@@ -89,9 +90,25 @@ function mockRes() {
   return res;
 }
 
+const sessionAccessTokens = new Map();
+
+async function createSupportSession() {
+  const clientToken = generateClientToken("analyze", "support");
+  const req = mockReq({}, { authorization: `Bearer ${clientToken.token}` });
+  const res = mockRes();
+  await startSessionHandler(req, res);
+  if (res.statusCode !== 200 || !res.body?.ok || !res.body.session_id || !res.body.access_token) {
+    throw new Error(`start-session failed: ${res.statusCode} ${res.body?.code || res.body?.error || "invalid response"}`);
+  }
+  sessionAccessTokens.set(res.body.session_id, res.body.access_token);
+  return res.body;
+}
+
 async function invokeAnalyze(body, module = "support") {
   const token = generateClientToken("analyze", module);
-  const req = mockReq(body, { authorization: `Bearer ${token.token}` });
+  const accessToken = sessionAccessTokens.get(body.session_id);
+  const reqBody = accessToken ? { ...body, access_token: accessToken } : body;
+  const req = mockReq(reqBody, { authorization: `Bearer ${token.token}` });
   const res = mockRes();
   await analyzeHandler(req, res);
   return { status: res.statusCode, body: res.body };
@@ -259,7 +276,7 @@ async function runSchemaChecks() {
 
 async function runTestA() {
   console.log("\n=== A. Normal completed support session (fake provider) ===");
-  const sessionId = `acc-a-${Date.now()}`;
+  const { session_id: sessionId } = await createSupportSession();
   const text = normalText();
   const answers = {
     0: "Началось после конфликта на работе, около двух месяцев.",
@@ -335,7 +352,7 @@ async function runTestA() {
 async function runTestB() {
   console.log("\n=== B. Long risk session (fake provider) ===");
   setProvider("test");
-  const sessionId = `acc-b-${Date.now()}`;
+  const { session_id: sessionId } = await createSupportSession();
   const text = riskyText();
   const requestId = getStableReportRequestId(sessionId, 3);
   const answers = { 0: "Ответ" };
@@ -382,7 +399,7 @@ async function runTestB() {
 
 async function runTestC() {
   console.log("\n=== C. Frontend disconnect simulation ===");
-  const sessionId = `acc-c-${Date.now()}`;
+  const { session_id: sessionId } = await createSupportSession();
   const text = normalText();
   const answers = { 0: "Ответ" };
   const history = buildHistory(text, answers);
@@ -435,7 +452,7 @@ async function runTestC() {
 
 async function runTestD() {
   console.log("\n=== D. Double request / double click ===");
-  const sessionId = `acc-d-${Date.now()}`;
+  const { session_id: sessionId } = await createSupportSession();
   const text = normalText();
   const answers = { 0: "Ответ" };
   const history = buildHistory(text, answers);

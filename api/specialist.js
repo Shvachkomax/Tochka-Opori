@@ -5,6 +5,7 @@ import { rateLimit } from "../lib/security/rate-limit.js";
 import { hashToken } from "../lib/security/council-token.js";
 import { getInviteUrl } from "../lib/config/site-url.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
+import { isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import {
   SAFE_MEDICATION_PERMISSION_KEYS,
   getMedicationOrderForOwner,
@@ -128,7 +129,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
-  const { action } = req.body || {};
+  const { action, module } = req.body || {};
+  if (rejectUnavailableModule(res, module)) return;
+  if (isAnMedSupportOnlyDeployment() && action === "getBodyClientOverview") {
+    return res.status(403).json({ ok: false, error: "Модуль недоступен в этой сборке" });
+  }
 
   try {
     switch (action) {

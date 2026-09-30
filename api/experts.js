@@ -1,6 +1,7 @@
 import { getSupabase } from "../lib/supabase.js";
 import { getPrivacySafeMode } from "../lib/sanitize.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
+import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
@@ -12,6 +13,10 @@ export default async function handler(req, res) {
   }
 
   const { action } = req.body || {};
+  if (rejectUnavailableModule(res, req.body?.module)) return;
+  if (isAnMedSupportOnlyDeployment() && hasBodySessionReference(req.body)) {
+    return res.status(403).json({ ok: false, error: "Модуль недоступен в этой сборке" });
+  }
 
   try {
     switch (action) {
