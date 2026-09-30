@@ -4706,7 +4706,7 @@ async function syncPracticesFromReport({ supabase, ownerId, sessionId, userRepor
 }
 
 // Upsert a single practice
-async function supsertPractice(supabase, ownerId, sessionId, practiceKey) {
+async function upsertPractice(supabase, ownerId, sessionId, practiceKey) {
   const def = PRACTICE_DEFS[practiceKey];
   if (!def) return;
 
