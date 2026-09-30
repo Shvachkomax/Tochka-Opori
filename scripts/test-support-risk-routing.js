@@ -19,6 +19,7 @@ assert.equal(hasOwnRiskPattern(safeScenario, selfHarmPattern), false, "explicit 
 assert.equal(hasOwnRiskPattern(safeScenario, selfHarmPattern, { negationAware: false }), true, "non-Support callers retain the existing detector behavior");
 assert.equal(hasOwnRiskPattern(safeScenario, suicidalIntentPattern), false);
 assert.equal(hasOwnRiskPattern(safeScenario, suicidalPlanPattern), false);
+assert.equal(hasOwnRiskPattern("Синтетический пациент отрицает мысли причинить себе вред и сохраняет контроль.", selfHarmPattern), false);
 
 const userOnlyRiskText = buildUserRiskAssessmentText({
   text: "Это безопасный синтетический случай.",
