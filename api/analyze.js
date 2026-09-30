@@ -24,6 +24,7 @@ import {
   saveFinalReportToSession,
   createReportArtifacts,
   deterministicUserReportFix,
+  synchronizeUserReportNextStep,
   repairInvalidJson,
   buildReportResponsePayload,
 } from "../lib/report/finalize.js";
@@ -298,24 +299,50 @@ function makeWordBoundaryRegex(words) {
 const OWN_RISK_PRONOUNS = makeWordBoundaryRegex(OWN_RISK_WORDS);
 const THIRD_PARTY_SUBJECTS = makeWordBoundaryRegex(THIRD_PARTY_WORDS);
 
-function isOwnRiskSentence(sentence, riskRegex) {
-  if (!riskRegex.test(sentence)) return false;
+function isExplicitlyNegatedRisk(sentence, riskMatch) {
+  const matchStart = riskMatch.index;
+  const matchEnd = matchStart + riskMatch[0].length;
+  const boundaries = [...sentence.matchAll(/[,;]|(?<![\p{L}\p{N}_])(?:но|однако|зато|а|и)(?![\p{L}\p{N}_])/giu)];
+  let clauseStart = 0;
+  let clauseEnd = sentence.length;
+
+  for (const boundary of boundaries) {
+    const boundaryEnd = boundary.index + boundary[0].length;
+    if (boundary.index < matchStart) clauseStart = boundaryEnd;
+    else if (boundary.index >= matchEnd) {
+      clauseEnd = boundary.index;
+      break;
+    }
+  }
+
+  const clause = sentence.slice(clauseStart, clauseEnd);
+  const beforeRisk = clause.slice(0, matchStart - clauseStart);
+  const negativeThought = /(?<![\p{L}\p{N}_])(?:нет|никаких|не было|не возникало|не появлялось|отсутствует|отсутствуют)(?![\p{L}\p{N}_])[^.!?]{0,45}(?<![\p{L}\p{N}_])(?:мысл[\p{L}]*|желан[\p{L}]*|намерен[\p{L}]*|план[\p{L}]*|суицид[\p{L}]*|самоповреж[\p{L}]*|голос[\p{L}]*)(?![\p{L}\p{N}_])/iu.test(clause);
+  const negativeAfterRisk = /(?<![\p{L}\p{N}_])(?:мысл[\p{L}]*|желан[\p{L}]*|намерен[\p{L}]*|план[\p{L}]*|суицид[\p{L}]*|самоповреж[\p{L}]*|голос[\p{L}]*|причин[\p{L}]*\s+себе\s+вред[\p{L}]*)(?![\p{L}\p{N}_])[^.!?]{0,45}(?<![\p{L}\p{N}_])(?:не было|не возникало|не появлялось|нет|отсутствует|отсутствуют)(?![\p{L}\p{N}_])/iu.test(clause);
+  const negativeAction = /(?<![\p{L}\p{N}_])не(?![\p{L}\p{N}_])\s+(?:думаю|хочу|планирую|собираюсь|намерен[\p{L}]*|причинял[\p{L}]*|режу|резал[\p{L}]*|порезал[\p{L}]*|слышу|вижу|угрожаю)(?![\p{L}\p{N}_])(?:\s+[\p{L}]+){0,2}\s*$/iu.test(beforeRisk);
+
+  return negativeThought || negativeAfterRisk || negativeAction;
+}
+
+function isOwnRiskSentence(sentence, riskRegex, negationAware = true) {
+  const riskMatch = sentence.match(riskRegex);
+  if (!riskMatch || (negationAware && isExplicitlyNegatedRisk(sentence, riskMatch))) return false;
   // Third-party mention near the risk term should not count as own risk.
   if (THIRD_PARTY_SUBJECTS.test(sentence)) return false;
   // Require a first-person indicator in the same sentence.
   return OWN_RISK_PRONOUNS.test(sentence);
 }
 
-function hasOwnRiskPattern(text, pattern) {
+export function hasOwnRiskPattern(text, pattern, { negationAware = true } = {}) {
   if (!text) return false;
   const sentences = text.split(/[.!?\n]+/).filter(Boolean);
   for (const sentence of sentences) {
-    if (isOwnRiskSentence(sentence, pattern)) return true;
+    if (isOwnRiskSentence(sentence, pattern, negationAware)) return true;
   }
   return false;
 }
 
-function deriveMinimumCareLevel({
+export function deriveMinimumCareLevel({
   riskLevel, suicidalIntent, suicidalPlan, selfHarmRisk,
   psychosisRedFlags, maniaRedFlags, riskToOthers,
   functionalImpairment, severeDistress, somaticSymptoms,
@@ -350,7 +377,7 @@ function deriveMinimumCareLevel({
   return "self_support";
 }
 
-function programmaticCareFix({
+export function programmaticCareFix({
   careRec,
   minimumLevel,
   hasSuicidalIntent,
@@ -2155,6 +2182,7 @@ ${antiRepeatBlock}
       if (!userPart) {
         userPart = "Нам не удалось сформулировать итог разговора достаточно точно. Ваш диалог сохранён, и к нему можно вернуться позже по коду доступа.";
       }
+      userPart = synchronizeUserReportNextStep(userPart, careRec);
 
       // Quality check is logged but not blocking — deterministic style fix already applied.
       const qualityCheck = checkReportQuality(userPart, text, historyText);
@@ -2311,18 +2339,19 @@ ${antiRepeatBlock}
     let careRec = parsed.care_recommendation || null;
     userPart = deterministicUserReportFix(userPart);
     const fullConversation = (historyText || "") + " " + (text || "");
-    const hasSuicidalIntent = hasOwnRiskPattern(fullConversation, /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu);
-    const hasSuicidalPlan = hasOwnRiskPattern(fullConversation, /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/iu);
-    const hasPsychosis = hasOwnRiskPattern(fullConversation, /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/iu);
-    const hasMania = hasOwnRiskPattern(fullConversation, /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/iu);
-    const hasRiskToOthers = hasOwnRiskPattern(fullConversation, /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/iu);
+    const riskDetectionOptions = activeModule === "support" ? undefined : { negationAware: false };
+    const hasSuicidalIntent = hasOwnRiskPattern(fullConversation, /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu, riskDetectionOptions);
+    const hasSuicidalPlan = hasOwnRiskPattern(fullConversation, /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/iu, riskDetectionOptions);
+    const hasPsychosis = hasOwnRiskPattern(fullConversation, /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/iu, riskDetectionOptions);
+    const hasMania = hasOwnRiskPattern(fullConversation, /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/iu, riskDetectionOptions);
+    const hasRiskToOthers = hasOwnRiskPattern(fullConversation, /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/iu, riskDetectionOptions);
     const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/iu.test(fullConversation);
     const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/iu.test(fullConversation);
     const hasSomaticSymptoms = /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/iu.test(fullConversation);
     const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/iu.test(fullConversation);
     const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/iu.test(fullConversation);
     const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/iu.test(fullConversation);
-    const hasSelfHarm = hasOwnRiskPattern(fullConversation, /реж.*себ|самоповреж|причин.*себе.*вред/iu);
+    const hasSelfHarm = hasOwnRiskPattern(fullConversation, /реж.*себ|самоповреж|причин.*себе.*вред/iu, riskDetectionOptions);
     const minimumLevel = deriveMinimumCareLevel({
       riskLevel: null,
       suicidalIntent: hasSuicidalIntent,
@@ -2356,6 +2385,9 @@ ${antiRepeatBlock}
     });
     if (!userPart) {
       userPart = "Нам не удалось сформулировать итог разговора достаточно точно. Ваш диалог сохранён, и к нему можно вернуться позже по коду доступа.";
+    }
+    if (activeModule === "support") {
+      userPart = synchronizeUserReportNextStep(userPart, careRec);
     }
     const report = userPart.includes("===USER_REPORT===")
       ? userPart

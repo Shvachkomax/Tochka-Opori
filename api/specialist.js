@@ -6,6 +6,8 @@ import { hashToken } from "../lib/security/council-token.js";
 import { getInviteUrl } from "../lib/config/site-url.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
 import { isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
+import { buildSpecialistClientList } from "../lib/specialist-client-list.js";
 import {
   SAFE_MEDICATION_PERMISSION_KEYS,
   getMedicationOrderForOwner,
@@ -518,6 +520,13 @@ async function handleLogin(req, res) {
     ? [...new Set(rawModules.filter((m) => VALID_MODULES.includes(m)))]
     : [];
 
+  const membershipResult = await loadSpecialistMemberships(supabase, expert.id);
+  if (membershipResult.error) {
+    console.error("[specialist:login] membership lookup error:", membershipResult.error.code || "UNKNOWN");
+    return res.status(500).json({ ok: false, error: "Не удалось загрузить членство специалиста" });
+  }
+  const membershipsList = membershipResult.memberships;
+
   // Generate opaque token
   const rawToken = crypto.randomBytes(TOKEN_BYTES).toString("hex");
   const tokenHash = hashToken(rawToken);
@@ -541,22 +550,6 @@ async function handleLogin(req, res) {
     console.error("[specialist:login] session insert error:", insertError);
     return res.status(500).json({ ok: false, error: "Ошибка сервера" });
   }
-
-  // Fetch all active memberships
-  const { data: memberships } = await supabase
-    .from("expert_organization_memberships")
-    .select("id, organization_id, role, status, organizations(name, slug, type)")
-    .eq("expert_id", expert.id)
-    .eq("status", "active");
-
-  const membershipsList = (memberships || []).map((m) => ({
-    membership_id: m.id,
-    organization_id: m.organization_id,
-    organization_name: m.organizations?.name || null,
-    organization_slug: m.organizations?.slug || null,
-    organization_type: m.organizations?.type || null,
-    role_in_organization: m.role,
-  }));
 
   // Set HttpOnly cookie — raw token never exposed to JavaScript
   res.setHeader("Set-Cookie", buildCookie(COOKIE_NAME, rawToken, COOKIE_MAX_AGE));
@@ -652,8 +645,6 @@ async function handleListClients(req, res) {
   }
 
   const supabase = getSupabase();
-  const clients = new Map(); // key → client registry item
-
   // ── 1. Primary assignments ──────────────────────────────
   let assignQuery = supabase
     .from("patient_assignments")
@@ -671,24 +662,6 @@ async function handleListClients(req, res) {
 
   const { data: assignments } = await assignQuery;
 
-  for (const a of assignments || []) {
-    const key = module === "body"
-      ? `body:${a.owner_type}:${a.owner_id}`
-      : `support:${a.public_code}`;
-    clients.set(key, {
-      client_ref: `assignment:${a.id}`,
-      module,
-      _publicCode: a.public_code,
-      _ownerType: a.owner_type,
-      _ownerId: a.owner_id,
-      relationship: "primary",
-      access_role: "owner",
-      status: a.status,
-      last_activity_at: a.updated_at,
-      _patientLabel: a.patient_label,
-    });
-  }
-
   // ── 2. Shared access ────────────────────────────────────
   let accessQuery = supabase
     .from("patient_access")
@@ -705,35 +678,15 @@ async function handleListClients(req, res) {
 
   const { data: accessRows } = await accessQuery;
 
-  for (const acc of accessRows || []) {
-    const key = module === "body"
-      ? `body:${acc.owner_type}:${acc.owner_id}`
-      : `support:${acc.public_code}`;
-    if (!clients.has(key)) {
-      clients.set(key, {
-        client_ref: `access:${acc.id}`,
-        module,
-        _publicCode: acc.public_code,
-        _ownerType: acc.owner_type,
-        _ownerId: acc.owner_id,
-        relationship: "shared",
-        access_role: acc.access_role,
-        status: acc.status,
-        last_activity_at: null,
-        _patientLabel: null,
-      });
-    }
-  }
-
   // ── 3. Resolve display names (batch) ────────────────────
   // Support: only patient_label (explicit non-clinical pseudonym).
   // Body: body_clients.display_name (user-provided, non-clinical).
   // Never read session text, AI content, clinical data.
 
   // Batch-fetch all body_clients display names for authorized owner IDs
-  const bodyOwnerIds = [...clients.values()]
-    .filter((c) => c._ownerId)
-    .map((c) => c._ownerId);
+  const bodyOwnerIds = [...new Set([...(assignments || []), ...(accessRows || [])]
+    .map((client) => client.owner_id)
+    .filter(Boolean))];
   const bodyDisplayNames = new Map(); // owner_id → display_name
   if (bodyOwnerIds.length > 0) {
     const { data: bcRows } = await supabase
@@ -749,28 +702,12 @@ async function handleListClients(req, res) {
     }
   }
 
-  const result = [];
-  for (const c of clients.values()) {
-    let display_name = "Клиент без имени";
-
-    if (module === "support" && c._patientLabel) {
-      display_name = c._patientLabel;
-    } else if (module === "body" && c._ownerId) {
-      const name = bodyDisplayNames.get(c._ownerId);
-      if (name) display_name = name;
-    }
-
-    result.push({
-      client_ref: c.client_ref,
-      module: c.module,
-      display_name,
-      relationship: c.relationship,
-      access_role: c.access_role,
-      status: c.status,
-      last_activity_at: c.last_activity_at,
-    });
-  }
-
+  const result = buildSpecialistClientList({
+    module,
+    assignments: assignments || [],
+    accessRows: accessRows || [],
+    bodyDisplayNames,
+  });
   return res.status(200).json({ ok: true, clients: result });
 }
 
@@ -1897,6 +1834,12 @@ export async function authorizeSpecialist(req) {
     : [];
   expert.allowed_modules = allowedModules;
 
+  const membershipResult = await loadSpecialistMemberships(supabase, expert.id);
+  if (membershipResult.error) {
+    console.error("[specialist:auth] membership lookup error:", membershipResult.error.code || "UNKNOWN");
+    return { status: 500, error: "Не удалось загрузить членство специалиста" };
+  }
+
   // Update last_seen_at (non-blocking, don't fail auth if this errors)
   supabase
     .from("specialist_sessions")
@@ -1905,25 +1848,9 @@ export async function authorizeSpecialist(req) {
     .then(() => {})
     .catch(() => {});
 
-  // Fetch memberships
-  const { data: memberships } = await supabase
-    .from("expert_organization_memberships")
-    .select("id, organization_id, role, status, organizations(name, slug, type)")
-    .eq("expert_id", expert.id)
-    .eq("status", "active");
-
-  const membershipsList = (memberships || []).map((m) => ({
-    membership_id: m.id,
-    organization_id: m.organization_id,
-    organization_name: m.organizations?.name || null,
-    organization_slug: m.organizations?.slug || null,
-    organization_type: m.organizations?.type || null,
-    role_in_organization: m.role,
-  }));
-
   return {
     expert,
-    memberships: membershipsList,
+    memberships: membershipResult.memberships,
     tokenHash,
     sessionId: session.id,
   };
