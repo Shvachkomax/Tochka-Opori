@@ -7,7 +7,7 @@ globalThis.setInterval = (...args) => {
   timer.unref?.();
   return timer;
 };
-const { deriveMinimumCareLevel, hasOwnRiskPattern, programmaticCareFix } = await import("../api/analyze.js");
+const { buildUserRiskAssessmentText, deriveMinimumCareLevel, hasOwnRiskPattern, programmaticCareFix } = await import("../api/analyze.js");
 globalThis.setInterval = originalSetInterval;
 
 const selfHarmPattern = /реж.*себ|самоповреж|причин.*себе.*вред/iu;
@@ -19,6 +19,23 @@ assert.equal(hasOwnRiskPattern(safeScenario, selfHarmPattern), false, "explicit 
 assert.equal(hasOwnRiskPattern(safeScenario, selfHarmPattern, { negationAware: false }), true, "non-Support callers retain the existing detector behavior");
 assert.equal(hasOwnRiskPattern(safeScenario, suicidalIntentPattern), false);
 assert.equal(hasOwnRiskPattern(safeScenario, suicidalPlanPattern), false);
+
+const userOnlyRiskText = buildUserRiskAssessmentText({
+  text: "Это безопасный синтетический случай.",
+  answers: { 0: "Нет, мыслей причинить себе вред не было." },
+  conversationHistory: [
+    { role: "assistant", questions: ["Были ли мысли причинить себе вред?"] },
+    { role: "user", content: "Контроль над собой сохраняю." },
+  ],
+});
+assert.doesNotMatch(userOnlyRiskText, /Были ли мысли причинить себе вред/);
+assert.equal(hasOwnRiskPattern(userOnlyRiskText, selfHarmPattern), false, "assistant questions must not count as patient risk evidence");
+const positiveAnswerRiskText = buildUserRiskAssessmentText({
+  text: "Обычный синтетический ввод.",
+  answers: { 0: "Да, я планирую причинить себе вред сегодня." },
+  conversationHistory: [{ role: "assistant", questions: ["Есть ли риск?"] }],
+});
+assert.equal(hasOwnRiskPattern(positiveAnswerRiskText, selfHarmPattern), true, "current user answers must remain part of risk evidence");
 
 const safeMinimum = deriveMinimumCareLevel({
   riskLevel: null,

@@ -342,6 +342,24 @@ export function hasOwnRiskPattern(text, pattern, { negationAware = true } = {}) 
   return false;
 }
 
+function collectRiskText(value) {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(collectRiskText);
+  if (value && typeof value === "object") return Object.values(value).flatMap(collectRiskText);
+  return [];
+}
+
+export function buildUserRiskAssessmentText({ text, answers, conversationHistory }) {
+  const previousUserText = (Array.isArray(conversationHistory) ? conversationHistory : [])
+    .filter((entry) => entry?.role === "user")
+    .flatMap((entry) => [entry.content, entry.answers].flatMap(collectRiskText));
+
+  return [...previousUserText, ...collectRiskText(text), ...collectRiskText(answers)]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
 export function deriveMinimumCareLevel({
   riskLevel, suicidalIntent, suicidalPlan, selfHarmRisk,
   psychosisRedFlags, maniaRedFlags, riskToOthers,
@@ -1605,6 +1623,9 @@ AI-assisted summary не сформирован из-за технической
           .map(([key, val]) => `Вопрос ${parseInt(key) + 1}: ${val || "нет ответа"}`)
           .join("\n")
       : "";
+  const riskAssessmentText = activeModule === "support"
+    ? buildUserRiskAssessmentText({ text, answers, conversationHistory: convHistory })
+    : `${historyText || ""} ${text || ""}`;
 
   const antiRepeatBlock = buildAntiRepeatBlock(convHistory, activeModule);
 
@@ -2131,19 +2152,18 @@ ${antiRepeatBlock}
       userPart = deterministicUserReportFix(userPart);
 
       // --- Care recommendation: backend minimum level override ---
-      const fullConversation = (historyText || "") + " " + (text || "");
-      const hasSuicidalIntent = hasOwnRiskPattern(fullConversation, /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu);
-      const hasSuicidalPlan = hasOwnRiskPattern(fullConversation, /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/iu);
-      const hasPsychosis = hasOwnRiskPattern(fullConversation, /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/iu);
-      const hasMania = hasOwnRiskPattern(fullConversation, /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/iu);
-      const hasRiskToOthers = hasOwnRiskPattern(fullConversation, /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/iu);
-      const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/iu.test(fullConversation);
-      const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/iu.test(fullConversation);
-      const hasSomaticSymptoms = /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/iu.test(fullConversation);
-      const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/iu.test(fullConversation);
-      const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/iu.test(fullConversation);
-      const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/iu.test(fullConversation);
-      const hasSelfHarm = hasOwnRiskPattern(fullConversation, /реж.*себ|самоповреж|причин.*себе.*вред/iu);
+      const hasSuicidalIntent = hasOwnRiskPattern(riskAssessmentText, /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu);
+      const hasSuicidalPlan = hasOwnRiskPattern(riskAssessmentText, /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/iu);
+      const hasPsychosis = hasOwnRiskPattern(riskAssessmentText, /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/iu);
+      const hasMania = hasOwnRiskPattern(riskAssessmentText, /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/iu);
+      const hasRiskToOthers = hasOwnRiskPattern(riskAssessmentText, /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/iu);
+      const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/iu.test(riskAssessmentText);
+      const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/iu.test(riskAssessmentText);
+      const hasSomaticSymptoms = /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/iu.test(riskAssessmentText);
+      const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/iu.test(riskAssessmentText);
+      const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/iu.test(riskAssessmentText);
+      const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/iu.test(riskAssessmentText);
+      const hasSelfHarm = hasOwnRiskPattern(riskAssessmentText, /реж.*себ|самоповреж|причин.*себе.*вред/iu);
 
       const minimumLevel = deriveMinimumCareLevel({
         riskLevel: null,
@@ -2338,20 +2358,19 @@ ${antiRepeatBlock}
     const doctorPart = parsed.doctor_report || "";
     let careRec = parsed.care_recommendation || null;
     userPart = deterministicUserReportFix(userPart);
-    const fullConversation = (historyText || "") + " " + (text || "");
     const riskDetectionOptions = activeModule === "support" ? undefined : { negationAware: false };
-    const hasSuicidalIntent = hasOwnRiskPattern(fullConversation, /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu, riskDetectionOptions);
-    const hasSuicidalPlan = hasOwnRiskPattern(fullConversation, /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/iu, riskDetectionOptions);
-    const hasPsychosis = hasOwnRiskPattern(fullConversation, /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/iu, riskDetectionOptions);
-    const hasMania = hasOwnRiskPattern(fullConversation, /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/iu, riskDetectionOptions);
-    const hasRiskToOthers = hasOwnRiskPattern(fullConversation, /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/iu, riskDetectionOptions);
-    const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/iu.test(fullConversation);
-    const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/iu.test(fullConversation);
-    const hasSomaticSymptoms = /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/iu.test(fullConversation);
-    const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/iu.test(fullConversation);
-    const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/iu.test(fullConversation);
-    const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/iu.test(fullConversation);
-    const hasSelfHarm = hasOwnRiskPattern(fullConversation, /реж.*себ|самоповреж|причин.*себе.*вред/iu, riskDetectionOptions);
+    const hasSuicidalIntent = hasOwnRiskPattern(riskAssessmentText, /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu, riskDetectionOptions);
+    const hasSuicidalPlan = hasOwnRiskPattern(riskAssessmentText, /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/iu, riskDetectionOptions);
+    const hasPsychosis = hasOwnRiskPattern(riskAssessmentText, /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/iu, riskDetectionOptions);
+    const hasMania = hasOwnRiskPattern(riskAssessmentText, /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/iu, riskDetectionOptions);
+    const hasRiskToOthers = hasOwnRiskPattern(riskAssessmentText, /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/iu, riskDetectionOptions);
+    const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/iu.test(riskAssessmentText);
+    const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/iu.test(riskAssessmentText);
+    const hasSomaticSymptoms = /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/iu.test(riskAssessmentText);
+    const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/iu.test(riskAssessmentText);
+    const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/iu.test(riskAssessmentText);
+    const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/iu.test(riskAssessmentText);
+    const hasSelfHarm = hasOwnRiskPattern(riskAssessmentText, /реж.*себ|самоповреж|причин.*себе.*вред/iu, riskDetectionOptions);
     const minimumLevel = deriveMinimumCareLevel({
       riskLevel: null,
       suicidalIntent: hasSuicidalIntent,
