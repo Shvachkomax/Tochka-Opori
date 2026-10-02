@@ -10109,18 +10109,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
             )}
 
-            {/* Open cabinet CTA — shown when saved session exists */}
-            {activeModule === "support" && phase === "input" && supportScreen === "landing" && getSupportSession().sessionId && (
-              <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button
-                  style={{ ...s.primary, fontSize: 14, padding: "12px 20px" }}
-                  onClick={() => loadSupportCabinet()}
-                >
-                  Открыть личный кабинет
-                </button>
-              </div>
-            )}
-
             {activeModule === "body" && bodyScreen === "landing" && (
               <div style={{ marginTop: 16, padding: 16, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 8 }}>
