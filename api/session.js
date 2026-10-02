@@ -25,7 +25,7 @@ import { recordClinicalEvent } from "../lib/clinical/projection.js";
 import { buildSupportCheckinLogicalSourceId, buildSupportCheckinObservationSnapshot } from "../lib/clinical/observation-mappings.js";
 import { recordClinicalObservation } from "../lib/clinical/projection.js";
 import { getMedicationCardsForOwner, isMedicationSessionEligible } from "../lib/clinical/medication.js";
-import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailableModule, getPilotId } from "../lib/security/module-availability.js";
 
 const BODY_SESSION_ACTIONS = new Set([
   "listBodyDailyLogs",
@@ -606,6 +606,7 @@ async function handleSave(req, res) {
       primary_expert_id: primaryExpertId,
       invite_token: inviteToken,
       json_data: {
+        pilot_id: getPilotId() || undefined,
         dialogDepth: dialogDepth ?? 0,
         previousPatientReport: previousPatientReport || "",
         previousDoctorReport: previousDoctorReport || "",
@@ -1195,6 +1196,7 @@ async function handleCreateFollowUpSession(req, res) {
       patient_text: "",
       conversation_history: [],
       json_data: {
+        pilot_id: getPilotId() || undefined,
         previousPublicCode: parent.public_code,
         isContinuation: true,
       },
@@ -1612,9 +1614,10 @@ async function handleExchangeContinuationCredential(req, res) {
 
     // Step 1: Find target session
     const targetTable = reqModule === "body" ? "body_clients" : "sessions";
+    const targetSelect = reqModule === "body" ? "session_id" : "session_id, json_data";
     let targetQuery = supabase
       .from(targetTable)
-      .select("session_id")
+      .select(targetSelect)
       .eq("anonymous_owner_id", credential.owner_id);
 
     if (reqModule !== "body") {
@@ -1633,6 +1636,17 @@ async function handleExchangeContinuationCredential(req, res) {
     if (!targetSession?.session_id) {
       console.log("[exchange] no target session for owner");
       return res.status(404).json({ ok: false, error: "Не удалось найти запись для этого кода. Обратитесь к специалисту." });
+    }
+
+    const serverPilot = getPilotId();
+    const sessionPilot = targetSession.json_data?.pilot_id ?? null;
+    if (serverPilot && sessionPilot && sessionPilot !== serverPilot) {
+      console.log("[exchange] pilot mismatch", JSON.stringify({
+        session_pilot: sessionPilot,
+        server_pilot: serverPilot,
+        response_status: 403,
+      }));
+      return res.status(403).json({ ok: false, error: "Код продолжения не принадлежит этому сервису." });
     }
 
     console.log("[exchange] target session found");
@@ -1676,7 +1690,7 @@ async function handleExchangeContinuationCredential(req, res) {
         public_code: cabinet.sessions?.[0]?.publicCode || null,
         patient_text: "",
         conversation_history: [],
-        json_data: {},
+        json_data: { pilot_id: getPilotId() || undefined },
         access_token_hash: fallbackHash,
         access_token_generated_at: new Date().toISOString(),
         legacy_access: false,

@@ -3,7 +3,7 @@ import { getSupabase } from "../lib/supabase.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
-import { rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { rejectUnavailableModule, getPilotId } from "../lib/security/module-availability.js";
 import { generatePublicCode } from "../lib/publicCode.js";
 
 function generateSessionId() {
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
       public_code: publicCode,
       patient_text: "",
       conversation_history: [],
-      json_data: { dialogDepth: 0 },
+      json_data: { pilot_id: getPilotId() || undefined, dialogDepth: 0 },
       legacy_access: false,
     });
 

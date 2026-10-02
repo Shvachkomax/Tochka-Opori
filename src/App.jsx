@@ -184,7 +184,7 @@ export default function App() {
   const [displayNameInput, setDisplayNameInput] = useState("");
 
   const [activeModule, setActiveModule] = useState(() => {
-    if (!APP_BRAND.isAnMed && typeof window !== "undefined") {
+    if (!APP_BRAND.isPilot && typeof window !== "undefined") {
       const host = window.location.hostname;
       if (host === "health.tochka-opori.online" || host.startsWith("health.")) return "body";
       const params = new URLSearchParams(window.location.search);
@@ -4741,7 +4741,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const adminModuleRoute = adminSubPage || (typeof window !== "undefined"
     ? window.location.pathname === "/admin/body" ? "body" : window.location.pathname === "/admin/council" ? "council" : "support"
     : "support");
-  const isDedicatedSubdomain = !APP_BRAND.isAnMed && typeof window !== "undefined" && (
+  const isDedicatedSubdomain = !APP_BRAND.isPilot && typeof window !== "undefined" && (
     window.location.hostname === "health.tochka-opori.online" || window.location.hostname.startsWith("health.") ||
     new URLSearchParams(window.location.search).get("module") === "body"
   );
@@ -4752,7 +4752,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   // Keep the AnMed pilot's presentation separate from the module selection.
   useEffect(() => {
-    document.title = APP_BRAND.isAnMed
+    document.title = APP_BRAND.isPilot
       ? APP_BRAND.title
       : isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.title;
   }, [isDedicatedSubdomain]);
@@ -9744,7 +9744,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 
   // Keep the legacy expert surface out of the AnMed pilot; its staff entry is /specialist.
-  if (APP_BRAND.isAnMed && typeof window !== "undefined" && window.location.pathname.match(/^\/expert\/?$/)) {
+  if (APP_BRAND.isPilot && typeof window !== "undefined" && window.location.pathname.match(/^\/expert\/?$/)) {
     window.location.replace("/specialist");
     return null;
   }
@@ -9874,20 +9874,30 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 `}</style>
           <div style={s.wrap}>
-        <header style={{ ...s.header, marginBottom: APP_BRAND.isAnMed ? 28 : (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
-          {APP_BRAND.isAnMed ? (
+        <header style={{ ...s.header, marginBottom: APP_BRAND.isPilot ? 28 : (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
+          {APP_BRAND.isPilot ? (
             <a
               href="/"
-              aria-label="АнМед — на главную"
+              aria-label={`${APP_BRAND.name} — на главную`}
               className="app-logo-link"
               style={{ display: "flex", alignItems: "center", gap: 12, color: "inherit", textDecoration: "none" }}
             >
-              <div aria-label={APP_BRAND.name} style={{ minWidth: 190 }}>
-                <div style={{ ...s.logo, color: "#14264A", fontSize: 34, fontWeight: 900, letterSpacing: "-0.04em" }}>
-                  Ан<span style={{ color: "#E63E4B" }}>Мед</span>
+              {APP_BRAND.isPneumo ? (
+                <img src={APP_BRAND.logoHeader} alt={APP_BRAND.name} style={{ height: 72, width: "auto", display: "block", objectFit: "contain", flexShrink: 0 }} />
+              ) : (
+                <div aria-label={APP_BRAND.name} style={{ minWidth: 190 }}>
+                  <div style={{ ...s.logo, color: "#14264A", fontSize: 34, fontWeight: 900, letterSpacing: "-0.04em" }}>
+                    Ан<span style={{ color: "#E63E4B" }}>Мед</span>
+                  </div>
+                  <div style={s.sub}>{APP_BRAND.subtitle}</div>
                 </div>
-                <div style={s.sub}>{APP_BRAND.subtitle}</div>
-              </div>
+              )}
+              {APP_BRAND.isPneumo && (
+                <div>
+                  <div style={{ ...s.logo, fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>{APP_BRAND.name}</div>
+                  <div style={s.sub}>{APP_BRAND.subtitle}</div>
+                </div>
+              )}
             </a>
           ) : (
             <div
@@ -9927,7 +9937,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           </div>
         </header>
 
-        {APP_BRAND.isAnMed && (
+        {APP_BRAND.isPilot && APP_BRAND.pilotNotice && (
           <div role="note" style={{ margin: "0 0 32px", padding: "12px 16px", borderRadius: 12, background: "#FFF1F1", border: "1px solid #E9B4B8", color: "#7D2530", fontSize: 14, lineHeight: 1.5 }}>
             {APP_BRAND.pilotNotice}
           </div>

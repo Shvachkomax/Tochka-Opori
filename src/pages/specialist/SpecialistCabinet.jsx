@@ -49,26 +49,42 @@ const SERVICE_FORMAT_LABELS = {
 };
 
 function SpecialistBrand() {
-  if (!APP_BRAND.isAnMed) {
-    return <img src="/logo-tochka-opory-header.png" alt="Точка опоры" style={{ height: 72, display: "block" }} />;
+  if (APP_BRAND.isPneumo) {
+    return (
+      <a
+        href="/"
+        aria-label={`${APP_BRAND.name} — на главную`}
+        style={{ display: "flex", alignItems: "center", gap: 12, color: "inherit", textDecoration: "none" }}
+      >
+        <img src={APP_BRAND.logoHeader} alt={APP_BRAND.name} style={{ height: 64, width: "auto", display: "block", objectFit: "contain" }} />
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1.2, color: "#14264A" }}>{APP_BRAND.name}</div>
+          <div style={{ fontSize: 12, color: "#7A7268" }}>{APP_BRAND.subtitle}</div>
+        </div>
+      </a>
+    );
   }
 
-  return (
-    <a
-      href="/"
-      aria-label="АнМед — на главную"
-      style={{ display: "block", color: "inherit", textDecoration: "none" }}
-    >
-      <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: "-0.04em", color: "#14264A" }}>
-        Ан<span style={{ color: "#E63E4B" }}>Мед</span>
-      </div>
-      <div style={{ fontSize: 12, color: "#7A7268" }}>{APP_BRAND.subtitle}</div>
-    </a>
-  );
+  if (APP_BRAND.isAnMed) {
+    return (
+      <a
+        href="/"
+        aria-label="АнМед — на главную"
+        style={{ display: "block", color: "inherit", textDecoration: "none" }}
+      >
+        <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: "-0.04em", color: "#14264A" }}>
+          Ан<span style={{ color: "#E63E4B" }}>Мед</span>
+        </div>
+        <div style={{ fontSize: 12, color: "#7A7268" }}>{APP_BRAND.subtitle}</div>
+      </a>
+    );
+  }
+
+  return <img src="/logo-tochka-opory-header.png" alt="Точка опоры" style={{ height: 72, display: "block" }} />;
 }
 
 function SpecialistPilotNotice() {
-  if (!APP_BRAND.isAnMed) return null;
+  if (!APP_BRAND.isPilot || !APP_BRAND.pilotNotice) return null;
   return (
     <div role="note" style={{ maxWidth: 800, margin: "0 auto 20px", padding: "12px 16px", borderRadius: 12, background: "#FFF1F1", border: "1px solid #E9B4B8", color: "#7D2530", fontSize: 14, lineHeight: 1.5 }}>
       {APP_BRAND.pilotNotice}
@@ -748,7 +764,7 @@ export default function SpecialistCabinet() {
   // ── Authenticated cabinet ────────────────────────────────
 
   const { expert, memberships } = auth;
-  const supportWorkspaceName = APP_BRAND.isAnMed ? APP_BRAND.name : "Точка Опоры";
+  const supportWorkspaceName = APP_BRAND.isPilot ? APP_BRAND.name : "Точка Опоры";
   const orgName = orgId
     ? memberships.find((m) => m.organization_id === orgId)?.organization_name || "Организация"
     : "Частная практика";
