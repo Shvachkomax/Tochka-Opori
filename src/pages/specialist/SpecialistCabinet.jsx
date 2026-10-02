@@ -54,12 +54,16 @@ function SpecialistBrand() {
   }
 
   return (
-    <div aria-label={APP_BRAND.name}>
+    <a
+      href="/"
+      aria-label="АнМед — на главную"
+      style={{ display: "block", color: "inherit", textDecoration: "none" }}
+    >
       <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: "-0.04em", color: "#14264A" }}>
         Ан<span style={{ color: "#E63E4B" }}>Мед</span>
       </div>
       <div style={{ fontSize: 12, color: "#7A7268" }}>{APP_BRAND.subtitle}</div>
-    </div>
+    </a>
   );
 }
 

@@ -9875,33 +9875,38 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 `}</style>
           <div style={s.wrap}>
         <header style={{ ...s.header, marginBottom: APP_BRAND.isAnMed ? 28 : (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
-          <div
-            style={{ display: "flex", alignItems: "center", gap: 12, cursor: activeModule === "support" && supportScreen !== "landing" ? "pointer" : "default" }}
-            onClick={activeModule === "support" && supportScreen !== "landing" ? goToSupportLanding : undefined}
-            title={activeModule === "support" && supportScreen !== "landing" ? "На главную" : undefined}
-          >
-            {APP_BRAND.isAnMed ? (
+          {APP_BRAND.isAnMed ? (
+            <a
+              href="/"
+              aria-label="АнМед — на главную"
+              className="app-logo-link"
+              style={{ display: "flex", alignItems: "center", gap: 12, color: "inherit", textDecoration: "none" }}
+            >
               <div aria-label={APP_BRAND.name} style={{ minWidth: 190 }}>
                 <div style={{ ...s.logo, color: "#14264A", fontSize: 34, fontWeight: 900, letterSpacing: "-0.04em" }}>
                   Ан<span style={{ color: "#E63E4B" }}>Мед</span>
                 </div>
                 <div style={s.sub}>{APP_BRAND.subtitle}</div>
               </div>
-            ) : (
-              <>
-                <img
-                  src="/logo-tochka-opory-header.png"
-                  alt={isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.name}
-                  className="app-logo"
-                  style={{ display: "block", flexShrink: 0, objectFit: "contain", height: 96, width: "auto" }}
-                />
-                <div>
-                  <div style={s.logo}>{isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.name}</div>
-                  {!isDedicatedSubdomain && <div style={s.sub}>{APP_BRAND.subtitle}</div>}
-                </div>
-              </>
-            )}
-          </div>
+            </a>
+          ) : (
+            <div
+              style={{ display: "flex", alignItems: "center", gap: 12, cursor: activeModule === "support" && supportScreen !== "landing" ? "pointer" : "default" }}
+              onClick={activeModule === "support" && supportScreen !== "landing" ? goToSupportLanding : undefined}
+              title={activeModule === "support" && supportScreen !== "landing" ? "На главную" : undefined}
+            >
+              <img
+                src="/logo-tochka-opory-header.png"
+                alt={isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.name}
+                className="app-logo"
+                style={{ display: "block", flexShrink: 0, objectFit: "contain", height: 96, width: "auto" }}
+              />
+              <div>
+                <div style={s.logo}>{isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.name}</div>
+                {!isDedicatedSubdomain && <div style={s.sub}>{APP_BRAND.subtitle}</div>}
+              </div>
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {!isDedicatedSubdomain && (<>
             {!(activeModule === "support" && supportScreen !== "landing") && (
