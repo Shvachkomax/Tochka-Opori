@@ -274,6 +274,12 @@ DECLARE
   v_verification_status text;
   v_test_only boolean;
 BEGIN
+  IF NEW.reference_status = 'matched' AND EXISTS (
+    SELECT 1 FROM public.medication_concepts
+    WHERE id = NEW.medication_concept_id AND test_only
+  ) THEN
+    RAISE EXCEPTION 'Test-only medication concepts cannot be matched to patient orders' USING ERRCODE = '23514';
+  END IF;
   IF NEW.reference_status <> 'verified' THEN RETURN NEW; END IF;
   SELECT d.source_provider, d.verification_status, (d.test_only OR s.test_only OR c.test_only)
     INTO v_source_provider, v_verification_status, v_test_only
@@ -301,6 +307,49 @@ BEGIN
     WHERE id = NEW.medication_concept_id AND test_only
   ) THEN
     RAISE EXCEPTION 'Test-only medication concepts cannot back clinician orders' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.prevent_medication_concept_test_only_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.test_only IS NOT DISTINCT FROM OLD.test_only THEN
+    RETURN NEW;
+  END IF;
+  IF EXISTS (
+      SELECT 1 FROM public.medication_reference_snapshots
+      WHERE medication_concept_id = OLD.id
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.patient_medication_orders
+      WHERE medication_concept_id = OLD.id
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.patient_medication_reference_matches
+      WHERE medication_concept_id = OLD.id
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.medication_orders
+      WHERE medication_concept_id = OLD.id
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.patient_medication_orders o,
+           jsonb_array_elements(o.reference_candidate_concepts) AS candidate
+      WHERE candidate->>'medication_concept_id' = OLD.id::text
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.patient_medication_reference_matches m,
+           jsonb_array_elements(m.candidate_concepts) AS candidate
+      WHERE candidate->>'medication_concept_id' = OLD.id::text
+    ) THEN
+    RAISE EXCEPTION 'Medication concept test_only is immutable after first use' USING ERRCODE = '23514';
   END IF;
   RETURN NEW;
 END;
@@ -344,6 +393,12 @@ DECLARE
   v_document_status text;
   v_test_only boolean;
 BEGIN
+  IF NEW.reference_status = 'matched' AND EXISTS (
+    SELECT 1 FROM public.medication_concepts
+    WHERE id = NEW.medication_concept_id AND test_only
+  ) THEN
+    RAISE EXCEPTION 'Test-only medication concepts cannot be matched to patient orders' USING ERRCODE = '23514';
+  END IF;
   IF NEW.reference_status <> 'verified' THEN RETURN NEW; END IF;
   SELECT d.source_provider, d.verification_status, (d.test_only OR s.test_only OR c.test_only)
     INTO v_provider, v_document_status, v_test_only
@@ -415,6 +470,9 @@ CREATE TRIGGER patient_medication_reference_matches_verified_validate
 CREATE TRIGGER medication_orders_reject_test_only_concept
   BEFORE INSERT OR UPDATE OF medication_concept_id ON public.medication_orders
   FOR EACH ROW EXECUTE FUNCTION public.reject_test_only_clinician_medication_concept();
+CREATE TRIGGER medication_concepts_test_only_immutable
+  BEFORE UPDATE OF test_only ON public.medication_concepts
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_medication_concept_test_only_mutation();
 
 ALTER TABLE public.medication_reference_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.medication_reference_snapshots ENABLE ROW LEVEL SECURITY;
@@ -437,5 +495,6 @@ REVOKE ALL ON FUNCTION public.audit_patient_medication_reference_match() FROM PU
 REVOKE ALL ON FUNCTION public.validate_patient_medication_reference_match_event() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.validate_patient_medication_reference_summary_for_ai() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.reject_test_only_clinician_medication_concept() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.prevent_medication_concept_test_only_mutation() FROM PUBLIC, anon, authenticated, service_role;
 
 NOTIFY pgrst, 'reload schema';

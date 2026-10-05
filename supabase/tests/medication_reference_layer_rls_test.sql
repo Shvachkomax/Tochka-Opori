@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(51);
+SELECT plan(55);
 
 INSERT INTO public.patient_medication_orders (
   id, owner_type, owner_id, source_module, item_type, name,
@@ -66,6 +66,12 @@ INSERT INTO public.medication_concepts (
   'Synthetic reference test', 'Synthetic reference test', 'single_ingredient', 'active', true
 );
 SELECT ok((SELECT test_only FROM public.medication_concepts WHERE id = 'b8000000-0000-4000-8000-000000000010'), 'synthetic catalog fixture is explicitly test-only');
+INSERT INTO public.medication_concepts (
+  id, concept_code, source_system, jurisdiction, canonical_name, display_name, concept_kind, status, test_only
+) VALUES (
+  'b8000000-0000-4000-8000-000000000030', 'medref.synthetic.nontest', 'internal', 'RU',
+  'Synthetic non-test concept', 'Synthetic non-test concept', 'single_ingredient', 'active', false
+);
 INSERT INTO public.medication_reference_documents (
   id, source_provider, source_document_id, canonical_identifier, source_title, source_version,
   retrieved_at, country, language, content_hash, verification_status, test_only, verified_at, verified_by
@@ -96,7 +102,7 @@ SELECT throws_ok(
       'b8000000-0000-4000-8000-000000000011', 'b8000000-0000-4000-8000-000000000010',
       'mismatched-test', '{}', repeat('c', 64), now(), false
     )$$,
-  '23514', 'Snapshot test_only must match its source document',
+  '23514', 'Snapshot test_only must match its source and concept',
   'test-only document cannot produce a non-test snapshot'
 );
 SELECT throws_ok(
@@ -133,6 +139,33 @@ SELECT throws_ok(
   '23514', 'Verified match event requires a verified non-test source snapshot',
   'test-only source cannot create a verified match event'
 );
+SELECT throws_ok(
+  $$UPDATE public.patient_medication_orders SET
+      reference_status = 'matched', medication_concept_id = 'b8000000-0000-4000-8000-000000000010',
+      reference_matched_by = 'patient', reference_match_method = 'explicit',
+      reference_matched_at = now(), reference_source_provider = 'fixture'
+    WHERE id = 'b8000000-0000-4000-8000-000000000001'$$,
+  '23514', 'Test-only medication concepts cannot be matched to patient orders',
+  'test-only concept cannot become a matched patient reference'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.patient_medication_reference_matches (
+      medication_order_id, owner_type, owner_id, reference_status,
+      medication_concept_id, matched_by, match_method, source_provider
+    ) VALUES (
+      'b8000000-0000-4000-8000-000000000001', 'anonymous_case',
+      'b8000000-0000-4000-8000-000000000002', 'matched',
+      'b8000000-0000-4000-8000-000000000010', 'patient', 'explicit', 'fixture'
+    )$$,
+  '23514', 'Test-only medication concepts cannot be matched to patient orders',
+  'test-only concept cannot create a matched reference event'
+);
+SELECT throws_ok(
+  $$UPDATE public.medication_concepts SET test_only = false
+    WHERE id = 'b8000000-0000-4000-8000-000000000010'$$,
+  '23514', 'Medication concept test_only is immutable after first use',
+  'concept used by a reference snapshot cannot change test_only'
+);
 INSERT INTO public.patient_medication_orders (
   id, owner_type, owner_id, source_module, item_type, name,
   single_dose, dose_unit, frequency_type, start_date, ongoing
@@ -158,14 +191,19 @@ SELECT throws_ok(
 SELECT throws_ok(
   $$INSERT INTO public.patient_medication_reference_matches (
       medication_order_id, owner_type, owner_id, reference_status,
-      medication_concept_id, matched_by, match_method
+      medication_concept_id, matched_by, match_method, source_provider
     ) VALUES (
       'b8000000-0000-4000-8000-000000000001', 'anonymous_case',
       'b8000000-0000-4000-8000-000000000099', 'matched',
-      'b8000000-0000-4000-8000-000000000010', 'patient', 'test'
+      'b8000000-0000-4000-8000-000000000030', 'patient', 'explicit', 'fixture'
     )$$,
   '23503', NULL,
   'reference match owner must match patient order owner'
+);
+SELECT lives_ok(
+  $$UPDATE public.medication_concepts SET test_only = true
+    WHERE id = 'b8000000-0000-4000-8000-000000000030'$$,
+  'unused concept test_only can still be changed'
 );
 
 SELECT throws_ok($$UPDATE public.medication_reference_documents SET source_title = 'changed' WHERE id = 'b8000000-0000-4000-8000-000000000011'$$, '55000', 'patient medication audit records are append-only', 'source documents are append-only');
