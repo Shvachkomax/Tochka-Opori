@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { getClientToken } from "./lib/clientToken.js";
+import { getClientToken, clearCachedToken } from "./lib/clientToken.js";
 import { withAccessToken, getBodySession } from "./lib/sessionAccess.js";
+import { parseApiResponse, classifyHttpError, classifyNetworkError, estimateRequestSize, countPhotos } from "./lib/apiResponse.js";
+import { compressPhotosToBudget } from "./lib/photoCompress.js";
 
 function getLocalDateString() {
   const d = new Date();
@@ -336,60 +338,55 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
     plateAnalysisRequestRef.current = requestId;
     setPlateAnalysisLoading(true);
     setPlateAnalysisError("");
+
+    const requestBody = {
+      module: "body",
+      stage: "plate_photo_analysis",
+      session_id: sessionId,
+      photos: photos.map(p => p.dataUrl),
+      request_id: requestId,
+    };
+
+    const requestSize = estimateRequestSize(requestBody);
+    console.log(`[plate-analysis] request_id=${requestId} photos=${photos.length} size=${requestSize}`);
+
+    async function doFetch(token) {
+      const hdrs = { "Content-Type": "application/json" };
+      if (token) hdrs["Authorization"] = `Bearer ${token}`;
+      return fetch("/api/analyze", { method: "POST", headers: hdrs, body: JSON.stringify(requestBody) });
+    }
+
     try {
       let token;
       try { token = await getClientToken("body", "analyze"); } catch {}
-      const hdrs = { "Content-Type": "application/json" };
-      if (token) hdrs["Authorization"] = `Bearer ${token}`;
-
-      let res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: hdrs,
-        body: JSON.stringify({
-          module: "body",
-          stage: "plate_photo_analysis",
-          session_id: sessionId,
-          photos: photos.map(p => p.dataUrl),
-          request_id: requestId,
-        }),
-      });
+      let res = await doFetch(token);
 
       if (res.status === 401 && token) {
+        clearCachedToken("analyze", "body");
         try { token = await getClientToken("body", "analyze"); } catch {}
-        hdrs["Authorization"] = `Bearer ${token}`;
-        res = await fetch("/api/analyze", {
-          method: "POST",
-          headers: hdrs,
-          body: JSON.stringify({
-            module: "body",
-            stage: "plate_photo_analysis",
-            session_id: sessionId,
-            photos: photos.map(p => p.dataUrl),
-            request_id: requestId,
-          }),
-        });
+        res = await doFetch(token);
       }
 
       if (plateAnalysisRequestRef.current !== requestId) return;
 
-      const data = await res.json();
-      if (data.ok && Array.isArray(data.results)) {
-        const hasAnySuccess = data.results.some(r => !r.error);
+      const parsed = await parseApiResponse(res);
+
+      if (parsed.json?.ok && Array.isArray(parsed.json.results)) {
+        const hasAnySuccess = parsed.json.results.some(r => !r.error);
         if (hasAnySuccess) {
-          setPlateAnalysis(data.results);
+          setPlateAnalysis(parsed.json.results);
         } else {
-          const firstError = data.results.find(r => r.error);
+          const firstError = parsed.json.results.find(r => r.error);
           setPlateAnalysisError(firstError?.error || "Не удалось проанализировать фото.");
         }
-      } else if (res.status === 402) {
-        setPlateAnalysisError("Недостаточно средств для анализа.");
-      } else if (res.status === 401) {
-        setPlateAnalysisError("Сессия истекла. Войдите снова по коду продолжения.");
       } else {
-        setPlateAnalysisError("Не удалось проанализировать фото.");
+        const err = classifyHttpError(parsed.status, parsed.json, parsed.text);
+        console.warn(`[plate-analysis] request_id=${requestId} failed status=${parsed.status} code=${err.code}`);
+        setPlateAnalysisError(err.message);
       }
-    } catch {
+    } catch (err) {
       if (plateAnalysisRequestRef.current !== requestId) return;
+      console.warn(`[plate-analysis] request_id=${requestId} network_error`);
       setPlateAnalysisError("Ошибка при анализе фото. Попробуйте ещё раз.");
     } finally {
       if (plateAnalysisRequestRef.current === requestId) {
@@ -408,6 +405,37 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
     e.preventDefault();
     setSubmitError("");
     setSubmitting(true);
+
+    const requestId = `diary-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const photoCount = photos.length;
+
+    // Adaptive photo compression with budget based on non-photo fields
+    let compressedPhotos = photos;
+    let photoBytes = 0;
+    let photoTruncated = false;
+    if (photos.length > 0) {
+      // Estimate non-photo fields size
+      const nonPhotoLog = { ...log, plate_photos: null };
+      const baseBytes = estimateRequestSize(nonPhotoLog);
+      try {
+        const result = await compressPhotosToBudget(
+          photos.map(p => ({ dataUrl: p.dataUrl, name: p.name })),
+          3 * 1024 * 1024,
+          baseBytes
+        );
+        compressedPhotos = result.photos.map((p, i) => ({ ...photos[i], dataUrl: p.dataUrl }));
+        photoBytes = result.totalBytes;
+        photoTruncated = result.truncated;
+        if (photoTruncated) {
+          setSubmitError(`Добавлено максимум 6 фото. Лишние фото не были прикреплены.`);
+          setTimeout(() => setSubmitError(""), 5000);
+        }
+        console.log(`[diary-save] request_id=${requestId} photo_compress: ${photos.length}→${compressedPhotos.length} photos, ${result.compressed} compressed, truncated=${photoTruncated}, base=${(baseBytes/1024).toFixed(0)}KB`);
+      } catch {
+        compressedPhotos = photos; // fallback to originals — do NOT silently drop
+        photoTruncated = false;
+      }
+    }
 
     const log = {
       log_date: logDate,
@@ -447,54 +475,95 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       mood_level: moodLevel,
       day_text: dayText || null,
       voice_transcript: voiceTranscript || null,
-      plate_photos: photos.length > 0 ? photos.map(p => p.dataUrl) : null,
+      plate_photos: compressedPhotos.length > 0 ? compressedPhotos.map(p => p.dataUrl) : null,
       plate_analysis: plateAnalysis.length > 0 ? plateAnalysis : null,
     };
 
-    try {
-      let token;
-      try { token = await getClientToken("body", "analyze"); } catch {}
+    const requestBody = {
+      module: "body",
+      stage: "daily_log_submitted",
+      session_id: sessionId,
+      daily_log: log,
+      request_id: requestId,
+      run_ai: false,
+    };
+
+    const requestSize = estimateRequestSize(requestBody);
+    console.log(`[diary-save] request_id=${requestId} photos=${photoCount} size=${requestSize}`);
+
+    if (requestSize > 4.5 * 1024 * 1024) {
+      setSubmitError(`Запрос слишком большой (${(requestSize / 1024 / 1024).toFixed(1)} МБ). Попробуйте уменьшить фото.`);
+      setSubmitting(false);
+      return;
+    }
+
+    async function doFetch(token, body) {
       const hdrs = { "Content-Type": "application/json" };
       if (token) hdrs["Authorization"] = `Bearer ${token}`;
+      return fetch("/api/analyze", { method: "POST", headers: hdrs, body: JSON.stringify(body) });
+    }
 
-      let res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: hdrs,
-        body: JSON.stringify({
-          module: "body",
-          stage: "daily_log_submitted",
-          session_id: sessionId,
-          daily_log: log,
-        }),
-      });
-
+    async function fetchWithRetry(body) {
+      let token;
+      try { token = await getClientToken("body", "analyze"); } catch {}
+      let res = await doFetch(token, body);
       if (res.status === 401 && token) {
+        clearCachedToken("analyze", "body");
         try { token = await getClientToken("body", "analyze"); } catch {}
-        hdrs["Authorization"] = `Bearer ${token}`;
-        res = await fetch("/api/analyze", {
-          method: "POST",
-          headers: hdrs,
-          body: JSON.stringify({
-            module: "body",
-            stage: "daily_log_submitted",
-            session_id: sessionId,
-            daily_log: log,
-          }),
-        });
+        res = await doFetch(token, body);
       }
+      return res;
+    }
 
-      const data = await res.json();
-      if (!res.ok || !data.ok || data.saved !== true) {
-        setSubmitError(
-          data.error || "Не удалось сохранить дневник. Попробуйте ещё раз."
-        );
+    try {
+      // Step 1: Save diary (no AI)
+      const saveRes = await fetchWithRetry(requestBody);
+      const saveParsed = await parseApiResponse(saveRes);
+
+      if (!saveParsed.ok || !saveParsed.json?.ok || saveParsed.json?.saved !== true) {
+        const err = classifyHttpError(saveParsed.status, saveParsed.json, saveParsed.text);
+        if (err.code === "UNAUTHORIZED") clearCachedToken("analyze", "body");
+        console.warn(`[diary-save] request_id=${requestId} save_failed status=${saveParsed.status} code=${err.code}`);
+        setSubmitError(err.message);
         setSubmitting(false);
         return;
       }
-      onComplete(data);
+
+      const savedData = saveParsed.json;
+      console.log(`[diary-save] request_id=${requestId} saved=true daily_log_id=${savedData.daily_log_id}`);
+
+      // Step 2: Trigger AI analysis (separate request, idempotent)
+      let aiResult = null;
+      try {
+        const aiRes = await fetchWithRetry({
+          module: "body",
+          stage: "daily_log_ai_analysis",
+          session_id: sessionId,
+          daily_log_id: savedData.daily_log_id,
+          request_id: `${requestId}-ai`,
+        });
+        const aiParsed = await parseApiResponse(aiRes);
+        if (aiParsed.ok && aiParsed.json?.ok) {
+          aiResult = aiParsed.json;
+          console.log(`[diary-save] request_id=${requestId} ai_status=${aiResult.ai_analysis_status} cached=${!!aiResult.cached}`);
+        } else {
+          console.warn(`[diary-save] request_id=${requestId} ai_failed status=${aiParsed.status}`);
+        }
+      } catch {
+        console.warn(`[diary-save] request_id=${requestId} ai_network_error`);
+      }
+
+      // Return combined result: save confirmed + AI status
+      onComplete({
+        ...savedData,
+        ...(aiResult || {}),
+        saved: true,
+        ai_analysis_status: aiResult?.ai_analysis_status || "pending",
+      });
     } catch (err) {
-      console.error("Diary submit error:", err);
-      setSubmitError("Не удалось сохранить дневник. Попробуйте ещё раз.");
+      const netErr = classifyNetworkError(err);
+      console.warn(`[diary-save] request_id=${requestId} network_error size=${requestSize} photos=${photoCount}`);
+      setSubmitError(netErr.message);
       setSubmitting(false);
     }
   }

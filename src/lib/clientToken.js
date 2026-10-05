@@ -45,6 +45,13 @@ async function fetchToken(action, module) {
   return data.token;
 }
 
+export function clearCachedToken(action, module) {
+  try {
+    const key = `${STORAGE_PREFIX}${action}:${module}`;
+    localStorage.removeItem(key);
+  } catch {}
+}
+
 export async function getClientToken(module, purpose) {
   const cached = getCached(purpose, module);
   if (cached) return cached;

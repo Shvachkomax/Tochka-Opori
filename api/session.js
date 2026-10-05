@@ -1992,7 +1992,7 @@ async function handleGetBodyCabinet(req, res) {
       .eq("owner_id", ownerId)
       .eq("owner_type", "anonymous_profile")
       .eq("module", "body")
-      .eq("revoked_at", null)
+      .is("revoked_at", null)
       .maybeSingle();
 
     return res.status(200).json({
@@ -2821,7 +2821,7 @@ async function handleGetBodyAiChat(req, res) {
 
     const { data: messages, error } = await supabase
       .from("body_ai_chat")
-      .select("id, role, message_text, ai_response, created_at, model_used, request_id")
+      .select("id, role, message_text, created_at, model_used, request_id")
       .eq("owner_id", owner.ownerId)
       .order("created_at", { ascending: false })
       .limit(msgLimit);
@@ -2831,8 +2831,17 @@ async function handleGetBodyAiChat(req, res) {
       return res.status(500).json({ ok: false, error: "Не удалось загрузить историю чата." });
     }
 
-    // Return in chronological order
-    const sorted = (messages || []).reverse();
+    // Return in chronological order, recovering full response from message_text JSON
+    const sorted = (messages || []).reverse().map(msg => {
+      // If message_text looks like JSON (fallback serialization), parse it back
+      if (msg.role === "assistant" && msg.message_text && msg.message_text.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(msg.message_text);
+          return { ...msg, ai_response: parsed, message_text: parsed.answer || msg.message_text };
+        } catch {}
+      }
+      return msg;
+    });
     return res.status(200).json({ ok: true, messages: sorted });
   } catch (error) {
     console.error("handleGetBodyAiChat error:", error.message);
@@ -2904,16 +2913,18 @@ async function handleSendBodyAiMessage(req, res) {
     const intentResult = detectIntent(trimmed, config, intentContext);
     if (intentResult) {
       // Save deterministic response
-      await supabase.from("body_ai_chat").insert({
-        owner_type: "anonymous_profile",
-        owner_id: owner.ownerId,
-        session_id,
-        role: "assistant",
-        message_text: intentResult.answer,
-        ai_response: intentResult,
-        model_used: "deterministic",
-        created_at: new Date().toISOString(),
-      });
+      try {
+        await supabase.from("body_ai_chat").insert({
+          owner_type: "anonymous_profile",
+          owner_id: owner.ownerId,
+          session_id,
+          role: "assistant",
+          message_text: intentResult.answer,
+          ai_response: intentResult,
+          model_used: "deterministic",
+          created_at: new Date().toISOString(),
+        });
+      } catch (_) { /* ai_response column may not exist; message_text is saved by caller */ }
       return res.status(200).json({
         ok: true,
         message: {
@@ -3019,14 +3030,13 @@ async function handleSendBodyAiMessage(req, res) {
 
     // Save assistant response
     const assistantMsgId = crypto.randomUUID();
-    const { error: assistantInsertErr } = await supabase.from("body_ai_chat").insert({
+    let assistantPayload = {
       id: assistantMsgId,
       owner_type: "anonymous_profile",
       owner_id: owner.ownerId,
       session_id,
       role: "assistant",
       message_text: aiAnswer,
-      ai_response: { answer: aiAnswer, small_next_step: aiSmallStep, question_for_specialist: aiQuestion, safety_note: aiSafety, confidence: aiConfidence },
       context_snapshot: {
         logs_count: context.recent_daily_logs?.length || 0,
         insights_count: context.active_insights?.length || 0,
@@ -3035,7 +3045,18 @@ async function handleSendBodyAiMessage(req, res) {
       request_id: requestId,
       model_used: result.model_used,
       created_at: new Date().toISOString(),
-    });
+    };
+    let assistantInsertErr = null;
+    const fullResponse = { answer: aiAnswer, small_next_step: aiSmallStep, question_for_specialist: aiQuestion, safety_note: aiSafety, confidence: aiConfidence };
+    ({ error: assistantInsertErr } = await supabase.from("body_ai_chat").insert({
+      ...assistantPayload,
+      ai_response: fullResponse,
+    }));
+    if (assistantInsertErr && assistantInsertErr.code === "42703") {
+      // ai_response column does not exist — serialize full response into message_text
+      assistantPayload.message_text = JSON.stringify(fullResponse);
+      ({ error: assistantInsertErr } = await supabase.from("body_ai_chat").insert(assistantPayload));
+    }
     if (assistantInsertErr) {
       console.error("[chat] step=8 assistant insert FAILED:", assistantInsertErr.code);
     } else {

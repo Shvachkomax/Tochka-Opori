@@ -15,6 +15,7 @@ import councilHandler from "./api/council.js";
 import usageHandler from "./api/usage.js";
 import startSessionHandler from "./api/start-session.js";
 import specialistHandler from "./api/specialist.js";
+import clientTokenHandler from "./api/client-token.js";
 
 const PORT = 3001;
 
@@ -60,6 +61,9 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
 
     if (nodeReq.url.startsWith("/api/specialist")) {
       return specialistHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/client-token")) {
+      return clientTokenHandler(req, res);
     }
     if (nodeReq.url.startsWith("/api/start-session")) {
       return startSessionHandler(req, res);

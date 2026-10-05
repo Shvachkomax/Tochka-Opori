@@ -887,10 +887,16 @@ ${conversationStyle}
 
 // Body diary daily log handler
 async function handleDailyLogAnalysis(req, res) {
-  const { session_id, daily_log } = req.body || {};
+  const { session_id, daily_log, request_id: clientRequestId, run_ai } = req.body || {};
+  const diagId = clientRequestId || `diag-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const startTime = Date.now();
+  const photoCount = Array.isArray(daily_log?.plate_photos) ? daily_log.plate_photos.length : 0;
+  const bodySize = JSON.stringify(req.body || {}).length;
+  const skipAi = run_ai === false;
 
   if (!session_id || !daily_log) {
-    return res.status(400).json({ ok: false, saved: false, error: "Missing session_id or daily_log" });
+    console.warn(`[body-diary-save] request_id=${diagId} stage=validation error=missing_fields`);
+    return res.status(400).json({ ok: false, saved: false, error: "Missing session_id or daily_log", request_id: diagId });
   }
 
   // Local date helper (avoids UTC offset issues near midnight)
@@ -924,7 +930,11 @@ async function handleDailyLogAnalysis(req, res) {
       "day_text", "voice_transcript",
       "plate_photos", "plate_analysis",
     ];
-    const safeLog = { session_id, module: "body", log_date: logDate };
+    const safeLog = { session_id, module: "body", log_date: logDate, daily_log_version: 2 };
+    // save_request_id requires migration; gracefully degrade if column missing
+    try {
+      safeLog.save_request_id = diagId;
+    } catch {}
     for (const key of ALLOWED_COLS) {
       if (daily_log[key] !== undefined) {
         safeLog[key] = daily_log[key];
@@ -956,36 +966,57 @@ async function handleDailyLogAnalysis(req, res) {
       .maybeSingle();
 
     if (findError) {
-      console.error("[body-diary-save] find error:", findError.code, findError.message);
-      return res.status(500).json({ ok: false, saved: false, error: "Не удалось сохранить дневник. Попробуйте ещё раз." });
+      console.error(`[body-diary-save] request_id=${diagId} stage=find_db_error code=${findError.code} size=${bodySize} photos=${photoCount}`);
+      return res.status(500).json({ ok: false, saved: false, error: "Не удалось сохранить дневник. Попробуйте ещё раз.", request_id: diagId });
     }
 
     let savedLog;
     if (existing) {
       // Update existing row
-      const { data: updated, error: updateError } = await supabase
+      let { data: updated, error: updateError } = await supabase
         .from("body_daily_logs")
         .update({ ...safeLog, updated_at: new Date().toISOString() })
         .eq("id", existing.id)
         .select("id, session_id, log_date, created_at, updated_at")
         .single();
 
+      // Fallback: if save_request_id column missing, retry without it
+      if (updateError && updateError.code === "42703") {
+        const { save_request_id: _omit, ...fallbackLog } = safeLog;
+        ({ data: updated, error: updateError } = await supabase
+          .from("body_daily_logs")
+          .update({ ...fallbackLog, updated_at: new Date().toISOString() })
+          .eq("id", existing.id)
+          .select("id, session_id, log_date, created_at, updated_at")
+          .single());
+      }
+
       if (updateError || !updated) {
-        console.error("[body-diary-save] update error:", updateError?.code, updateError?.message);
-        return res.status(500).json({ ok: false, saved: false, error: "Не удалось сохранить дневник. Попробуйте ещё раз." });
+        console.error(`[body-diary-save] request_id=${diagId} stage=update_db_error code=${updateError?.code} size=${bodySize} photos=${photoCount}`);
+        return res.status(500).json({ ok: false, saved: false, error: "Не удалось сохранить дневник. Попробуйте ещё раз.", request_id: diagId });
       }
       savedLog = updated;
     } else {
       // Insert new row
-      const { data: inserted, error: insertError } = await supabase
+      let { data: inserted, error: insertError } = await supabase
         .from("body_daily_logs")
         .insert(safeLog)
         .select("id, session_id, log_date, created_at, updated_at")
         .single();
 
+      // Fallback: if save_request_id column missing, retry without it
+      if (insertError && insertError.code === "42703") {
+        const { save_request_id: _omit, ...fallbackLog } = safeLog;
+        ({ data: inserted, error: insertError } = await supabase
+          .from("body_daily_logs")
+          .insert(fallbackLog)
+          .select("id, session_id, log_date, created_at, updated_at")
+          .single());
+      }
+
       if (insertError || !inserted) {
-        console.error("[body-diary-save] insert error:", insertError?.code, insertError?.message);
-        return res.status(500).json({ ok: false, saved: false, error: "Не удалось сохранить дневник. Попробуйте ещё раз." });
+        console.error(`[body-diary-save] request_id=${diagId} stage=insert_db_error code=${insertError?.code} size=${bodySize} photos=${photoCount}`);
+        return res.status(500).json({ ok: false, saved: false, error: "Не удалось сохранить дневник. Попробуйте ещё раз.", request_id: diagId });
       }
       savedLog = inserted;
     }
@@ -1103,6 +1134,21 @@ async function handleDailyLogAnalysis(req, res) {
       } catch (plateErr) {
         console.error("[body-diary-save] plate history save skipped:", plateErr.message);
       }
+    }
+
+    console.log(`[body-diary-save] request_id=${diagId} stage=db_saved confirmed=true size=${bodySize} photos=${photoCount} duration=${Date.now() - startTime}ms`);
+
+    // If AI is deferred, return immediately after confirmed save
+    if (skipAi) {
+      return res.status(200).json({
+        ok: true,
+        saved: true,
+        request_id: diagId,
+        daily_log_id: savedLog.id,
+        log_date: savedLog.log_date,
+        session_id,
+        ai_analysis_status: "pending",
+      });
     }
 
     // Only now run AI analysis (after confirmed save)
@@ -1238,13 +1284,14 @@ ${dayDesc || "Нет заполненных полей."}
         }
       }
 
-      // Debit credits for AI analysis
+      // Debit credits for AI analysis (version-stable idempotency key)
       try {
+        const debitVersion = safeLog.daily_log_version || 1;
         await debitCreditsForSession({
           sessionId: session_id,
           module: "body",
           resourceType: "body_diary_ai_analysis",
-          requestId: `body-diary-ai-${session_id}-${Date.now()}`,
+          requestId: `body-diary-ai-${savedLog.id}-v${debitVersion}`,
           provider: result.provider,
           model: result.model_used,
         });
@@ -1255,6 +1302,7 @@ ${dayDesc || "Нет заполненных полей."}
       return res.status(200).json({
         ok: true,
         saved: true,
+        request_id: diagId,
         daily_log_id: savedLog.id,
         log_date: savedLog.log_date,
         session_id,
@@ -1269,12 +1317,14 @@ ${dayDesc || "Нет заполненных полей."}
       });
     } catch (aiError) {
       // Save succeeded but AI failed — still return success with fallback text
-      console.error("[body-diary-save] AI analysis failed:", aiError.message);
+      console.error(`[body-diary-save] request_id=${diagId} stage=ai_error code=ai_failed duration=${Date.now() - startTime}ms`);
       return res.status(200).json({
         ok: true,
         saved: true,
+        request_id: diagId,
         daily_log_id: savedLog.id,
         analysis_ready: false,
+        ai_analysis_status: "error",
         log_date: savedLog.log_date,
         session_id,
         ai_day_summary: "Спасибо, день записан. Продолжайте наблюдение.",
@@ -1282,8 +1332,340 @@ ${dayDesc || "Нет заполненных полей."}
       });
     }
   } catch (err) {
-    console.error("[body-diary-save] fatal error:", err.message);
-    return res.status(500).json({ ok: false, saved: false, error: "Не удалось сохранить дневник. Попробуйте ещё раз." });
+    console.error(`[body-diary-save] request_id=${diagId} stage=fatal_error message=${err.message} size=${bodySize} photos=${photoCount} duration=${Date.now() - startTime}ms`);
+    return res.status(500).json({ ok: false, saved: false, error: "Не удалось сохранить дневник. Попробуйте ещё раз.", request_id: diagId });
+  }
+}
+
+async function handleDailyLogAiAnalysis(req, res) {
+  const { session_id, daily_log_id, request_id: clientRequestId } = req.body || {};
+  const diagId = clientRequestId || `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const startTime = Date.now();
+
+  if (!session_id) {
+    return res.status(400).json({ ok: false, error: "Missing session_id", request_id: diagId });
+  }
+
+  try {
+    const { getSupabase } = await import("../lib/supabase.js");
+    const supabase = getSupabase();
+
+    // Find the diary entry
+    let diaryQuery = supabase
+      .from("body_daily_logs")
+      .select("id, log_date, steps, activity_comment, workout_done, workout_type, workout_minutes, calories, breakfast, lunch, dinner, snacks, nutrition_comment, overeating_level, sweet_cravings, water_l, sleep_hours, sleep_quality, energy_level, mood_level, day_text, plate_analysis, ai_analysis_status, ai_analysis_request_id, daily_log_version, updated_at")
+      .eq("session_id", session_id);
+
+    if (daily_log_id) {
+      diaryQuery = diaryQuery.eq("id", daily_log_id);
+    } else {
+      diaryQuery = diaryQuery.order("created_at", { ascending: false }).limit(1);
+    }
+
+    const { data: diary, error: findError } = await diaryQuery.maybeSingle();
+
+    if (findError || !diary) {
+      console.warn(`[body-diary-ai] request_id=${diagId} stage=find_error code=${findError?.code} session=${session_id}`);
+      return res.status(404).json({ ok: false, error: "Дневник не найден.", request_id: diagId });
+    }
+
+    // Idempotency: if AI already completed, return cached result
+    if (diary.ai_analysis_status === "success") {
+      return res.status(200).json({
+        ok: true,
+        saved: true,
+        request_id: diagId,
+        daily_log_id: diary.id,
+        ai_analysis_status: "success",
+        ai_day_summary: diary.ai_day_summary || null,
+        ai_focus_tomorrow: diary.ai_focus_tomorrow || null,
+        cached: true,
+      });
+    }
+
+    // Idempotency: if AI is in progress (another request started), don't duplicate
+    if (diary.ai_analysis_status === "in_progress" && diary.ai_analysis_request_id && diary.ai_analysis_request_id !== diagId) {
+      const elapsed = Date.now() - new Date(diary.updated_at || 0).getTime();
+      if (elapsed < 120000) { // 2 min timeout for in-progress
+        return res.status(200).json({
+          ok: true,
+          saved: true,
+          request_id: diagId,
+          daily_log_id: diary.id,
+          ai_analysis_status: "in_progress",
+          message: "Анализ уже выполняется.",
+        });
+      }
+      // Timeout: allow retry
+    }
+
+    // Mark as in_progress with our request_id
+    // Stable debit ID: same for retry of same version, different for new version
+    const analyzeVersion = diary.daily_log_version || 1;
+    const stableDebitId = `body-diary-ai-${diary.id}-v${analyzeVersion}`;
+    await supabase
+      .from("body_daily_logs")
+      .update({ ai_analysis_status: "in_progress", ai_analysis_request_id: diagId })
+      .eq("id", diary.id)
+      .eq("ai_analysis_status", "pending"); // Only if still pending (CAS)
+
+    // Re-read to confirm we won the race
+    const { data: confirmed } = await supabase
+      .from("body_daily_logs")
+      .select("ai_analysis_status, ai_analysis_request_id")
+      .eq("id", diary.id)
+      .maybeSingle();
+
+    if (confirmed?.ai_analysis_request_id && confirmed.ai_analysis_request_id !== diagId && confirmed.ai_analysis_status === "in_progress") {
+      return res.status(200).json({
+        ok: true,
+        saved: true,
+        request_id: diagId,
+        daily_log_id: diary.id,
+        ai_analysis_status: "in_progress",
+        message: "Анализ уже выполняется другим запросом.",
+      });
+    }
+
+    // Run AI analysis
+    const conversationStyle = readCorePrompt("conversation-style.md") || "";
+    const systemPrompt = `
+Ты — доброжелательный ассистент модуля "Здоровье & Стройность". Пользователь заполнил дневник дня.
+Твоя задача: написать структурированный итог дня.
+Верни JSON строго с полями:
+{
+  "ai_day_summary": "2-4 предложения общий итог дня",
+  "ai_positive_observation": "одно конкретное что получилось сегодня",
+  "ai_pattern_observation": "одно наблюдение или паттерн, если данных достаточно; иначе null",
+  "ai_focus_tomorrow": "один мягкий фокус на завтра",
+  "ai_question_for_user": "один открытый вопрос для рефлексии"
+}
+${conversationStyle}
+`;
+
+    const plateSummary = Array.isArray(diary.plate_analysis) && diary.plate_analysis.length > 0
+      ? diary.plate_analysis.map((p, i) => `Фото ${i + 1}: ${p.balance_summary || "—"}`).join("\n")
+      : null;
+
+    const dayDesc = [
+      diary.steps ? `Шаги: ${diary.steps}` : null,
+      diary.activity_comment ? `Активность: ${diary.activity_comment}` : null,
+      diary.workout_done ? `Тренировка: ${diary.workout_type || "да"}` : "Тренировки не было",
+      diary.calories ? `Калории: ${diary.calories}` : null,
+      diary.breakfast ? `Завтрак: ${diary.breakfast}` : null,
+      diary.lunch ? `Обед: ${diary.lunch}` : null,
+      diary.dinner ? `Ужин: ${diary.dinner}` : null,
+      diary.sleep_hours ? `Сон: ${diary.sleep_hours} ч` : null,
+      diary.energy_level ? `Энергия: ${diary.energy_level}/10` : null,
+      diary.mood_level ? `Настроение: ${diary.mood_level}/10` : null,
+      diary.day_text ? `Комментарий: ${diary.day_text}` : null,
+      plateSummary ? `Анализ тарелок:\n${plateSummary}` : null,
+    ].filter(Boolean).join("\n");
+
+    const userPrompt = `Пользователь записал день в дневник здоровья.\n\n${dayDesc || "Нет заполненных полей."}\n\nНапиши короткий итог дня.`;
+
+    const MODEL = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
+    const FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
+    const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
+
+    const result = await runTask(TASK_TYPES.BODY_INTAKE, {
+      systemPrompt,
+      userPrompt,
+      model: MODEL,
+      fallbackModel: FALLBACK,
+      reasoningEffort: REASONING_EFFORT,
+    });
+
+    const parsed = result.parsed;
+
+    // Late-response protection: only write if version hasn't changed
+    const { data: current } = await supabase
+      .from("body_daily_logs")
+      .select("daily_log_version, updated_at")
+      .eq("id", diary.id)
+      .maybeSingle();
+
+    const currentVersion = current?.daily_log_version || 1;
+    if (currentVersion !== analyzeVersion) {
+      console.warn(`[body-diary-ai] request_id=${diagId} stage=stale_response version_old=${analyzeVersion} version_current=${currentVersion}`);
+      return res.status(200).json({
+        ok: true,
+        saved: true,
+        request_id: diagId,
+        daily_log_id: diary.id,
+        ai_analysis_status: "stale",
+        message: "Дневник был изменён во время анализа. Запустите анализ заново.",
+      });
+    }
+
+    if (parsed && parsed.ai_day_summary) {
+      // Ownership check: verify we still own this operation (not superseded by timeout retry)
+      const { data: ownership } = await supabase
+        .from("body_daily_logs")
+        .select("ai_analysis_request_id, ai_analysis_status")
+        .eq("id", diary.id)
+        .maybeSingle();
+
+      if (ownership?.ai_analysis_request_id !== diagId) {
+        console.warn(`[body-diary-ai] request_id=${diagId} stage=lost_ownership current_owner=${ownership?.ai_analysis_request_id}`);
+        return res.status(200).json({
+          ok: true, saved: true, request_id: diagId, daily_log_id: diary.id,
+          ai_analysis_status: "superseded",
+          message: "Операция была заменена другим запросом.",
+        });
+      }
+
+      // Write results with CAS on version
+      const { error: updateErr } = await supabase
+        .from("body_daily_logs")
+        .update({
+          ai_day_summary: parsed.ai_day_summary,
+          ai_focus_tomorrow: parsed.ai_focus_tomorrow,
+          ai_positive_observation: parsed.ai_positive_observation || null,
+          ai_pattern_observation: parsed.ai_pattern_observation || null,
+          ai_question_for_user: parsed.ai_question_for_user || null,
+          ai_analysis_status: "success",
+          ai_analysis_request_id: diagId,
+          ai_analysis_model: result.model_used,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", diary.id)
+        .eq("daily_log_version", analyzeVersion) // CAS: only if version unchanged
+        .eq("ai_analysis_request_id", diagId); // CAS: only if we still own it
+
+      if (updateErr) {
+        console.warn(`[body-diary-ai] request_id=${diagId} stage=write_conflict`);
+        return res.status(200).json({
+          ok: true,
+          saved: true,
+          request_id: diagId,
+          ai_analysis_status: "stale",
+          message: "Дневник был изменён. Запустите анализ заново.",
+        });
+      }
+
+      // Debit with stable idempotency key
+      try {
+        const { debitCreditsForSession } = await import("../lib/usage/debit.js");
+        await debitCreditsForSession({
+          sessionId: session_id,
+          module: "body",
+          resourceType: "body_diary_ai_analysis",
+          requestId: stableDebitId, // Stable across retries
+          provider: result.provider,
+          model: result.model_used,
+        });
+      } catch (e) {
+        console.error(`[body-diary-ai] request_id=${diagId} debit_failed: ${e.message}`);
+      }
+    }
+
+    console.log(`[body-diary-ai] request_id=${diagId} stage=ai_completed duration=${Date.now() - startTime}ms`);
+
+    return res.status(200).json({
+      ok: true,
+      saved: true,
+      request_id: diagId,
+      daily_log_id: diary.id,
+      ai_analysis_status: "success",
+      ai_day_summary: parsed?.ai_day_summary || "Спасибо, день записан.",
+      ai_positive_observation: parsed?.ai_positive_observation || null,
+      ai_pattern_observation: parsed?.ai_pattern_observation || null,
+      ai_focus_tomorrow: parsed?.ai_focus_tomorrow || "Постарайтесь сегодня лечь спать вовремя.",
+      ai_question_for_user: parsed?.ai_question_for_user || null,
+      model_used: result.model_used,
+    });
+  } catch (aiError) {
+    console.error(`[body-diary-ai] request_id=${diagId} stage=ai_error message=${aiError.message} duration=${Date.now() - startTime}ms`);
+    // Reset to pending so retry is possible
+    try {
+      const { getSupabase } = await import("../lib/supabase.js");
+      await getSupabase().from("body_daily_logs")
+        .update({ ai_analysis_status: "error" })
+        .eq("id", daily_log_id || "");
+    } catch {}
+    return res.status(200).json({
+      ok: true,
+      saved: true,
+      request_id: diagId,
+      ai_analysis_status: "error",
+      error: "Анализ временно недоступен. Дневник сохранён.",
+    });
+  }
+}
+
+async function handleCheckSaveStatus(req, res) {
+  const { session_id, save_request_id, daily_log_id } = req.body || {};
+  const diagId = `check-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  if (!session_id) {
+    return res.status(400).json({ ok: false, error: "Missing session_id", request_id: diagId });
+  }
+
+  try {
+    const { getSupabase } = await import("../lib/supabase.js");
+    const supabase = getSupabase();
+
+    let query = supabase
+      .from("body_daily_logs")
+      .select("id, log_date, ai_analysis_status, ai_analysis_request_id, updated_at, daily_log_version")
+      .eq("session_id", session_id);
+
+    if (save_request_id) {
+      query = query.eq("save_request_id", save_request_id);
+    } else if (daily_log_id) {
+      query = query.eq("id", daily_log_id);
+    } else {
+      query = query.order("created_at", { ascending: false }).limit(1);
+    }
+
+    const { data: diary, error: findError } = await query.maybeSingle();
+
+    // If save_request_id column doesn't exist (PGRST204), cannot confirm
+    if (findError && findError.code === "PGRST204" && save_request_id) {
+      return res.status(200).json({
+        ok: false,
+        found: false,
+        saved: false,
+        confirmed: false,
+        message: "Не удалось подтвердить сохранение: поле идентификатора операции недоступно. Проверьте дневник вручную.",
+        request_id: diagId,
+      });
+    }
+
+    if (findError) {
+      console.error(`[check-save] request_id=${diagId} stage=query_error code=${findError.code}`);
+      return res.status(500).json({ ok: false, error: "Ошибка проверки.", request_id: diagId });
+    }
+
+    if (!diary) {
+      return res.status(200).json({
+        ok: false,
+        found: false,
+        saved: false,
+        confirmed: false,
+        message: "Результат операции не подтверждён. Возможно, после этой операции дневник был изменён другим запросом.",
+        request_id: diagId,
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      found: true,
+      saved: true,
+      confirmed: true,
+      daily_log_id: diary.id,
+      log_date: diary.log_date,
+      save_request_id: diary.save_request_id,
+      ai_analysis_status: diary.ai_analysis_status || "pending",
+      ai_analysis_request_id: diary.ai_analysis_request_id || null,
+      daily_log_version: diary.daily_log_version || 1,
+      updated_at: diary.updated_at,
+      request_id: diagId,
+    });
+  } catch (err) {
+    console.error(`[check-save] request_id=${diagId} stage=fatal message=${err.message}`);
+    return res.status(500).json({ ok: false, error: "Ошибка проверки.", request_id: diagId });
   }
 }
 
@@ -1424,7 +1806,7 @@ async function handlePlatePhotoAnalysis(req, res) {
   });
 }
 
-const VALID_STAGES = ["intake_completed", "daily_log_submitted", "plate_photo_analysis"];
+const VALID_STAGES = ["intake_completed", "daily_log_submitted", "plate_photo_analysis", "daily_log_ai_analysis", "check_save_status"];
 const MAX_TEXT_LENGTH = 15000;
 const MAX_CONVERSATION_TURNS = 50;
 
@@ -1468,6 +1850,16 @@ export default async function handler(req, res) {
   // Body diary daily log stage
   if (stage === "daily_log_submitted" && activeModule === "body" && session_id && daily_log) {
     return await handleDailyLogAnalysis(req, res);
+  }
+
+  // Body diary AI-only analysis (after confirmed save)
+  if (stage === "daily_log_ai_analysis" && activeModule === "body" && session_id) {
+    return await handleDailyLogAiAnalysis(req, res);
+  }
+
+  // Check save status by request_id (after potential response loss)
+  if (stage === "check_save_status" && activeModule === "body" && session_id) {
+    return await handleCheckSaveStatus(req, res);
   }
 
   // Body plate photo analysis stage
