@@ -938,7 +938,7 @@ async function handleDailyLogAnalysis(req, res) {
       "day_text", "voice_transcript",
       "plate_photos", "plate_analysis",
     ];
-    const safeLog = { session_id, module: "body", log_date: logDate, daily_log_version: 2 };
+    const safeLog = { session_id, module: "body", log_date: logDate, daily_log_version: 2, ai_analysis_status: "pending" };
     // save_request_id requires migration; gracefully degrade if column missing
     try {
       safeLog.save_request_id = diagId;

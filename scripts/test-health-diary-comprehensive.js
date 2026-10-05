@@ -304,4 +304,41 @@ assert.ok(!analyzeCode.includes("Запись не найдена. Возмож�
 
 console.log("PASS save verification contract: no fallback, 'not confirmed' on missing column and A-after-B");
 
+// ── 10. Sequential scenario: save → AI success → repeat cached → 1 debit ──
+
+resetDb();
+const seqDiary = makeDiary({ ai_analysis_status: "pending", daily_log_version: 1 });
+mockDb.body_daily_logs.push(seqDiary);
+
+// Step 1: Mark as in_progress (CAS on pending)
+seqDiary.ai_analysis_status = "in_progress";
+seqDiary.ai_analysis_request_id = "ai-seq-1";
+
+// Step 2: Write success (CAS on version + ownership)
+assert.equal(seqDiary.daily_log_version, 1, "version unchanged before write");
+seqDiary.ai_day_summary = "День получился спокойным";
+seqDiary.ai_analysis_status = "success";
+seqDiary.ai_analysis_request_id = "ai-seq-1";
+
+// Step 3: Debit once
+const seqDebit1 = debitCredits(`body-diary-ai-${seqDiary.id}-v1`);
+assert.equal(seqDebit1.action, "debited", "first AI run: debit recorded");
+
+// Step 4: Repeat AI on same version → cached
+const seqResult = tryStartAi(seqDiary, "ai-seq-2");
+assert.equal(seqResult.action, "cached", "repeat AI: returns cached result");
+
+// Step 5: No second debit
+const seqDebit2 = debitCredits(`body-diary-ai-${seqDiary.id}-v1`);
+assert.equal(seqDebit2.action, "skipped", "repeat AI: no second debit");
+assert.equal(mockDb.usage_ledger.filter(e => e.request_id.startsWith(`body-diary-ai-${seqDiary.id}`)).length, 1, "exactly 1 debit for this diary version");
+
+// Step 6: New version → separate debit
+seqDiary.daily_log_version = 2;
+seqDiary.ai_analysis_status = "pending";
+const seqDebit3 = debitCredits(`body-diary-ai-${seqDiary.id}-v2`);
+assert.equal(seqDebit3.action, "debited", "new version: separate debit");
+
+console.log("PASS sequential: save → AI success → repeat cached → 1 debit per version");
+
 console.log("\n=== All Health diary comprehensive tests passed ===");
