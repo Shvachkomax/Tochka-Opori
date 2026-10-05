@@ -479,10 +479,12 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       plate_analysis: plateAnalysis.length > 0 ? plateAnalysis : null,
     };
 
+    const sessionCreds = getBodySession();
     const requestBody = {
       module: "body",
       stage: "daily_log_submitted",
       session_id: sessionId,
+      access_token: sessionCreds.accessToken || null,
       daily_log: log,
       request_id: requestId,
       run_ai: false,
@@ -539,6 +541,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
           module: "body",
           stage: "daily_log_ai_analysis",
           session_id: sessionId,
+          access_token: sessionCreds.accessToken || null,
           daily_log_id: savedData.daily_log_id,
           request_id: `${requestId}-ai`,
         });

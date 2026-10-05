@@ -6,6 +6,7 @@ import { readModulePrompt, readCorePrompt } from "../lib/prompts.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
+import { validateSessionAccess } from "../lib/security/access-token.js";
 import { debitCreditsForSession, setSessionVisibleAfterCode } from "../lib/usage/debit.js";
 import { ensureWallet, setWalletVisible } from "../lib/usage/wallet.js";
 import { getOrCreateContinuationCredential } from "../lib/session/continuation-store.js";
@@ -887,7 +888,7 @@ ${conversationStyle}
 
 // Body diary daily log handler
 async function handleDailyLogAnalysis(req, res) {
-  const { session_id, daily_log, request_id: clientRequestId, run_ai } = req.body || {};
+  const { session_id, daily_log, request_id: clientRequestId, run_ai, access_token } = req.body || {};
   const diagId = clientRequestId || `diag-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const startTime = Date.now();
   const photoCount = Array.isArray(daily_log?.plate_photos) ? daily_log.plate_photos.length : 0;
@@ -897,6 +898,13 @@ async function handleDailyLogAnalysis(req, res) {
   if (!session_id || !daily_log) {
     console.warn(`[body-diary-save] request_id=${diagId} stage=validation error=missing_fields`);
     return res.status(400).json({ ok: false, saved: false, error: "Missing session_id or daily_log", request_id: diagId });
+  }
+
+  // Validate session access_token
+  const sessionValid = await validateSessionAccess(session_id, access_token);
+  if (!sessionValid) {
+    console.warn(`[body-diary-save] request_id=${diagId} stage=auth_denied session=${session_id}`);
+    return res.status(401).json({ ok: false, saved: false, error: "Сессия недействительна. Войдите снова по коду продолжения.", request_id: diagId });
   }
 
   // Local date helper (avoids UTC offset issues near midnight)
@@ -1338,12 +1346,19 @@ ${dayDesc || "Нет заполненных полей."}
 }
 
 async function handleDailyLogAiAnalysis(req, res) {
-  const { session_id, daily_log_id, request_id: clientRequestId } = req.body || {};
+  const { session_id, daily_log_id, request_id: clientRequestId, access_token } = req.body || {};
   const diagId = clientRequestId || `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const startTime = Date.now();
 
   if (!session_id) {
     return res.status(400).json({ ok: false, error: "Missing session_id", request_id: diagId });
+  }
+
+  // Validate session access_token
+  const sessionValid = await validateSessionAccess(session_id, access_token);
+  if (!sessionValid) {
+    console.warn(`[body-diary-ai] request_id=${diagId} stage=auth_denied session=${session_id}`);
+    return res.status(401).json({ ok: false, error: "Сессия недействительна. Войдите снова по коду продолжения.", request_id: diagId });
   }
 
   try {
@@ -1595,11 +1610,18 @@ ${conversationStyle}
 }
 
 async function handleCheckSaveStatus(req, res) {
-  const { session_id, save_request_id, daily_log_id } = req.body || {};
+  const { session_id, save_request_id, daily_log_id, access_token } = req.body || {};
   const diagId = `check-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   if (!session_id) {
     return res.status(400).json({ ok: false, error: "Missing session_id", request_id: diagId });
+  }
+
+  // Validate session access_token
+  const sessionValid = await validateSessionAccess(session_id, access_token);
+  if (!sessionValid) {
+    console.warn(`[check-save] request_id=${diagId} stage=auth_denied session=${session_id}`);
+    return res.status(401).json({ ok: false, error: "Сессия недействительна. Войдите снова по коду продолжения.", request_id: diagId });
   }
 
   try {
