@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(47);
+SELECT plan(51);
 
 INSERT INTO public.patient_medication_orders (
   id, owner_type, owner_id, source_module, item_type, name,
@@ -60,11 +60,12 @@ SELECT is((SELECT count(*)::integer FROM public.patient_medication_reference_mat
 SELECT is((SELECT count(*)::integer FROM public.patient_medication_order_events WHERE medication_order_id = 'b8000000-0000-4000-8000-000000000003'), 1, 'existing patient order audit still records create');
 
 INSERT INTO public.medication_concepts (
-  id, concept_code, source_system, jurisdiction, canonical_name, display_name, concept_kind, status
+  id, concept_code, source_system, jurisdiction, canonical_name, display_name, concept_kind, status, test_only
 ) VALUES (
   'b8000000-0000-4000-8000-000000000010', 'medref.synthetic.test', 'internal', 'RU',
-  'Synthetic reference test', 'Synthetic reference test', 'single_ingredient', 'active'
+  'Synthetic reference test', 'Synthetic reference test', 'single_ingredient', 'active', true
 );
+SELECT ok((SELECT test_only FROM public.medication_concepts WHERE id = 'b8000000-0000-4000-8000-000000000010'), 'synthetic catalog fixture is explicitly test-only');
 INSERT INTO public.medication_reference_documents (
   id, source_provider, source_document_id, canonical_identifier, source_title, source_version,
   retrieved_at, country, language, content_hash, verification_status, test_only, verified_at, verified_by
@@ -119,6 +120,39 @@ SELECT throws_ok(
     WHERE id = 'b8000000-0000-4000-8000-000000000001'$$,
   '23514', 'Verified medication reference requires a verified non-test source snapshot',
   'test-only source cannot verify a patient order'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.patient_medication_reference_matches (
+      medication_order_id, owner_type, owner_id, reference_status, medication_concept_id,
+      matched_by, match_method, source_provider, reference_snapshot_id
+    ) VALUES (
+      'b8000000-0000-4000-8000-000000000001', 'anonymous_case', 'b8000000-0000-4000-8000-000000000002',
+      'verified', 'b8000000-0000-4000-8000-000000000010', 'curator', 'test', 'fixture',
+      'b8000000-0000-4000-8000-000000000012'
+    )$$,
+  '23514', 'Verified match event requires a verified non-test source snapshot',
+  'test-only source cannot create a verified match event'
+);
+INSERT INTO public.patient_medication_orders (
+  id, owner_type, owner_id, source_module, item_type, name,
+  single_dose, dose_unit, frequency_type, start_date, ongoing
+) VALUES (
+  'b8000000-0000-4000-8000-000000000021',
+  'anonymous_case', 'b8000000-0000-4000-8000-000000000002', 'support',
+  'supplement', 'synthetic-reference-test-supplement', 1, 'capsule', 'as_needed', current_date, true
+);
+SELECT throws_ok(
+  $$UPDATE public.patient_medication_orders SET
+      reference_status = 'candidate', reference_candidate_concepts = '[{"medication_concept_id":"b8000000-0000-4000-8000-000000000010"}]',
+      reference_confidence = 1, reference_match_method = 'test', reference_source_provider = 'fixture'
+    WHERE id = 'b8000000-0000-4000-8000-000000000021'$$,
+  '23514', NULL,
+  'supplement cannot link to a medication concept'
+);
+SELECT throws_ok(
+  $$INSERT INTO public.medication_orders (id, medication_concept_id) VALUES ('b8000000-0000-4000-8000-000000000020', 'b8000000-0000-4000-8000-000000000010')$$,
+  '23514', 'Test-only medication concepts cannot back clinician orders',
+  'test-only concept cannot become a clinician-authored order'
 );
 
 SELECT throws_ok(

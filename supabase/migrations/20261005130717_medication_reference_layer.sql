@@ -1,6 +1,12 @@
 -- Provider-neutral, versioned medication reference data.
 -- Reuses C2 medication_concepts; patient-entered order text remains canonical for the report.
 
+ALTER TABLE public.medication_concepts
+  ADD COLUMN test_only boolean NOT NULL DEFAULT false;
+CREATE INDEX medication_concepts_reference_search_idx
+  ON public.medication_concepts (jurisdiction, status, test_only, lower(display_name));
+COMMENT ON COLUMN public.medication_concepts.test_only IS 'Test-only concepts are excluded from patient matching and clinician orders.';
+
 CREATE TABLE public.medication_reference_documents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   source_provider text NOT NULL CHECK (length(btrim(source_provider)) > 0),
@@ -106,6 +112,8 @@ ALTER TABLE public.patient_medication_orders
     CHECK (jsonb_typeof(reference_candidate_concepts) = 'array'),
   ADD CONSTRAINT patient_medication_orders_reference_confidence_check
     CHECK (reference_confidence IS NULL OR (reference_confidence >= 0 AND reference_confidence <= 1)),
+  ADD CONSTRAINT patient_medication_orders_reference_item_type_check
+    CHECK (item_type = 'medication' OR reference_status = 'unresolved'),
   ADD CONSTRAINT patient_medication_orders_reference_state_check CHECK (
     (reference_status = 'unresolved'
       AND medication_concept_id IS NULL AND reference_source_snapshot_id IS NULL
@@ -214,12 +222,20 @@ SET search_path = ''
 AS $$
 DECLARE
   v_document_test_only boolean;
+  v_concept_test_only boolean;
 BEGIN
   SELECT test_only INTO v_document_test_only
   FROM public.medication_reference_documents
   WHERE id = NEW.source_document_id;
-  IF NOT FOUND OR v_document_test_only IS DISTINCT FROM NEW.test_only THEN
-    RAISE EXCEPTION 'Snapshot test_only must match its source document' USING ERRCODE = '23514';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Reference source document does not exist' USING ERRCODE = '23503';
+  END IF;
+  SELECT test_only INTO v_concept_test_only
+  FROM public.medication_concepts
+  WHERE id = NEW.medication_concept_id;
+  IF NOT FOUND OR v_document_test_only IS DISTINCT FROM NEW.test_only
+     OR v_concept_test_only IS DISTINCT FROM NEW.test_only THEN
+    RAISE EXCEPTION 'Snapshot test_only must match its source and concept' USING ERRCODE = '23514';
   END IF;
   RETURN NEW;
 END;
@@ -259,15 +275,32 @@ DECLARE
   v_test_only boolean;
 BEGIN
   IF NEW.reference_status <> 'verified' THEN RETURN NEW; END IF;
-  SELECT d.source_provider, d.verification_status, (d.test_only OR s.test_only)
+  SELECT d.source_provider, d.verification_status, (d.test_only OR s.test_only OR c.test_only)
     INTO v_source_provider, v_verification_status, v_test_only
   FROM public.medication_reference_snapshots s
   JOIN public.medication_reference_documents d ON d.id = s.source_document_id
+  JOIN public.medication_concepts c ON c.id = s.medication_concept_id
   WHERE s.id = NEW.reference_source_snapshot_id
     AND s.medication_concept_id = NEW.medication_concept_id;
   IF NOT FOUND OR v_verification_status <> 'verified' OR v_test_only
      OR v_source_provider IS DISTINCT FROM NEW.reference_source_provider THEN
     RAISE EXCEPTION 'Verified medication reference requires a verified non-test source snapshot' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.reject_test_only_clinician_medication_concept()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.medication_concepts
+    WHERE id = NEW.medication_concept_id AND test_only
+  ) THEN
+    RAISE EXCEPTION 'Test-only medication concepts cannot back clinician orders' USING ERRCODE = '23514';
   END IF;
   RETURN NEW;
 END;
@@ -297,6 +330,32 @@ BEGIN
     NEW.medication_concept_id, NEW.reference_confidence, NEW.reference_matched_by,
     NEW.reference_match_method, NEW.reference_source_provider, NEW.reference_source_snapshot_id
   );
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.validate_patient_medication_reference_match_event()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+DECLARE
+  v_provider text;
+  v_document_status text;
+  v_test_only boolean;
+BEGIN
+  IF NEW.reference_status <> 'verified' THEN RETURN NEW; END IF;
+  SELECT d.source_provider, d.verification_status, (d.test_only OR s.test_only OR c.test_only)
+    INTO v_provider, v_document_status, v_test_only
+  FROM public.medication_reference_snapshots s
+  JOIN public.medication_reference_documents d ON d.id = s.source_document_id
+  JOIN public.medication_concepts c ON c.id = s.medication_concept_id
+  WHERE s.id = NEW.reference_snapshot_id
+    AND s.medication_concept_id = NEW.medication_concept_id;
+  IF NOT FOUND OR v_document_status <> 'verified' OR v_test_only
+     OR v_provider IS DISTINCT FROM NEW.source_provider THEN
+    RAISE EXCEPTION 'Verified match event requires a verified non-test source snapshot' USING ERRCODE = '23514';
+  END IF;
   RETURN NEW;
 END;
 $$;
@@ -350,6 +409,12 @@ CREATE TRIGGER patient_medication_orders_reference_match_audit
 CREATE TRIGGER patient_medication_reference_matches_append_only
   BEFORE UPDATE OR DELETE ON public.patient_medication_reference_matches
   FOR EACH ROW EXECUTE FUNCTION public.prevent_patient_medication_audit_mutation();
+CREATE TRIGGER patient_medication_reference_matches_verified_validate
+  BEFORE INSERT ON public.patient_medication_reference_matches
+  FOR EACH ROW EXECUTE FUNCTION public.validate_patient_medication_reference_match_event();
+CREATE TRIGGER medication_orders_reject_test_only_concept
+  BEFORE INSERT OR UPDATE OF medication_concept_id ON public.medication_orders
+  FOR EACH ROW EXECUTE FUNCTION public.reject_test_only_clinician_medication_concept();
 
 ALTER TABLE public.medication_reference_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.medication_reference_snapshots ENABLE ROW LEVEL SECURITY;
@@ -369,6 +434,8 @@ REVOKE ALL ON FUNCTION public.validate_medication_reference_snapshot() FROM PUBL
 REVOKE ALL ON FUNCTION public.validate_medication_reference_summary() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.validate_patient_medication_verified_reference() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.audit_patient_medication_reference_match() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.validate_patient_medication_reference_match_event() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.validate_patient_medication_reference_summary_for_ai() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.reject_test_only_clinician_medication_concept() FROM PUBLIC, anon, authenticated, service_role;
 
 NOTIFY pgrst, 'reload schema';
