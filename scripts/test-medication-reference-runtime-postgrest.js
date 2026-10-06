@@ -1,6 +1,16 @@
 // Medication reference runtime checks via PostgREST against TEST only.
 // Refuses any Supabase URL other than the TEST project. No secrets are printed.
 // Usage: node scripts/test-medication-reference-runtime-postgrest.js
+//
+// Repeatable by design:
+// - Immutable reference fixtures (concepts, documents, snapshots, summaries) use
+//   stable IDs and are created once. On re-runs they are reused only when their
+//   content matches the expected synthetic fixture exactly; any mismatch fails
+//   closed before anything is mutated. Append-only fixtures are never deleted
+//   or updated for cleanup.
+// - Patient orders are mutable run state. Fixed order IDs are reused, verified
+//   by identity, and restored to the unresolved baseline (only when needed)
+//   before each scenario. Only synthetic test_only fixtures are ever written.
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
@@ -50,7 +60,13 @@ function check(condition, label) {
   }
 }
 
-const RUN = Date.now();
+function failClosed(label) {
+  check(false, label);
+  console.error("Fail closed: aborting before mutating any further rows.");
+  console.log(`\nPostgREST runtime checks: ${passed} passed, ${failed} failed`);
+  process.exit(1);
+}
+
 const ownerHealth = "11111111-1111-4111-8111-111111111111";
 const ownerSupport = "22222222-2222-4222-8222-222222222222";
 const ownerOther = "99999999-9999-4999-8999-999999999999";
@@ -61,7 +77,6 @@ const docId = "b8000000-0000-4000-8000-00000000a011";
 const snapshotId = "b8000000-0000-4000-8000-00000000a012";
 const summaryId = "b8000000-0000-4000-8000-00000000a013";
 const orderTextId = "b8000000-0000-4000-8000-00000000a021";
-const orderCandidateId = "b8000000-0000-4000-8000-00000000a022";
 const orderGateId = "b8000000-0000-4000-8000-00000000a023";
 const orderSupplementId = "b8000000-0000-4000-8000-00000000a024";
 
@@ -71,39 +86,171 @@ function errCode(error) {
   return String(error?.code || error?.details || error?.message || "");
 }
 
-async function main() {
-  console.log("\nFixtures (synthetic, test_only)");
-  const { error: conceptError } = await supabase.from("medication_concepts").insert([
-    {
-      id: conceptTestId,
-      concept_code: `medref.runtime.test.${RUN}`,
-      source_system: "internal",
-      jurisdiction: "RU",
-      canonical_name: "Synthetic runtime test concept",
-      display_name: "Synthetic runtime test concept",
-      concept_kind: "single_ingredient",
-      status: "active",
-      test_only: true,
-    },
-    {
-      id: conceptUnusedId,
-      concept_code: `medref.runtime.unused.${RUN}`,
-      source_system: "internal",
-      jurisdiction: "RU",
-      canonical_name: "Synthetic runtime unused concept",
-      display_name: "Synthetic runtime unused concept",
-      concept_kind: "single_ingredient",
-      status: "active",
-      test_only: false,
-    },
-  ]);
-  check(!conceptError, `synthetic concepts inserted${conceptError ? ` (${conceptError.message})` : ""}`);
+// Legacy runs stamped fixture codes with a numeric run marker. Reuse accepts
+// the stable code or exactly that legacy shape; anything else fails closed.
+function fixtureCodeOk(actual, stable, legacyPrefix) {
+  if (actual === stable) return true;
+  if (typeof actual !== "string" || !actual.startsWith(legacyPrefix)) return false;
+  return /^\d+$/.test(actual.slice(legacyPrefix.length));
+}
 
-  const { error: docError } = await supabase.from("medication_reference_documents").insert({
+function fieldMismatch(label, actual, expected) {
+  return actual === expected ? null : `${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`;
+}
+
+function verifyConceptTest(row) {
+  if (!fixtureCodeOk(row?.concept_code, "medref.runtime.test.fixture", "medref.runtime.test.")) return "concept_code is not the synthetic runtime fixture code";
+  return fieldMismatch("source_system", row.source_system, "internal")
+    || fieldMismatch("jurisdiction", row.jurisdiction, "RU")
+    || fieldMismatch("canonical_name", row.canonical_name, "Synthetic runtime test concept")
+    || fieldMismatch("display_name", row.display_name, "Synthetic runtime test concept")
+    || fieldMismatch("concept_kind", row.concept_kind, "single_ingredient")
+    || fieldMismatch("status", row.status, "active")
+    || fieldMismatch("test_only", row.test_only, true);
+}
+
+function verifyConceptUnused(row) {
+  if (!fixtureCodeOk(row?.concept_code, "medref.runtime.unused.fixture", "medref.runtime.unused.")) return "concept_code is not the synthetic runtime fixture code";
+  return fieldMismatch("source_system", row.source_system, "internal")
+    || fieldMismatch("jurisdiction", row.jurisdiction, "RU")
+    || fieldMismatch("canonical_name", row.canonical_name, "Synthetic runtime unused concept")
+    || fieldMismatch("display_name", row.display_name, "Synthetic runtime unused concept")
+    || fieldMismatch("concept_kind", row.concept_kind, "single_ingredient")
+    || fieldMismatch("status", row.status, "active")
+    || fieldMismatch("test_only", row.test_only, false);
+}
+
+function verifyDocument(row) {
+  if (!fixtureCodeOk(row?.source_document_id, "runtime-doc-fixture", "runtime-doc-")) return "source_document_id is not the synthetic runtime fixture code";
+  if (!fixtureCodeOk(row?.canonical_identifier, "fixture:runtime-doc-fixture", "fixture:runtime-doc-")) return "canonical_identifier is not the synthetic runtime fixture code";
+  return fieldMismatch("source_provider", row.source_provider, "fixture")
+    || fieldMismatch("source_title", row.source_title, "Synthetic runtime fixture document, not medical information")
+    || fieldMismatch("source_version", row.source_version, "v1")
+    || fieldMismatch("country", row.country, "RU")
+    || fieldMismatch("language", row.language, "ru")
+    || fieldMismatch("content_hash", row.content_hash, "a".repeat(64))
+    || fieldMismatch("verification_status", row.verification_status, "verified")
+    || fieldMismatch("test_only", row.test_only, true)
+    || fieldMismatch("verified_by", row.verified_by, "runtime-test-only-fixture");
+}
+
+function verifySnapshot(row) {
+  return fieldMismatch("source_document_id", row?.source_document_id, docId)
+    || fieldMismatch("medication_concept_id", row.medication_concept_id, conceptTestId)
+    || fieldMismatch("snapshot_version", row.snapshot_version, "v1")
+    || fieldMismatch("source_facts", JSON.stringify(row.source_facts), JSON.stringify({ mechanism_summary: "Synthetic runtime fixture only; no medical content." }))
+    || fieldMismatch("content_hash", row.content_hash, "b".repeat(64))
+    || fieldMismatch("test_only", row.test_only, true);
+}
+
+function verifySummary(row) {
+  return fieldMismatch("reference_snapshot_id", row?.reference_snapshot_id, snapshotId)
+    || fieldMismatch("summary_language", row.summary_language, "ru")
+    || fieldMismatch("summary_text", row.summary_text, "Synthetic runtime summary fixture; not medical information.")
+    || fieldMismatch("model_provider", row.model_provider, "fixture")
+    || fieldMismatch("model_name", row.model_name, "fixture-model")
+    || fieldMismatch("prompt_version", row.prompt_version, "runtime-v1")
+    || fieldMismatch("review_status", row.review_status, "draft")
+    || fieldMismatch("test_only", row.test_only, true);
+}
+
+async function ensureReferenceFixture(label, table, insertRow, verifyRow) {
+  const { error: insertError } = await supabase.from(table).insert(insertRow);
+  if (!insertError) {
+    check(true, `${label} fixture created (synthetic, immutable)`);
+    return insertRow;
+  }
+  if (!errCode(insertError).includes("23505")) {
+    failClosed(`${label} fixture insert failed (${insertError.message})`);
+  }
+  const { data: existing, error: readError } = await supabase.from(table).select("*").eq("id", insertRow.id).maybeSingle();
+  if (readError || !existing) failClosed(`${label} fixture exists but cannot be read for verification`);
+  const mismatch = verifyRow(existing);
+  if (mismatch) failClosed(`${label} fixture content mismatch, fail closed: ${mismatch}`);
+  check(true, `${label} fixture reused (content verified)`);
+  return existing;
+}
+
+const orderBaseline = {
+  reference_status: "unresolved",
+  reference_candidate_concepts: [],
+  reference_confidence: null,
+  reference_matched_by: null,
+  reference_match_method: null,
+  reference_matched_at: null,
+  reference_source_provider: null,
+  reference_source_snapshot_id: null,
+  medication_concept_id: null,
+};
+
+async function ensureOrder(label, insertRow) {
+  const { error: insertError } = await supabase.from("patient_medication_orders").insert(insertRow);
+  if (!insertError) return { created: true, reset: false };
+  if (!errCode(insertError).includes("23505")) failClosed(`${label} order insert failed (${insertError.message})`);
+  const { data: existing, error: readError } = await supabase.from("patient_medication_orders")
+    .select("id, name, owner_type, owner_id, source_module, item_type, single_dose, dose_unit, reference_status, reference_candidate_concepts, medication_concept_id, reference_confidence, reference_matched_by, reference_match_method, reference_matched_at, reference_source_provider, reference_source_snapshot_id")
+    .eq("id", insertRow.id).maybeSingle();
+  if (readError || !existing) failClosed(`${label} order exists but cannot be read for verification`);
+  const identityMismatch = fieldMismatch("name", existing.name, insertRow.name)
+    || fieldMismatch("owner_type", existing.owner_type, insertRow.owner_type)
+    || fieldMismatch("owner_id", existing.owner_id, insertRow.owner_id)
+    || fieldMismatch("source_module", existing.source_module, insertRow.source_module)
+    || fieldMismatch("item_type", existing.item_type, insertRow.item_type)
+    || fieldMismatch("single_dose", Number(existing.single_dose), insertRow.single_dose)
+    || fieldMismatch("dose_unit", existing.dose_unit, insertRow.dose_unit);
+  if (identityMismatch) failClosed(`${label} order content mismatch, fail closed: ${identityMismatch}`);
+  const atBaseline = existing.reference_status === "unresolved"
+    && existing.medication_concept_id === null
+    && (existing.reference_candidate_concepts || []).length === 0
+    && existing.reference_confidence === null
+    && existing.reference_matched_by === null
+    && existing.reference_match_method === null
+    && existing.reference_matched_at === null
+    && existing.reference_source_provider === null
+    && existing.reference_source_snapshot_id === null;
+  if (atBaseline) return { created: false, reset: false };
+  const { error: resetError } = await supabase.from("patient_medication_orders").update(orderBaseline).eq("id", insertRow.id);
+  if (resetError) failClosed(`${label} order baseline restore failed (${resetError.message})`);
+  return { created: false, reset: true };
+}
+
+function orderFixtureLabel(label, result) {
+  return result.created
+    ? `${label} order fixture created (insert defaults)`
+    : result.reset
+      ? `${label} order fixture reused (baseline restored)`
+      : `${label} order fixture reused (baseline confirmed)`;
+}
+
+async function main() {
+  console.log("\nReference fixtures (synthetic, immutable, reused across runs)");
+  await ensureReferenceFixture("test-only concept", "medication_concepts", {
+    id: conceptTestId,
+    concept_code: "medref.runtime.test.fixture",
+    source_system: "internal",
+    jurisdiction: "RU",
+    canonical_name: "Synthetic runtime test concept",
+    display_name: "Synthetic runtime test concept",
+    concept_kind: "single_ingredient",
+    status: "active",
+    test_only: true,
+  }, verifyConceptTest);
+  const conceptUnusedRow = await ensureReferenceFixture("non-test concept", "medication_concepts", {
+    id: conceptUnusedId,
+    concept_code: "medref.runtime.unused.fixture",
+    source_system: "internal",
+    jurisdiction: "RU",
+    canonical_name: "Synthetic runtime unused concept",
+    display_name: "Synthetic runtime unused concept",
+    concept_kind: "single_ingredient",
+    status: "active",
+    test_only: false,
+  }, verifyConceptUnused);
+  await ensureReferenceFixture("test-only document", "medication_reference_documents", {
     id: docId,
     source_provider: "fixture",
-    source_document_id: `runtime-doc-${RUN}`,
-    canonical_identifier: `fixture:runtime-doc-${RUN}`,
+    source_document_id: "runtime-doc-fixture",
+    canonical_identifier: "fixture:runtime-doc-fixture",
     source_title: "Synthetic runtime fixture document, not medical information",
     source_version: "v1",
     retrieved_at: new Date().toISOString(),
@@ -114,10 +261,8 @@ async function main() {
     test_only: true,
     verified_at: new Date().toISOString(),
     verified_by: "runtime-test-only-fixture",
-  });
-  check(!docError, `test-only document inserted${docError ? ` (${docError.message})` : ""}`);
-
-  const { error: snapshotError } = await supabase.from("medication_reference_snapshots").insert({
+  }, verifyDocument);
+  await ensureReferenceFixture("test-only snapshot", "medication_reference_snapshots", {
     id: snapshotId,
     source_document_id: docId,
     medication_concept_id: conceptTestId,
@@ -126,10 +271,8 @@ async function main() {
     content_hash: "b".repeat(64),
     retrieved_at: new Date().toISOString(),
     test_only: true,
-  });
-  check(!snapshotError, `test-only snapshot inserted${snapshotError ? ` (${snapshotError.message})` : ""}`);
-
-  const { error: summaryError } = await supabase.from("medication_reference_summaries").insert({
+  }, verifySnapshot);
+  await ensureReferenceFixture("test-only summary", "medication_reference_summaries", {
     id: summaryId,
     reference_snapshot_id: snapshotId,
     summary_language: "ru",
@@ -138,11 +281,10 @@ async function main() {
     model_name: "fixture-model",
     prompt_version: "runtime-v1",
     test_only: true,
-  });
-  check(!summaryError, `test-only summary inserted${summaryError ? ` (${summaryError.message})` : ""}`);
+  }, verifySummary);
 
   console.log("\nCheck 1: patient order text is preserved verbatim");
-  const { error: orderError } = await supabase.from("patient_medication_orders").insert({
+  const textOrderState = await ensureOrder("patient", {
     id: orderTextId,
     owner_type: "anonymous_profile",
     owner_id: ownerHealth,
@@ -156,7 +298,7 @@ async function main() {
     start_date: "2026-10-06",
     ongoing: true,
   });
-  check(!orderError, `patient order inserted${orderError ? ` (${orderError.message})` : ""}`);
+  check(true, orderFixtureLabel("patient", textOrderState));
   const { data: orderTextRow } = await supabase
     .from("patient_medication_orders")
     .select("name, reference_status, medication_concept_id")
@@ -165,7 +307,7 @@ async function main() {
   check(orderTextRow?.name === originalText, "stored name equals original patient-entered text (no normalization)");
   check(
     orderTextRow?.reference_status === "unresolved" && orderTextRow?.medication_concept_id === null,
-    "new order starts unresolved without concept link",
+    "order starts from unresolved baseline without concept link",
   );
 
   console.log("\nChecks 2-3: exact candidate is recorded, never auto-matched");
@@ -174,8 +316,8 @@ async function main() {
     reference_candidate_concepts: [
       {
         medication_concept_id: conceptUnusedId,
-        concept_code: `medref.runtime.unused.${RUN}`,
-        display_name: "Synthetic runtime unused concept",
+        concept_code: conceptUnusedRow.concept_code,
+        display_name: conceptUnusedRow.display_name,
         confidence: 1,
         confidence_method: "exact_normalized_name",
       },
@@ -211,7 +353,7 @@ async function main() {
   );
 
   console.log("\nCheck 5: fail-closed reference states are rejected");
-  const { error: supplementInsertError } = await supabase.from("patient_medication_orders").insert({
+  const supplementState = await ensureOrder("supplement", {
     id: orderSupplementId,
     owner_type: "anonymous_case",
     owner_id: ownerSupport,
@@ -224,13 +366,13 @@ async function main() {
     start_date: "2026-10-06",
     ongoing: true,
   });
-  check(!supplementInsertError, `supplement order inserted${supplementInsertError ? ` (${supplementInsertError.message})` : ""}`);
+  check(true, orderFixtureLabel("supplement", supplementState));
   const { error: supplementLinkError } = await supabase
     .from("patient_medication_orders")
     .update(candidatePayload)
     .eq("id", orderSupplementId);
   check(!!supplementLinkError && errCode(supplementLinkError).includes("23514"), "supplement cannot enter a medication candidate state (23514)");
-  const { error: gateInsertError } = await supabase.from("patient_medication_orders").insert({
+  const gateState = await ensureOrder("gate", {
     id: orderGateId,
     owner_type: "anonymous_case",
     owner_id: ownerSupport,
@@ -244,7 +386,7 @@ async function main() {
     start_date: "2026-10-06",
     ongoing: true,
   });
-  check(!gateInsertError, `gate order inserted${gateInsertError ? ` (${gateInsertError.message})` : ""}`);
+  check(true, orderFixtureLabel("gate", gateState));
   const { error: verifiedMissingSnapshotError } = await supabase
     .from("patient_medication_orders")
     .update({
