@@ -428,35 +428,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
     const requestId = `diary-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const photoCount = photos.length;
 
-    // Adaptive photo compression with budget based on non-photo fields
-    let compressedPhotos = photos;
-    let photoBytes = 0;
-    let photoTruncated = false;
-    if (photos.length > 0) {
-      // Estimate non-photo fields size
-      const nonPhotoLog = { ...log, plate_photos: null };
-      const baseBytes = estimateRequestSize(nonPhotoLog);
-      try {
-        const result = await compressPhotosToBudget(
-          photos.map(p => ({ dataUrl: p.dataUrl, name: p.name })),
-          3 * 1024 * 1024,
-          baseBytes
-        );
-        compressedPhotos = result.photos.map((p, i) => ({ ...photos[i], dataUrl: p.dataUrl }));
-        photoBytes = result.totalBytes;
-        photoTruncated = result.truncated;
-        if (photoTruncated) {
-          setSubmitError(`Добавлено максимум 6 фото. Лишние фото не были прикреплены.`);
-          setTimeout(() => setSubmitError(""), 5000);
-        }
-        console.log(`[diary-save] request_id=${requestId} photo_compress: ${photos.length}→${compressedPhotos.length} photos, ${result.compressed} compressed, truncated=${photoTruncated}, base=${(baseBytes/1024).toFixed(0)}KB`);
-      } catch {
-        compressedPhotos = photos; // fallback to originals — do NOT silently drop
-        photoTruncated = false;
-      }
-    }
-
-    const log = {
+    const logBase = {
       log_date: logDate,
       weight_kg: num(weightKg),
       waist_cm: num(waistCm),
@@ -494,6 +466,37 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       mood_level: moodLevel,
       day_text: dayText || null,
       voice_transcript: voiceTranscript || null,
+    };
+
+    // Adaptive photo compression with budget based on non-photo fields
+    let compressedPhotos = photos;
+    let photoBytes = 0;
+    let photoTruncated = false;
+    if (photos.length > 0) {
+      // Estimate non-photo fields size
+      const baseBytes = estimateRequestSize(logBase);
+      try {
+        const result = await compressPhotosToBudget(
+          photos.map(p => ({ dataUrl: p.dataUrl, name: p.name })),
+          3 * 1024 * 1024,
+          baseBytes
+        );
+        compressedPhotos = result.photos.map((p, i) => ({ ...photos[i], dataUrl: p.dataUrl }));
+        photoBytes = result.totalBytes;
+        photoTruncated = result.truncated;
+        if (photoTruncated) {
+          setSubmitError(`Добавлено максимум 6 фото. Лишние фото не были прикреплены.`);
+          setTimeout(() => setSubmitError(""), 5000);
+        }
+        console.log(`[diary-save] request_id=${requestId} photo_compress: ${photos.length}→${compressedPhotos.length} photos, ${result.compressed} compressed, truncated=${photoTruncated}, base=${(baseBytes/1024).toFixed(0)}KB`);
+      } catch {
+        compressedPhotos = photos; // fallback to originals — do NOT silently drop
+        photoTruncated = false;
+      }
+    }
+
+    const log = {
+      ...logBase,
       plate_photos: compressedPhotos.length > 0 ? compressedPhotos.map(p => p.dataUrl) : null,
       plate_analysis: plateAnalysis.length > 0 ? plateAnalysis : null,
     };
