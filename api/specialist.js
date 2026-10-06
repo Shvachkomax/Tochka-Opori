@@ -12,6 +12,8 @@ import {
   normalizeMedicationPermissionKeys,
   parseMedicationOrderRef,
 } from "../lib/clinical/medication.js";
+import { patientMedicationOwnerMatches } from "../lib/clinical/patient-reported-medication.js";
+import { loadMedicationReferenceViews } from "../lib/clinical/medication-reference.js";
 
 // ── Constants ─────────────────────────────────────────────
 
@@ -150,6 +152,8 @@ export default async function handler(req, res) {
         return await handleListMedicationConcepts(req, res);
       case "listPatientMedicationOrders":
         return await handleListPatientMedicationOrders(req, res);
+      case "listPatientReportedMedicationOrders":
+        return await handleListPatientReportedMedicationOrders(req, res);
       case "getMedicationOrder":
         return await handleGetMedicationOrder(req, res);
       case "createMedicationOrder":
@@ -276,6 +280,7 @@ async function handleListMedicationConcepts(req, res) {
     .select("id, concept_code, display_name, canonical_name, concept_kind")
     .eq("source_system", "internal")
     .eq("jurisdiction", "RU")
+    .eq("test_only", false)
     .eq("status", "active")
     .order("display_name");
   if (error) return medicationErrorResponse(res, error, "Не удалось загрузить справочник препаратов.");
@@ -312,6 +317,7 @@ async function handleListPatientMedicationOrders(req, res) {
       .select("id, concept_code, display_name, canonical_name, concept_kind")
       .eq("source_system", "internal")
       .eq("jurisdiction", "RU")
+      .eq("test_only", false)
       .eq("status", "active")
       .order("display_name");
     return res.status(200).json({
@@ -332,6 +338,73 @@ async function handleListPatientMedicationOrders(req, res) {
   } catch (error) {
     return medicationErrorResponse(res, error, "Не удалось загрузить назначения.");
   }
+}
+
+async function handleListPatientReportedMedicationOrders(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  const { client_ref: clientRef, organization_id: organizationId, module } = req.body || {};
+  if (!clientRef || !["support", "body"].includes(module)) {
+    return res.status(400).json({ ok: false, error: "Некорректный запрос." });
+  }
+  const context = validateSpecialistContext({ memberships: authResult.memberships, organizationId, module, allowedModules: authResult.expert.allowed_modules });
+  if (!context.ok) return res.status(403).json({ ok: false, error: context.error });
+  const resolved = await resolveAuthorizedSpecialistClient({
+    expert: authResult.expert,
+    memberships: authResult.memberships,
+    clientRef,
+    organizationId,
+    module,
+  });
+  if (!resolved.ok) return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
+
+  let ownerId = resolved.ownerId;
+  let ownerType = resolved.ownerType;
+  const sourceModule = module === "body" ? "health" : "support";
+  if (module === "support") {
+    const { data: session, error } = await getSupabase().from("sessions")
+      .select("anonymous_owner_id").eq("public_code", resolved.publicCode).eq("module", "support").maybeSingle();
+    if (error || !session?.anonymous_owner_id) return res.status(404).json({ ok: false, error: "Пациент не найден." });
+    ownerId = session.anonymous_owner_id;
+    ownerType = "anonymous_case";
+  }
+  if (!ownerId || ownerType !== (module === "body" ? "anonymous_profile" : "anonymous_case")) {
+    return res.status(403).json({ ok: false, error: "Доступ к данным пациента запрещён." });
+  }
+
+  const supabase = getSupabase();
+  const { data: orders, error } = await supabase.from("patient_medication_orders").select("*")
+    .eq("owner_type", ownerType).eq("owner_id", ownerId).eq("source_module", sourceModule)
+    .order("start_date", { ascending: false });
+  if (error) return medicationErrorResponse(res, error, "Не удалось загрузить сведения пациента.");
+  const ownedOrders = (orders || []).filter((order) => patientMedicationOwnerMatches(order, { ownerType, ownerId, sourceModule }));
+  let referenceViews = new Map();
+  try {
+    referenceViews = await loadMedicationReferenceViews(supabase, ownedOrders);
+  } catch (referenceError) {
+    console.warn("[specialist] verified patient medication references unavailable:", referenceError.code || "query_failed");
+  }
+  const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const { data: intakeLogs, error: intakeError } = await supabase.from("medication_intake_logs").select("*")
+    .eq("owner_type", ownerType).eq("owner_id", ownerId).gte("scheduled_date", since)
+    .order("scheduled_date", { ascending: false }).limit(200);
+  if (intakeError) return medicationErrorResponse(res, intakeError, "Не удалось загрузить отметки приёма.");
+  const owner = { ownerType, ownerId, sourceModule };
+  return res.status(200).json({
+    ok: true,
+    orders: ownedOrders.map((order) => ({
+      ...order,
+      medication_reference: referenceViews.get(order.id) || {
+        status: order.reference_status || "unresolved",
+        concept: null,
+        candidates: [],
+        verified_reference: null,
+      },
+    })),
+    intake_logs: (intakeLogs || []).filter((log) => log.owner_type === ownerType && log.owner_id === ownerId),
+    read_only: true,
+    provenance: "patient_reported",
+  });
 }
 
 async function handleGetMedicationOrder(req, res) {

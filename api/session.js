@@ -25,6 +25,24 @@ import { recordClinicalEvent } from "../lib/clinical/projection.js";
 import { buildSupportCheckinLogicalSourceId, buildSupportCheckinObservationSnapshot } from "../lib/clinical/observation-mappings.js";
 import { recordClinicalObservation } from "../lib/clinical/projection.js";
 import { getMedicationCardsForOwner, isMedicationSessionEligible } from "../lib/clinical/medication.js";
+import {
+  PATIENT_MEDICATION_REFERENCE_PROVIDER,
+  canExplicitlySelectMedicationConcept,
+  findExactMedicationConceptCandidates,
+  loadMedicationReferenceForOrder,
+  loadMedicationReferenceViews,
+} from "../lib/clinical/medication-reference.js";
+import {
+  buildPatientMedicationContext,
+  buildScheduledMedicationIntakes,
+  isMedicationDate,
+  isPatientMedicationOrderStatus,
+  patientMedicationOwnerMatches,
+  projectMedicationIntakes,
+  validateMedicationIntake,
+  validatePatientMedicationOrder,
+  PATIENT_MEDICATION_SAFETY_INSTRUCTION,
+} from "../lib/clinical/patient-reported-medication.js";
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -367,6 +385,18 @@ export default async function handler(req, res) {
         return await handleGetBodyHealthContext(req, res);
       case "saveBodyHealthContext":
         return await handleSaveBodyHealthContext(req, res);
+      case "listPatientMedicationOrders":
+        return await handleListPatientMedicationOrders(req, res);
+      case "savePatientMedicationOrder":
+        return await handleSavePatientMedicationOrder(req, res);
+      case "updatePatientMedicationOrderStatus":
+        return await handleUpdatePatientMedicationOrderStatus(req, res);
+      case "recordMedicationIntake":
+        return await handleRecordMedicationIntake(req, res);
+      case "findPatientMedicationReferenceCandidates":
+        return await handleFindPatientMedicationReferenceCandidates(req, res);
+      case "confirmPatientMedicationReferenceMatch":
+        return await handleConfirmPatientMedicationReferenceMatch(req, res);
       case "createBodyServiceRequest":
         return await handleCreateBodyServiceRequest(req, res, { legacy: false });
       case "createLegacyBodyServiceRequest":
@@ -2967,7 +2997,10 @@ async function handleSendBodyAiMessage(req, res) {
       console.error("[chat] step=5 prompt load FAILED:", promptErr.message);
     }
 
-    const systemPrompt = `${chatPrompt}\n\n${conversationStyle}\n\nКонтекст пользователя:\n${JSON.stringify(context, null, 2)}`;
+    const medicationSafety = context.patient_medication_context
+      ? `\n\nПравило безопасности по лекарствам:\n${PATIENT_MEDICATION_SAFETY_INSTRUCTION}`
+      : "";
+    const systemPrompt = `${chatPrompt}\n\n${conversationStyle}${medicationSafety}\n\nКонтекст пользователя:\n${JSON.stringify(context, null, 2)}`;
     const userPrompt = trimmed;
 
     const MODEL = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
@@ -3202,6 +3235,9 @@ async function buildAiChatContext({ supabase, ownerId }) {
     context.recent_chat_messages = (recentChat || []).reverse();
   } catch {}
 
+  const medicationContext = await loadPatientMedicationContext(supabase, "anonymous_profile", ownerId, "health");
+  if (medicationContext) context.patient_medication_context = medicationContext;
+
   return context;
 }
 
@@ -3329,6 +3365,294 @@ async function handleSaveBodyHealthContext(req, res) {
     console.error("handleSaveBodyHealthContext error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка сохранения контекста здоровья." });
   }
+}
+
+async function resolvePatientMedicationOwner(reqBody = {}) {
+  const { module, session_id, access_token } = reqBody;
+  if (module === "health") {
+    const owner = await resolveBodyOwner(session_id, access_token);
+    return owner ? { ...owner, ownerType: "anonymous_profile", sourceModule: "health" } : null;
+  }
+  if (module === "support") {
+    const owner = await resolveSupportOwner(session_id, access_token);
+    return owner ? { ...owner, ownerType: "anonymous_case", sourceModule: "support" } : null;
+  }
+  return null;
+}
+
+async function handleListPatientMedicationOrders(req, res) {
+  const body = req.body || {};
+  const owner = await resolvePatientMedicationOwner(body);
+  if (!owner) return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+  const scheduledDate = isMedicationDate(body.scheduled_date)
+    ? body.scheduled_date
+    : new Date().toISOString().slice(0, 10);
+  const supabase = getSupabase();
+  const { data: orders, error } = await supabase
+    .from("patient_medication_orders")
+    .select("*")
+    .eq("owner_type", owner.ownerType)
+    .eq("owner_id", owner.ownerId)
+    .eq("source_module", owner.sourceModule)
+    .order("status", { ascending: true })
+    .order("start_date", { ascending: false });
+  if (error) {
+    console.error("[patient-medication-list] query failed:", error.code);
+    return res.status(500).json({ ok: false, error: "Не удалось загрузить список." });
+  }
+
+  const ownedOrders = (orders || []).filter((order) => patientMedicationOwnerMatches(order, owner));
+  let referenceByOrder = new Map();
+  try {
+    referenceByOrder = await loadMedicationReferenceViews(supabase, ownedOrders);
+  } catch (referenceError) {
+    console.warn("[patient-medication-list] verified reference unavailable:", referenceError.code || "query_failed");
+  }
+  const ordersWithReference = ownedOrders.map((order) => ({
+    ...order,
+    medication_reference: referenceByOrder.get(order.id) || {
+      status: order.reference_status || "unresolved",
+      concept: null,
+      candidates: [],
+      verified_reference: null,
+    },
+  }));
+  let schedule = [];
+  if (body.include_schedule === true) {
+    const tasks = buildScheduledMedicationIntakes(ownedOrders, scheduledDate);
+    const { data: logs, error: logError } = tasks.length
+      ? await supabase.from("medication_intake_logs").select("*")
+        .eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
+        .eq("scheduled_date", scheduledDate)
+      : { data: [], error: null };
+    if (logError) {
+      console.error("[patient-medication-list] intake query failed:", logError.code);
+      return res.status(500).json({ ok: false, error: "Не удалось загрузить отметки приёма." });
+    }
+    schedule = projectMedicationIntakes(tasks, logs || []);
+  }
+  return res.status(200).json({ ok: true, orders: ordersWithReference, schedule, scheduled_date: scheduledDate });
+}
+
+async function handleSavePatientMedicationOrder(req, res) {
+  const body = req.body || {};
+  const owner = await resolvePatientMedicationOwner(body);
+  if (!owner) return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+  const validated = validatePatientMedicationOrder(body.order || {});
+  if (!validated.ok) return res.status(400).json({ ok: false, error: validated.error });
+
+  const supabase = getSupabase();
+  const payload = {
+    ...validated.order,
+    owner_type: owner.ownerType,
+    owner_id: owner.ownerId,
+    source_module: owner.sourceModule,
+    session_id: owner.sessionId,
+    updated_at: new Date().toISOString(),
+  };
+  let query;
+  if (body.order_id) {
+    const { data: existing, error: existingError } = await supabase.from("patient_medication_orders")
+      .select("id, item_type, name, dosage_form, strength")
+      .eq("id", body.order_id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
+      .eq("source_module", owner.sourceModule).maybeSingle();
+    if (existingError || !existing) return res.status(404).json({ ok: false, error: "Назначение не найдено." });
+    const identityChanged = existing.item_type !== payload.item_type
+      || existing.name !== payload.name
+      || existing.dosage_form !== payload.dosage_form
+      || existing.strength !== payload.strength;
+    if (identityChanged) {
+      Object.assign(payload, {
+        medication_concept_id: null,
+        reference_status: "unresolved",
+        reference_candidate_concepts: [],
+        reference_confidence: null,
+        reference_matched_by: null,
+        reference_match_method: null,
+        reference_matched_at: null,
+        reference_source_provider: null,
+        reference_source_snapshot_id: null,
+      });
+    }
+    query = supabase.from("patient_medication_orders").update(payload)
+      .eq("id", body.order_id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
+      .eq("source_module", owner.sourceModule).select("*").maybeSingle();
+  } else {
+    query = supabase.from("patient_medication_orders").insert(payload).select("*").single();
+  }
+  const { data, error } = await query;
+  if (error || !data) {
+    console.error("[patient-medication-save] write failed:", error?.code || "not_found");
+    return res.status(error?.code === "23514" ? 400 : 500).json({ ok: false, error: "Не удалось сохранить назначение." });
+  }
+  return res.status(200).json({ ok: true, order: data, message: body.order_id ? "Изменения сохранены." : "Назначение добавлено в ваш список." });
+}
+
+async function handleUpdatePatientMedicationOrderStatus(req, res) {
+  const body = req.body || {};
+  const owner = await resolvePatientMedicationOwner(body);
+  if (!owner) return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+  if (!body.order_id || !isPatientMedicationOrderStatus(body.status)) return res.status(400).json({ ok: false, error: "Некорректный статус назначения." });
+  const { data, error } = await getSupabase().from("patient_medication_orders")
+    .update({ status: body.status, updated_at: new Date().toISOString() })
+    .eq("id", body.order_id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
+    .eq("source_module", owner.sourceModule).select("*").maybeSingle();
+  if (error || !data) return res.status(404).json({ ok: false, error: "Назначение не найдено." });
+  return res.status(200).json({ ok: true, order: data });
+}
+
+async function handleRecordMedicationIntake(req, res) {
+  const body = req.body || {};
+  const owner = await resolvePatientMedicationOwner(body);
+  if (!owner) return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+  const validated = validateMedicationIntake(body.intake || {});
+  if (!validated.ok) return res.status(400).json({ ok: false, error: validated.error });
+
+  const supabase = getSupabase();
+  const { data: order, error: orderError } = await supabase.from("patient_medication_orders")
+    .select("id, item_type, name, single_dose, dose_unit, frequency_type, times_per_day, scheduled_times, start_date, end_date, ongoing, status")
+    .eq("id", body.order_id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
+    .eq("source_module", owner.sourceModule).maybeSingle();
+  if (orderError || !order) return res.status(404).json({ ok: false, error: "Назначение не найдено." });
+  const scheduled = buildScheduledMedicationIntakes([order], validated.intake.scheduled_date)
+    .some((task) => task.scheduled_slot === validated.intake.scheduled_slot);
+  if (!scheduled) return res.status(400).json({ ok: false, error: "Для этого назначения нет запланированного приёма в выбранную дату." });
+
+  const task = buildScheduledMedicationIntakes([order], validated.intake.scheduled_date)
+    .find((item) => item.scheduled_slot === validated.intake.scheduled_slot);
+  const { data, error } = await supabase.from("medication_intake_logs").upsert({
+    owner_type: owner.ownerType,
+    owner_id: owner.ownerId,
+    medication_order_id: order.id,
+    scheduled_date: validated.intake.scheduled_date,
+    scheduled_time: task.scheduled_time,
+    ...validated.intake,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "medication_order_id,scheduled_date,scheduled_slot" }).select("*").single();
+  if (error) {
+    console.error("[patient-medication-intake] save failed:", error.code);
+    return res.status(500).json({ ok: false, error: "Не удалось сохранить отметку." });
+  }
+  return res.status(200).json({ ok: true, intake: data });
+}
+
+async function handleFindPatientMedicationReferenceCandidates(req, res) {
+  const body = req.body || {};
+  const owner = await resolvePatientMedicationOwner(body);
+  if (!owner) return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+  if (!body.order_id) return res.status(400).json({ ok: false, error: "Укажите назначение." });
+
+  const supabase = getSupabase();
+  const { data: order, error: orderError } = await supabase.from("patient_medication_orders")
+    .select("id, item_type, name, owner_type, owner_id, source_module, reference_status, medication_concept_id, reference_source_snapshot_id")
+    .eq("id", body.order_id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
+    .eq("source_module", owner.sourceModule).maybeSingle();
+  if (orderError || !order) return res.status(404).json({ ok: false, error: "Назначение не найдено." });
+  if (order.item_type === "supplement") {
+    return res.status(200).json({ ok: true, reference_status: "unresolved", candidates: [], reason: "supplement_reference_unavailable" });
+  }
+  if (["matched", "verified"].includes(order.reference_status)) {
+    const { data: concept } = order.medication_concept_id
+      ? await supabase.from("medication_concepts").select("id, display_name, canonical_name, concept_kind, source_system").eq("id", order.medication_concept_id).eq("test_only", false).maybeSingle()
+      : { data: null };
+    const reference = await loadMedicationReferenceForOrder(supabase, order);
+    return res.status(200).json({ ok: true, reference_status: order.reference_status, candidates: [], concept, verified_reference: reference });
+  }
+
+  const { data: concepts, error: conceptsError, count } = await supabase.from("medication_concepts")
+    .select("id, concept_code, source_system, jurisdiction, canonical_name, display_name, concept_kind, status, test_only", { count: "exact" })
+    .eq("jurisdiction", "RU").eq("status", "active").eq("test_only", false).limit(5000);
+  if (conceptsError) {
+    console.warn("[medication-reference-search] catalog unavailable:", conceptsError.code);
+    return res.status(200).json({ ok: true, reference_status: "unresolved", candidates: [], reason: "reference_provider_unavailable" });
+  }
+  if ((count || 0) > (concepts || []).length) {
+    return res.status(200).json({ ok: true, reference_status: "unresolved", candidates: [], reason: "catalog_limit_reached" });
+  }
+
+  let providerCandidateIds = new Set();
+  try {
+    const providerResult = await PATIENT_MEDICATION_REFERENCE_PROVIDER.searchMedication(order.name);
+    if (providerResult?.available === true && Array.isArray(providerResult.candidates)) {
+      providerCandidateIds = new Set(providerResult.candidates.map((candidate) => candidate.medication_concept_id).filter(Boolean));
+    }
+  } catch (providerError) {
+    console.warn("[medication-reference-search] provider unavailable:", providerError.code || "query_failed");
+  }
+  const internalMatch = findExactMedicationConceptCandidates(order.name, (concepts || []).filter((concept) => concept.source_system === "internal"));
+  const providerMatch = findExactMedicationConceptCandidates(order.name, (concepts || []).filter((concept) => providerCandidateIds.has(concept.id)));
+  const candidateMap = new Map([...internalMatch.candidates, ...providerMatch.candidates].map((candidate) => [candidate.medication_concept_id, candidate]));
+  const matchedCandidates = [...candidateMap.values()];
+  const result = {
+    reference_status: matchedCandidates.length === 0 ? "unresolved" : matchedCandidates.length === 1 ? "candidate" : "ambiguous",
+    confidence: matchedCandidates.length === 1 ? 1 : null,
+  };
+  const candidates = matchedCandidates.map((candidate) => ({
+    medication_concept_id: candidate.medication_concept_id,
+    concept_code: candidate.concept_code,
+    display_name: candidate.display_name,
+    canonical_name: candidate.canonical_name,
+    concept_kind: candidate.concept_kind,
+    source_system: candidate.source_system,
+    confidence: candidate.confidence,
+    confidence_method: candidate.confidence_method,
+  }));
+  const { error: updateError } = await supabase.from("patient_medication_orders").update({
+    reference_status: result.reference_status,
+    reference_candidate_concepts: candidates,
+    reference_confidence: result.confidence,
+    reference_matched_by: null,
+    reference_match_method: candidates.length ? "exact_normalized_name" : null,
+    reference_matched_at: null,
+    reference_source_provider: candidates.length === 1 ? candidates[0].source_system : candidates.length ? "multiple_catalog_sources" : null,
+    medication_concept_id: null,
+    reference_source_snapshot_id: null,
+    updated_at: new Date().toISOString(),
+  }).eq("id", order.id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
+    .eq("source_module", owner.sourceModule);
+  if (updateError) return res.status(500).json({ ok: false, error: "Не удалось сохранить результат сопоставления." });
+  return res.status(200).json({ ok: true, reference_status: result.reference_status, candidates });
+}
+
+async function handleConfirmPatientMedicationReferenceMatch(req, res) {
+  const body = req.body || {};
+  const owner = await resolvePatientMedicationOwner(body);
+  if (!owner) return res.status(401).json({ ok: false, error: "Требуется авторизация." });
+  if (!body.order_id || !body.medication_concept_id) return res.status(400).json({ ok: false, error: "Укажите назначение и вариант препарата." });
+
+  const supabase = getSupabase();
+  const { data: order, error: orderError } = await supabase.from("patient_medication_orders")
+    .select("id, item_type, name, reference_status, reference_candidate_concepts")
+    .eq("id", body.order_id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
+    .eq("source_module", owner.sourceModule).maybeSingle();
+  if (orderError || !order) return res.status(404).json({ ok: false, error: "Назначение не найдено." });
+  if (order.item_type !== "medication" || !["candidate", "ambiguous"].includes(order.reference_status)
+    || !(order.reference_candidate_concepts || []).some((candidate) => candidate.medication_concept_id === body.medication_concept_id)) {
+    return res.status(400).json({ ok: false, error: "Выберите один из найденных точных вариантов." });
+  }
+
+  const { data: concept, error: conceptError } = await supabase.from("medication_concepts")
+    .select("id, concept_code, source_system, jurisdiction, canonical_name, display_name, concept_kind, status, test_only")
+    .eq("id", body.medication_concept_id).eq("jurisdiction", "RU").eq("status", "active").eq("test_only", false).maybeSingle();
+  const candidateConceptIds = (order.reference_candidate_concepts || []).map((candidate) => candidate.medication_concept_id);
+  if (conceptError || !concept?.source_system || !canExplicitlySelectMedicationConcept(order.name, candidateConceptIds, concept)) {
+    return res.status(400).json({ ok: false, error: "Выбранный вариант больше не является точным совпадением." });
+  }
+
+  const { data: updated, error } = await supabase.from("patient_medication_orders").update({
+    medication_concept_id: concept.id,
+    reference_status: "matched",
+    reference_confidence: 1,
+    reference_matched_by: "patient",
+    reference_match_method: "patient_confirmed_exact_normalized_name",
+    reference_matched_at: new Date().toISOString(),
+    reference_source_provider: concept.source_system,
+    reference_source_snapshot_id: null,
+    updated_at: new Date().toISOString(),
+  }).eq("id", order.id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
+    .eq("source_module", owner.sourceModule).select("*").maybeSingle();
+  if (error || !updated) return res.status(500).json({ ok: false, error: "Не удалось сохранить сопоставление." });
+  return res.status(200).json({ ok: true, order: updated, concept, verified: false });
 }
 
 // ============================================================
@@ -5139,7 +5463,10 @@ async function handleSendSupportMessage(req, res) {
     const { readModulePrompt, readCorePrompt } = await import("../lib/prompts.js");
     const chatPrompt = readModulePrompt("support", "ai-chat.md");
     const conversationStyle = readCorePrompt("conversation-style.md");
-    const systemPrompt = `${chatPrompt}\n\n${conversationStyle}\n\nКонтекст пользователя:\n${JSON.stringify(context, null, 2)}`;
+    const medicationSafety = context.patient_medication_context
+      ? `\n\nПравило безопасности по лекарствам:\n${PATIENT_MEDICATION_SAFETY_INSTRUCTION}`
+      : "";
+    const systemPrompt = `${chatPrompt}\n\n${conversationStyle}${medicationSafety}\n\nКонтекст пользователя:\n${JSON.stringify(context, null, 2)}`;
 
     // Call AI
     const { runTask, TASK_TYPES } = await import("../lib/modelRouter.js");
@@ -5271,6 +5598,9 @@ async function buildSupportChatContext(supabase, ownerId) {
     .limit(5);
   context.recent_chat = (recentChat || []).reverse();
 
+  const medicationContext = await loadPatientMedicationContext(supabase, "anonymous_case", ownerId, "support");
+  if (medicationContext) context.patient_medication_context = medicationContext;
+
   // UI capabilities — what the user can access
   context.available_sections = [
     "report", "history", "checkins", "practices",
@@ -5282,6 +5612,43 @@ async function buildSupportChatContext(supabase, ownerId) {
   context.service_request_available = true;
 
   return context;
+}
+
+async function loadPatientMedicationContext(supabase, ownerType, ownerId, sourceModule) {
+  try {
+    const { data: medicationOrders } = await supabase
+      .from("patient_medication_orders")
+      .select("id, item_type, name, active_ingredient, strength, single_dose, dose_unit, route, frequency_type, times_per_day, scheduled_times, instructions, start_date, end_date, patient_comment, status, reported_as_doctor_order, medication_concept_id, reference_status, reference_confidence, reference_matched_by, reference_matched_at, reference_match_method, reference_source_provider, reference_source_snapshot_id")
+      .eq("owner_type", ownerType).eq("owner_id", ownerId)
+      .eq("source_module", sourceModule).eq("status", "active")
+      .order("start_date", { ascending: false });
+    const orders = medicationOrders || [];
+    if (!orders.length) return null;
+
+    const recentSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const orderIds = orders.map((order) => order.id);
+    const [{ data: intakeLogs }, { data: orderEvents }] = await Promise.all([
+      supabase.from("medication_intake_logs")
+        .select("medication_order_id, scheduled_date, status, actual_time, actual_dose, actual_dose_unit, patient_note")
+        .eq("owner_type", ownerType).eq("owner_id", ownerId)
+        .gte("scheduled_date", recentSince.slice(0, 10)).order("scheduled_date", { ascending: false }).limit(40),
+      supabase.from("patient_medication_order_events")
+        .select("event_type, changed_fields, previous_status, new_status, created_at")
+        .eq("owner_type", ownerType).eq("owner_id", ownerId)
+        .in("medication_order_id", orderIds).gte("created_at", recentSince)
+        .order("created_at", { ascending: false }).limit(20),
+    ]);
+    let referenceViews = new Map();
+    try {
+      referenceViews = await loadMedicationReferenceViews(supabase, orders);
+    } catch (referenceError) {
+      console.warn(`[${sourceModule}-context] verified medication reference unavailable:`, referenceError.code || "query_failed");
+    }
+    return buildPatientMedicationContext(orders, intakeLogs || [], orderEvents || [], referenceViews);
+  } catch (error) {
+    console.warn(`[${sourceModule}-context] patient medication context unavailable:`, error.code || "query_failed");
+    return null;
+  }
 }
 
 export { syncPracticesFromReport };
