@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { getClientToken } from "./lib/clientToken.js";
+import { buildVoiceBlob } from "./lib/voiceRecording.js";
 
 function getLocalDateString() {
   const d = new Date();
@@ -514,7 +515,7 @@ export default function HealthCabinet({
       mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const blob = buildVoiceBlob(audioChunksRef.current, mr);
         if (blob.size < 100) { setTranscribing(false); return; }
         await transcribeAudio(blob);
       };
@@ -544,7 +545,7 @@ export default function HealthCabinet({
       let token;
       try { token = await getClientToken("body", "transcribe"); } catch {}
       const tHeaders = {
-        "Content-Type": "audio/webm",
+        "Content-Type": blob.type,
         "X-Session-Id": sessionId,
         "X-Module": "body",
         "X-Access-Token": accessToken,

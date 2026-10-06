@@ -141,12 +141,24 @@ export default async function handler(req, res) {
       return res.status(413).json({ error: "Файл слишком большой. Максимум 20 МБ." });
     }
 
+    const contentType = req.headers["content-type"] || "";
+    const { normalizeAudioContentType, audioFilenameForContentType, isWebmAudioContentType } =
+      await import("../lib/audio-mime.js");
+    const normalizedType = normalizeAudioContentType(contentType);
+    const audioFilename = audioFilenameForContentType(contentType);
+
+    // Safe diagnostics only: never log raw audio or credential material.
     console.log("Transcribe request:", {
-      contentType: req.headers["content-type"],
+      contentType: normalizedType || "missing",
+      extension: audioFilename ? audioFilename.split(".").pop() : "unsupported",
       size: audioBuffer?.length || 0,
       sessionId: sessionId || "none",
       module: module || "none",
     });
+
+    if (!audioFilename) {
+      return res.status(415).json({ error: "Неподдерживаемый формат аудио." });
+    }
 
     if (!audioBuffer || audioBuffer.length < 1000) {
       return res.status(400).json({
@@ -154,38 +166,40 @@ export default async function handler(req, res) {
       });
     }
 
-    const contentType = req.headers["content-type"] || "audio/webm";
-
     const transcription = await transcribe(TASK_TYPES.TRANSCRIPTION, {
       audioBuffer,
-      contentType,
+      contentType: normalizedType,
     });
 
     const text = transcription.text;
-    let audioFormat = "webm";
-    let audioForAnalysis = audioBuffer;
 
-    try {
-      const { webmToWav } = await import("../lib/audio.js");
-      const wav = await webmToWav(audioBuffer);
-      if (wav && wav.length > 44) {
-        audioForAnalysis = wav;
-        audioFormat = "wav";
-      }
-    } catch (convErr) {
-      console.log("WebM->WAV conversion unavailable, trying original format:", convErr.message);
-    }
-
+    // Voice analysis is experimental and non-blocking. It only accepts WAV
+    // produced from WebM input; MP4/other containers are skipped instead of
+    // being sent mislabelled to the analysis path.
     let voiceObservations = null;
     let voiceAnalysisSucceeded = false;
-    try {
-      voiceObservations = await analyzeVoice(TASK_TYPES.VOICE_ANALYSIS, {
-        audioBuffer: audioForAnalysis,
-        audioFormat,
-      });
-      voiceAnalysisSucceeded = true;
-    } catch (e) {
-      console.log("Voice analysis skipped (non-blocking):", e.message);
+    if (isWebmAudioContentType(contentType)) {
+      try {
+        const { webmToWav } = await import("../lib/audio.js");
+        const wav = await webmToWav(audioBuffer);
+        if (wav && wav.length > 44) {
+          try {
+            voiceObservations = await analyzeVoice(TASK_TYPES.VOICE_ANALYSIS, {
+              audioBuffer: wav,
+              audioFormat: "wav",
+            });
+            voiceAnalysisSucceeded = true;
+          } catch (e) {
+            console.log("Voice analysis skipped (non-blocking):", e.message);
+          }
+        } else {
+          console.log("Voice analysis skipped (non-blocking): WebM->WAV produced no usable audio");
+        }
+      } catch (convErr) {
+        console.log("Voice analysis skipped (non-blocking): WebM->WAV conversion unavailable:", convErr.message);
+      }
+    } else {
+      console.log("Voice analysis skipped (non-blocking): container not supported for analysis:", normalizedType || "missing");
     }
 
     if (!voiceObservations) {

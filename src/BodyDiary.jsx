@@ -3,6 +3,7 @@ import { getClientToken, clearCachedToken } from "./lib/clientToken.js";
 import { withAccessToken, getBodySession } from "./lib/sessionAccess.js";
 import { parseApiResponse, classifyHttpError, classifyNetworkError, estimateRequestSize, countPhotos } from "./lib/apiResponse.js";
 import { compressPhotosToBudget } from "./lib/photoCompress.js";
+import { buildVoiceBlob } from "./lib/voiceRecording.js";
 import PatientMedicationOrders from "./PatientMedicationOrders.jsx";
 
 function getLocalDateString() {
@@ -225,13 +226,13 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const blob = buildVoiceBlob(audioChunksRef.current, mr);
         if (blob.size < 100) return;
         try {
           let token;
           try { token = await getClientToken("body", "transcribe"); } catch {}
           const tHeaders = {
-            "Content-Type": "audio/webm",
+            "Content-Type": blob.type,
             "X-Session-Id": sessionId,
             "X-Module": "body",
             "X-Access-Token": saved.accessToken,

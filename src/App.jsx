@@ -12,6 +12,7 @@ import MedicationCard from "./MedicationCard.jsx";
 import PatientMedicationOrders from "./PatientMedicationOrders.jsx";
 import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
 import { saveBodySession, saveBodyDisplayResult, saveSupportSession, getBodySession, getSupportSession, clearBodySession, clearSupportSession, withAccessToken } from "./lib/sessionAccess.js";
+import { buildVoiceBlob } from "./lib/voiceRecording.js";
 import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
 import ExpertInvitePage from "./pages/expert/ExpertInvitePage.jsx";
 import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
@@ -2286,7 +2287,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     let token;
     try { token = await getClientToken(mod, "transcribe"); } catch {}
     const tHeaders = {
-      "Content-Type": "audio/webm",
+      "Content-Type": audioBlob.type,
       "X-Session-Id": currentSession.sessionId,
       "X-Module": "support",
       "X-Access-Token": currentSession.accessToken,
@@ -2369,7 +2370,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         }
         if (cabinetVoiceIgnoreStopRef.current) return;
 
-        const audioBlob = new Blob(cabinetVoiceChunksRef.current, { type: "audio/webm" });
+        const audioBlob = buildVoiceBlob(cabinetVoiceChunksRef.current, recorder);
         setCabinetVoiceTranscribing(true);
         try {
           const data = await transcribeSupportAudio(audioBlob, saved);
@@ -2465,9 +2466,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
 
-        const audioBlob = new Blob(audioChunksRef.current, {
-          type: "audio/webm",
-        });
+        const audioBlob = buildVoiceBlob(audioChunksRef.current, recorder);
 
         setTranscribing(true);
 
@@ -2559,9 +2558,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           clearInterval(questionTimerRef.current);
         }
 
-        const audioBlob = new Blob(questionAudioChunksRef.current, {
-          type: "audio/webm",
-        });
+        const audioBlob = buildVoiceBlob(questionAudioChunksRef.current, recorder);
 
         setQuestionTranscribingIndex(index);
 
@@ -2654,9 +2651,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           clearInterval(crisisTimerRef.current);
         }
 
-        const audioBlob = new Blob(crisisAudioChunksRef.current, {
-          type: "audio/webm",
-        });
+        const audioBlob = buildVoiceBlob(crisisAudioChunksRef.current, recorder);
 
         setCrisisTranscribing(true);
 
@@ -2665,7 +2660,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           let token;
           try { token = await getClientToken(mod, "transcribe"); } catch {}
           const tHeaders = {
-            "Content-Type": "audio/webm",
+            "Content-Type": audioBlob.type,
             "X-Session-Id": currentSession.sessionId,
             "X-Module": "support",
             "X-Access-Token": currentSession.accessToken,
