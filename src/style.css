@@ -52,3 +52,87 @@ textarea { width: 100%; min-height: 225px; resize: none; border-radius: 22px; bo
 .service-request-feedback-success { background: #E2EBE4; color: #5F7D6C; }
 .service-request-feedback-error { background: #FCEEEE; color: #9B4B3E; }
 .service-request-spinner { width: 11px; height: 11px; flex: 0 0 11px; border: 2px solid rgba(95,125,108,.25); border-top-color: #5F7D6C; border-radius: 50%; animation: spin .7s linear infinite; }
+
+/* ── Health service request (mobile-safe layout) ───────────────────── */
+.body-service-request-context-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+.body-service-request-context-check {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  max-width: 18px;
+  margin: 0;
+}
+.body-service-request-context-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.body-service-request-contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.body-service-request-contact-grid .body-service-request-field,
+.body-service-request-contact-wide .body-service-request-field {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.body-service-request-service-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.body-service-request-service-title {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.body-service-request-service-price {
+  white-space: nowrap;
+}
+.body-service-request-actions {
+  display: flex;
+  gap: 12px;
+}
+.body-service-request-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.body-service-request-detail-title {
+  min-width: 0;
+}
+.body-service-request-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+@media (max-width: 560px) {
+  .body-service-request-contact-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .body-service-request-actions {
+    flex-direction: column;
+  }
+  .body-service-request-actions button {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}

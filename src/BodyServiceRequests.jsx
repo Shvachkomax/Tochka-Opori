@@ -174,9 +174,9 @@ export default function BodyServiceRequests({ onBack }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {requests.map(r => (
                 <div key={r.id} onClick={() => { setSelectedRequest(r); setView("detail"); }} style={{ padding: "12px 16px", borderRadius: 12, border: `1px solid ${r.status === "answered" ? "#c4d0c6" : "#e8e2d8"}`, background: r.status === "answered" ? "#f0f5f1" : "#faf6ef", cursor: "pointer" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{r.title || r.request_type}</div>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <div className="body-service-request-detail-head" style={{ marginBottom: 4 }}>
+                    <div className="body-service-request-detail-title" style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{r.title || r.request_type}</div>
+                    <div className="body-service-request-badges">
                       {r.status === "answered" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#e8f0ea", color: "#5f8b7a", fontWeight: 600 }}>Есть ответ</span>}
                       {r.status === "scheduled" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#e8f0ea", color: "#6b8fc7", fontWeight: 600 }}>Запланировано</span>}
                       <span style={{ fontSize: 12, color: STATUS_COLORS[r.status] || "#8a7e72", fontWeight: 600 }}>{STATUS_LABELS[r.status] || r.status}</span>
@@ -222,9 +222,9 @@ export default function BodyServiceRequests({ onBack }) {
                       padding: "12px 16px", borderRadius: 12, border: `1px solid ${serviceCode === service.service_code ? "#7D9A89" : "#e8e2d8"}`,
                       background: serviceCode === service.service_code ? "#e8f0ea" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
                     }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{service.label}</div>
-                        <div style={{ fontSize: 13, color: "#5f8b7a", fontWeight: 700, whiteSpace: "nowrap" }}>{service.credits.toLocaleString("ru-RU")} кредитов</div>
+                      <div className="body-service-request-service-row">
+                        <div className="body-service-request-service-title" style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{service.label}</div>
+                        <div className="body-service-request-service-price" style={{ fontSize: 13, color: "#5f8b7a", fontWeight: 700 }}>{service.credits.toLocaleString("ru-RU")} кредитов</div>
                       </div>
                       <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 3 }}>Формат: {FORMAT_LABELS[service.meeting_format] || service.meeting_format}</div>
                     </button>
@@ -253,9 +253,9 @@ export default function BodyServiceRequests({ onBack }) {
               { v: includeWeekly, s: setIncludeWeekly, l: "Недельный итог" },
               { v: includeHealthCtx, s: setIncludeHealthCtx, l: "Здоровье, анализы и препараты" },
             ].map(c => (
-              <label key={c.l} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, cursor: "pointer", fontSize: 13, color: "#5f574f" }}>
-                <input type="checkbox" checked={c.v} onChange={e => c.s(e.target.checked)} />
-                {c.l}
+              <label key={c.l} className="body-service-request-context-row" style={{ fontSize: 13, color: "#5f574f" }}>
+                <input type="checkbox" className="body-service-request-context-check" checked={c.v} onChange={e => c.s(e.target.checked)} />
+                <span className="body-service-request-context-label">{c.l}</span>
               </label>
             ))}
           </div>
@@ -263,16 +263,16 @@ export default function BodyServiceRequests({ onBack }) {
           {needContact && (
             <div style={{ marginBottom: 16, padding: 16, borderRadius: 12, background: "#faf6ef", border: "1px solid #e8e2d8" }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Когда вам удобно?</div>
-              <div style={{ marginBottom: 8 }}>
-                <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Телефон" style={{ width: "100%", height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              <div className="body-service-request-contact-wide" style={{ marginBottom: 8 }}>
+                <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Телефон" className="body-service-request-field" style={{ height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit" }} />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-                <input value={preferredDate} onChange={e => setPreferredDate(e.target.value)} type="date" placeholder="Дата" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-                <input value={preferredTimeFrom} onChange={e => setPreferredTimeFrom(e.target.value)} type="time" placeholder="С" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
-                <input value={preferredTimeTo} onChange={e => setPreferredTimeTo(e.target.value)} type="time" placeholder="До" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              <div className="body-service-request-contact-grid">
+                <input value={preferredDate} onChange={e => setPreferredDate(e.target.value)} type="date" placeholder="Дата" className="body-service-request-field" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+                <input value={preferredTimeFrom} onChange={e => setPreferredTimeFrom(e.target.value)} type="time" placeholder="С" className="body-service-request-field" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+                <input value={preferredTimeTo} onChange={e => setPreferredTimeTo(e.target.value)} type="time" placeholder="До" className="body-service-request-field" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
               </div>
-              <div>
-                <input value={preferredTimeText} onChange={e => setPreferredTimeText(e.target.value)} placeholder="Например: завтра после 18:00 или в будни утром" style={{ width: "100%", height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+              <div className="body-service-request-contact-wide">
+                <input value={preferredTimeText} onChange={e => setPreferredTimeText(e.target.value)} placeholder="Например: завтра после 18:00 или в будни утром" className="body-service-request-field" style={{ height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit" }} />
               </div>
             </div>
           )}
@@ -283,11 +283,11 @@ export default function BodyServiceRequests({ onBack }) {
 
           {submitError && <div style={{ color: "#b5473f", fontSize: 14, marginBottom: 12 }}>{submitError}</div>}
 
-          <div style={{ display: "flex", gap: 12 }}>
-            <button onClick={handleSubmit} disabled={submitting} style={{ flex: 1, padding: "12px 20px", borderRadius: 16, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 15, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.6 : 1, fontFamily: "inherit" }}>
+          <div className="body-service-request-actions">
+            <button onClick={handleSubmit} disabled={submitting} className="body-service-request-primary" style={{ flex: 1, padding: "12px 20px", borderRadius: 16, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 15, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.6 : 1, fontFamily: "inherit" }}>
               {submitting ? "Отправка..." : "Отправить запрос"}
             </button>
-            <button onClick={() => setView("list")} disabled={submitting} style={{ padding: "12px 20px", borderRadius: 16, border: "1px solid #d8cec1", background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+            <button onClick={() => setView("list")} disabled={submitting} className="body-service-request-secondary" style={{ padding: "12px 20px", borderRadius: 16, border: "1px solid #d8cec1", background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
               Отмена
             </button>
           </div>
@@ -298,9 +298,9 @@ export default function BodyServiceRequests({ onBack }) {
       {view === "detail" && selectedRequest && (
         <div>
           <div style={{ padding: 16, borderRadius: 12, border: "1px solid #e8e2d8", marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: "#2f2925" }}>{selectedRequest.title || selectedRequest.request_type}</div>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div className="body-service-request-detail-head">
+              <div className="body-service-request-detail-title" style={{ fontSize: 16, fontWeight: 600, color: "#2f2925" }}>{selectedRequest.title || selectedRequest.request_type}</div>
+              <div className="body-service-request-badges">
                 {selectedRequest.status === "answered" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#e8f0ea", color: "#5f8b7a", fontWeight: 600 }}>Ответ специалиста получен</span>}
                 {selectedRequest.status === "scheduled" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#e8f0ea", color: "#6b8fc7", fontWeight: 600 }}>Консультация запланирована</span>}
                 {selectedRequest.status === "completed" && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "#e8f0ea", color: "#7D9A89", fontWeight: 600 }}>Запрос завершён</span>}
@@ -345,13 +345,13 @@ export default function BodyServiceRequests({ onBack }) {
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 12 }}>
+          <div className="body-service-request-actions">
             {["submitted", "accepted", "needs_clarification", "scheduled"].includes(selectedRequest.status) && (
-              <button onClick={() => handleCancel(selectedRequest.id)} style={{ flex: 1, padding: "12px 20px", borderRadius: 16, border: "1px solid #d8cec1", background: "#fff", color: "#b5473f", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+              <button onClick={() => handleCancel(selectedRequest.id)} className="body-service-request-secondary" style={{ flex: 1, padding: "12px 20px", borderRadius: 16, border: "1px solid #d8cec1", background: "#fff", color: "#b5473f", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
                 Отменить запрос
               </button>
             )}
-            <button onClick={() => setView("list")} style={{ padding: "12px 20px", borderRadius: 16, border: "1px solid #d8cec1", background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+            <button onClick={() => setView("list")} className="body-service-request-secondary" style={{ padding: "12px 20px", borderRadius: 16, border: "1px solid #d8cec1", background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
               К списку
             </button>
           </div>

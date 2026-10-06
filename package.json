@@ -13,6 +13,7 @@
     "e2e:service-requests": "node scripts/e2e-service-requests-browser.mjs",
     "e2e:continuation": "node scripts/e2e-continuation-browser.mjs",
     "e2e:session-pair": "node scripts/e2e-session-pair.js",
+    "e2e:service-request-layout": "node scripts/e2e-service-request-layout.js",
     "test:body-pricing": "node scripts/test-body-pricing.js",
     "test:patient-reported-medications": "node scripts/test-patient-reported-medications.js",
     "test:medication-reference": "node scripts/test-medication-reference.js",
