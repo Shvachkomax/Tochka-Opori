@@ -11,7 +11,7 @@ import BodyServiceRequests from "./BodyServiceRequests.jsx";
 import MedicationCard from "./MedicationCard.jsx";
 import PatientMedicationOrders from "./PatientMedicationOrders.jsx";
 import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
-import { saveBodySession, saveSupportSession, getBodySession, getSupportSession, clearBodySession, clearSupportSession, withAccessToken } from "./lib/sessionAccess.js";
+import { saveBodySession, saveBodyDisplayResult, saveSupportSession, getBodySession, getSupportSession, clearBodySession, clearSupportSession, withAccessToken } from "./lib/sessionAccess.js";
 import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
 import ExpertInvitePage from "./pages/expert/ExpertInvitePage.jsx";
 import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
@@ -3205,8 +3205,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       clearBodySession();
     }
     try {
-      if (sid) localStorage.setItem("body_last_result", JSON.stringify(response));
-      localStorage.setItem("body_last_created_at", new Date().toISOString());
+      if (sid) saveBodyDisplayResult(response);
       if (response?.continuation_code) {
         setContinuationCode(response.continuation_code);
       }

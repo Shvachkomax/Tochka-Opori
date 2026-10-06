@@ -9,6 +9,7 @@ const BODY_PAIR_KEY = "body_session_pair";
 const BODY_SESSION_KEY = "body_last_session_id";
 const BODY_TOKEN_KEY = "body_last_access_token";
 const BODY_RESULT_KEY = "body_last_result";
+const BODY_RESULT_CREATED_KEY = "body_last_created_at";
 const SUPPORT_PAIR_KEY = "support_session_pair";
 const SUPPORT_SESSION_KEY = "support_last_session_id";
 const SUPPORT_TOKEN_KEY = "support_last_access_token";
@@ -159,6 +160,24 @@ export function clearBodySession() {
 
 export function clearSupportSession() {
   clearSupportKeys();
+}
+
+// Display-only intake result state. body_session_pair is the single
+// credential storage: access_token and continuation_code never belong in
+// the display cache. Pre-fix legacy records may still contain an
+// access_token and are read as-is for one-time legacy pair confirmation.
+export function saveBodyDisplayResult(response) {
+  try {
+    if (!response || typeof response !== "object") return false;
+    const sanitized = { ...response };
+    delete sanitized.access_token;
+    delete sanitized.continuation_code;
+    localStorage.setItem(BODY_RESULT_KEY, JSON.stringify(sanitized));
+    localStorage.setItem(BODY_RESULT_CREATED_KEY, new Date().toISOString());
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Attach the access_token to a session API request body only when the

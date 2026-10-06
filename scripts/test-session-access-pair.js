@@ -35,6 +35,7 @@ function check(value, label) {
 
 const {
   saveBodySession,
+  saveBodyDisplayResult,
   getBodySession,
   clearBodySession,
   saveSupportSession,
@@ -208,6 +209,40 @@ console.log("\nReload / storage failure behavior");
   check(afterPartial.sessionId === null && afterPartial.accessToken === null, "failed write plus missing token still never yields a mixed pair");
 }
 
+console.log("\nDisplay result state stores no credential material");
+{
+  const mock = createStorageMock();
+  resetStorage(mock);
+  saveBodySession("session-B", "token-B");
+  const stored = saveBodyDisplayResult({
+    session_id: "session-B",
+    access_token: "token-B",
+    continuation_code: "HEALTH-SECRET-CODE",
+    user_report: "план",
+    body_plan: { days: [] },
+  });
+  const raw = mock.getItem("body_last_result") || "";
+  check(stored === true && !raw.includes("token-B") && !raw.includes("HEALTH-SECRET-CODE"),
+    "body_last_result keeps no access_token and no continuation code");
+  check(raw.includes("session-B") && raw.includes("план"),
+    "body_last_result keeps the display fields needed to restore the plan");
+  const pair = getBodySession();
+  check(pair.sessionId === "session-B" && pair.accessToken === "token-B",
+    "body_session_pair remains the single credential storage after the display save");
+  const afterReload = getBodySession();
+  check(afterReload.accessToken === "token-B", "reload keeps working through body_session_pair with a sanitized display state");
+}
+{
+  const mock = createStorageMock();
+  resetStorage(mock);
+  mock.setItem("body_last_session_id", "session-B");
+  mock.setItem("body_last_access_token", "token-B");
+  mock.setItem("body_last_result", JSON.stringify({ session_id: "session-B", access_token: "token-B", user_report: "старый план" }));
+  const pair = getBodySession();
+  check(pair.sessionId === "session-B" && pair.accessToken === "token-B",
+    "a pre-fix legacy result that still carries the token can one-time confirm a consistent legacy pair");
+}
+
 console.log("\nClient-side guard and handler structure");
 {
   const fs = await import("node:fs");
@@ -226,6 +261,9 @@ console.log("\nClient-side guard and handler structure");
   check(intakeBlock.includes("saveBodySession(sid, token)"), "intake completion stores the credential pair atomically");
   check(!intakeBlock.includes("localStorage.setItem(\"body_last_session_id\""), "intake completion no longer writes session_id without its token");
   check(intakeBlock.includes("clearBodySession()"), "intake completion without a token clears the previous pair");
+  check(intakeBlock.includes("saveBodyDisplayResult(response)"), "intake completion stores the display result through the sanitized helper");
+  check(intakeBlock.indexOf("saveBodySession(sid, token)") < intakeBlock.indexOf("saveBodyDisplayResult(response)"),
+    "the trusted credential pair is saved before the display result state");
 }
 
 console.log("\nNo token logging");
