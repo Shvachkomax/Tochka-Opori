@@ -88,6 +88,35 @@ assert.throws(() => canonicalizeProviderFacts({ strength: () => 1 }), /non-JSON|
 assert.throws(() => canonicalizeProviderFacts({ strength: undefined }), /non-JSON|invalid/);
 check(canonicalizeProviderFacts(factsBase) === canonicalizeProviderFacts(factsKeyOrder), "canonical representation is stable under key reordering");
 
+console.log("\nDeep immutable provider facts (revision hardening)");
+const mutableFacts = {
+  trade_name: "Name",
+  interactions: { with_food: "none", deep: { items: ["a", "b"] } },
+  special_warnings: ["warn one", "warn two"],
+};
+const frozenFacts = validateProviderFacts(mutableFacts);
+mutableFacts.trade_name = "CHANGED";
+mutableFacts.interactions.with_food = "CHANGED";
+mutableFacts.interactions.deep.items.push("c");
+mutableFacts.special_warnings.push("warn three");
+check(frozenFacts.trade_name === "Name" && frozenFacts.interactions.with_food === "none"
+  && frozenFacts.interactions.deep.items.length === 2 && frozenFacts.special_warnings.length === 2,
+  "validated facts are independent of later input mutation (nested object and array)");
+check(Object.isFrozen(frozenFacts) && Object.isFrozen(frozenFacts.interactions) && Object.isFrozen(frozenFacts.interactions.deep) && Object.isFrozen(frozenFacts.special_warnings),
+  "validated facts and all nested objects/arrays are recursively frozen");
+assert.throws(() => {
+  frozenFacts.interactions.with_food = "x";
+}, TypeError);
+assert.throws(() => {
+  frozenFacts.special_warnings.push("x");
+}, TypeError);
+check(frozenFacts.special_warnings[0] === "warn one" && frozenFacts.special_warnings[1] === "warn two", "validated arrays preserve their order");
+const mutableSectionValue = { with_food: "none", deep: { items: ["a", "b"] } };
+const frozenSection = validateProviderFactSection({ revision: { provider_record_id: "rec-1", source_version: "fixture-v1" }, section: "interactions", value: mutableSectionValue });
+mutableSectionValue.deep.items.push("c");
+check(frozenSection.value.deep.items.length === 2 && Object.isFrozen(frozenSection.value) && Object.isFrozen(frozenSection.value.deep.items),
+  "section projection values are deep-frozen copies of the input");
+
 console.log("\nFixture provider");
 const provider = createFixtureMedicationReferenceProvider();
 check(typeof provider.searchMedication === "function" && typeof provider.getOfficialInformation === "function", "fixture provider implements the seam");

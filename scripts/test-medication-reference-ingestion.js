@@ -195,6 +195,78 @@ check(rejected.status === "created" && rejected.document.verification_status ===
 const stateAfterReject = await loadRevisionStateRows(mock, promoted.document);
 check(resolveDocumentStatusOfRecord(stateAfterReject)?.verification_status === "rejected", "the newest state row wins: after reject the state of record is rejected");
 
+console.log("\nSnapshot content comparison (canonical JSON semantics)");
+const orderedFacts = {
+  trade_name: "Synthetic Ingestion Fixture",
+  active_ingredient: "synthetic-ingestion-compound",
+  special_warnings: ["warn one", "warn two"],
+  interactions: { with_food: "none", with_alcohol: "avoid" },
+};
+const reorderedTopLevel = {
+  interactions: { with_food: "none", with_alcohol: "avoid" },
+  special_warnings: ["warn one", "warn two"],
+  active_ingredient: "synthetic-ingestion-compound",
+  trade_name: "Synthetic Ingestion Fixture",
+};
+const reorderedNested = {
+  trade_name: "Synthetic Ingestion Fixture",
+  active_ingredient: "synthetic-ingestion-compound",
+  special_warnings: ["warn one", "warn two"],
+  interactions: { with_alcohol: "avoid", with_food: "none" },
+};
+const reorderMock = createSupabaseMock();
+const baselineSnap = await promoteReferenceRevision(reorderMock, {
+  providerId, document: documentRef, facts: orderedFacts, conceptId: "concept-1",
+  testOnly: true, verifiedBy: "runtime-tester", retrievedAt: t(1),
+});
+check(baselineSnap.snapshotStatus === "created", "baseline snapshot created for comparison cases");
+const topReorder = await promoteReferenceRevision(reorderMock, {
+  providerId, document: documentRef, facts: reorderedTopLevel, conceptId: "concept-1",
+  testOnly: true, verifiedBy: "runtime-tester", retrievedAt: t(2),
+});
+check(topReorder.snapshotStatus === "reused" && topReorder.contentHash === baselineSnap.contentHash, "top-level fact key order does not affect snapshot reuse");
+const nestedReorder = await promoteReferenceRevision(reorderMock, {
+  providerId, document: documentRef, facts: reorderedNested, conceptId: "concept-1",
+  testOnly: true, verifiedBy: "runtime-tester", retrievedAt: t(3),
+});
+check(nestedReorder.snapshotStatus === "reused", "nested object key order does not affect snapshot reuse");
+
+function seededPromoteMock(seedFacts, hash) {
+  return createSupabaseMock({
+    medication_reference_documents: [{
+      id: "doc-seed", source_provider: providerId, source_document_id: documentRef.source_document_id,
+      canonical_identifier: documentRef.canonical_identifier, source_title: documentRef.source_title,
+      source_version: documentRef.source_version, published_at: null, effective_at: null,
+      retrieved_at: t(1), country: "RU", language: "ru", content_hash: hash,
+      verification_status: "verified", test_only: true, verified_at: t(1), verified_by: "runtime-tester", created_at: t(1),
+    }],
+    medication_reference_snapshots: [{
+      id: "snap-seed", source_document_id: "doc-seed", medication_concept_id: "concept-1",
+      snapshot_version: "fixture-v1", source_facts: seedFacts, content_hash: hash,
+      retrieved_at: t(1), test_only: true, created_at: t(1),
+    }],
+  });
+}
+const orderedHash = computeReferenceContentHash(orderedFacts, "fixture-v1");
+const arrayReorderedFacts = { ...orderedFacts, special_warnings: ["warn two", "warn one"] };
+await assert.rejects(
+  async () => promoteReferenceRevision(seededPromoteMock(arrayReorderedFacts, orderedHash), {
+    providerId, document: documentRef, facts: orderedFacts, conceptId: "concept-1",
+    testOnly: true, verifiedBy: "runtime-tester", retrievedAt: t(2),
+  }),
+  /fail closed/,
+);
+check(true, "array order change on a reused snapshot state is a content mismatch and fails closed");
+const nestedChangedFacts = { ...orderedFacts, interactions: { with_food: "DIFFERENT", with_alcohol: "avoid" } };
+await assert.rejects(
+  async () => promoteReferenceRevision(seededPromoteMock(nestedChangedFacts, orderedHash), {
+    providerId, document: documentRef, facts: orderedFacts, conceptId: "concept-1",
+    testOnly: true, verifiedBy: "runtime-tester", retrievedAt: t(2),
+  }),
+  /fail closed/,
+);
+check(true, "nested fact value change on a reused snapshot state is a content mismatch and fails closed");
+
 console.log("\nVerified-only loader honors revision status-of-record");
 function loaderFixture(overrides = {}) {
   const contentHashDoc = "c".repeat(64);
