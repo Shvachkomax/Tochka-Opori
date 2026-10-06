@@ -15,6 +15,7 @@
     "test:body-pricing": "node scripts/test-body-pricing.js",
     "test:patient-reported-medications": "node scripts/test-patient-reported-medications.js",
     "test:medication-reference": "node scripts/test-medication-reference.js",
+    "test:medication-reference-provider": "node scripts/test-medication-reference-provider.js",
     "test:service-request-finance": "node scripts/test-service-request-finance.js",
     "e2e:service-request-finance": "node scripts/e2e-service-request-finance-browser.mjs"
   },
