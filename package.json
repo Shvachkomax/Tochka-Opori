@@ -13,6 +13,8 @@
     "e2e:service-requests": "node scripts/e2e-service-requests-browser.mjs",
     "e2e:continuation": "node scripts/e2e-continuation-browser.mjs",
     "test:body-pricing": "node scripts/test-body-pricing.js",
+    "test:patient-reported-medications": "node scripts/test-patient-reported-medications.js",
+    "test:medication-reference": "node scripts/test-medication-reference.js",
     "test:service-request-finance": "node scripts/test-service-request-finance.js",
     "e2e:service-request-finance": "node scripts/e2e-service-request-finance-browser.mjs"
   },
