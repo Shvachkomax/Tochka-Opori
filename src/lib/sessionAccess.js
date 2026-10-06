@@ -68,29 +68,30 @@ function removeLegacySupportKeys() {
   } catch {}
 }
 
-// Atomic pair save: both values are written together or nothing changes.
-// A successful write replaces the pair and drops legacy keys; a failed
-// write leaves the previous consistent pair untouched; a partial call
-// (missing session_id or token) clears the pair so a new session can
-// never end up next to an older token.
-export function saveBodySession(sessionId, accessToken) {
+// Atomic pair save. Returns true only when the exact pair is written and
+// read back. Any failure is fail-closed: the module's pair is cleared so a
+// failed new-session save can never leave an older session active, and the
+// caller must treat the session credential as unsaved.
+function savePair(pairKey, clearKeys, removeLegacyKeys, sessionId, accessToken) {
   if (sessionId && accessToken) {
-    if (writePairKey(BODY_PAIR_KEY, sessionId, accessToken)) {
-      removeLegacyBodyKeys();
+    if (writePairKey(pairKey, sessionId, accessToken)) {
+      removeLegacyKeys();
+      const readBack = readJson(pairKey);
+      if (isValidPair(readBack) && readBack.sessionId === sessionId && readBack.accessToken === accessToken) {
+        return true;
+      }
     }
-    return;
   }
-  clearBodyKeys();
+  clearKeys();
+  return false;
+}
+
+export function saveBodySession(sessionId, accessToken) {
+  return savePair(BODY_PAIR_KEY, clearBodyKeys, removeLegacyBodyKeys, sessionId, accessToken);
 }
 
 export function saveSupportSession(sessionId, accessToken) {
-  if (sessionId && accessToken) {
-    if (writePairKey(SUPPORT_PAIR_KEY, sessionId, accessToken)) {
-      removeLegacySupportKeys();
-    }
-    return;
-  }
-  clearSupportKeys();
+  return savePair(SUPPORT_PAIR_KEY, clearSupportKeys, removeLegacySupportKeys, sessionId, accessToken);
 }
 
 // Legacy body recovery is accepted ONLY when body_last_result confirms
@@ -104,8 +105,12 @@ function recoverLegacyBodyPair() {
   if (legacySessionId && legacyToken) {
     const result = readJson(BODY_RESULT_KEY);
     if (result && result.session_id === legacySessionId && result.access_token === legacyToken) {
+      sanitizeStoredBodyResult();
       return { sessionId: legacySessionId, accessToken: legacyToken };
     }
+  }
+  if (legacySessionId || legacyToken) {
+    sanitizeStoredBodyResult();
   }
   return null;
 }
@@ -178,6 +183,34 @@ export function saveBodyDisplayResult(response) {
   } catch {
     return false;
   }
+}
+
+// Purge credential material from a stored display result. Legacy pre-fix
+// records carry an access_token; after the one-time pair confirmation (or
+// when the legacy state is rejected) that copy must not survive. A result
+// that cannot be parsed is removed entirely.
+function sanitizeStoredBodyResult() {
+  try {
+    const raw = localStorage.getItem(BODY_RESULT_KEY);
+    if (raw === null) return;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      localStorage.removeItem(BODY_RESULT_KEY);
+      return;
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      localStorage.removeItem(BODY_RESULT_KEY);
+      return;
+    }
+    if ("access_token" in parsed || "continuation_code" in parsed) {
+      const sanitized = { ...parsed };
+      delete sanitized.access_token;
+      delete sanitized.continuation_code;
+      localStorage.setItem(BODY_RESULT_KEY, JSON.stringify(sanitized));
+    }
+  } catch {}
 }
 
 // Attach the access_token to a session API request body only when the

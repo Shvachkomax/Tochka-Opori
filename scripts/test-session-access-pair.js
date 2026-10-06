@@ -186,27 +186,31 @@ console.log("\nReload / storage failure behavior");
   const after = getBodySession();
   check(before.sessionId === after.sessionId && before.accessToken === after.accessToken, "reload (fresh read) returns the same consistent pair");
 }
+console.log("\nFailed pair write is fail-closed (never leaves an older session active)");
 {
   const mock = createStorageMock();
   resetStorage(mock);
-  saveBodySession("session-A", "token-A");
+  check(saveBodySession("session-A", "token-A") === true, "successful pair save reports success and read-back matches");
+  check(saveSupportSession("sup-A", "sup-token-A") === true, "successful support pair save reports success");
   const throwing = {
     getItem: mock.getItem,
     removeItem: mock.removeItem,
     clear: mock.clear,
-    _dump: mock._dump,
     setItem: () => {
       throw new Error("QuotaExceededError");
     },
   };
   globalThis.localStorage = throwing;
-  saveBodySession("session-B", "token-B");
+  const failedBody = saveBodySession("session-B", "token-B");
+  const failedSupport = saveSupportSession("sup-B", "sup-token-B");
   globalThis.localStorage = mock;
+  check(failedBody === false && failedSupport === false, "failed pair writes report failure");
   const pair = getBodySession();
-  check(pair.sessionId === "session-A" && pair.accessToken === "token-A", "a failed atomic write keeps the old consistent pair (never B/tokenA)");
-  saveBodySession("session-C", null);
-  const afterPartial = getBodySession();
-  check(afterPartial.sessionId === null && afterPartial.accessToken === null, "failed write plus missing token still never yields a mixed pair");
+  check(pair.sessionId === null && pair.accessToken === null, "failed new-session save clears the old body pair (session A is never left active)");
+  check(getSupportSession().sessionId === null, "failed new-session save clears the old support pair too");
+  check(withAccessToken({ action: "getBodyCabinet", session_id: "session-A" }, "session-A").access_token === undefined,
+    "no cabinet request can run with the cleared old token after a failed write");
+  check(saveBodySession("session-C", null) === false, "partial save reports failure");
 }
 
 console.log("\nDisplay result state stores no credential material");
@@ -241,6 +245,31 @@ console.log("\nDisplay result state stores no credential material");
   const pair = getBodySession();
   check(pair.sessionId === "session-B" && pair.accessToken === "token-B",
     "a pre-fix legacy result that still carries the token can one-time confirm a consistent legacy pair");
+  const raw = mock.getItem("body_last_result") || "";
+  check(!raw.includes("token-B") && raw.includes("старый план"),
+    "after the one-time migration body_last_result keeps no access_token but keeps the display fields");
+}
+{
+  const mock = createStorageMock();
+  resetStorage(mock);
+  mock.setItem("body_last_session_id", "session-B");
+  mock.setItem("body_last_access_token", "token-A");
+  mock.setItem("body_last_result", JSON.stringify({ session_id: "session-A", access_token: "token-A", continuation_code: "HEALTH-SECRET-CODE" }));
+  const pair = getBodySession();
+  check(pair.sessionId === null && pair.accessToken === null, "poisoned legacy state is rejected (unchanged)");
+  const raw = mock.getItem("body_last_result") || "";
+  check(!raw.includes("token-A") && !raw.includes("HEALTH-SECRET-CODE"),
+    "a rejected legacy state purges credential material from the display result");
+}
+{
+  const mock = createStorageMock();
+  resetStorage(mock);
+  mock.setItem("body_last_session_id", "session-B");
+  mock.setItem("body_last_access_token", "token-B");
+  mock.setItem("body_last_result", "{not-json");
+  const pair = getBodySession();
+  check(pair.sessionId === null && pair.accessToken === null && mock.getItem("body_last_result") === null,
+    "a corrupted display result is removed entirely while healing legacy state");
 }
 
 console.log("\nClient-side guard and handler structure");
@@ -264,6 +293,24 @@ console.log("\nClient-side guard and handler structure");
   check(intakeBlock.includes("saveBodyDisplayResult(response)"), "intake completion stores the display result through the sanitized helper");
   check(intakeBlock.indexOf("saveBodySession(sid, token)") < intakeBlock.indexOf("saveBodyDisplayResult(response)"),
     "the trusted credential pair is saved before the display result state");
+  check(intakeBlock.includes("const pairSaved =") && intakeBlock.includes("if (!pairSaved) clearBodySession()"),
+    "a failed pair write is fail-closed in the intake completion handler");
+  check(intakeBlock.includes("if (!pairSaved)") && intakeBlock.includes("Не удалось сохранить доступ к сессии"),
+    "a failed pair write shows an explicit error and keeps the continuation code memory-only");
+
+  // Blocker 3: session_id is never presented as a continuation code
+  const codeStepIdx = appCode.indexOf("Ваш код продолжения");
+  const codeStepBlock = appCode.substring(codeStepIdx, codeStepIdx + 2200);
+  check(!codeStepBlock.includes("bodyIntakeResult.session_id"), "the code step never displays session_id as the continuation code");
+  check(codeStepBlock.includes("continuation_code || continuationCode"), "the code step shows the in-memory continuation code after a fresh intake");
+  check(codeStepBlock.includes("Код продолжения не хранится на устройстве"),
+    "the code step explains when no continuation code is available on the device");
+  const copyIdx = appCode.indexOf("function copyBodyCode");
+  const copyBlock = appCode.substring(copyIdx, copyIdx + 400);
+  check(!copyBlock.includes("session_id") && !copyBlock.includes("body_last_session_id"),
+    "copyBodyCode never falls back to a session short code");
+  check(appCode.includes("preferCode: true") && appCode.includes("options.preferCode === true"),
+    "an explicitly entered continuation code takes priority over a stored pair");
 }
 
 console.log("\nNo token logging");

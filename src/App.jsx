@@ -1325,7 +1325,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }
 
-  async function loadBodyCabinet(enteredCode) {
+  async function loadBodyCabinet(enteredCode, options = {}) {
+    const preferCode = options.preferCode === true;
     const saved = getBodySession();
     const accessToken = saved.accessToken;
 
@@ -1337,7 +1338,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       let effectiveSessionId;
       let effectiveAccessToken;
 
-      if (accessToken && saved.sessionId) {
+      // An explicitly user-entered continuation code is never silently
+      // overridden by a previously stored credential pair.
+      if (!(preferCode && enteredCode) && accessToken && saved.sessionId) {
         const d = new Date();
         const clientToday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         const body = { action: "getBodyCabinet", sessionId: saved.sessionId, accessToken, clientToday };
@@ -3197,26 +3200,23 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     const sid = response?.session_id || "";
     const token = response?.access_token || "";
     // Credential pair first and atomically: a new session must never be
-    // stored next to a previous session's token, and a missing token must
-    // never keep the previous pair alive for this session.
-    if (sid && token) {
-      saveBodySession(sid, token);
-    } else {
-      clearBodySession();
-    }
+    // stored next to a previous session's token. A failed pair write is
+    // fail-closed: the previous pair is cleared and never stays active.
+    const pairSaved = Boolean(sid && token) && saveBodySession(sid, token);
+    if (!pairSaved) clearBodySession();
     try {
       if (sid) saveBodyDisplayResult(response);
       if (response?.continuation_code) {
         setContinuationCode(response.continuation_code);
       }
     } catch (e) {}
-    if (sid && !token) {
+    if (!pairSaved) {
       showToast("Не удалось сохранить доступ к сессии. Войдите снова по коду продолжения.", "error");
     }
   }
 
   function copyBodyCode() {
-    const code = bodyIntakeResult?.continuation_code || continuationCode || bodyIntakeResult?.session_id || localStorage.getItem("body_last_session_id");
+    const code = bodyIntakeResult?.continuation_code || continuationCode;
     if (!code) return;
     navigator.clipboard.writeText(code).then(() => {
       setBodyCodeCopied(true);
@@ -3227,7 +3227,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function continueBodyByCode() {
     const code = bodyContinuationInput.trim();
     if (!code) return;
-    await loadBodyCabinet(code);
+    await loadBodyCabinet(code, { preferCode: true });
     setBodyContinuationInput("");
   }
 
@@ -10187,7 +10187,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               )}
 
               {/* Step 2: Continuation code */}
-              {bodyIntakeStep === 1 && (bodyIntakeResult.continuation_code || bodyIntakeResult.session_id) && (
+              {bodyIntakeStep === 1 && (
                 <>
                   <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16, color: "#2f2925" }}>
                     Ваш код продолжения
@@ -10195,21 +10195,30 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   <div style={{ color: "#665c52", fontSize: 14, marginBottom: 16, lineHeight: 1.6 }}>
                     Сохраните этот код. Он открывает ваш профиль, план и дневник на любом устройстве.
                   </div>
-                  <div style={{
-                    textAlign: "center", padding: 24, borderRadius: 16, background: "#f6f0e7",
-                    border: "1px solid #d8cec1", marginBottom: 20,
-                  }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "0.06em", color: "#2f2925", fontFamily: "monospace", marginBottom: 12, wordBreak: "break-all" }}>
-                      {bodyIntakeResult.continuation_code || bodyIntakeResult.session_id}
-                    </div>
-                    <button onClick={copyBodyCode} style={{
-                      padding: "10px 24px", borderRadius: 12, border: 0,
-                      background: bodyCodeCopied ? "#4caf50" : "#7D9A89",
-                      color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                  {(bodyIntakeResult.continuation_code || continuationCode) ? (
+                    <div style={{
+                      textAlign: "center", padding: 24, borderRadius: 16, background: "#f6f0e7",
+                      border: "1px solid #d8cec1", marginBottom: 20,
                     }}>
-                      {bodyCodeCopied ? "Код скопирован" : "Скопировать код"}
-                    </button>
-                  </div>
+                      <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "0.06em", color: "#2f2925", fontFamily: "monospace", marginBottom: 12, wordBreak: "break-all" }}>
+                        {bodyIntakeResult.continuation_code || continuationCode}
+                      </div>
+                      <button onClick={copyBodyCode} style={{
+                        padding: "10px 24px", borderRadius: 12, border: 0,
+                        background: bodyCodeCopied ? "#4caf50" : "#7D9A89",
+                        color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                      }}>
+                        {bodyCodeCopied ? "Код скопирован" : "Скопировать код"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{
+                      textAlign: "center", padding: 24, borderRadius: 16, background: "#f6f0e7",
+                      border: "1px solid #d8cec1", marginBottom: 20, color: "#665c52", fontSize: 14, lineHeight: 1.6,
+                    }}>
+                      Код продолжения не хранится на устройстве. В личном кабинете можно создать новый код.
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
                     <button onClick={() => setBodyIntakeStep(0)} style={{
                       flex: 1, height: 48, borderRadius: 14, border: "1px solid #d8cec1",

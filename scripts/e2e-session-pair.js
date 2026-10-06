@@ -54,11 +54,7 @@ async function readLegacy(page) {
   }));
 }
 
-async function fillIntake(page, name) {
-  await page.goto(INTAKE_URL, { waitUntil: "domcontentloaded" });
-  const cta = page.getByText("Перейти к анкете");
-  await cta.waitFor({ timeout: 15000 });
-  await cta.click();
+async function fillIntakeForm(page, name, options = {}) {
   const form = page.locator('form[data-body-intake]');
   await form.waitFor({ timeout: 15000 });
   await form.locator('input[placeholder="Имя или псевдоним"]').fill(name);
@@ -77,19 +73,49 @@ async function fillIntake(page, name) {
   await form.locator("input.healthRedFlagCheckbox").last().check();
   await form.locator('button[type="submit"]').click();
   await page.getByRole("button", { name: "Дальше" }).waitFor({ timeout: 120000 });
+  let toastSeen = false;
+  if (options.expectFailToast) {
+    toastSeen = (await page.getByText("Не удалось сохранить доступ к сессии").count()) > 0;
+  }
   await page.getByRole("button", { name: "Дальше" }).click();
+  // The code step must show the full continuation code (never a short session id)
+  const codeText = (await page.locator("body").innerText()).match(/HEALTH-[A-Z0-9]+-[A-Z0-9-]+/i)?.[0] || "";
   try {
     await page.getByRole("button", { name: "Продолжить" }).click({ timeout: 8000 });
     await page.getByRole("button", { name: "Начать дневник" }).click({ timeout: 8000 });
   } catch {
     // result walkthrough is cosmetic; the pair is already stored
   }
+  return { codeText, toastSeen };
+}
+
+async function finishToCabinet(page) {
   const cabinetCta = page.getByRole("button", { name: "Перейти в личный кабинет" });
   if (await cabinetCta.count()) {
     await cabinetCta.click();
   } else {
     await page.goto(INTAKE_URL, { waitUntil: "domcontentloaded" });
   }
+}
+
+async function fillIntake(page, name) {
+  await page.goto(INTAKE_URL, { waitUntil: "domcontentloaded" });
+  await openIntakeForm(page);
+  const { codeText: shownCode } = await fillIntakeForm(page, name);
+  await finishToCabinet(page);
+  return shownCode;
+}
+
+async function openIntakeForm(page) {
+  const cta = page.getByText("Перейти к анкете");
+  await cta.waitFor({ timeout: 15000 });
+  await cta.click();
+  await page.locator('form[data-body-intake]').waitFor({ timeout: 15000 });
+}
+
+async function backToLanding(page) {
+  await page.getByRole("button", { name: "На главную" }).click();
+  await page.getByText("Перейти к анкете").waitFor({ timeout: 15000 });
 }
 
 async function gotoCabinet(page) {
@@ -145,12 +171,17 @@ async function fillAndSaveDiary(page, marker) {
 async function scenario1(page) {
   console.log("\n--- Scenario 1: intake -> pair -> cabinet -> diary -> plate -> save -> reload ---");
   const log = wireRequestLog(page);
-  await fillIntake(page, "E2E Pair One");
+  const shownCode = await fillIntake(page, "E2E Pair One");
   const pairA = await readPair(page);
   if (pairA?.sessionId && pairA?.accessToken) {
     ok(`scenario1: intake stored an atomic credential pair (session ${String(pairA.sessionId).slice(0, 12)}…)`);
   } else {
     no(`scenario1: pair not stored: ${JSON.stringify(await readLegacy(page))}`);
+  }
+  if (shownCode && shownCode.split("-").length >= 5 && shownCode !== pairA?.sessionId) {
+    ok("scenario1: the fresh intake shows the full continuation code, not the session short code");
+  } else {
+    no(`scenario1: unexpected continuation code display: "${shownCode}" vs session ${pairA?.sessionId}`);
   }
 
   await gotoCabinet(page);
@@ -204,6 +235,23 @@ async function scenario1(page) {
   pairAfterReload?.accessToken === pairA?.accessToken
     ? ok("scenario1: credential pair survives reload unchanged")
     : no("scenario1: pair changed across reload");
+
+  // Blocker 3: restored (sanitized) result never shows session_id as a code
+  await page.evaluate(() => localStorage.removeItem("body_session_pair"));
+  await page.goto(INTAKE_URL, { waitUntil: "domcontentloaded" });
+  const restoreBtn = page.getByRole("button", { name: "Вернуться к последнему плану" });
+  await restoreBtn.waitFor({ timeout: 15000 });
+  await restoreBtn.click();
+  await page.getByRole("button", { name: "Дальше" }).click();
+  await page.waitForTimeout(500);
+  const codeStepText = await page.locator("body").innerText();
+  if (codeStepText.includes("Код продолжения не хранится на устройстве")
+    && !codeStepText.includes(pairA.sessionId)
+    && !codeStepText.includes("Скопировать код")) {
+    ok("scenario1: restored result hides the code step fallback and never shows the session short code");
+  } else {
+    no("scenario1: restored result still exposes a session short code or copy action");
+  }
   return { tokenA: pairA?.accessToken || "token-A-missing", sessionA: pairA?.sessionId || null };
 }
 
@@ -213,14 +261,18 @@ async function resetApp(page) {
 }
 
 async function scenario2(page) {
-  console.log("\n--- Scenario 2: intake A -> intake B replaces the pair; token A never sent again ---");
+  console.log("\n--- Scenario 2: intake A -> intake B replaces the pair (no storage reset between) ---");
   await resetApp(page);
-  await fillIntake(page, "E2E Pair One B");
+  await openIntakeForm(page);
+  await fillIntakeForm(page, "E2E Pair One B");
   const pairA = await readPair(page);
   const tokenA = pairA?.accessToken || "token-A-missing";
 
-  await page.evaluate(() => localStorage.clear());
-  await fillIntake(page, "E2E Pair Two");
+  // Second intake in the same browser WITHOUT clearing storage: the pair A
+  // must be fully replaced by pair B.
+  await backToLanding(page);
+  await openIntakeForm(page);
+  await fillIntakeForm(page, "E2E Pair Two");
   const pairB = await readPair(page);
   if (pairB?.sessionId && pairB?.sessionId !== pairA?.sessionId && pairB?.accessToken && pairB?.accessToken !== tokenA) {
     ok("scenario2: second intake replaced the whole pair (session B + token B)");
@@ -234,6 +286,7 @@ async function scenario2(page) {
 
   const log = wireRequestLog(page);
   const logStart = log.length;
+  await finishToCabinet(page);
   await gotoCabinet(page);
   await openNewDiary(page);
   const markerB = `e2e pair day B ${Date.now()}`;
@@ -297,6 +350,51 @@ async function scenario3(page, seed) {
     : no("scenario3: cabinet still reachable with the poisoned pair");
 }
 
+async function scenario4(page) {
+  console.log("\n--- Scenario 4: storage write failure fails closed, old pair never stays active ---");
+  await resetApp(page);
+  await openIntakeForm(page);
+  await fillIntakeForm(page, "E2E Fail A");
+  const pairA = await readPair(page);
+  const tokenA = pairA?.accessToken || "token-A-missing";
+  if (pairA?.sessionId && pairA?.accessToken) {
+    ok("scenario4: intake A stored pair A/tokenA");
+  } else {
+    no("scenario4: pair A not stored");
+  }
+
+  await backToLanding(page);
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    window.__restoreSetItem = () => { Storage.prototype.setItem = original; };
+    Storage.prototype.setItem = () => { throw new Error("QuotaExceededError"); };
+  });
+  const log = wireRequestLog(page);
+  const logStart = log.length;
+  await openIntakeForm(page);
+  const { toastSeen } = await fillIntakeForm(page, "E2E Fail B", { expectFailToast: true });
+
+  const pairAfter = await readPair(page);
+  const legacyAfter = await readLegacy(page);
+  (!pairAfter && !legacyAfter.sessionId && !legacyAfter.token)
+    ? ok("scenario4: after the failed pair write no credential pair is active (A/tokenA cleared)")
+    : no(`scenario4: stale credentials survived: pair=${JSON.stringify(pairAfter)} legacy=${JSON.stringify(legacyAfter)}`);
+  const leaked = log.slice(logStart).filter((r) => r.post.includes(tokenA));
+  leaked.length === 0
+    ? ok("scenario4: no request carries token A after the failed write")
+    : no(`scenario4: token A leaked into ${leaked.length} request(s)`);
+  toastSeen
+    ? ok("scenario4: client shows the explicit fail-closed error")
+    : no("scenario4: explicit fail-closed error not shown");
+
+  await page.evaluate(() => window.__restoreSetItem());
+  await backToLanding(page);
+  const recoveryText = await page.locator("body").innerText();
+  recoveryText.includes("Уже есть код продолжения")
+    ? ok("scenario4: continuation-code recovery path is available to the user")
+    : no("scenario4: continuation-code recovery path missing");
+}
+
 async function run() {
   const only = process.env.E2E_ONLY || "";
   const browser = await chromium.launch({ headless: true, channel: "chrome" });
@@ -306,6 +404,7 @@ async function run() {
     if (!only || only === "1") await scenario1(page);
     if (!only || only === "2") await scenario2(page);
     if (!only || only === "3") await scenario3(page);
+    if (!only || only === "4") await scenario4(page);
   } finally {
     await browser.close();
   }
