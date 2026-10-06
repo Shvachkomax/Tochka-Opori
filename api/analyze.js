@@ -1692,10 +1692,19 @@ async function handleCheckSaveStatus(req, res) {
 }
 
 async function handlePlatePhotoAnalysis(req, res) {
-  const { session_id, photos } = req.body || {};
+  const { session_id, photos, access_token } = req.body || {};
 
   if (!session_id) {
     return res.status(400).json({ error: "Missing session_id" });
+  }
+
+  // Photo analysis is a protected session operation: it requires the same
+  // credential pair as the diary save and must not work from session_id
+  // knowledge alone.
+  const sessionValid = await validateSessionAccess(session_id, access_token);
+  if (!sessionValid) {
+    console.warn(`[plate-analysis] stage=auth_denied session=${session_id}`);
+    return res.status(401).json({ ok: false, error: "Сессия недействительна. Войдите снова по коду продолжения." });
   }
 
   if (!Array.isArray(photos) || photos.length === 0 || photos.length > 6) {

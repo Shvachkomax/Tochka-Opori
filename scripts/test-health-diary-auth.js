@@ -40,9 +40,25 @@ const diaryCode = await import("node:fs").then(fs => fs.readFileSync("src/BodyDi
 
 assert.ok(diaryCode.includes("access_token: sessionCreds.accessToken"), "BodyDiary sends access_token in save request");
 assert.ok(diaryCode.includes('stage: "daily_log_ai_analysis"'), "BodyDiary has AI analysis request");
-assert.ok(diaryCode.includes("access_token: sessionCreds.accessToken || null"), "BodyDiary sends access_token in AI request");
+assert.ok(diaryCode.includes("access_token: sessionCreds.accessToken"), "BodyDiary sends access_token in AI request");
 
 console.log("PASS client: access_token sent in save and AI requests");
+
+// ── 2b. plate_photo_analysis requires the session credential pair ───────
+
+const plateIdx = analyzeCode.indexOf("function handlePlatePhotoAnalysis");
+const plateBlock = analyzeCode.substring(plateIdx, plateIdx + 3000);
+assert.ok(plateBlock.includes("validateSessionAccess"), "handlePlatePhotoAnalysis calls validateSessionAccess");
+assert.ok(plateBlock.includes("access_token"), "handlePlatePhotoAnalysis extracts access_token from body");
+const plateAuth = plateBlock.indexOf("validateSessionAccess");
+const plateAiIdx = plateBlock.indexOf("runTask");
+assert.ok(plateAuth > 0 && plateAiIdx > plateAuth, "handlePlatePhotoAnalysis: auth check before any AI work");
+
+const plateClientIdx = diaryCode.indexOf('stage: "plate_photo_analysis"');
+const plateClientBlock = diaryCode.substring(Math.max(0, plateClientIdx - 600), plateClientIdx + 250);
+assert.ok(plateClientBlock.includes("sessionCreds.accessToken"), "BodyDiary sends access_token with plate_photo_analysis");
+
+console.log("PASS plate_photo_analysis: server validates the credential pair, client sends the token");
 
 // ── 3. validateSessionAccess rejects empty/missing token ────────────────
 

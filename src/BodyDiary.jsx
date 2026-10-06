@@ -127,7 +127,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
     async function loadSources() {
       try {
         const saved = getBodySession();
-        if (!saved.sessionId || !saved.accessToken) return;
+        if (!saved.accessToken || saved.sessionId !== sessionId) return;
         let token;
         try { token = await getClientToken("body", "session"); } catch {}
         const hdrs = { "Content-Type": "application/json" };
@@ -340,10 +340,18 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
     setPlateAnalysisLoading(true);
     setPlateAnalysisError("");
 
+    const sessionCreds = getBodySession();
+    if (!sessionCreds.accessToken || sessionCreds.sessionId !== sessionId) {
+      setPlateAnalysisError("Сессия недействительна. Войдите снова по коду продолжения.");
+      setPlateAnalysisLoading(false);
+      return;
+    }
+
     const requestBody = {
       module: "body",
       stage: "plate_photo_analysis",
       session_id: sessionId,
+      access_token: sessionCreds.accessToken,
       photos: photos.map(p => p.dataUrl),
       request_id: requestId,
     };
@@ -406,6 +414,16 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
     e.preventDefault();
     setSubmitError("");
     setSubmitting(true);
+
+    // Credential pair is checked BEFORE any network request: the stored
+    // session_id and access_token must belong to each other and to this
+    // diary session. A missing or mismatched pair fails client-side.
+    const sessionCreds = getBodySession();
+    if (!sessionCreds.accessToken || sessionCreds.sessionId !== sessionId) {
+      setSubmitError("Сессия недействительна. Войдите снова по коду продолжения.");
+      setSubmitting(false);
+      return;
+    }
 
     const requestId = `diary-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const photoCount = photos.length;
@@ -480,12 +498,11 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       plate_analysis: plateAnalysis.length > 0 ? plateAnalysis : null,
     };
 
-    const sessionCreds = getBodySession();
     const requestBody = {
       module: "body",
       stage: "daily_log_submitted",
       session_id: sessionId,
-      access_token: sessionCreds.accessToken || null,
+      access_token: sessionCreds.accessToken,
       daily_log: log,
       request_id: requestId,
       run_ai: false,
@@ -542,7 +559,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
           module: "body",
           stage: "daily_log_ai_analysis",
           session_id: sessionId,
-          access_token: sessionCreds.accessToken || null,
+          access_token: sessionCreds.accessToken,
           daily_log_id: savedData.daily_log_id,
           request_id: `${requestId}-ai`,
         });

@@ -3194,18 +3194,26 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setBodyIntakeStage("result");
     setBodyIntakeStep(0);
     setBodyScreen("result");
+    const sid = response?.session_id || "";
+    const token = response?.access_token || "";
+    // Credential pair first and atomically: a new session must never be
+    // stored next to a previous session's token, and a missing token must
+    // never keep the previous pair alive for this session.
+    if (sid && token) {
+      saveBodySession(sid, token);
+    } else {
+      clearBodySession();
+    }
     try {
-      const sid = response?.session_id || "";
-      localStorage.setItem("body_last_session_id", sid);
-      localStorage.setItem("body_last_result", JSON.stringify(response));
+      if (sid) localStorage.setItem("body_last_result", JSON.stringify(response));
       localStorage.setItem("body_last_created_at", new Date().toISOString());
       if (response?.continuation_code) {
         setContinuationCode(response.continuation_code);
       }
-      if (sid && response?.access_token) {
-        saveBodySession(sid, response.access_token);
-      }
     } catch (e) {}
+    if (sid && !token) {
+      showToast("Не удалось сохранить доступ к сессии. Войдите снова по коду продолжения.", "error");
+    }
   }
 
   function copyBodyCode() {
@@ -10359,7 +10367,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
            {activeModule === "body" && bodyScreen === "cabinet" && bodyCabinetData && (
              <HealthCabinet
                sessionId={bodyDiarySessionId}
-               accessToken={getBodySession().accessToken}
+               accessToken={(getBodySession().sessionId === bodyDiarySessionId ? getBodySession().accessToken : null)}
                displayName={bodyCabinetData.display_name || null}
                profile={bodyCabinetData.profile}
                wallet={bodyCabinetData.wallet}
@@ -10373,10 +10381,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                onOpenServiceRequests={() => { clearToast(); setBodyScreen("service_requests"); }}
                onUpdateDisplayName={async (name) => {
                  try {
+                   const pair = getBodySession();
+                   if (!pair.accessToken || pair.sessionId !== bodyDiarySessionId) {
+                     showToast("Сессия недействительна. Войдите снова по коду продолжения.", "error");
+                     return;
+                   }
                    const res = await fetch("/api/session", {
                      method: "POST",
                      headers: { "Content-Type": "application/json" },
-                     body: JSON.stringify({ action: "updateBodyDisplayName", session_id: bodyDiarySessionId, access_token: getBodySession().accessToken, display_name: name }),
+                     body: JSON.stringify({ action: "updateBodyDisplayName", session_id: bodyDiarySessionId, access_token: pair.accessToken, display_name: name }),
                    });
                    const data = await res.json();
                    if (data.ok) {
