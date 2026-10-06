@@ -2,26 +2,30 @@
 // специалистом" screen (new-request form and detail view). TEST only.
 //
 // Requires (separate terminals):
-//   1) node /var/folders/bq/dwfnvhjs5h192n4syngj695r0000gn/T/opencode/run-api-test.mjs
-//      (local-api-server.js on :3001 with TEST Supabase env, ref-guarded)
+//   1) local API server (local-api-server.js) on :3001 with TEST
+//      Supabase env and a ref-guard
 //   2) npm run build && npm run preview -- --port 5173 --host 127.0.0.1
 // Usage: node scripts/e2e-service-request-layout.js
 //
 // Asserts at 320/375/390/430/1280 widths that nothing overflows the
 // viewport horizontally and that the context checkboxes, their labels,
 // textarea, service prices, phone/date/time fields and action buttons
-// stay fully inside the viewport.
+// stay fully inside the viewport. TEST fixtures are owner-scoped and
+// the created smoke request is deleted afterwards.
 
 import { chromium } from "playwright";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
-const { createClient } = createRequire("/Users/macintosh/Documents/GitHub/Tochka-Opori/package.json")("@supabase/supabase-js");
+const require = createRequire(import.meta.url);
+const { createClient } = require("@supabase/supabase-js");
 
+const PROJECT_ROOT = fileURLToPath(new URL("..", import.meta.url));
 const BASE = process.env.E2E_BASE_URL || "http://127.0.0.1:5173";
 const INTAKE_URL = `${BASE}/?module=body`;
 const REQUIRED_REF = "eehyehlhiyztciaezaus";
-const PROJECT_ROOT = "/Users/macintosh/Documents/GitHub/Tochka-Opori";
 const VIEWPORTS = [
   { width: 320, height: 568 },
   { width: 375, height: 667 },
@@ -162,10 +166,7 @@ function reportMeasurement(label, result) {
   }
 }
 
-// TEST-only fixture: the create-request path requires an active specialist
-// assignment for the Health owner. Uses TEST Supabase with a ref-guard and
-// stable synthetic ids (reused across runs).
-async function ensureSpecialistAssignment(sessionId) {
+function openTestSupabase() {
   const env = {};
   try {
     for (const line of readFileSync(`${PROJECT_ROOT}/.env.local`, "utf8").split("\n")) {
@@ -180,17 +181,24 @@ async function ensureSpecialistAssignment(sessionId) {
     throw new Error(`Refusing: expected TEST ref ${REQUIRED_REF}, got ${ref}.`);
   }
   if (!key) throw new Error("Missing TEST_SUPABASE_SERVICE_ROLE_KEY.");
-  const supabase = createClient(url, key, { auth: { persistSession: false } });
+  return createClient(url, key, { auth: { persistSession: false } });
+}
 
+// TEST-only fixture: the create-request path requires an active specialist
+// assignment for the current Health owner. The expert is a stable synthetic
+// row; the assignment is found or created FOR THIS OWNER ONLY — other TEST
+// assignments are never modified.
+async function ensureSpecialistAssignment(sessionId) {
+  const supabase = openTestSupabase();
   const { data: clientRow } = await supabase
     .from("body_clients")
     .select("anonymous_owner_id")
     .eq("session_id", sessionId)
     .maybeSingle();
-  if (!clientRow?.anonymous_owner_id) throw new Error("body_clients owner not found for the test session");
+  const ownerId = clientRow?.anonymous_owner_id;
+  if (!ownerId) throw new Error("body_clients owner not found for the test session");
 
   const expertId = "e6000000-0000-4000-8000-000000000001";
-  const assignmentId = "e6000000-0000-4000-8000-000000000002";
   const { error: expertError } = await supabase.from("experts").insert({
     id: expertId,
     name: "E2E Layout Specialist",
@@ -200,13 +208,28 @@ async function ensureSpecialistAssignment(sessionId) {
     is_active: true,
     access_code: "E2E-LAYOUT-CODE",
   });
-  if (expertError && !String(expertError.code).includes("23505")) {
+  if (expertError && !String(expertError.code || "").includes("23505")) {
     throw new Error(`expert fixture insert failed: ${expertError.message}`);
   }
+
+  const { data: existing, error: lookupError } = await supabase
+    .from("patient_assignments")
+    .select("id")
+    .eq("owner_type", "anonymous_profile")
+    .eq("owner_id", ownerId)
+    .eq("module", "body")
+    .eq("status", "active")
+    .maybeSingle();
+  if (lookupError) throw new Error(`assignment lookup failed: ${lookupError.message}`);
+  if (existing) {
+    console.log(`fixture: active specialist assignment reused for owner ${String(ownerId).slice(0, 8)}…`);
+    return ownerId;
+  }
+
   const { error: assignmentError } = await supabase.from("patient_assignments").insert({
-    id: assignmentId,
+    id: randomUUID(),
     owner_type: "anonymous_profile",
-    owner_id: clientRow.anonymous_owner_id,
+    owner_id: ownerId,
     organization_id: null,
     primary_expert_id: expertId,
     assigned_by_expert_name: "e2e-layout",
@@ -214,14 +237,36 @@ async function ensureSpecialistAssignment(sessionId) {
     status: "active",
     patient_label: "E2E Layout Assignment",
   });
-  if (assignmentError && !String(assignmentError.code).includes("23505")) {
-    throw new Error(`assignment fixture insert failed: ${assignmentError.message}`);
+  if (assignmentError) throw new Error(`assignment fixture insert failed: ${assignmentError.message}`);
+  console.log(`fixture: active specialist assignment created for owner ${String(ownerId).slice(0, 8)}…`);
+  return ownerId;
+}
+
+// TEST-only cleanup: remove only the smoke request created for this owner.
+async function cleanupSmokeRequest(ownerId) {
+  if (!ownerId) return;
+  try {
+    const supabase = openTestSupabase();
+    const { error } = await supabase
+      .from("service_requests")
+      .delete()
+      .eq("module", "body")
+      .eq("owner_type", "anonymous_profile")
+      .eq("owner_id", ownerId)
+      .eq("message", "layout smoke request");
+    if (error) {
+      console.log(`cleanup: request removal skipped (${error.message})`);
+    } else {
+      console.log(`cleanup: smoke request removed for owner ${String(ownerId).slice(0, 8)}…`);
+    }
+  } catch (error) {
+    console.log(`cleanup: request removal skipped (${error.message})`);
   }
-  console.log("fixture: active specialist assignment ensured (TEST)");
 }
 
 async function run() {
   const browser = await chromium.launch({ headless: true, channel: "chrome" });
+  let ownerId = null;
   try {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
@@ -231,7 +276,7 @@ async function run() {
       try { return JSON.parse(localStorage.getItem("body_session_pair") || "null"); } catch { return null; }
     });
     if (!pair?.sessionId) throw new Error("no credential pair after intake");
-    await ensureSpecialistAssignment(pair.sessionId);
+    ownerId = await ensureSpecialistAssignment(pair.sessionId);
     await page.getByRole("button", { name: "Перейти в личный кабинет" }).click().catch(async () => {
       await page.goto(INTAKE_URL, { waitUntil: "domcontentloaded" });
     });
@@ -286,6 +331,7 @@ async function run() {
     }
   } finally {
     await browser.close();
+    await cleanupSmokeRequest(ownerId);
   }
   console.log(`\nService request layout: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
