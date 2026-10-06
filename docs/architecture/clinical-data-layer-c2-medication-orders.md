@@ -4,7 +4,7 @@
 
 C2 v0.1 adds the medication order foundation only. It supports the `support` schema/runtime path and keeps `body` schema-compatible but runtime-disabled. C2.1 owns exposures, adherence, effects, adverse events, conditional protocols, interaction checking, active medication AI, episodes, cohorts, and Clinical Intelligence.
 
-The patient medication AI flag is hard-disabled in C2 v0.1. A valid order or stored safe permission never exposes medication context to a patient AI model.
+The patient medication AI flag is hard-disabled for clinician-authored C2 orders in v0.1. A valid C2 order or stored safe permission never exposes that order to a patient AI model. The separately owner-scoped patient-reported list can be included in Health/Support quick-chat context under the safety rules documented in `patient-reported-medications.md`; this does not enable AI access to C2 orders or Support triage.
 
 ## Medication Identity
 
