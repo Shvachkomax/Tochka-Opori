@@ -33,10 +33,12 @@ function createReqRes(nodeReq, nodeRes, bodyBuffer) {
     json(data) {
       nodeRes.writeHead(this.statusCode, { "Content-Type": "application/json", ...this.headers });
       nodeRes.end(JSON.stringify(data));
+      return this;
     },
     send(data) {
       nodeRes.writeHead(this.statusCode, this.headers);
       nodeRes.end(data);
+      return this;
     },
   };
 
