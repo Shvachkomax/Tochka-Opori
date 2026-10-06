@@ -20,6 +20,7 @@ function check(value, label) {
 
 function createSupabaseMock(initialTables = {}) {
   const tables = new Map();
+  let clockTick = 0;
   for (const [name, rows] of Object.entries(initialTables)) tables.set(name, rows.map((row) => ({ ...row })));
   function rowsOf(name) {
     if (!tables.has(name)) tables.set(name, []);
@@ -39,7 +40,7 @@ function createSupabaseMock(initialTables = {}) {
   function exec(state) {
     const rows = rowsOf(state.name);
     if (state.op === "insert") {
-      const row = { id: `mock-${state.name}-${rows.length + 1}`, created_at: new Date().toISOString(), ...state.payload };
+      const row = { id: `mock-${state.name}-${rows.length + 1}`, created_at: new Date(Date.UTC(2026, 0, 2, 0, 0, clockTick++)).toISOString(), ...state.payload };
       const keys = uniqueKeys[state.name];
       if (keys && rows.some((existing) => keys.every((key) => existing[key] === row[key]))) {
         return { data: null, error: { code: "23505", message: "duplicate key value violates unique constraint" } };
@@ -185,13 +186,14 @@ check(partialResult.documentStatus === "reused" && partialResult.snapshotStatus 
 
 const retired = await retireReferenceRevision(mock, promoted.document, { stateRowId: "state-retired-1" });
 check(retired.status === "created" && retired.document.verification_status === "retired", "retire appends a retired state row for the exact revision");
+const stateAfterRetire = await loadRevisionStateRows(mock, promoted.document);
+check(resolveDocumentStatusOfRecord(stateAfterRetire)?.verification_status === "retired", "after retire the exact revision state of record is retired");
 const retiredAgain = await retireReferenceRevision(mock, promoted.document);
 check(retiredAgain.status === "reused" && retiredAgain.document.id === "state-retired-1", "retire retry is idempotent");
 const rejected = await rejectReferenceRevision(mock, staged.document, { stateRowId: "state-rejected-1" });
 check(rejected.status === "created" && rejected.document.verification_status === "rejected", "reject appends a rejected state row for the exact revision");
-
-const finalStateRows = await loadRevisionStateRows(mock, promoted.document);
-check(resolveDocumentStatusOfRecord(finalStateRows)?.verification_status === "retired", "after retire the exact revision state of record is retired");
+const stateAfterReject = await loadRevisionStateRows(mock, promoted.document);
+check(resolveDocumentStatusOfRecord(stateAfterReject)?.verification_status === "rejected", "the newest state row wins: after reject the state of record is rejected");
 
 console.log("\nVerified-only loader honors revision status-of-record");
 function loaderFixture(overrides = {}) {
