@@ -1,13 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getClientToken } from "./lib/clientToken.js";
 import { getBodySession } from "./lib/sessionAccess.js";
-
-const PRESCRIBED_BY = [
-  { value: "doctor", label: "Врач" },
-  { value: "specialist", label: "Специалист" },
-  { value: "self", label: "Самостоятельно" },
-  { value: "unknown", label: "Не знаю / не помню" },
-];
+import PatientMedicationOrders from "./PatientMedicationOrders.jsx";
 
 const LAB_ITEMS = [
   "Общий анализ крови", "Глюкоза", "Инсулин", "ТТГ", "Т4 свободный",
@@ -147,75 +141,16 @@ export default function BodyHealthContext({ onCancel, onComplete }) {
         <button onClick={() => addItem(conditions, setConditions, { name: "", status: "active", comment: "" })} style={s.addBtn}>+ Добавить состояние</button>
       </div>
 
-      {/* Medications */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Лекарства</div>
-        <div style={s.note}>Укажите только то, что уже принимаете. Не начинайте и не отменяйте препараты без врача.</div>
-        {medications.map((m, i) => (
-          <div key={i} style={{ padding: 12, borderRadius: 10, background: "#fff", border: "1px solid #e8e2d8", marginBottom: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925" }}>Препарат {i + 1}</div>
-              <button onClick={() => removeItem(medications, setMedications, i)} style={s.danger}>Убрать</button>
-            </div>
-            <div style={s.field}>
-              <input style={s.input} placeholder="Название препарата" value={m.name || ""} onChange={e => updateItem(medications, setMedications, i, "name", e.target.value)} />
-            </div>
-            <div style={s.row2}>
-              <div style={s.field}>
-                <input style={s.input} placeholder="Дозировка" value={m.dosage || ""} onChange={e => updateItem(medications, setMedications, i, "dosage", e.target.value)} />
-              </div>
-              <div style={s.field}>
-                <input style={s.input} placeholder="Как часто" value={m.frequency || ""} onChange={e => updateItem(medications, setMedications, i, "frequency", e.target.value)} />
-              </div>
-            </div>
-            <div style={s.field}>
-              <select style={s.select} value={m.prescribed_by || ""} onChange={e => updateItem(medications, setMedications, i, "prescribed_by", e.target.value)}>
-                <option value="">Кто назначил?</option>
-                {PRESCRIBED_BY.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div style={s.field}>
-              <input style={s.input} placeholder="Комментарий (необязательно)" value={m.comment || ""} onChange={e => updateItem(medications, setMedications, i, "comment", e.target.value)} />
-            </div>
-          </div>
-        ))}
-        <button onClick={() => addItem(medications, setMedications, { name: "", dosage: "", frequency: "", prescribed_by: "", comment: "" })} style={s.addBtn}>+ Добавить препарат</button>
-      </div>
+      <PatientMedicationOrders module="health" />
 
-      {/* Supplements */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>БАДы и витамины</div>
-        <div style={s.note}>БАДы тоже важно учитывать: они могут влиять на самочувствие и сочетаться с препаратами.</div>
-        {supplements.map((sp, i) => (
-          <div key={i} style={{ padding: 12, borderRadius: 10, background: "#fff", border: "1px solid #e8e2d8", marginBottom: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925" }}>БАД / витамин {i + 1}</div>
-              <button onClick={() => removeItem(supplements, setSupplements, i)} style={s.danger}>Убрать</button>
-            </div>
-            <div style={s.field}>
-              <input style={s.input} placeholder="Название" value={sp.name || ""} onChange={e => updateItem(supplements, setSupplements, i, "name", e.target.value)} />
-            </div>
-            <div style={s.row2}>
-              <div style={s.field}>
-                <input style={s.input} placeholder="Дозировка" value={sp.dosage || ""} onChange={e => updateItem(supplements, setSupplements, i, "dosage", e.target.value)} />
-              </div>
-              <div style={s.field}>
-                <input style={s.input} placeholder="Как часто" value={sp.frequency || ""} onChange={e => updateItem(supplements, setSupplements, i, "frequency", e.target.value)} />
-              </div>
-            </div>
-            <div style={s.field}>
-              <select style={s.select} value={sp.recommended_by || ""} onChange={e => updateItem(supplements, setSupplements, i, "recommended_by", e.target.value)}>
-                <option value="">Кто рекомендовал?</option>
-                {PRESCRIBED_BY.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div style={s.field}>
-              <input style={s.input} placeholder="Комментарий (необязательно)" value={sp.comment || ""} onChange={e => updateItem(supplements, setSupplements, i, "comment", e.target.value)} />
-            </div>
-          </div>
-        ))}
-        <button onClick={() => addItem(supplements, setSupplements, { name: "", dosage: "", frequency: "", recommended_by: "", comment: "" })} style={s.addBtn}>+ Добавить БАД / витамин</button>
-      </div>
+      {(medications.length > 0 || supplements.length > 0) && (
+        <div style={{ ...s.section, background: "#f5f1ea" }}>
+          <div style={s.sectionTitle}>Ранее сохранённые сведения</div>
+          <div style={s.note}>Это старый свободный список без расписания. Он сохранён как был и не считается подтверждённым назначением. Актуальные сведения можно внести в раздел «Лекарства и БАДы» выше.</div>
+          {medications.map((item, index) => <div key={`med-${index}`} style={{ fontSize: 13, color: "#5f574f", marginBottom: 6 }}>{item.name || "Препарат"}{item.dosage ? ` · ${item.dosage}` : ""}{item.frequency ? ` · ${item.frequency}` : ""}</div>)}
+          {supplements.map((item, index) => <div key={`supp-${index}`} style={{ fontSize: 13, color: "#5f574f", marginBottom: 6 }}>{item.name || "БАД"}{item.dosage ? ` · ${item.dosage}` : ""}{item.frequency ? ` · ${item.frequency}` : ""}</div>)}
+        </div>
+      )}
 
       {/* Labs */}
       <div style={s.section}>

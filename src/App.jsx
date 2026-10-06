@@ -9,6 +9,7 @@ import BodyDayView from "./BodyDayView.jsx";
 import BodyHealthContext from "./BodyHealthContext.jsx";
 import BodyServiceRequests from "./BodyServiceRequests.jsx";
 import MedicationCard from "./MedicationCard.jsx";
+import PatientMedicationOrders from "./PatientMedicationOrders.jsx";
 import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
 import { saveBodySession, saveSupportSession, getBodySession, getSupportSession, clearBodySession, clearSupportSession, withAccessToken } from "./lib/sessionAccess.js";
 import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
@@ -11319,6 +11320,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 </div>
 
+                <PatientMedicationOrders module="support" />
                 <MedicationCard cards={supportCabinet.medication_cards} />
 
                 {/* ROW 1: Последний разговор + Следующий шаг */}

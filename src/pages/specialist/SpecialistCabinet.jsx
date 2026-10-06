@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import SpecialistMedicationOrders from "../../SpecialistMedicationOrders.jsx";
+import PatientReportedMedicationSummary from "../../PatientReportedMedicationSummary.jsx";
 import { buildSpecialistContextKey, isCurrentSpecialistContext } from "./specialistContext.js";
 
 // ── Styles ────────────────────────────────────────────────
@@ -102,10 +103,13 @@ export default function SpecialistCabinet() {
   // C2 v0.1 medication foundation — Support runtime only.
   const [medicationData, setMedicationData] = useState(null);
   const [medicationLoading, setMedicationLoading] = useState(false);
+  const [patientReportedMedicationData, setPatientReportedMedicationData] = useState(null);
+  const [patientReportedMedicationLoading, setPatientReportedMedicationLoading] = useState(false);
 
   // Stale-response guard: only the latest detail request result is applied
   const detailGenerationRef = useRef(0);
   const medicationGenerationRef = useRef(0);
+  const patientMedicationGenerationRef = useRef(0);
   const contextGenerationRef = useRef(0);
   const serviceRequestGenerationRef = useRef(0);
   const invitationGenerationRef = useRef(0);
@@ -141,6 +145,9 @@ export default function SpecialistCabinet() {
     setMedicationData(null);
     setMedicationLoading(false);
     medicationGenerationRef.current++;
+    setPatientReportedMedicationData(null);
+    setPatientReportedMedicationLoading(false);
+    patientMedicationGenerationRef.current++;
     clearSelectedClientDetail();
   }
 
@@ -390,6 +397,9 @@ export default function SpecialistCabinet() {
     setProfAnalysisLoading(false);
     setClientTab("overview");
     detailGenerationRef.current++;
+    patientMedicationGenerationRef.current++;
+    setPatientReportedMedicationData(null);
+    setPatientReportedMedicationLoading(false);
   }
 
   function selectOrg(id) {
@@ -626,6 +636,34 @@ export default function SpecialistCabinet() {
 
   useEffect(() => {
     loadMedicationOrders();
+  }, [auth, selectedClient, orgId, module]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadPatientReportedMedicationOrders() {
+    if (!auth || !selectedClient) {
+      setPatientReportedMedicationData(null);
+      return;
+    }
+    setPatientReportedMedicationLoading(true);
+    const generation = ++patientMedicationGenerationRef.current;
+    try {
+      const res = await fetch("/api/specialist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action: "listPatientReportedMedicationOrders", client_ref: selectedClient, organization_id: orgId, module }),
+      });
+      const data = await res.json();
+      if (generation !== patientMedicationGenerationRef.current) return;
+      setPatientReportedMedicationData(data.ok ? data : { orders: [], intake_logs: [], error: data.error || "Не удалось загрузить сведения пациента." });
+    } catch {
+      if (generation === patientMedicationGenerationRef.current) setPatientReportedMedicationData({ orders: [], intake_logs: [], error: "Ошибка сети." });
+    } finally {
+      if (generation === patientMedicationGenerationRef.current) setPatientReportedMedicationLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadPatientReportedMedicationOrders();
   }, [auth, selectedClient, orgId, module]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function mutateMedication(action, payload = {}) {
@@ -913,6 +951,8 @@ export default function SpecialistCabinet() {
               detail={clientDetail}
               loading={clientDetailLoading}
               error={clientDetailError}
+              patientReportedMedicationData={patientReportedMedicationData}
+              patientReportedMedicationLoading={patientReportedMedicationLoading}
               onBack={clearSelectedClientDetail}
             />
           ) : (
@@ -927,6 +967,8 @@ export default function SpecialistCabinet() {
               profAnalysisLoading={profAnalysisLoading}
               medicationData={medicationData || { orders: [], concepts: [], can_manage: false }}
               medicationLoading={medicationLoading}
+              patientReportedMedicationData={patientReportedMedicationData}
+              patientReportedMedicationLoading={patientReportedMedicationLoading}
               onCreateMedication={(payload) => mutateMedication("createMedicationOrder", payload)}
               onSupersedeMedication={(order, payload) => mutateMedication("supersedeMedicationOrder", { ...payload, order_ref: order.order_ref })}
               onRevokeMedication={(order) => mutateMedication("revokeMedicationOrder", { order_ref: order.order_ref, reason_code: "clinician_decision", creation_idempotency_key: globalThis.crypto?.randomUUID?.() || `revoke-${Date.now()}` })}
@@ -1265,7 +1307,7 @@ function InvitationCard({ invitation: inv, onRevoke, onRespond }) {
 
 // ── Client Detail Card ────────────────────────────────────
 
-function ClientDetail({ detail, loading, error, tab, onTabChange, onBack, profAnalysis, profAnalysisLoading, medicationData, medicationLoading, onCreateMedication, onSupersedeMedication, onRevokeMedication }) {
+function ClientDetail({ detail, loading, error, tab, onTabChange, onBack, profAnalysis, profAnalysisLoading, medicationData, medicationLoading, patientReportedMedicationData, patientReportedMedicationLoading, onCreateMedication, onSupersedeMedication, onRevokeMedication }) {
   const tabs = [
     { id: "overview", label: "Обзор" },
     { id: "sessions", label: "Сессии" },
@@ -1496,6 +1538,10 @@ function ClientDetail({ detail, loading, error, tab, onTabChange, onBack, profAn
 
       {tab === "medications" && (
         <div>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Сведения пациента</div>
+          <PatientReportedMedicationSummary data={patientReportedMedicationData} loading={patientReportedMedicationLoading} />
+          <div style={S.divider} />
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Назначения специалиста</div>
           {medicationLoading ? (
             <p style={{ fontSize: 13, color: "#7A7268" }}>Загрузка назначений...</p>
           ) : medicationData?.error ? (
@@ -1516,12 +1562,13 @@ function ClientDetail({ detail, loading, error, tab, onTabChange, onBack, profAn
 
 // ── Health Client Detail Card (Body module, read-only) ────
 
-function HealthClientDetail({ detail, loading, error, onBack }) {
+function HealthClientDetail({ detail, loading, error, patientReportedMedicationData, patientReportedMedicationLoading, onBack }) {
   const [tab, setTab] = React.useState("overview");
 
   const tabs = [
     { id: "overview", label: "Обзор" },
     { id: "diary", label: "Дневник" },
+    { id: "medications", label: "Лекарства и БАДы" },
     { id: "nutrition", label: "Питание" },
     { id: "activity", label: "Активность" },
     { id: "weight", label: "Вес и параметры" },
@@ -1678,6 +1725,12 @@ function HealthClientDetail({ detail, loading, error, onBack }) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {tab === "medications" && (
+        <div>
+          <PatientReportedMedicationSummary data={patientReportedMedicationData} loading={patientReportedMedicationLoading} />
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { getClientToken, clearCachedToken } from "./lib/clientToken.js";
 import { withAccessToken, getBodySession } from "./lib/sessionAccess.js";
 import { parseApiResponse, classifyHttpError, classifyNetworkError, estimateRequestSize, countPhotos } from "./lib/apiResponse.js";
 import { compressPhotosToBudget } from "./lib/photoCompress.js";
+import PatientMedicationOrders from "./PatientMedicationOrders.jsx";
 
 function getLocalDateString() {
   const d = new Date();
@@ -613,6 +614,8 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
 
       <h2 style={s.heading}>Дневник дня</h2>
       <p style={s.subheading}>Отметьте, как прошёл день. Не нужно идеально — нам важна честная картина.</p>
+
+      <PatientMedicationOrders module="health" mode="schedule" scheduledDate={logDate} sessionId={sessionId} />
 
       {/* Date + body measurements */}
       <div style={s.section}>
