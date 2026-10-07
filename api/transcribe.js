@@ -1,4 +1,5 @@
 import { transcribe, analyzeVoice, TASK_TYPES } from "../lib/modelRouter.js";
+import { normalizeAudioContentType, isSupportedAudioContentType, isWebmAudioContentType, getAudioExtension } from "../lib/audio-mime.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
@@ -157,7 +158,10 @@ export default async function handler(req, res) {
       });
     }
 
-    const contentType = req.headers["content-type"] || "audio/webm";
+    const contentType = normalizeAudioContentType(req.headers["content-type"]);
+    if (!isSupportedAudioContentType(contentType)) {
+      return res.status(415).json({ error: "Unsupported audio format" });
+    }
 
     const transcription = await transcribe(TASK_TYPES.TRANSCRIPTION, {
       audioBuffer,
@@ -165,30 +169,34 @@ export default async function handler(req, res) {
     });
 
     const text = transcription.text;
-    let audioFormat = "webm";
+    let audioFormat = getAudioExtension(contentType) || "unknown";
     let audioForAnalysis = audioBuffer;
 
-    try {
-      const { webmToWav } = await import("../lib/audio.js");
-      const wav = await webmToWav(audioBuffer);
-      if (wav && wav.length > 44) {
-        audioForAnalysis = wav;
-        audioFormat = "wav";
+    if (isWebmAudioContentType(contentType)) {
+      try {
+        const { webmToWav } = await import("../lib/audio.js");
+        const wav = await webmToWav(audioBuffer);
+        if (wav && wav.length > 44) {
+          audioForAnalysis = wav;
+          audioFormat = "wav";
+        }
+      } catch (convErr) {
+        console.log("WebM->WAV conversion unavailable, trying original format:", convErr.message);
       }
-    } catch (convErr) {
-      console.log("WebM->WAV conversion unavailable, trying original format:", convErr.message);
     }
 
     let voiceObservations = null;
     let voiceAnalysisSucceeded = false;
-    try {
-      voiceObservations = await analyzeVoice(TASK_TYPES.VOICE_ANALYSIS, {
-        audioBuffer: audioForAnalysis,
-        audioFormat,
-      });
-      voiceAnalysisSucceeded = true;
-    } catch (e) {
-      console.log("Voice analysis skipped (non-blocking):", e.message);
+    if (isWebmAudioContentType(contentType)) {
+      try {
+        voiceObservations = await analyzeVoice(TASK_TYPES.VOICE_ANALYSIS, {
+          audioBuffer: audioForAnalysis,
+          audioFormat,
+        });
+        voiceAnalysisSucceeded = true;
+      } catch (e) {
+        console.log("Voice analysis skipped (non-blocking):", e.message);
+      }
     }
 
     if (!voiceObservations) {

@@ -16,6 +16,7 @@
     "test:service-request-finance": "node scripts/test-service-request-finance.js",
     "test:analyze-session-access": "node scripts/test-analyze-session-access.js",
     "test:practice-sync": "node scripts/test-practice-sync.js",
+    "test:voice-audio-mime": "node scripts/test-voice-audio-mime.js",
     "test:specialist-memberships": "node scripts/test-specialist-memberships.js",
     "test:support-risk-routing": "node scripts/test-support-risk-routing.js",
     "e2e:service-request-finance": "node scripts/e2e-service-request-finance-browser.mjs"
