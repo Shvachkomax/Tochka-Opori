@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { getClientToken } from "./lib/clientToken.js";
 import { withSessionAccess, getBodySession } from "./lib/sessionAccess.js";
 
@@ -221,19 +222,20 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+      const voiceCapture = createVoiceRecording(stream);
+      const mr = voiceCapture.recorder;
       mediaRecorderRef.current = mr;
       audioChunksRef.current = [];
       mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        if (blob.size < 100) return;
+        const blob = await voiceCapture.blobPromise;
+        if (!isUsableVoiceBlob(blob)) { setSubmitError("Запись слишком короткая или пустая. Можно написать день текстом."); return; }
         try {
           let token;
           try { token = await getClientToken("body", "transcribe"); } catch {}
           const tHeaders = {
-            "Content-Type": "audio/webm",
+            "Content-Type": blob.type || "audio/webm",
             "X-Session-Id": sessionId,
             "X-Module": "body",
             "X-Access-Token": saved.accessToken,

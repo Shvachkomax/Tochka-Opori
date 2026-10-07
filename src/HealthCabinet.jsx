@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { getClientToken } from "./lib/clientToken.js";
 
 function getLocalDateString() {
@@ -508,13 +509,14 @@ export default function HealthCabinet({
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+      const voiceCapture = createVoiceRecording(stream);
+      const mr = voiceCapture.recorder;
       mediaRecorderRef.current = mr;
       audioChunksRef.current = [];
       mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const blob = await voiceCapture.blobPromise;
         if (blob.size < 100) { setTranscribing(false); return; }
         await transcribeAudio(blob);
       };
@@ -540,11 +542,12 @@ export default function HealthCabinet({
   async function transcribeAudio(blob) {
     setTranscribing(true);
     setTranscriptionError("");
+    if (!isUsableVoiceBlob(blob)) { setTranscriptionError("Запись слишком короткая или пустая. Попробуйте ещё раз."); setTranscribing(false); return; }
     try {
       let token;
       try { token = await getClientToken("body", "transcribe"); } catch {}
       const tHeaders = {
-        "Content-Type": "audio/webm",
+        "Content-Type": blob.type || "audio/webm",
         "X-Session-Id": sessionId,
         "X-Module": "body",
         "X-Access-Token": accessToken,
