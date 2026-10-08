@@ -22,7 +22,8 @@ const TOKEN_BYTES = 32; // 256-bit token
 const GENERIC_AUTH_ERROR = "Неверный код специалиста";
 const COOKIE_NAME = "tochka_specialist_session";
 const COOKIE_MAX_AGE = Math.floor(SESSION_TTL_MS / 1000); // seconds
-const COOKIE_PATH = "/api/specialist";
+const COOKIE_PATH = "/api";
+const LEGACY_COOKIE_PATH = "/api/specialist";
 
 // ── Allowed origins for cookie-authenticated requests ─────
 
@@ -86,12 +87,12 @@ function isProduction() {
   return process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
 }
 
-function buildCookie(name, value, maxAge) {
+function buildCookie(name, value, maxAge, path = COOKIE_PATH) {
   const parts = [
     `${name}=${value}`,
     "HttpOnly",
     "SameSite=Lax",
-    `Path=${COOKIE_PATH}`,
+    `Path=${path}`,
     `Max-Age=${maxAge}`,
   ];
   if (isProduction()) parts.push("Secure");
@@ -627,7 +628,10 @@ async function handleLogin(req, res) {
   }));
 
   // Set HttpOnly cookie — raw token never exposed to JavaScript
-  res.setHeader("Set-Cookie", buildCookie(COOKIE_NAME, rawToken, COOKIE_MAX_AGE));
+  res.setHeader("Set-Cookie", [
+    buildCookie(COOKIE_NAME, "", 0, LEGACY_COOKIE_PATH),
+    buildCookie(COOKIE_NAME, rawToken, COOKIE_MAX_AGE),
+  ]);
 
   return res.status(200).json({
     ok: true,
@@ -678,7 +682,10 @@ async function handleLogout(req, res) {
   const authResult = await authorizeSpecialist(req);
 
   // Clear cookie regardless of auth result
-  res.setHeader("Set-Cookie", buildCookie(COOKIE_NAME, "", 0));
+  res.setHeader("Set-Cookie", [
+    buildCookie(COOKIE_NAME, "", 0, LEGACY_COOKIE_PATH),
+    buildCookie(COOKIE_NAME, "", 0),
+  ]);
 
   if (authResult.error) {
     // Even if session was already invalid, cookie is cleared — treat as success

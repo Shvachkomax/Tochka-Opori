@@ -405,6 +405,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   });
 
   // Expert state
+  const reviewsAuthGeneration = useRef(0);
   const [expertData, setExpertData] = useState(() => {
     try {
       const saved = localStorage.getItem("tochka_expert");
@@ -732,18 +733,44 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setToast({ message, type, key: Date.now() });
   }
 
+  function clearReviewState() {
+    reviewsAuthGeneration.current += 1;
+    setTrainingSessions([]);
+    setTrainingSelection(new Set());
+    setTimelineCache({});
+    setTimelineData(null);
+    setTimelineCode(null);
+    setSessionDetailsCache({});
+    setSessionDetailsData(null);
+  }
+
+  async function fetchReviews(options) {
+    const generation = reviewsAuthGeneration.current;
+    const response = await fetch("/api/reviews", { ...options, credentials: "same-origin" });
+    if (generation !== reviewsAuthGeneration.current) throw new Error("Вход изменился. Повторите запрос.");
+    const action = JSON.parse(options.body || "{}").action;
+    if (response.status === 401 && expertData && action !== "save") {
+      clearReviewState();
+      setExpertData(null);
+      localStorage.removeItem("tochka_expert");
+      setExpertModalOpen(true);
+    }
+    return response;
+  }
+
   async function handleExpertLogin() {
     const code = expertCodeInput.trim();
     if (!code) return;
     setExpertLoggingIn(true);
     try {
-      const res = await fetch("/api/experts", {
+      const res = await fetch("/api/specialist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "login", access_code: code }),
       });
       const data = await res.json();
       if (data.ok && data.expert) {
+        clearReviewState();
         setExpertData(data.expert);
         localStorage.setItem("tochka_expert", JSON.stringify(data.expert));
         setExpertModalOpen(false);
@@ -759,7 +786,18 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }
 
-  function handleExpertLogout() {
+  async function handleExpertLogout() {
+    try {
+      const res = await fetch("/api/specialist", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "logout" }),
+      });
+      if (!res.ok) throw new Error("logout failed");
+    } catch {
+      showToast("Не удалось выйти. Попробуйте ещё раз.", "error");
+      return;
+    }
+    clearReviewState();
     setExpertData(null);
     localStorage.removeItem("tochka_expert");
     showToast("Режим специалиста выключен");
@@ -1051,9 +1089,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         return;
       }
       setRegistrationResult(data);
-      setExpertData(data.expert);
-      localStorage.setItem("tochka_expert", JSON.stringify(data.expert));
-      showToast(`Режим специалиста активирован: ${data.expert.name}`);
+      const login = await fetch("/api/specialist", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "login", access_code: data.access_code }),
+      });
+      const signedIn = await login.json();
+      if (!login.ok || !signedIn.ok) {
+        showToast("Регистрация завершена. Сохраните код и войдите по нему.", "error");
+        return;
+      }
+      clearReviewState();
+      setExpertData(signedIn.expert);
+      localStorage.setItem("tochka_expert", JSON.stringify(signedIn.expert));
+      showToast(`Режим специалиста активирован: ${signedIn.expert.name}`);
     } catch (e) {
       showToast(`Ошибка подключения: ${e?.message || "проверьте, запущен ли сервер"}`, "error");
     } finally {
@@ -2198,13 +2246,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       return;
     }
     try {
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "save",
-          case_id: sessionId,
-          sessionId: sessionId,
+          case_id: saved.sessionId,
+          sessionId: saved.sessionId,
+          access_token: saved.accessToken,
           publicCode: publicCode || "",
           module: "support",
           createdAt: new Date().toISOString(),
@@ -2913,10 +2962,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           expert_role: expertData?.role || null,
           expert_specialty: expertData?.specialty || null,
         };
-        fetch("/api/reviews", {
+        fetchReviews({
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "save", ...review }),
+          body: JSON.stringify(withAccessToken({ action: "save", ...review }, sid)),
         }).catch(() => {});
       } else {
         throw new Error("Неизвестный тип ответа");
@@ -3033,10 +3082,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       expert_role: expertData?.role || null,
       expert_specialty: expertData?.specialty || null,
     };
-    fetch("/api/reviews", {
+    fetchReviews({
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "save", ...review }),
+      body: JSON.stringify(withAccessToken({ action: "save", ...review }, status.session_id)),
     }).catch(() => {});
   }
 
@@ -3750,7 +3799,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       } else {
         body.admin_secret = adminPassword;
       }
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -3778,7 +3827,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const body = { action: "saveTrainingSession", ...row };
       if (expertData) body.expert_id = expertData.id;
       else body.admin_secret = adminPassword;
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -3812,7 +3861,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const body = { action: "updateTrainingSession", id, updates };
       if (expertData) body.expert_id = expertData.id;
       else body.admin_secret = adminPassword;
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -3841,7 +3890,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     if (!confirm("Удалить запись?")) return;
     try {
       const body = { action: "deleteTrainingSession", id, admin_secret: adminPassword };
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -3862,7 +3911,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     try {
       const reason = trainingDeletionReason === "other" ? trainingDeletionReasonCustom || "other" : trainingDeletionReason;
       const body = { action: "trashTrainingSession", id, admin_secret: adminPassword, expert_name: "admin", deletion_reason: reason };
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -3886,7 +3935,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     try {
       const reason = trainingDeletionReason === "other" ? trainingDeletionReasonCustom || "other" : trainingDeletionReason;
       const body = { action: "trashTrainingSessions", ids, admin_secret: adminPassword, expert_name: "admin", deletion_reason: reason };
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -3910,7 +3959,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function restoreSingleTrainingSession(id) {
     try {
       const body = { action: "restoreTrainingSession", id, admin_secret: adminPassword };
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -3930,7 +3979,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function restoreBulkTrainingSessions(ids) {
     try {
       const body = { action: "restoreTrainingSessions", ids, admin_secret: adminPassword };
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -3952,7 +4001,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function permanentDeleteTrainingSession(id) {
     try {
       const body = { action: "permanentlyDeleteTrainingSession", id, admin_secret: adminPassword };
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -3973,7 +4022,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function permanentDeleteBulkTrainingSessions(ids) {
     try {
       const body = { action: "permanentlyDeleteTrainingSessions", ids, admin_secret: adminPassword };
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -4002,7 +4051,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       };
       if (expertData) body.expert_id = expertData.id;
       else body.admin_secret = adminPassword;
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -4026,7 +4075,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const body = { action: "exportTrainingCsv", ...trainingFilter, showTrash: trainingShowTrash };
       if (expertData) body.expert_id = expertData.id;
       else body.admin_secret = adminPassword;
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -4131,7 +4180,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   async function loadQualityStats() {
     try {
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "getQualityAnalysisStats", admin_secret: adminPassword }),
@@ -4154,7 +4203,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function loadQualityInsights() {
     setQualityLoading(true);
     try {
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "listQualityInsights", admin_secret: adminPassword }),
@@ -4184,7 +4233,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       if (qualitySelectedReviewIds.length > 0) {
         body.review_ids = qualitySelectedReviewIds;
       }
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -4207,7 +4256,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   async function loadQualityInsightDetail(insightId) {
     try {
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "getQualityInsight", admin_secret: adminPassword, insight_id: insightId }),
@@ -4225,7 +4274,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   async function updateQualityInsightStatus(insightId, status) {
     try {
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "updateQualityInsightStatus", admin_secret: adminPassword, insight_id: insightId, status }),
@@ -4317,10 +4366,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     const trash = showTrash !== undefined ? showTrash : adminReviewShowTrash;
     setAdminLoading(true);
     try {
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "list", status: st, environment: env, expert_filter: exp, limit: 100, showTrash: trash }),
+        body: JSON.stringify({ action: "list", admin_secret: adminPassword, status: st, environment: env, expert_filter: exp, limit: 100, showTrash: trash }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -4341,7 +4390,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function adminUpdateStatus(reviewId, status) {
     setAdminActionLoading(reviewId);
     try {
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "updateStatus", review_id: reviewId, status, admin_secret: adminPassword }),
@@ -4448,7 +4497,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       if (newStatus) {
         body.status = newStatus;
       }
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...body, action: "saveCorrection" }),
@@ -4481,7 +4530,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function adminDownloadJsonl(status) {
     const st = status || "approved";
     try {
-      const res = await fetch("/api/reviews", {
+      const res = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "exportJsonl", admin_secret: adminPassword, status: st }),
@@ -4634,7 +4683,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         if (expertData?.access_code) body.expert_code = expertData.access_code;
       }
 
-      const resp = await fetch("/api/reviews", {
+      const resp = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -4680,7 +4729,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         if (expertData?.access_code) body.expert_code = expertData.access_code;
       }
 
-      const resp = await fetch("/api/reviews", {
+      const resp = await fetchReviews({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -8961,7 +9010,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                                 onClick={async () => {
                                   setAdminActionLoading(review.id);
                                   try {
-                                    const res = await fetch("/api/reviews", {
+                                    const res = await fetchReviews({
                                       method: "POST",
                                       headers: { "Content-Type": "application/json" },
                                       body: JSON.stringify({ action: "restoreReview", review_id: review.id, admin_secret: adminPassword }),
@@ -9043,7 +9092,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                                     onClick={async () => {
                                       setAdminActionLoading(review.id);
                                       try {
-                                        const res = await fetch("/api/reviews", {
+                                        const res = await fetchReviews({
                                           method: "POST",
                                           headers: { "Content-Type": "application/json" },
                                           body: JSON.stringify({ action: "softDeleteReview", review_id: review.id, admin_secret: adminPassword }),
@@ -9104,7 +9153,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                                         onClick={async () => {
                                           setAdminActionLoading(review.id);
                                           try {
-                                            const res = await fetch("/api/reviews", {
+                                            const res = await fetchReviews({
                                               method: "POST",
                                               headers: { "Content-Type": "application/json" },
                                               body: JSON.stringify({ action: "permanentDeleteReview", review_id: review.id, admin_secret: adminPassword }),
@@ -9169,7 +9218,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                                         onClick={async () => {
                                           setAdminActionLoading(review.id);
                                           try {
-                                            const res = await fetch("/api/reviews", {
+                                            const res = await fetchReviews({
                                               method: "POST",
                                               headers: { "Content-Type": "application/json" },
                                               body: JSON.stringify({ action: "deleteFullTestSession", review_id: review.id, admin_secret: adminPassword }),
