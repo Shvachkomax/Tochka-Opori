@@ -20,6 +20,7 @@
     "test:medication-reference-provider": "node scripts/test-medication-reference-provider.js",
     "test:medication-reference-ingestion": "node scripts/test-medication-reference-ingestion.js",
     "test:session-access-pair": "node scripts/test-session-access-pair.js",
+    "test:reviews-access": "node --experimental-test-module-mocks scripts/test-reviews-access.js",
     "test:voice-audio-mime": "node scripts/test-voice-audio-mime.js",
     "test:service-request-finance": "node scripts/test-service-request-finance.js",
     "e2e:service-request-finance": "node scripts/e2e-service-request-finance-browser.mjs"

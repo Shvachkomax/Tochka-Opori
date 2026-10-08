@@ -5,6 +5,7 @@ import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
 import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback } from "../lib/conversation.js";
 import { readFileSync, existsSync } from "node:fs";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
+import { prepareReviewsAccess, canAccessReviewRecord, scopeTrainingQuery, stripReviewCredentials } from "../lib/security/reviews-access.js";
 
 const ALLOWED_STATUSES = ["pending", "approved", "rejected", "needs_review", "local_auto_saved"];
 const TRAINING_STATUSES = ["new", "reviewed", "needs_prompt_update", "approved_for_learning", "rejected", "archived"];
@@ -12,10 +13,7 @@ const SESSION_KINDS = ["initial", "follow_up", "diary_check", "support_toolkit_c
 const CASE_TYPES = ["anxiety", "sleep", "depression_like", "grief", "trauma", "body_tension", "adhd_like", "substance", "alcohol", "bipolar_red_flags", "psychosis_red_flags", "acute_psychosis", "suicide_risk", "self_harm_risk", "medication_issue", "mixed", "other"];
 
 function authorizeExpert(req) {
-  const { admin_secret, expert_id, expert_code } = req.body || {};
-  const adminSecret = process.env.ADMIN_SECRET;
-  const isAdmin = admin_secret && adminSecret && admin_secret === adminSecret;
-  return { isAdmin, expertId: expert_id || null, expertCode: expert_code || null };
+  return req.reviewsAuth;
 }
 
 async function getSupabaseClient() {
@@ -26,9 +24,18 @@ async function getSupabaseClient() {
 }
 
 export default async function handler(req, res) {
+  const sendJson = res.json.bind(res);
+  res.json = payload => sendJson(stripReviewCredentials(payload));
   if (handleOptions(req, res)) return;
 
-  applyCors(req, res);
+  if (!applyCors(req, res)) {
+    return res.status(403).json({ ok: false, error: "Origin not allowed" });
+  }
+  // Cookie credentials are shared with /api/specialist. Require Origin for
+  // browser requests, including mutations; Bearer clients may omit it.
+  if (req.headers.cookie?.includes("tochka_specialist_session=") && !req.headers.origin) {
+    return res.status(403).json({ ok: false, error: "Origin required" });
+  }
 
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -37,6 +44,7 @@ export default async function handler(req, res) {
   const { action } = req.body || {};
 
   try {
+    req.reviewsAuth = await prepareReviewsAccess(req);
     switch (action) {
       case "save":
         return await handleSave(req, res);
@@ -98,8 +106,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
     }
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ ok: false, error: error.message });
     console.error("reviews fatal error", { message: error?.message, stack: error?.stack });
-    return res.status(500).json({ ok: false, error: error?.message || "Fatal reviews error" });
+    return res.status(500).json({ ok: false, error: "Не удалось обработать запрос" });
   }
 }
 
@@ -118,7 +127,8 @@ async function handleSave(req, res) {
       if (!fs.existsSync(REVIEWS_DIR)) {
         fs.mkdirSync(REVIEWS_DIR, { recursive: true });
       }
-      const filePath = path.join(REVIEWS_DIR, `${review.case_id || review.sessionId || Date.now()}.json`);
+      const fileName = String(review.case_id || review.sessionId || Date.now()).replace(/[^a-zA-Z0-9_-]/g, "_");
+      const filePath = path.join(REVIEWS_DIR, `${fileName}.json`);
       fs.writeFileSync(filePath, JSON.stringify(localReview, null, 2));
     } catch {}
 
@@ -296,7 +306,7 @@ async function handleUpdateStatus(req, res) {
       return res.status(500).json({ ok: false, error: "ADMIN_SECRET is not configured" });
     }
 
-    if (!admin_secret || admin_secret !== adminSecret) {
+    if (!authorizeExpert(req).isAdmin) {
       return res.status(401).json({ ok: false, error: "Invalid admin_secret" });
     }
 
@@ -383,7 +393,7 @@ async function handleSaveCorrection(req, res) {
       return res.status(500).json({ ok: false, error: "ADMIN_SECRET is not configured" });
     }
 
-    if (!admin_secret || admin_secret !== adminSecret) {
+    if (!authorizeExpert(req).isAdmin) {
       return res.status(401).json({ ok: false, error: "Invalid admin_secret" });
     }
 
@@ -482,7 +492,7 @@ async function handleExportJsonl(req, res) {
     if (!adminSecret) {
       return res.status(500).json({ ok: false, error: "ADMIN_SECRET is not configured" });
     }
-    if (!admin_secret || admin_secret !== adminSecret) {
+    if (!authorizeExpert(req).isAdmin) {
       return res.status(401).json({ ok: false, error: "Invalid admin_secret" });
     }
 
@@ -556,23 +566,7 @@ async function handleListTrainingSessions(req, res) {
       query = query.filter("json_data->_deleted", "is", null);
     }
 
-    if (!isAdmin && expertId) {
-      // Non-admin expert: show records where they are primary_expert, expert_id, or have access
-      const { data: accessCodes } = await supabase
-        .from("patient_access")
-        .select("public_code")
-        .eq("expert_id", expertId)
-        .eq("status", "active");
-      const accessCodesList = (accessCodes || []).map((a) => a.public_code);
-
-      query = query.or(
-        `primary_expert_id.eq.${expertId},expert_id.eq.${expertId}${
-          accessCodesList.length > 0
-            ? "," + accessCodesList.map((c) => `public_code.eq.${c}`).join(",")
-            : ""
-        }`
-      );
-    }
+    query = scopeTrainingQuery(query, req.reviewsAuth);
 
     // Admin filters from UI
     if (filterOrgId) {
@@ -613,7 +607,8 @@ async function handleListTrainingSessions(req, res) {
       });
     }
 
-    return res.status(200).json({ ok: true, sessions: data || [], count: Array.isArray(data) ? data.length : 0 });
+    const visible = (data || []).filter(row => canAccessReviewRecord(req.reviewsAuth, row, { training: true }));
+    return res.status(200).json({ ok: true, sessions: stripReviewCredentials(visible), count: visible.length });
   } catch (error) {
     return res.status(500).json({
       ok: false,
@@ -631,7 +626,7 @@ async function handleSaveTrainingSession(req, res) {
       return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
     }
 
-    const { isAdmin, expertId, expertCode } = authorizeExpert(req);
+    const { isAdmin, expertId } = authorizeExpert(req);
     if (!isAdmin && !expertId) {
       return res.status(401).json({ ok: false, error: "Access denied" });
     }
@@ -761,10 +756,11 @@ async function handleUpdateTrainingSession(req, res) {
     if (!isAdmin && expertId) {
       const { data: existing } = await supabase
         .from("training_sessions")
-        .select("expert_id")
+        .select("*")
         .eq("id", id)
         .single();
-      if (!existing || existing.expert_id !== expertId) {
+      if (!existing || existing.expert_id !== expertId
+        || !canAccessReviewRecord(req.reviewsAuth, existing, { write: true, training: true })) {
         return res.status(403).json({ ok: false, error: "Access denied: not your session" });
       }
     }
@@ -1424,6 +1420,10 @@ async function handleCreateTrainingFromReview(req, res) {
       return res.status(404).json({ ok: false, error: "Review not found", details: fetchError?.message });
     }
 
+    if (!canAccessReviewRecord(req.reviewsAuth, review, { write: true })) {
+      return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+    }
+
     const jsonData = review.json_data || {};
     let foundCode = public_code ||
       review.public_code ||
@@ -1459,7 +1459,8 @@ async function handleCreateTrainingFromReview(req, res) {
       public_code: foundCode,
       session_id: review.session_id || review.sessionId || null,
       case_review_id: review_id,
-      expert_id: jsonData.expert_id || expertId || null,
+      expert_id: isAdmin ? (jsonData.expert_id || null) : expertId,
+      organization_id: review.organization_id || null,
       expert_name: jsonData.expert_name || null,
       expert_role: jsonData.expert_role || null,
       session_sequence: foundCode ? maxSeq + 1 : 1,
@@ -1535,7 +1536,9 @@ async function handleExportTrainingCsv(req, res) {
     if (params.expected_case_type && params.expected_case_type !== "all") query = query.eq("expected_case_type", params.expected_case_type);
     if (params.session_kind && params.session_kind !== "all") query = query.eq("session_kind", params.session_kind);
 
-    const { data, error } = await query.limit(1000);
+    query = scopeTrainingQuery(query, req.reviewsAuth);
+    const { data: rows, error } = await query.limit(1000);
+    const data = (rows || []).filter(row => canAccessReviewRecord(req.reviewsAuth, row, { training: true }));
     if (error) {
       return res.status(500).json({ ok: false, error: "Failed to fetch for CSV", details: error.message });
     }
@@ -2071,7 +2074,7 @@ async function handleGetSessionTimeline(req, res) {
       return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
     }
 
-    const { isAdmin, expertId, expertCode } = authorizeExpert(req);
+    const { isAdmin, expertId } = authorizeExpert(req);
     if (!isAdmin && !expertId) {
       return res.status(401).json({ ok: false, error: "Access denied" });
     }
@@ -2108,44 +2111,10 @@ async function handleGetSessionTimeline(req, res) {
     // Build a unified items list from sessions + case_reviews + training_sessions
     const items = [];
 
-    // Check if expert has access to this code
-    // For non-admin: check primary_expert_id, patient_access, or org membership
-    let accessCodesSet = null;
-    let expertOrgId = null;
-    let expertOrgRole = null;
-    if (!isAdmin && expertId) {
-      const { data: memberships } = await supabase
-        .from("expert_organization_memberships")
-        .select("organization_id, role")
-        .eq("expert_id", expertId)
-        .eq("status", "active");
-      const orgMembership = (memberships || []).find((m) =>
-        ["owner", "admin", "supervisor"].includes(m.role)
-      );
-      expertOrgId = orgMembership?.organization_id || null;
-      expertOrgRole = orgMembership?.role || null;
-      const { data: accessRecords } = await supabase
-        .from("patient_access")
-        .select("public_code")
-        .eq("expert_id", expertId)
-        .eq("status", "active");
-      accessCodesSet = new Set((accessRecords || []).map((a) => a.public_code));
-    }
-    const hasAccessToCode = (publicCode, itemExpertId, itemOrgId) => {
-      if (isAdmin) return true;
-      // Direct expert match
-      if (itemExpertId === expertId) return true;
-      // Code-level access via patient_access
-      if (publicCode && accessCodesSet && accessCodesSet.has(publicCode)) return true;
-      // Org-level access (owner/admin/supervisor can see all in their org)
-      if (expertOrgId && itemOrgId === expertOrgId && ["owner", "admin", "supervisor"].includes(expertOrgRole)) return true;
-      return false;
-    };
-
     // Process sessions
     if (sessions) {
       for (const s of sessions) {
-        if (!hasAccessToCode(s.public_code || code, s.primary_expert_id || s.expert_id, s.organization_id)) continue;
+        if (!canAccessReviewRecord(req.reviewsAuth, s)) continue;
         items.push({
           source: "session",
           session_id: s.session_id || s.id,
@@ -2175,7 +2144,7 @@ async function handleGetSessionTimeline(req, res) {
     // Process case_reviews
     if (caseReviews) {
       for (const r of caseReviews) {
-        if (!hasAccessToCode(r.public_code || code, r.primary_expert_id || r.expert_id, r.organization_id)) continue;
+        if (!canAccessReviewRecord(req.reviewsAuth, r)) continue;
         const j = r.json_data || {};
         items.push({
           source: "case_review",
@@ -2206,7 +2175,7 @@ async function handleGetSessionTimeline(req, res) {
     // Process training_sessions
     if (trainingSessions) {
       for (const t of trainingSessions) {
-        if (!hasAccessToCode(t.public_code || code, t.primary_expert_id || t.expert_id, t.organization_id)) continue;
+        if (!canAccessReviewRecord(req.reviewsAuth, t, { training: true })) continue;
         items.push({
           source: "training_session",
           session_id: t.session_id || null,
@@ -2326,10 +2295,8 @@ async function handleGetSessionTimelineDetails(req, res) {
     const privacy = getPrivacySafeMode();
 
     // Helper to check ownership
-    function checkAccess(record) {
-      if (isAdmin) return true;
-      if (!record) return false;
-      return record.expert_id === expertId;
+    function checkAccess(record, training = false) {
+      return canAccessReviewRecord(req.reviewsAuth, record, { training });
     }
 
     let session = {};
@@ -2416,7 +2383,7 @@ async function handleGetSessionTimelineDetails(req, res) {
         .eq("case_review_id", case_review_id)
         .maybeSingle();
 
-      if (linkedTraining) {
+      if (linkedTraining && checkAccess(linkedTraining, true)) {
         session.training_session_id = linkedTraining.id;
         session.training = buildTrainingObject(linkedTraining);
       }
@@ -2532,7 +2499,7 @@ async function handleGetSessionTimelineDetails(req, res) {
         .eq("session_id", session_id)
         .maybeSingle();
 
-      if (linkedTraining) {
+      if (linkedTraining && checkAccess(linkedTraining, true)) {
         session.training_session_id = linkedTraining.id;
         session.training = buildTrainingObject(linkedTraining);
       }
@@ -2554,7 +2521,7 @@ async function handleGetSessionTimelineDetails(req, res) {
         return res.status(404).json({ ok: false, error: "Training session not found" });
       }
 
-      if (!checkAccess(t)) {
+      if (!checkAccess(t, true)) {
         return res.status(403).json({ ok: false, error: "access_denied" });
       }
 
