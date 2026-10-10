@@ -1,16 +1,17 @@
 import { chromium } from "playwright";
 import { createClient } from "@supabase/supabase-js";
 
-const BASE_URL = process.env.E2E_BASE_URL || "https://tochka-opori-test.vercel.app";
-const BODY_CODE = process.env.E2E_BODY_CONTINUATION_CODE || "HEALTH-C1HL-TST-ABCD-EFGH-JKMN";
-const SUPABASE_URL = process.env.TEST_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const BASE_URL = process.env.E2E_BASE_URL;
+const BODY_CODE = process.env.E2E_BODY_CONTINUATION_CODE;
+const SUPABASE_URL = process.env.TEST_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error("Set TEST_SUPABASE_URL and TEST_SUPABASE_SERVICE_ROLE_KEY for TEST E2E.");
+if (!BASE_URL || !BODY_CODE || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("Set E2E_BASE_URL, E2E_BODY_CONTINUATION_CODE, TEST_SUPABASE_URL, and TEST_SUPABASE_SERVICE_ROLE_KEY.");
 }
-if (!BASE_URL.includes("tochka-opori-test.vercel.app") && !BASE_URL.startsWith("http://localhost")) {
-  throw new Error("Refusing to run body service-request input E2E outside TEST/localhost.");
+const targetUrl = new URL(BASE_URL);
+if (!["localhost", "127.0.0.1"].includes(targetUrl.hostname)) {
+  throw new Error("Refusing E2E against remote deployments; use a local app and TEST database only.");
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -60,10 +61,10 @@ const uniqueMsg = `${firstLine}\nВторая строка — символы: +
 
 async function main() {
   const browser = await chromium.launch({ headless: true, channel: "chrome" });
+  const cleanupIds = [];
   try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
-    const cleanupIds = [];
     const createResp = { status: null, ok: false, id: null, error: null };
 
     page.on("response", async (r) => {
@@ -130,6 +131,26 @@ async function main() {
     console.log(`Body service-request input E2E: ${results.length - failed.length} passed, ${failed.length} failed`);
     if (failed.length) process.exitCode = 1;
   } finally {
+    const { data: markedRows, error: lookupError } = await supabase
+      .from("service_requests")
+      .select("id")
+      .eq("owner_type", "anonymous_profile")
+      .eq("module", "body")
+      .like("message", `${firstLine.slice(0, 24)}%`);
+    if (lookupError) {
+      console.error("E2E cleanup lookup failed:", lookupError.message);
+    } else {
+      const ids = [...new Set([...cleanupIds, ...(markedRows || []).map((row) => row.id)])];
+      if (ids.length) {
+        const { error: cleanupError } = await supabase
+          .from("service_requests")
+          .delete()
+          .eq("owner_type", "anonymous_profile")
+          .eq("module", "body")
+          .in("id", ids);
+        if (cleanupError) console.error("E2E cleanup failed:", cleanupError.message);
+      }
+    }
     await browser.close();
   }
 }
