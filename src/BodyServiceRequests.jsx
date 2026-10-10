@@ -347,12 +347,12 @@ export default function BodyServiceRequests({ onBack }) {
             <div role="status" style={{ marginBottom: 16, padding: 16, borderRadius: 12, background: "#faf6ef", border: "1px solid #e8d5b8" }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: "#2f2925", marginBottom: 8 }}>У вас пока нет подключённого специалиста</div>
               <div style={{ fontSize: 13, color: "#5f574f", lineHeight: 1.5, marginBottom: 12 }}>
-                Попросите нас подобрать специалиста или пригласите своего врача. В заявке на подбор будет только текст вашего вопроса; дневник, анализы и другие сведения не передаются.
+                Попросите нас подобрать специалиста или пригласите своего врача. В заявке на подбор будут тема и текст вопроса; дневник, анализы и другие сведения не прикладываются.
               </div>
 
               {matchRequestSent ? (
                 <div style={{ padding: 12, borderRadius: 10, background: "#e8f0ea", color: "#426452", fontSize: 14 }}>
-                  Заявка на подбор отправлена. После назначения специалиста вы сможете отправить ему этот запрос.
+                  Заявка на подбор отправлена. Администратор увидит тему и текст вопроса. После назначения специалиста вы сможете отдельно оформить консультационный запрос.
                 </div>
               ) : (
                 <button onClick={handleRequestSpecialistMatch} disabled={matchRequestSubmitting} style={{ width: "100%", padding: "12px 16px", borderRadius: 12, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 14, cursor: matchRequestSubmitting ? "not-allowed" : "pointer", opacity: matchRequestSubmitting ? 0.6 : 1, fontFamily: "inherit", marginBottom: 8 }}>
