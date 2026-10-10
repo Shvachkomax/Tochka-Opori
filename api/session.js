@@ -4248,8 +4248,11 @@ async function handleDeclinePatientInvitationById(req, res) {
 // Create patient invitation (patient → specialist)
 async function handleCreatePatientInvitation(req, res) {
   try {
-    const { session_id, access_token, message } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
+    const { session_id, access_token } = req.body || {};
+    const module = req.body?.module === "body" ? "body" : "support";
+    const owner = module === "body"
+      ? await resolveBodyOwner(session_id, access_token)
+      : await resolveSupportOwner(session_id, access_token);
     if (!owner) {
       return res.status(401).json({ ok: false, error: "Требуется авторизация." });
     }
@@ -4265,8 +4268,8 @@ async function handleCreatePatientInvitation(req, res) {
       .insert({
         token_hash: tokenHash,
         direction: "patient_to_specialist",
-        module: "support",
-        inviter_owner_type: "anonymous_case",
+        module,
+        inviter_owner_type: module === "body" ? "anonymous_profile" : "anonymous_case",
         inviter_owner_id: owner.ownerId,
         // target_owner_id/expert_id left null — doctor is unknown at creation time
         status: "pending",
@@ -4326,21 +4329,28 @@ async function handleListPatientInvitations(req, res) {
 async function handleCreateMatchRequest(req, res) {
   try {
     const { session_id, access_token, message } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
+    const module = req.body?.module === "body" ? "body" : "support";
+    const owner = module === "body"
+      ? await resolveBodyOwner(session_id, access_token)
+      : await resolveSupportOwner(session_id, access_token);
     if (!owner) {
       return res.status(401).json({ ok: false, error: "Требуется авторизация." });
     }
 
     const supabase = getSupabase();
 
-    // Check no active assignment exists
-    const { data: existing } = await supabase
+    // Check no active assignment exists for the correct module owner.
+    let assignmentQuery = supabase
       .from("patient_assignments")
       .select("id")
-      .eq("public_code", owner.publicCode)
-      .eq("module", "support")
-      .eq("status", "active")
-      .maybeSingle();
+      .eq("module", module)
+      .eq("status", "active");
+    if (module === "body") {
+      assignmentQuery = assignmentQuery.eq("owner_type", "anonymous_profile").eq("owner_id", owner.ownerId);
+    } else {
+      assignmentQuery = assignmentQuery.eq("public_code", owner.publicCode);
+    }
+    const { data: existing } = await assignmentQuery.maybeSingle();
 
     if (existing) {
       return res.status(400).json({ ok: false, error: "У вас уже есть закреплённый специалист" });
@@ -4349,10 +4359,10 @@ async function handleCreateMatchRequest(req, res) {
     const { data: request, error } = await supabase
       .from("specialist_match_requests")
       .insert({
-        owner_type: "anonymous_case",
+        owner_type: module === "body" ? "anonymous_profile" : "anonymous_case",
         owner_id: owner.ownerId,
-        module: "support",
-        message: message || null,
+        module,
+        message: typeof message === "string" ? message.trim().slice(0, 3000) || null : null,
         status: "submitted",
       })
       .select("id, status, created_at")
