@@ -154,7 +154,7 @@ export default function BodyServiceRequests({ onBack }) {
         `Тема: ${TOPIC_LABELS[serviceTopic] || serviceTopic}.`,
         selectedService ? `Формат: ${FORMAT_LABELS[selectedService.meeting_format] || selectedService.meeting_format}.` : "",
         `Вопрос пациента: ${message.trim()}`,
-      ].filter(Boolean).join("\\n");
+      ].filter(Boolean).join("\n");
       const data = await apiCall("createMatchRequest", { module: "body", message: requestMessage });
       if (!data.ok) throw new Error(data.error || "Не удалось отправить заявку на подбор.");
       setMatchRequestSent(true);
