@@ -66,6 +66,13 @@ export default function BodyServiceRequests({ onBack }) {
   const [preferredTimeText, setPreferredTimeText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [missingSpecialist, setMissingSpecialist] = useState(false);
+  const [matchRequestSubmitting, setMatchRequestSubmitting] = useState(false);
+  const [matchRequestSent, setMatchRequestSent] = useState(false);
+  const [inviteCreating, setInviteCreating] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [inviteCopyStatus, setInviteCopyStatus] = useState("");
+  const [routingError, setRoutingError] = useState("");
 
   useEffect(() => {
     loadRequests();
@@ -97,6 +104,10 @@ export default function BodyServiceRequests({ onBack }) {
     }
     setSubmitting(true);
     setSubmitError("");
+    setMissingSpecialist(false);
+    setRoutingError("");
+    setMatchRequestSent(false);
+    setInviteUrl("");
     try {
       const data = await apiCall("createBodyServiceRequest", {
         service_code: serviceCode,
@@ -123,9 +134,58 @@ export default function BodyServiceRequests({ onBack }) {
       setServiceCode("");
       loadRequests();
     } catch (e) {
-      setSubmitError(e.message);
+      if (String(e.message || "").includes("Нет активного назначения специалиста")) {
+        setMissingSpecialist(true);
+      } else {
+        setSubmitError(e.message);
+      }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleRequestSpecialistMatch() {
+    setMatchRequestSubmitting(true);
+    setRoutingError("");
+    try {
+      const selectedService = pricing.find((item) => item.service_code === serviceCode);
+      const requestMessage = [
+        "Заявка на подбор специалиста для консультации.",
+        `Тема: ${TOPIC_LABELS[serviceTopic] || serviceTopic}.`,
+        selectedService ? `Формат: ${FORMAT_LABELS[selectedService.meeting_format] || selectedService.meeting_format}.` : "",
+        `Вопрос пациента: ${message.trim()}`,
+      ].filter(Boolean).join("\n");
+      const data = await apiCall("createMatchRequest", { module: "body", message: requestMessage });
+      if (!data.ok) throw new Error(data.error || "Не удалось отправить заявку на подбор.");
+      setMatchRequestSent(true);
+    } catch (e) {
+      setRoutingError(e.message || "Не удалось отправить заявку на подбор.");
+    } finally {
+      setMatchRequestSubmitting(false);
+    }
+  }
+
+  async function handleInviteOwnDoctor() {
+    setInviteCreating(true);
+    setRoutingError("");
+    setInviteCopyStatus("");
+    try {
+      const data = await apiCall("createPatientInvitation", { module: "body" });
+      if (!data.ok || !data.invitation?.url) throw new Error(data.error || "Не удалось создать ссылку.");
+      setInviteUrl(data.invitation.url);
+    } catch (e) {
+      setRoutingError(e.message || "Не удалось создать ссылку.");
+    } finally {
+      setInviteCreating(false);
+    }
+  }
+
+  async function copyInviteUrl() {
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setInviteCopyStatus("Ссылка скопирована.");
+    } catch {
+      setInviteCopyStatus("Не удалось скопировать автоматически. Нажмите и удерживайте ссылку, чтобы скопировать её.");
     }
   }
 
@@ -283,11 +343,51 @@ export default function BodyServiceRequests({ onBack }) {
 
           {submitError && <div style={{ color: "#b5473f", fontSize: 14, marginBottom: 12 }}>{submitError}</div>}
 
+          {missingSpecialist && (
+            <div role="status" style={{ marginBottom: 16, padding: 16, borderRadius: 12, background: "#faf6ef", border: "1px solid #e8d5b8" }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#2f2925", marginBottom: 8 }}>У вас пока нет подключённого специалиста</div>
+              <div style={{ fontSize: 13, color: "#5f574f", lineHeight: 1.5, marginBottom: 12 }}>
+                Попросите нас подобрать специалиста или пригласите своего врача. В заявке на подбор будут тема и текст вопроса; дневник, анализы и другие сведения не прикладываются.
+              </div>
+
+              {matchRequestSent ? (
+                <div style={{ padding: 12, borderRadius: 10, background: "#e8f0ea", color: "#426452", fontSize: 14 }}>
+                  Заявка на подбор отправлена. Администратор увидит тему и текст вопроса. После назначения специалиста вы сможете отдельно оформить консультационный запрос.
+                </div>
+              ) : (
+                <button onClick={handleRequestSpecialistMatch} disabled={matchRequestSubmitting} style={{ width: "100%", padding: "12px 16px", borderRadius: 12, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 14, cursor: matchRequestSubmitting ? "not-allowed" : "pointer", opacity: matchRequestSubmitting ? 0.6 : 1, fontFamily: "inherit", marginBottom: 8 }}>
+                  {matchRequestSubmitting ? "Отправляем заявку..." : "Попросить подобрать специалиста"}
+                </button>
+              )}
+
+              {!inviteUrl ? (
+                <button onClick={handleInviteOwnDoctor} disabled={inviteCreating} style={{ width: "100%", padding: "12px 16px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: inviteCreating ? "not-allowed" : "pointer", opacity: inviteCreating ? 0.6 : 1, fontFamily: "inherit" }}>
+                  {inviteCreating ? "Создаём ссылку..." : "Пригласить своего врача"}
+                </button>
+              ) : (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925", marginBottom: 6 }}>Отправьте врачу эту ссылку (действует 14 дней):</div>
+                  <input readOnly value={inviteUrl} aria-label="Ссылка-приглашение врачу" onFocus={e => e.target.select()} style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 13, marginBottom: 8 }} />
+                  <button onClick={copyInviteUrl} style={{ width: "100%", padding: "10px 16px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>Скопировать ссылку</button>
+                  {inviteCopyStatus && <div style={{ marginTop: 6, fontSize: 12, color: "#5f574f" }}>{inviteCopyStatus}</div>}
+                  <div style={{ marginTop: 8, fontSize: 12, color: "#8a7e72", lineHeight: 1.5 }}>Ссылка не открывает врачу ваш дневник и медицинские данные. После подключения врача вы сможете отдельно отправить запрос.</div>
+                </div>
+              )}
+
+              {routingError && <div style={{ marginTop: 10, color: "#b5473f", fontSize: 13 }}>{routingError}</div>}
+              <button onClick={handleSubmit} disabled={submitting} style={{ width: "100%", marginTop: 10, padding: "10px 16px", borderRadius: 12, border: "1px solid #d8cec1", background: "transparent", color: "#5f574f", fontWeight: 600, fontSize: 13, cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                {submitting ? "Проверяем..." : "Проверить ещё раз"}
+              </button>
+            </div>
+          )}
+
           <div className="body-service-request-actions">
-            <button onClick={handleSubmit} disabled={submitting} className="body-service-request-primary" style={{ flex: 1, padding: "12px 20px", borderRadius: 16, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 15, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.6 : 1, fontFamily: "inherit" }}>
-              {submitting ? "Отправка..." : "Отправить запрос"}
-            </button>
-            <button onClick={() => setView("list")} disabled={submitting} className="body-service-request-secondary" style={{ padding: "12px 20px", borderRadius: 16, border: "1px solid #d8cec1", background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+            {!missingSpecialist && (
+              <button onClick={handleSubmit} disabled={submitting} className="body-service-request-primary" style={{ flex: 1, padding: "12px 20px", borderRadius: 16, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 15, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.6 : 1, fontFamily: "inherit" }}>
+                {submitting ? "Отправка..." : "Отправить запрос"}
+              </button>
+            )}
+            <button onClick={() => setView("list")} disabled={submitting || matchRequestSubmitting || inviteCreating} className="body-service-request-secondary" style={{ padding: "12px 20px", borderRadius: 16, border: "1px solid #d8cec1", background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
               Отмена
             </button>
           </div>

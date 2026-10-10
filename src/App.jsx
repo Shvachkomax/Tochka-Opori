@@ -478,6 +478,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         .then((d) => {
           if (d.valid && d.invite) {
             setInviteInfo({ valid: true, ...d.invite });
+            if (d.invite.module === "body") setActiveModule("body");
             if (d.invite.direction === "patient_to_specialist") {
               setInviteSpecialistAuth({ loading: true, authenticated: false, error: null });
               fetch("/api/specialist", {
