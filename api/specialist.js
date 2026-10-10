@@ -1731,7 +1731,21 @@ async function handleListInvitations(req, res) {
 }
 
 async function resolveInvitationPatientOwner(supabase, invitation) {
-  if (invitation.inviter_owner_type !== "anonymous_case" || !invitation.inviter_owner_id) return null;
+  if (!invitation.inviter_owner_id) return null;
+
+  if (invitation.module === "body") {
+    if (invitation.inviter_owner_type !== "anonymous_profile") return null;
+    const { data: client, error } = await supabase
+      .from("body_clients")
+      .select("session_id")
+      .eq("anonymous_owner_id", invitation.inviter_owner_id)
+      .limit(1)
+      .maybeSingle();
+    if (error || !client) return null;
+    return { ownerId: invitation.inviter_owner_id, publicCode: null };
+  }
+
+  if (invitation.module !== "support" || invitation.inviter_owner_type !== "anonymous_case") return null;
   const { data: session, error } = await supabase
     .from("sessions")
     .select("session_id, public_code, anonymous_owner_id")
@@ -1778,19 +1792,44 @@ async function handleAcceptPatientInvitation(req, res) {
       .maybeSingle();
 
     if (error || !invitation) return res.status(404).json({ ok: false, error: "Приглашение не найдено" });
-    if (invitation.direction !== "patient_to_specialist" || invitation.module !== "support") {
+    if (invitation.direction !== "patient_to_specialist" || !["support", "body"].includes(invitation.module)) {
       return res.status(400).json({ ok: false, error: "Некорректное приглашение" });
     }
-    if (String(invitation.target_expert_id) !== String(authResult.expert.id)) {
-      return res.status(403).json({ ok: false, error: "Приглашение адресовано другому специалисту" });
+    const expertModules = Array.isArray(authResult.expert.allowed_modules) ? authResult.expert.allowed_modules : [];
+    if (!expertModules.includes(invitation.module)) {
+      return res.status(403).json({ ok: false, error: "У вас нет доступа к этому модулю" });
     }
     if (invitation.status !== "pending") return res.status(400).json({ ok: false, error: "Приглашение уже обработано" });
+    if (invitation.target_expert_id && String(invitation.target_expert_id) !== String(authResult.expert.id)) {
+      return res.status(403).json({ ok: false, error: "Приглашение адресовано другому специалисту" });
+    }
+    if (!invitation.target_expert_id) {
+      const { data: claimed, error: claimError } = await supabase
+        .from("patient_specialist_invitations")
+        .update({ target_expert_id: authResult.expert.id, updated_at: new Date().toISOString() })
+        .eq("id", invitation.id)
+        .eq("status", "pending")
+        .is("target_expert_id", null)
+        .select("id")
+        .maybeSingle();
+      if (claimError) return res.status(500).json({ ok: false, error: "Не удалось принять приглашение" });
+      if (!claimed) {
+        const { data: latest } = await supabase
+          .from("patient_specialist_invitations")
+          .select("target_expert_id")
+          .eq("id", invitation.id)
+          .maybeSingle();
+        if (String(latest?.target_expert_id) !== String(authResult.expert.id)) {
+          return res.status(409).json({ ok: false, error: "Приглашение уже принято другим специалистом" });
+        }
+      }
+    }
     if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
       return res.status(400).json({ ok: false, error: "Приглашение истекло" });
     }
 
     const owner = await resolveInvitationPatientOwner(supabase, invitation);
-    if (!owner) return res.status(409).json({ ok: false, error: "У пациента ещё нет активной Support-сессии" });
+    if (!owner) return res.status(409).json({ ok: false, error: "Не удалось найти активный профиль пациента" });
 
     const { data: result, error: rpcError } = await supabase.rpc("accept_specialist_invitation", {
       p_token_hash: invitation.token_hash,
