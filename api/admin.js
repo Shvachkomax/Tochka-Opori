@@ -2577,16 +2577,20 @@ async function handleReviewOnboardingRequest(req, res) {
 async function handleListMatchRequests(req, res) {
   const password = extractPassword(req);
   const role = resolveRole(password);
-  if (!checkAccess(role, "support")) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+  if (!checkAccess(role, "support") && !checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+  }
 
   const { status } = req.body || {};
   const supabase = getSupabase();
+  const scopedModule = role === "body" ? "body" : role === "support" ? "support" : null;
 
   let query = supabase
     .from("specialist_match_requests")
     .select("id, owner_type, owner_id, module, organization_id, message, status, assigned_expert_id, created_at, assigned_at")
     .order("created_at", { ascending: false })
     .limit(100);
+  if (scopedModule) query = query.eq("module", scopedModule);
 
   if (status && status !== "all") {
     query = query.eq("status", status);
@@ -2601,7 +2605,9 @@ async function handleListMatchRequests(req, res) {
 async function handleAssignMatchRequest(req, res) {
   const password = extractPassword(req);
   const role = resolveRole(password);
-  if (!checkAccess(role, "support")) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+  if (!checkAccess(role, "support") && !checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+  }
 
   const { id, expert_id, organization_id } = req.body || {};
   if (!id || !expert_id) return res.status(400).json({ ok: false, error: "Missing id or expert_id" });
@@ -2614,6 +2620,7 @@ async function handleAssignMatchRequest(req, res) {
     .maybeSingle();
 
   if (findError || !request) return res.status(404).json({ ok: false, error: "Заявка не найдена" });
+  if (!checkAccess(role, request.module)) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
   if (request.status !== "submitted") return res.status(400).json({ ok: false, error: "Заявка уже обработана" });
 
   // Verify expert exists and has module entitlement
