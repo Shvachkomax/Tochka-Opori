@@ -2443,16 +2443,20 @@ async function handleReassignBodyClientExpert(req, res) {
 async function handleListOnboardingRequests(req, res) {
   const password = extractPassword(req);
   const role = resolveRole(password);
-  if (!checkAccess(role, "support")) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+  if (!checkAccess(role, "support") && !checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+  }
 
   const { status } = req.body || {};
   const supabase = getSupabase();
+  const scopedModule = role === "body" ? "body" : role === "support" ? "support" : null;
 
   let query = supabase
     .from("specialist_onboarding_requests")
     .select("id, invitation_id, module, organization_id, name, contact_email, contact_phone, comment, status, expert_id, created_at, reviewed_at")
     .order("created_at", { ascending: false })
     .limit(100);
+  if (scopedModule) query = query.eq("module", scopedModule);
 
   if (status && status !== "all") {
     query = query.eq("status", status);
@@ -2467,7 +2471,9 @@ async function handleListOnboardingRequests(req, res) {
 async function handleReviewOnboardingRequest(req, res) {
   const password = extractPassword(req);
   const role = resolveRole(password);
-  if (!checkAccess(role, "support")) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+  if (!checkAccess(role, "support") && !checkAccess(role, "body")) {
+    return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+  }
 
   const { id, review_action: reviewAction, expert_id } = req.body || {};
   if (!id || !reviewAction) return res.status(400).json({ ok: false, error: "Missing id or review_action" });
@@ -2475,11 +2481,12 @@ async function handleReviewOnboardingRequest(req, res) {
   const supabase = getSupabase();
   const { data: request, error: findError } = await supabase
     .from("specialist_onboarding_requests")
-    .select("id, status, invitation_id")
+    .select("id, status, invitation_id, module")
     .eq("id", id)
     .maybeSingle();
 
   if (findError || !request) return res.status(404).json({ ok: false, error: "Заявка не найдена" });
+  if (!checkAccess(role, request.module)) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
   if (request.status !== "submitted") return res.status(400).json({ ok: false, error: "Заявка уже обработана" });
 
   const now = new Date().toISOString();
