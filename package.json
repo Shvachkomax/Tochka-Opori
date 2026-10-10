@@ -22,7 +22,9 @@
     "test:session-access-pair": "node scripts/test-session-access-pair.js",
     "test:voice-audio-mime": "node scripts/test-voice-audio-mime.js",
     "test:service-request-finance": "node scripts/test-service-request-finance.js",
-    "e2e:service-request-finance": "node scripts/e2e-service-request-finance-browser.mjs"
+    "e2e:service-request-finance": "node scripts/e2e-service-request-finance-browser.mjs",
+    "e2e:body-service-request-input": "node scripts/e2e-body-service-request-input-browser.mjs",
+    "test:service-request-input-styles": "node scripts/test-service-request-input-styles.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

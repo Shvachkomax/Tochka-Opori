@@ -242,7 +242,7 @@ export default function BodyServiceRequests({ onBack }) {
 
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 6, display: "block" }}>Что хотите уточнить?</label>
-            <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Опишите вопрос своими словами..." style={{ width: "100%", minHeight: 120, padding: 12, borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
+            <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Опишите вопрос своими словами..." style={{ width: "100%", minHeight: 120, padding: 12, borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
           </div>
 
           <div style={{ marginBottom: 16 }}>
@@ -264,15 +264,15 @@ export default function BodyServiceRequests({ onBack }) {
             <div style={{ marginBottom: 16, padding: 16, borderRadius: 12, background: "#faf6ef", border: "1px solid #e8e2d8" }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Когда вам удобно?</div>
               <div className="body-service-request-contact-wide" style={{ marginBottom: 8 }}>
-                <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Телефон" className="body-service-request-field" style={{ height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+                <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Телефон" className="body-service-request-field" style={{ height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 14, outline: "none", fontFamily: "inherit" }} />
               </div>
               <div className="body-service-request-contact-grid">
-                <input value={preferredDate} onChange={e => setPreferredDate(e.target.value)} type="date" placeholder="Дата" className="body-service-request-field" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
-                <input value={preferredTimeFrom} onChange={e => setPreferredTimeFrom(e.target.value)} type="time" placeholder="С" className="body-service-request-field" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
-                <input value={preferredTimeTo} onChange={e => setPreferredTimeTo(e.target.value)} type="time" placeholder="До" className="body-service-request-field" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+                <input value={preferredDate} onChange={e => setPreferredDate(e.target.value)} type="date" placeholder="Дата" className="body-service-request-field" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+                <input value={preferredTimeFrom} onChange={e => setPreferredTimeFrom(e.target.value)} type="time" placeholder="С" className="body-service-request-field" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
+                <input value={preferredTimeTo} onChange={e => setPreferredTimeTo(e.target.value)} type="time" placeholder="До" className="body-service-request-field" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
               </div>
               <div className="body-service-request-contact-wide">
-                <input value={preferredTimeText} onChange={e => setPreferredTimeText(e.target.value)} placeholder="Например: завтра после 18:00 или в будни утром" className="body-service-request-field" style={{ height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+                <input value={preferredTimeText} onChange={e => setPreferredTimeText(e.target.value)} placeholder="Например: завтра после 18:00 или в будни утром" className="body-service-request-field" style={{ height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 14, outline: "none", fontFamily: "inherit" }} />
               </div>
             </div>
           )}
