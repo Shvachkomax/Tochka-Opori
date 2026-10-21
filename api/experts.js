@@ -1,3 +1,4 @@
+import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import { getSupabase } from "../lib/supabase.js";
 import { getPrivacySafeMode } from "../lib/sanitize.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
@@ -5,6 +6,7 @@ import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailabl
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
+  if (deploymentOrganizationId() && req.body?.action !== "validateInviteToken") return res.status(403).json({ ok: false, error: "В этом контуре используйте кабинет специалиста" });
 
   applyCors(req, res);
 

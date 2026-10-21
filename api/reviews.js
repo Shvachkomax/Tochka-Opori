@@ -1,3 +1,4 @@
+import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import { getSupabase } from "../lib/supabase.js";
 import { createClient } from "@supabase/supabase-js";
 import { maskSensitiveData, getPrivacySafeMode, maskText } from "../lib/sanitize.js";
@@ -28,6 +29,7 @@ async function getSupabaseClient() {
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
+  if (deploymentOrganizationId() && req.body?.action !== "save") return res.status(403).json({ ok: false, error: "В этом контуре используйте кабинет специалиста" });
 
   applyCors(req, res);
 

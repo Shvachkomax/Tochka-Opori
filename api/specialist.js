@@ -1,3 +1,4 @@
+import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import crypto from "node:crypto";
 import { getSupabase } from "../lib/supabase.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
@@ -528,6 +529,9 @@ async function handleLogin(req, res) {
     return res.status(500).json({ ok: false, error: "Не удалось загрузить членство специалиста" });
   }
   const membershipsList = membershipResult.memberships;
+  if (deploymentOrganizationId() && !membershipsList.length) {
+    return res.status(401).json({ ok: false, error: GENERIC_AUTH_ERROR });
+  }
 
   // Generate opaque token
   const rawToken = crypto.randomBytes(TOKEN_BYTES).toString("hex");
@@ -1269,7 +1273,7 @@ async function handleListServiceRequests(req, res) {
 
   // Validate module entitlement if module filter provided
   if (module) {
-    const ctx = validateSpecialistContext({ memberships, organizationId: null, module, allowedModules: expert.allowed_modules });
+    const ctx = validateSpecialistContext({ memberships, organizationId: deploymentOrganizationId(), module, allowedModules: expert.allowed_modules });
     if (!ctx.ok) {
       return res.status(403).json({ ok: false, error: ctx.error });
     }
@@ -1292,6 +1296,14 @@ async function handleListServiceRequests(req, res) {
     .order("created_at", { ascending: false })
     .limit(100);
 
+  if (deploymentOrganizationId()) {
+    const { data: scopedSessions, error: scopeError } = await supabase.from("sessions")
+      .select("anonymous_owner_id").eq("module", "support");
+    if (scopeError) return res.status(500).json({ ok: false, error: "Не удалось проверить организацию" });
+    const owners = [...new Set((scopedSessions || []).map(row => row.anonymous_owner_id).filter(Boolean))];
+    if (!owners.length) return res.status(200).json({ ok: true, requests: [] });
+    query = query.in("owner_id", owners).eq("module", "support");
+  }
   if (status && status !== "all") {
     query = query.eq("status", status);
   }
@@ -1413,6 +1425,11 @@ async function handleUpdateServiceRequest(req, res) {
     return res.status(404).json({ ok: false, error: "Запрос не найден" });
   }
 
+  if (deploymentOrganizationId()) {
+    const { data: ownedSession, error: scopeError } = await supabase.from("sessions")
+      .select("id").eq("anonymous_owner_id", request.owner_id).eq("module", "support").limit(1).maybeSingle();
+    if (scopeError || !ownedSession) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+  }
   // Ownership check: specialist can only update their own requests
   if (request.specialist_id !== expertIdStr) {
     return res.status(403).json({ ok: false, error: "Доступ запрещён" });
@@ -1870,6 +1887,10 @@ export async function authorizeSpecialist(req) {
     return { status: 500, error: "Не удалось загрузить членство специалиста" };
   }
 
+  if (deploymentOrganizationId() && !membershipResult.memberships.length) {
+    return { status: 403, error: "Нет доступа к этой организации" };
+  }
+
   // Update last_seen_at (non-blocking, don't fail auth if this errors)
   supabase
     .from("specialist_sessions")
@@ -1889,6 +1910,8 @@ export async function authorizeSpecialist(req) {
 // ── CONTEXT VALIDATION (for future patient queries) ───────
 
 export function validateSpecialistContext({ memberships, organizationId, module, allowedModules }) {
+  const org = deploymentOrganizationId();
+  if (org && organizationId !== org) return { ok: false, error: "Нет доступа к указанной организации" };
   const validModules = ["support", "body"];
   if (!validModules.includes(module)) {
     return { ok: false, error: "Некорректный модуль" };

@@ -1,3 +1,4 @@
+import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import { getSupabase } from "../lib/supabase.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
@@ -7,6 +8,7 @@ const EXPERT_TOKEN_MAX_AGE_DAYS = 30;
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
+  if (deploymentOrganizationId()) return res.status(403).json({ ok: false, error: "В этом контуре используйте кабинет специалиста" });
   applyCors(req, res);
 
   if (req.method !== "POST") {

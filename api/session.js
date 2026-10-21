@@ -1,3 +1,4 @@
+import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import crypto from "crypto";
 import { getSupabase } from "../lib/supabase.js";
 import { maskText, maskSensitiveData, getPrivacySafeMode } from "../lib/sanitize.js";
@@ -503,6 +504,9 @@ async function handleSave(req, res) {
       return res.status(500).json({ ok: false, error: "База данных временно недоступна. Попробуйте позже." });
     }
 
+    if (deploymentOrganizationId() && !existing?.data) {
+      return res.status(403).json({ ok: false, error: "Сессия недоступна" });
+    }
     let publicCode = existing?.data?.public_code;
     let organizationId = existing?.data?.organization_id || null;
     let primaryExpertId = existing?.data?.primary_expert_id || null;

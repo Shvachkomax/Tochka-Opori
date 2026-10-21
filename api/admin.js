@@ -1,3 +1,4 @@
+import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import { getSupabase } from "../lib/supabase.js";
 import { applyCors, handleOptions, timingSafeEqual, getAdminTokenFromHeader } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
@@ -35,6 +36,7 @@ function extractPassword(req) {
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
+  if (deploymentOrganizationId()) return res.status(403).json({ ok: false, error: "В этом контуре используйте кабинет специалиста" });
 
   applyCors(req, res);
 
