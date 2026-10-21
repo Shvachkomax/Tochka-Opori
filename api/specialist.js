@@ -8,6 +8,8 @@ import { recordClinicalEvent } from "../lib/clinical/projection.js";
 import { isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
 import { buildSpecialistClientList } from "../lib/specialist-client-list.js";
+import { normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
+import { buildSpecialistRequestContext } from "../lib/specialist/request-context.js";
 import {
   SAFE_MEDICATION_PERMISSION_KEYS,
   getMedicationOrderForOwner,
@@ -1281,7 +1283,9 @@ async function handleListServiceRequests(req, res) {
 
   let query = supabase
     .from("service_requests")
-    .select("id, module, owner_type, owner_id, specialist_id, specialist_name, request_type, service_code, service_topic, meeting_format, title, message, status, priority, due_at, scheduled_at, scheduled_place, scheduled_comment, specialist_response, client_contact, price_credits, reserved_credits, charged_credits, created_at, updated_at, answered_at, completed_at, cancelled_at")
+    .select(isAnMedSupportOnlyDeployment()
+      ? "id, module, owner_type, owner_id, session_id, specialist_id, specialist_name, request_type, service_code, service_topic, meeting_format, title, message, status, priority, due_at, scheduled_at, scheduled_place, scheduled_comment, specialist_response, client_contact, price_credits, reserved_credits, charged_credits, created_at, updated_at, answered_at, completed_at, cancelled_at"
+      : "id, module, owner_type, owner_id, specialist_id, specialist_name, request_type, service_code, service_topic, meeting_format, title, message, status, priority, due_at, scheduled_at, scheduled_place, scheduled_comment, specialist_response, client_contact, price_credits, reserved_credits, charged_credits, created_at, updated_at, answered_at, completed_at, cancelled_at")
     .eq("specialist_id", expertIdStr)
     .in("module", effectiveModules)
     .in("owner_type", effectiveModules.map((item) => item === "body" ? "anonymous_profile" : "anonymous_case"))
@@ -1297,6 +1301,23 @@ async function handleListServiceRequests(req, res) {
   if (error) {
     console.error("[listServiceRequests] query error:", error.code);
     return res.status(500).json({ ok: false, error: "Не удалось загрузить запросы." });
+  }
+
+  const supportSessionIds = isAnMedSupportOnlyDeployment()
+    ? [...new Set((requests || []).filter((request) => request.module === "support" && request.session_id).map((request) => request.session_id))]
+    : [];
+  const sessionContexts = new Map();
+  if (supportSessionIds.length > 0) {
+    const { data: sessions } = await supabase.from("sessions")
+      .select("session_id, patient_text, user_report, doctor_report, created_at, json_data")
+      .eq("module", "support")
+      .in("session_id", supportSessionIds);
+    for (const session of sessions || []) {
+      sessionContexts.set(session.session_id, buildSpecialistRequestContext({
+        session,
+        crisisBlock: session.json_data?.crisis_block || null,
+      }));
+    }
   }
 
   // Batch-resolve display names for clients
@@ -1329,6 +1350,7 @@ async function handleListServiceRequests(req, res) {
     request_ref: `service-request:${r.id}`,
     module: r.module,
     client_display_name: ownerNames.get(r.owner_id) || "Клиент",
+    ...(isAnMedSupportOnlyDeployment() ? { clinical_context: sessionContexts.get(r.session_id) || null } : {}),
     request_type: r.request_type,
     service_code: r.service_code || null,
     service_topic: r.service_topic || null,
@@ -1596,7 +1618,15 @@ async function handleListInvitations(req, res) {
     return res.status(500).json({ ok: false, error: "Не удалось загрузить приглашения" });
   }
 
-  return res.status(200).json({ ok: true, invitations: invitations || [] });
+  const currentInvitations = isAnMedSupportOnlyDeployment() ? normalizeInvitationStatuses(invitations || []) : (invitations || []);
+  const expiredIds = currentInvitations.filter((invitation, index) => invitation.status === "expired" && invitations?.[index]?.status === "pending").map((invitation) => invitation.id);
+  if (isAnMedSupportOnlyDeployment() && expiredIds.length > 0) {
+    await supabase.from("patient_specialist_invitations")
+      .update({ status: "expired", updated_at: new Date().toISOString() })
+      .in("id", expiredIds)
+      .eq("status", "pending");
+  }
+  return res.status(200).json({ ok: true, invitations: currentInvitations });
 }
 
 async function resolveInvitationPatientOwner(supabase, invitation) {

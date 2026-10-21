@@ -932,6 +932,8 @@ export default function SpecialistCabinet() {
                       invitation={inv}
                       onRevoke={revokeInvitation}
                       onRespond={respondToPatientInvitation}
+                      onResend={APP_BRAND.isAnMed ? createInvitation : null}
+                      onToast={showToast}
                     />
                   ))}
                 </div>
@@ -977,7 +979,9 @@ export default function SpecialistCabinet() {
               <p style={{ fontSize: 13, color: "#991B1B" }}>{clientsError}</p>
             ) : clients.length === 0 ? (
               <p style={{ fontSize: 13, color: "#7A7268" }}>
-                В этом рабочем пространстве пока нет закреплённых клиентов.
+                {APP_BRAND.isAnMed
+                  ? "Здесь появляются пациенты после того, как они отправят запрос этому специалисту или примут ваше приглашение. Пока пациент не подтвердил связь, его разговоры и отчёты здесь не отображаются."
+                  : "В этом рабочем пространстве пока нет закреплённых клиентов."}
               </p>
             ) : (
               <div>
@@ -1082,6 +1086,25 @@ function ServiceRequestCard({ request: r, onAction, updating, pendingAction, fee
 
       {r.title && <div style={{ fontSize: 13, fontWeight: 600, marginTop: 8, color: "#2E2A25" }}>{r.title}</div>}
       {r.service_topic && <div style={{ fontSize: 12, color: "#7A7268", marginTop: 4 }}>Тема: {SERVICE_TOPIC_LABELS[r.service_topic] || r.service_topic}</div>}
+      {r.clinical_context && (
+        <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: "#F8FAF8", border: "1px solid rgba(125,154,137,.25)" }}>
+          <div style={{ fontSize: 11, color: "#7A7268", marginBottom: 4 }}>
+            Предварительная сводка · {r.clinical_context.session_date ? new Date(r.clinical_context.session_date).toLocaleString("ru-RU", { day: "2-digit", month: "long", year: "numeric" }) : created}
+          </div>
+          <div style={{ fontSize: 12, color: "#2E2A25", lineHeight: 1.5 }}>{r.clinical_context.preliminary_summary}</div>
+          {r.clinical_context.signals_for_attention && (
+            <div style={{ marginTop: 8, fontSize: 12, color: "#5F574F", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+              <strong>Сигналы и контекст:</strong>{"\n"}{r.clinical_context.signals_for_attention}
+            </div>
+          )}
+          {r.clinical_context.crisis_context && (
+            <details style={{ marginTop: 8, fontSize: 12, color: "#5F574F" }}>
+              <summary style={{ cursor: "pointer", fontWeight: 600 }}>Ответы в блоке безопасности</summary>
+              <div style={{ whiteSpace: "pre-wrap", marginTop: 6, lineHeight: 1.5 }}>{r.clinical_context.crisis_context}</div>
+            </details>
+          )}
+        </div>
+      )}
 
       {r.price_credits > 0 && (
         <div style={{ fontSize: 12, color: "#7D9A89", marginTop: 4, fontWeight: 600 }}>
@@ -1261,10 +1284,56 @@ const INVITATION_STATUS_COLORS = {
   revoked: { bg: "#f0e0e0", text: "#8B4A3A" },
 };
 
-function InvitationCard({ invitation: inv, onRevoke, onRespond }) {
+function InvitationCard({ invitation: inv, onRevoke, onRespond, onResend, onToast }) {
+  const [replacement, setReplacement] = useState(null);
+  const [replacementLoading, setReplacementLoading] = useState(false);
   const sc = INVITATION_STATUS_COLORS[inv.status] || INVITATION_STATUS_COLORS.pending;
   const created = inv.created_at ? new Date(inv.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
   const expires = inv.expires_at ? new Date(inv.expires_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+
+  async function ensureReplacement() {
+    if (replacement) return replacement;
+    if (!onResend) return null;
+    setReplacementLoading(true);
+    try {
+      const created = await onResend(inv.patient_label || null);
+      if (created) setReplacement(created);
+      return created;
+    } finally {
+      setReplacementLoading(false);
+    }
+  }
+
+  async function copyReplacementLink() {
+    const created = await ensureReplacement();
+    if (!created?.url) return;
+    try {
+      await navigator.clipboard.writeText(created.url);
+      onToast("Новая ссылка скопирована. Отправьте её пациенту.");
+    } catch {
+      setReplacement(created);
+    }
+  }
+
+  async function shareReplacementLink() {
+    const created = await ensureReplacement();
+    if (!created?.url) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Приглашение в сервис", url: created.url });
+        onToast("Приглашение передано для отправки.");
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(created.url);
+      onToast("Новая ссылка скопирована. Отправьте её пациенту.");
+    } catch {
+      setReplacement(created);
+    }
+  }
 
   return (
     <div style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid rgba(46,42,37,.08)", marginBottom: 8, background: "#fff" }}>
@@ -1291,6 +1360,18 @@ function InvitationCard({ invitation: inv, onRevoke, onRespond }) {
           <button onClick={() => onRevoke(inv.id)} style={{ ...S.actionBtn, marginLeft: 8, color: "#B85C4A", borderColor: "rgba(184,92,74,.3)" }}>
             Отозвать
           </button>
+        </div>
+      )}
+      {APP_BRAND.isAnMed && onResend && inv.status === "expired" && inv.direction !== "patient_to_specialist" && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 8 }}>
+            Срок ссылки закончился. Новая ссылка будет создана отдельно; после этого отправьте её пациенту.
+          </div>
+          {replacement?.url && <div style={{ fontSize: 12, color: "#5F574F", marginBottom: 8, wordBreak: "break-all" }}>Новая ссылка: {replacement.url}</div>}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={copyReplacementLink} disabled={replacementLoading} style={S.actionBtn}>{replacementLoading ? "Создаём ссылку…" : "Скопировать ссылку"}</button>
+            <button onClick={shareReplacementLink} disabled={replacementLoading} style={S.actionBtn}>{replacementLoading ? "Создаём ссылку…" : "Отправить повторно"}</button>
+          </div>
         </div>
       )}
     </div>
