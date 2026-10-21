@@ -3,6 +3,7 @@ import { getSupabase } from "../lib/supabase.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
+import { rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { generatePublicCode } from "../lib/publicCode.js";
 
 function generateSessionId() {
@@ -20,6 +21,7 @@ export default async function handler(req, res) {
 
   const tokenCheck = requireClientToken(["analyze"])(req, res);
   if (!tokenCheck) return;
+  if (rejectUnavailableModule(res, tokenCheck.module)) return;
 
   const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 30, prefix: "start-session:" });
   const limited = await limit(req, res);

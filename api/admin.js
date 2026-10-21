@@ -1,3 +1,4 @@
+import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import { getSupabase } from "../lib/supabase.js";
 import { applyCors, handleOptions, timingSafeEqual, getAdminTokenFromHeader } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
@@ -5,6 +6,7 @@ import { logAdminAction, getClientIp } from "../lib/security/audit.js";
 import { generateInviteToken, generateExpertAccessToken, hashToken } from "../lib/security/council-token.js";
 import { sendEmail } from "../lib/email/provider.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
+import { isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 
 function resolveRole(token) {
   if (!token) return null;
@@ -34,6 +36,7 @@ function extractPassword(req) {
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
+  if (deploymentOrganizationId()) return res.status(403).json({ ok: false, error: "В этом контуре используйте кабинет специалиста" });
 
   applyCors(req, res);
 
@@ -46,6 +49,10 @@ export default async function handler(req, res) {
   if (limited) return;
 
   const { action } = req.body || {};
+  if (rejectUnavailableModule(res, req.body?.module)) return;
+  if (isAnMedSupportOnlyDeployment() && typeof action === "string" && /body/i.test(action)) {
+    return res.status(403).json({ ok: false, error: "Модуль недоступен в этой сборке" });
+  }
 
   try {
     switch (action) {

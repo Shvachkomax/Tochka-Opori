@@ -1,3 +1,4 @@
+import { createVoiceRecording } from "../src/lib/voiceRecording.js";
 // Deterministic tests for truthful audio container handling across the
 // voice transcription path (client recorder helper, server MIME mapping,
 // OpenAI provider filename derivation). No network, no Supabase.
@@ -117,7 +118,7 @@ console.log("\nProvider and API source hardening");
     const code = readFileSync(file, "utf8");
     check(!code.includes('type: "audio/webm"') && !code.includes('"Content-Type": "audio/webm"'),
       `${file} no longer hardcodes audio/webm for recorded audio`);
-    check(code.includes("buildVoiceBlob"), `${file} builds recording blobs through the shared helper`);
+    check(code.includes("createVoiceRecording") && code.includes("voiceCapture.blobPromise"), `${file} builds recording blobs through the shared helper`);
   }
   const diaryCode = readFileSync("src/BodyDiary.jsx", "utf8");
   check(diaryCode.includes('"Content-Type": blob.type'), "BodyDiary sends the actual blob type as Content-Type");
@@ -125,5 +126,28 @@ console.log("\nProvider and API source hardening");
     && diaryCode.includes('"X-Access-Token": saved.accessToken'),
     "BodyDiary keeps the Health credential-pair headers");
 }
+
+class FakeMediaRecorder {
+  static supported = ["audio/mp4"];
+  static isTypeSupported(type) { return this.supported.includes(type); }
+  constructor(_stream, options = {}) { this.mimeType = options.mimeType || "audio/mp4"; this.state = "inactive"; this.listeners = {}; }
+  addEventListener(name, fn) { (this.listeners[name] ||= []).push(fn); }
+  emit(name, data = {}) { for (const fn of this.listeners[name] || []) fn({ type: name, ...data }); }
+  start() { this.state = "recording"; }
+  stop() {
+    this.state = "inactive";
+    this.emit("dataavailable", { data: new Blob(["iphone audio"], { type: this.mimeType }) });
+    this.emit("stop");
+  }
+}
+globalThis.MediaRecorder = FakeMediaRecorder;
+const capture = createVoiceRecording({});
+capture.recorder.start();
+capture.recorder.stop();
+const blob = await capture.blobPromise;
+check(blob.type === "audio/mp4", "preserves recorder MIME in final Blob");
+check(await blob.text() === "iphone audio", "collects final dataavailable payload before resolving");
+check(audioExtensionForContentType(blob.type) === "mp4", "keeps matching file extension for provider upload");
+
 
 console.log(`\nVoice audio MIME tests: ${passed} passed`);

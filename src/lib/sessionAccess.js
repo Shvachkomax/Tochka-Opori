@@ -227,3 +227,10 @@ export function withAccessToken(body, sessionId) {
   }
   return body;
 }
+
+export function withSessionAccess(body, session) {
+  if (!session?.sessionId) return body;
+  const request = { ...body, session_id: session.sessionId };
+  if (session.accessToken) request.access_token = session.accessToken;
+  return request;
+}

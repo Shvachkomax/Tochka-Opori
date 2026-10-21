@@ -3,8 +3,8 @@ import { getClientToken, clearCachedToken } from "./lib/clientToken.js";
 import { withAccessToken, getBodySession } from "./lib/sessionAccess.js";
 import { parseApiResponse, classifyHttpError, classifyNetworkError, estimateRequestSize, countPhotos } from "./lib/apiResponse.js";
 import { compressPhotosToBudget } from "./lib/photoCompress.js";
-import { buildVoiceBlob } from "./lib/voiceRecording.js";
 import PatientMedicationOrders from "./PatientMedicationOrders.jsx";
+import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 
 function getLocalDateString() {
   const d = new Date();
@@ -220,14 +220,15 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+      const voiceCapture = createVoiceRecording(stream);
+      const mr = voiceCapture.recorder;
       mediaRecorderRef.current = mr;
       audioChunksRef.current = [];
       mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = buildVoiceBlob(audioChunksRef.current, mr);
-        if (blob.size < 100) return;
+        const blob = await voiceCapture.blobPromise;
+        if (!isUsableVoiceBlob(blob)) { setSubmitError("Запись слишком короткая или пустая. Можно написать день текстом."); return; }
         try {
           let token;
           try { token = await getClientToken("body", "transcribe"); } catch {}

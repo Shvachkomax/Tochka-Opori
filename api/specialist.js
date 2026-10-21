@@ -1,3 +1,4 @@
+import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import crypto from "node:crypto";
 import { getSupabase } from "../lib/supabase.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
@@ -5,6 +6,11 @@ import { rateLimit } from "../lib/security/rate-limit.js";
 import { hashToken } from "../lib/security/council-token.js";
 import { getInviteUrl } from "../lib/config/site-url.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
+import { isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
+import { buildSpecialistClientList } from "../lib/specialist-client-list.js";
+import { normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
+import { buildSpecialistRequestContext } from "../lib/specialist/request-context.js";
 import {
   SAFE_MEDICATION_PERMISSION_KEYS,
   getMedicationOrderForOwner,
@@ -130,7 +136,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
-  const { action } = req.body || {};
+  const { action, module } = req.body || {};
+  if (rejectUnavailableModule(res, module)) return;
+  if (isAnMedSupportOnlyDeployment() && action === "getBodyClientOverview") {
+    return res.status(403).json({ ok: false, error: "Модуль недоступен в этой сборке" });
+  }
 
   try {
     switch (action) {
@@ -586,6 +596,16 @@ async function handleLogin(req, res) {
     ? [...new Set(rawModules.filter((m) => VALID_MODULES.includes(m)))]
     : [];
 
+  const membershipResult = await loadSpecialistMemberships(supabase, expert.id);
+  if (membershipResult.error) {
+    console.error("[specialist:login] membership lookup error:", membershipResult.error.code || "UNKNOWN");
+    return res.status(500).json({ ok: false, error: "Не удалось загрузить членство специалиста" });
+  }
+  const membershipsList = membershipResult.memberships;
+  if (deploymentOrganizationId() && !membershipsList.length) {
+    return res.status(401).json({ ok: false, error: GENERIC_AUTH_ERROR });
+  }
+
   // Generate opaque token
   const rawToken = crypto.randomBytes(TOKEN_BYTES).toString("hex");
   const tokenHash = hashToken(rawToken);
@@ -609,22 +629,6 @@ async function handleLogin(req, res) {
     console.error("[specialist:login] session insert error:", insertError);
     return res.status(500).json({ ok: false, error: "Ошибка сервера" });
   }
-
-  // Fetch all active memberships
-  const { data: memberships } = await supabase
-    .from("expert_organization_memberships")
-    .select("id, organization_id, role, status, organizations(name, slug, type)")
-    .eq("expert_id", expert.id)
-    .eq("status", "active");
-
-  const membershipsList = (memberships || []).map((m) => ({
-    membership_id: m.id,
-    organization_id: m.organization_id,
-    organization_name: m.organizations?.name || null,
-    organization_slug: m.organizations?.slug || null,
-    organization_type: m.organizations?.type || null,
-    role_in_organization: m.role,
-  }));
 
   // Set HttpOnly cookie — raw token never exposed to JavaScript
   res.setHeader("Set-Cookie", buildCookie(COOKIE_NAME, rawToken, COOKIE_MAX_AGE));
@@ -720,8 +724,6 @@ async function handleListClients(req, res) {
   }
 
   const supabase = getSupabase();
-  const clients = new Map(); // key → client registry item
-
   // ── 1. Primary assignments ──────────────────────────────
   let assignQuery = supabase
     .from("patient_assignments")
@@ -739,24 +741,6 @@ async function handleListClients(req, res) {
 
   const { data: assignments } = await assignQuery;
 
-  for (const a of assignments || []) {
-    const key = module === "body"
-      ? `body:${a.owner_type}:${a.owner_id}`
-      : `support:${a.public_code}`;
-    clients.set(key, {
-      client_ref: `assignment:${a.id}`,
-      module,
-      _publicCode: a.public_code,
-      _ownerType: a.owner_type,
-      _ownerId: a.owner_id,
-      relationship: "primary",
-      access_role: "owner",
-      status: a.status,
-      last_activity_at: a.updated_at,
-      _patientLabel: a.patient_label,
-    });
-  }
-
   // ── 2. Shared access ────────────────────────────────────
   let accessQuery = supabase
     .from("patient_access")
@@ -773,35 +757,15 @@ async function handleListClients(req, res) {
 
   const { data: accessRows } = await accessQuery;
 
-  for (const acc of accessRows || []) {
-    const key = module === "body"
-      ? `body:${acc.owner_type}:${acc.owner_id}`
-      : `support:${acc.public_code}`;
-    if (!clients.has(key)) {
-      clients.set(key, {
-        client_ref: `access:${acc.id}`,
-        module,
-        _publicCode: acc.public_code,
-        _ownerType: acc.owner_type,
-        _ownerId: acc.owner_id,
-        relationship: "shared",
-        access_role: acc.access_role,
-        status: acc.status,
-        last_activity_at: null,
-        _patientLabel: null,
-      });
-    }
-  }
-
   // ── 3. Resolve display names (batch) ────────────────────
   // Support: only patient_label (explicit non-clinical pseudonym).
   // Body: body_clients.display_name (user-provided, non-clinical).
   // Never read session text, AI content, clinical data.
 
   // Batch-fetch all body_clients display names for authorized owner IDs
-  const bodyOwnerIds = [...clients.values()]
-    .filter((c) => c._ownerId)
-    .map((c) => c._ownerId);
+  const bodyOwnerIds = [...new Set([...(assignments || []), ...(accessRows || [])]
+    .map((client) => client.owner_id)
+    .filter(Boolean))];
   const bodyDisplayNames = new Map(); // owner_id → display_name
   if (bodyOwnerIds.length > 0) {
     const { data: bcRows } = await supabase
@@ -817,28 +781,12 @@ async function handleListClients(req, res) {
     }
   }
 
-  const result = [];
-  for (const c of clients.values()) {
-    let display_name = "Клиент без имени";
-
-    if (module === "support" && c._patientLabel) {
-      display_name = c._patientLabel;
-    } else if (module === "body" && c._ownerId) {
-      const name = bodyDisplayNames.get(c._ownerId);
-      if (name) display_name = name;
-    }
-
-    result.push({
-      client_ref: c.client_ref,
-      module: c.module,
-      display_name,
-      relationship: c.relationship,
-      access_role: c.access_role,
-      status: c.status,
-      last_activity_at: c.last_activity_at,
-    });
-  }
-
+  const result = buildSpecialistClientList({
+    module,
+    assignments: assignments || [],
+    accessRows: accessRows || [],
+    bodyDisplayNames,
+  });
   return res.status(200).json({ ok: true, clients: result });
 }
 
@@ -1398,7 +1346,7 @@ async function handleListServiceRequests(req, res) {
 
   // Validate module entitlement if module filter provided
   if (module) {
-    const ctx = validateSpecialistContext({ memberships, organizationId: null, module, allowedModules: expert.allowed_modules });
+    const ctx = validateSpecialistContext({ memberships, organizationId: deploymentOrganizationId(), module, allowedModules: expert.allowed_modules });
     if (!ctx.ok) {
       return res.status(403).json({ ok: false, error: ctx.error });
     }
@@ -1412,13 +1360,23 @@ async function handleListServiceRequests(req, res) {
 
   let query = supabase
     .from("service_requests")
-    .select("id, module, owner_type, owner_id, specialist_id, specialist_name, request_type, service_code, service_topic, meeting_format, title, message, status, priority, due_at, scheduled_at, scheduled_place, scheduled_comment, specialist_response, client_contact, price_credits, reserved_credits, charged_credits, created_at, updated_at, answered_at, completed_at, cancelled_at")
+    .select(isAnMedSupportOnlyDeployment()
+      ? "id, module, owner_type, owner_id, session_id, specialist_id, specialist_name, request_type, service_code, service_topic, meeting_format, title, message, status, priority, due_at, scheduled_at, scheduled_place, scheduled_comment, specialist_response, client_contact, price_credits, reserved_credits, charged_credits, created_at, updated_at, answered_at, completed_at, cancelled_at"
+      : "id, module, owner_type, owner_id, specialist_id, specialist_name, request_type, service_code, service_topic, meeting_format, title, message, status, priority, due_at, scheduled_at, scheduled_place, scheduled_comment, specialist_response, client_contact, price_credits, reserved_credits, charged_credits, created_at, updated_at, answered_at, completed_at, cancelled_at")
     .eq("specialist_id", expertIdStr)
     .in("module", effectiveModules)
     .in("owner_type", effectiveModules.map((item) => item === "body" ? "anonymous_profile" : "anonymous_case"))
     .order("created_at", { ascending: false })
     .limit(100);
 
+  if (deploymentOrganizationId()) {
+    const { data: scopedSessions, error: scopeError } = await supabase.from("sessions")
+      .select("anonymous_owner_id").eq("module", "support");
+    if (scopeError) return res.status(500).json({ ok: false, error: "Не удалось проверить организацию" });
+    const owners = [...new Set((scopedSessions || []).map(row => row.anonymous_owner_id).filter(Boolean))];
+    if (!owners.length) return res.status(200).json({ ok: true, requests: [] });
+    query = query.in("owner_id", owners).eq("module", "support");
+  }
   if (status && status !== "all") {
     query = query.eq("status", status);
   }
@@ -1428,6 +1386,23 @@ async function handleListServiceRequests(req, res) {
   if (error) {
     console.error("[listServiceRequests] query error:", error.code);
     return res.status(500).json({ ok: false, error: "Не удалось загрузить запросы." });
+  }
+
+  const supportSessionIds = isAnMedSupportOnlyDeployment()
+    ? [...new Set((requests || []).filter((request) => request.module === "support" && request.session_id).map((request) => request.session_id))]
+    : [];
+  const sessionContexts = new Map();
+  if (supportSessionIds.length > 0) {
+    const { data: sessions } = await supabase.from("sessions")
+      .select("session_id, patient_text, user_report, doctor_report, created_at, json_data")
+      .eq("module", "support")
+      .in("session_id", supportSessionIds);
+    for (const session of sessions || []) {
+      sessionContexts.set(session.session_id, buildSpecialistRequestContext({
+        session,
+        crisisBlock: session.json_data?.crisis_block || null,
+      }));
+    }
   }
 
   // Batch-resolve display names for clients
@@ -1460,6 +1435,7 @@ async function handleListServiceRequests(req, res) {
     request_ref: `service-request:${r.id}`,
     module: r.module,
     client_display_name: ownerNames.get(r.owner_id) || "Клиент",
+    ...(isAnMedSupportOnlyDeployment() ? { clinical_context: sessionContexts.get(r.session_id) || null } : {}),
     request_type: r.request_type,
     service_code: r.service_code || null,
     service_topic: r.service_topic || null,
@@ -1522,6 +1498,11 @@ async function handleUpdateServiceRequest(req, res) {
     return res.status(404).json({ ok: false, error: "Запрос не найден" });
   }
 
+  if (deploymentOrganizationId()) {
+    const { data: ownedSession, error: scopeError } = await supabase.from("sessions")
+      .select("id").eq("anonymous_owner_id", request.owner_id).eq("module", "support").limit(1).maybeSingle();
+    if (scopeError || !ownedSession) return res.status(403).json({ ok: false, error: "Доступ запрещён" });
+  }
   // Ownership check: specialist can only update their own requests
   if (request.specialist_id !== expertIdStr) {
     return res.status(403).json({ ok: false, error: "Доступ запрещён" });
@@ -1727,7 +1708,15 @@ async function handleListInvitations(req, res) {
     return res.status(500).json({ ok: false, error: "Не удалось загрузить приглашения" });
   }
 
-  return res.status(200).json({ ok: true, invitations: invitations || [] });
+  const currentInvitations = isAnMedSupportOnlyDeployment() ? normalizeInvitationStatuses(invitations || []) : (invitations || []);
+  const expiredIds = currentInvitations.filter((invitation, index) => invitation.status === "expired" && invitations?.[index]?.status === "pending").map((invitation) => invitation.id);
+  if (isAnMedSupportOnlyDeployment() && expiredIds.length > 0) {
+    await supabase.from("patient_specialist_invitations")
+      .update({ status: "expired", updated_at: new Date().toISOString() })
+      .in("id", expiredIds)
+      .eq("status", "pending");
+  }
+  return res.status(200).json({ ok: true, invitations: currentInvitations });
 }
 
 async function resolveInvitationPatientOwner(supabase, invitation) {
@@ -1965,6 +1954,16 @@ export async function authorizeSpecialist(req) {
     : [];
   expert.allowed_modules = allowedModules;
 
+  const membershipResult = await loadSpecialistMemberships(supabase, expert.id);
+  if (membershipResult.error) {
+    console.error("[specialist:auth] membership lookup error:", membershipResult.error.code || "UNKNOWN");
+    return { status: 500, error: "Не удалось загрузить членство специалиста" };
+  }
+
+  if (deploymentOrganizationId() && !membershipResult.memberships.length) {
+    return { status: 403, error: "Нет доступа к этой организации" };
+  }
+
   // Update last_seen_at (non-blocking, don't fail auth if this errors)
   supabase
     .from("specialist_sessions")
@@ -1973,25 +1972,9 @@ export async function authorizeSpecialist(req) {
     .then(() => {})
     .catch(() => {});
 
-  // Fetch memberships
-  const { data: memberships } = await supabase
-    .from("expert_organization_memberships")
-    .select("id, organization_id, role, status, organizations(name, slug, type)")
-    .eq("expert_id", expert.id)
-    .eq("status", "active");
-
-  const membershipsList = (memberships || []).map((m) => ({
-    membership_id: m.id,
-    organization_id: m.organization_id,
-    organization_name: m.organizations?.name || null,
-    organization_slug: m.organizations?.slug || null,
-    organization_type: m.organizations?.type || null,
-    role_in_organization: m.role,
-  }));
-
   return {
     expert,
-    memberships: membershipsList,
+    memberships: membershipResult.memberships,
     tokenHash,
     sessionId: session.id,
   };
@@ -2000,6 +1983,8 @@ export async function authorizeSpecialist(req) {
 // ── CONTEXT VALIDATION (for future patient queries) ───────
 
 export function validateSpecialistContext({ memberships, organizationId, module, allowedModules }) {
+  const org = deploymentOrganizationId();
+  if (org && organizationId !== org) return { ok: false, error: "Нет доступа к указанной организации" };
   const validModules = ["support", "body"];
   if (!validModules.includes(module)) {
     return { ok: false, error: "Некорректный модуль" };

@@ -1,3 +1,4 @@
+import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import { getSupabase } from "../lib/supabase.js";
 import { createClient } from "@supabase/supabase-js";
 import { maskSensitiveData, getPrivacySafeMode, maskText } from "../lib/sanitize.js";
@@ -5,6 +6,7 @@ import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
 import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback } from "../lib/conversation.js";
 import { readFileSync, existsSync } from "node:fs";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
+import { rejectUnavailableModule } from "../lib/security/module-availability.js";
 
 const ALLOWED_STATUSES = ["pending", "approved", "rejected", "needs_review", "local_auto_saved"];
 const TRAINING_STATUSES = ["new", "reviewed", "needs_prompt_update", "approved_for_learning", "rejected", "archived"];
@@ -27,6 +29,7 @@ async function getSupabaseClient() {
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
+  if (deploymentOrganizationId() && req.body?.action !== "save") return res.status(403).json({ ok: false, error: "В этом контуре используйте кабинет специалиста" });
 
   applyCors(req, res);
 
@@ -35,6 +38,7 @@ export default async function handler(req, res) {
   }
 
   const { action } = req.body || {};
+  if (rejectUnavailableModule(res, req.body?.module)) return;
 
   try {
     switch (action) {

@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, Component } from "react";
+import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
 import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback, buildConversationPairs } from "../lib/conversation.js";
 import BodyIntake from "./BodyIntake.jsx";
@@ -11,12 +12,12 @@ import BodyServiceRequests from "./BodyServiceRequests.jsx";
 import MedicationCard from "./MedicationCard.jsx";
 import PatientMedicationOrders from "./PatientMedicationOrders.jsx";
 import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
-import { saveBodySession, saveBodyDisplayResult, saveSupportSession, getBodySession, getSupportSession, clearBodySession, clearSupportSession, withAccessToken } from "./lib/sessionAccess.js";
-import { buildVoiceBlob } from "./lib/voiceRecording.js";
+import { saveBodySession, saveBodyDisplayResult, saveSupportSession, getBodySession, getSupportSession, clearBodySession, clearSupportSession, withAccessToken, withSessionAccess } from "./lib/sessionAccess.js";
 import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
 import ExpertInvitePage from "./pages/expert/ExpertInvitePage.jsx";
 import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
 import SpecialistCabinet from "./pages/specialist/SpecialistCabinet.jsx";
+import { APP_BRAND } from "./lib/appBrand.js";
 
 class AdminErrorBoundary extends Component {
   constructor(props) {
@@ -53,6 +54,8 @@ export default function App() {
   const [text, setText] = useState("");
   const [questions, setQuestions] = useState(null);
   const [answers, setAnswers] = useState({});
+  const [crisisMode, setCrisisMode] = useState(false);
+  const [crisisBlock, setCrisisBlock] = useState(null);
   const [result, setResult] = useState(null);
   const [phase, setPhase] = useState("input");
   const [supportScreen, setSupportScreen] = useState("landing");
@@ -156,6 +159,7 @@ export default function App() {
   const [supportViewingSessionData, setSupportViewingSessionData] = useState(null);
   const [supportSessionLoading, setSupportSessionLoading] = useState(false);
   const [supportNewRequestOpen, setSupportNewRequestOpen] = useState(false);
+  const [supportRequestSessionId, setSupportRequestSessionId] = useState(null);
   const [supportNewRequest, setSupportNewRequest] = useState({ service_code: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
   const [supportRequestSubmitting, setSupportRequestSubmitting] = useState(false);
   const [accessExpanded, setAccessExpanded] = useState(false);
@@ -185,7 +189,7 @@ export default function App() {
   const [displayNameInput, setDisplayNameInput] = useState("");
 
   const [activeModule, setActiveModule] = useState(() => {
-    if (typeof window !== "undefined") {
+    if (!APP_BRAND.isSupportPilot && typeof window !== "undefined") {
       const host = window.location.hostname;
       if (host === "health.tochka-opori.online" || host.startsWith("health.")) return "body";
       const params = new URLSearchParams(window.location.search);
@@ -1245,7 +1249,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       let effectiveSessionId;
       let effectiveAccessToken;
 
-      if (accessToken && saved.sessionId) {
+      if (accessToken && saved.sessionId && !(APP_BRAND.isSupportPilot && enteredCode)) {
         // Same device: use stored access token.
         const body = { action: "getCabinet", sessionId: saved.sessionId, access_token: accessToken };
         const cabinetRes = await fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -1294,6 +1298,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         wallet: cabinetData.wallet || null,
         specialist: cabinetData.specialist || null,
         service_requests: cabinetData.service_requests || [],
+        match_requests: APP_BRAND.isSupportPilot ? cabinetData.match_requests || [] : [],
         unread_message_count: cabinetData.unread_message_count || 0,
         display_name: cabinetData.display_name || null,
         medication_cards: cabinetData.medication_cards || [],
@@ -1311,16 +1316,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setQuickChatMessages([]);
       setQuickChatInput("");
       setQuickChatShowHistory(false);
+      return true;
     } catch (e) {
       const msg = e.message || "";
       let userMsg = "Не удалось открыть кабинет. Попробуйте ещё раз.";
-      if (msg.includes("код продолжения") || msg.includes("continuation") || msg.includes("401") || msg.includes("403")) {
+      if (APP_BRAND.isSupportPilot && msg.includes("старой версии")) {
+        userMsg = msg;
+      } else if (msg.includes("код продолжения") || msg.includes("continuation") || msg.includes("401") || msg.includes("403")) {
         userMsg = "Проверьте код продолжения.";
       } else if (msg.includes("fetch") || msg.includes("NetworkError") || msg.includes("network")) {
         userMsg = "Не удалось связаться с сервисом. Попробуйте ещё раз.";
       }
       setContinuationCodeError(userMsg);
-      showToast(userMsg, "error");
+      if (!(APP_BRAND.isSupportPilot && msg.includes("старой версии"))) showToast(userMsg, "error");
+      return false;
     } finally {
       setCabinetLoading(false);
     }
@@ -1515,6 +1524,28 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     const latestReport = supportCabinet?.latest_report || {};
     setSessionId(saved.sessionId);
     setPublicCode(latest?.publicCode || supportCabinet?.public_code || saved.sessionId);
+    if (APP_BRAND.isSupportPilot && latestReport.crisisBlock?.status === "safety_check_in_progress") {
+      const safetyQuestions = latestReport.crisisBlock.questions || [
+        "Вы сейчас в безопасности? Есть ли риск, что вы причините себе вред в ближайшее время?",
+        "Есть ли у вас сейчас намерение или конкретный план причинить себе вред?",
+        "Вы сейчас один/одна? Кто может побыть рядом или поговорить с вами?",
+        "Кому вы можете позвонить или написать прямо сейчас?",
+      ];
+      setText(latestReport.crisisBlock.initial_message || latest?.summary || "");
+      setIsContinuation(false);
+      setPreviousPatientReport("");
+      setPreviousDoctorReport("");
+      setConversationHistory([{ role: "assistant", questions: safetyQuestions }]);
+      setDialogDepth(1);
+      setAnswers({});
+      setQuestions(safetyQuestions);
+      setResult(null);
+      setCrisisMode(true);
+      setCrisisBlock(latestReport.crisisBlock);
+      setPhase("questions");
+      setSupportScreen("questions");
+      return;
+    }
     setIsContinuation(true);
     setPreviousPatientReport(latestReport.user_report || "");
     setPreviousDoctorReport("");
@@ -1526,6 +1557,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setAnswers({});
     setQuestions(null);
     setResult(null);
+    setCrisisMode(false);
+    setCrisisBlock(null);
     setFollowUpAnswers({});
     setPhase("followup");
     setSupportScreen("followup");
@@ -1650,6 +1683,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 
   // Submit a new support service request
+  function openSupportRequestForSession(targetSessionId = sessionId) {
+    setSupportRequestSessionId(targetSessionId || null);
+    setSupportNewRequestOpen(true);
+  }
+
   async function submitSupportServiceRequest() {
     const saved = getSupportSession();
     if (!saved.sessionId || !saved.accessToken) {
@@ -1671,7 +1709,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "createSupportServiceRequest",
-          session_id: saved.sessionId,
+          session_id: APP_BRAND.isSupportPilot ? supportRequestSessionId || saved.sessionId : saved.sessionId,
           access_token: saved.accessToken,
           service_code: supportNewRequest.service_code,
           reason: supportNewRequest.reason,
@@ -1688,6 +1726,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       }
       showToast("Запрос отправлен специалисту.", "success");
       setSupportNewRequestOpen(false);
+      setSupportRequestSessionId(null);
       setSupportNewRequest({ service_code: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
       // Refresh cabinet to show new request
       await refreshSupportCabinet();
@@ -1743,6 +1782,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           wallet: data.wallet || null,
           specialist: data.specialist || null,
           service_requests: data.service_requests || [],
+          match_requests: APP_BRAND.isSupportPilot ? data.match_requests || [] : [],
           unread_message_count: data.unread_message_count || 0,
           display_name: data.display_name || null,
           medication_cards: data.medication_cards || [],
@@ -2283,6 +2323,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 
   async function transcribeSupportAudio(audioBlob, currentSession) {
+    if (!isUsableVoiceBlob(audioBlob)) throw new Error("Запись слишком короткая или пустая. Попробуйте ещё раз.");
     const mod = "support";
     let token;
     try { token = await getClientToken(mod, "transcribe"); } catch {}
@@ -2351,7 +2392,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         throw new Error("Сессия истекла. Войдите снова по коду продолжения.");
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const voiceCapture = createVoiceRecording(stream);
+      const recorder = voiceCapture.recorder;
       cabinetVoiceStreamRef.current = stream;
       cabinetVoiceRecorderRef.current = recorder;
       cabinetVoiceChunksRef.current = [];
@@ -2370,7 +2412,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         }
         if (cabinetVoiceIgnoreStopRef.current) return;
 
-        const audioBlob = buildVoiceBlob(cabinetVoiceChunksRef.current, recorder);
+        const audioBlob = await voiceCapture.blobPromise;
         setCabinetVoiceTranscribing(true);
         try {
           const data = await transcribeSupportAudio(audioBlob, saved);
@@ -2453,7 +2495,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      const recorder = new MediaRecorder(stream);
+      const voiceCapture = createVoiceRecording(stream);
+      const recorder = voiceCapture.recorder;
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
@@ -2466,7 +2509,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
 
-        const audioBlob = buildVoiceBlob(audioChunksRef.current, recorder);
+        const audioBlob = await voiceCapture.blobPromise;
 
         setTranscribing(true);
 
@@ -2541,7 +2584,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      const recorder = new MediaRecorder(stream);
+      const voiceCapture = createVoiceRecording(stream);
+      const recorder = voiceCapture.recorder;
       questionMediaRecorderRef.current = recorder;
       questionAudioChunksRef.current = [];
 
@@ -2558,7 +2602,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           clearInterval(questionTimerRef.current);
         }
 
-        const audioBlob = buildVoiceBlob(questionAudioChunksRef.current, recorder);
+        const audioBlob = await voiceCapture.blobPromise;
 
         setQuestionTranscribingIndex(index);
 
@@ -2634,7 +2678,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      const recorder = new MediaRecorder(stream);
+      const voiceCapture = createVoiceRecording(stream);
+      const recorder = voiceCapture.recorder;
       crisisMediaRecorderRef.current = recorder;
       crisisAudioChunksRef.current = [];
 
@@ -2651,11 +2696,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           clearInterval(crisisTimerRef.current);
         }
 
-        const audioBlob = buildVoiceBlob(crisisAudioChunksRef.current, recorder);
+        const audioBlob = await voiceCapture.blobPromise;
 
         setCrisisTranscribing(true);
 
         try {
+          if (!isUsableVoiceBlob(audioBlob)) throw new Error("Запись слишком короткая или пустая. Попробуйте ещё раз.");
           const mod = "support";
           let token;
           try { token = await getClientToken(mod, "transcribe"); } catch {}
@@ -2748,10 +2794,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setError("");
     setQuestions(null);
 
-    // Ensure session exists before first analyze call
-    if (!sessionId && activeModule === "support") {
+    let analyzeSessionId = sessionId;
+    let analyzeSessionAccess = null;
+
+    // Use the returned session context immediately; React state updates are asynchronous.
+    if (activeModule === "support" && !analyzeSessionId) {
       try {
         const sessionData = await ensureStartSession();
+        analyzeSessionId = sessionData.sessionId;
+        analyzeSessionAccess = sessionData;
         setSessionId(sessionData.sessionId);
 
         // Save display_name immediately after session creation
@@ -2767,6 +2818,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         setLoading(false);
         return;
       }
+    } else if (activeModule === "support") {
+      const current = sessionRef.current?.sessionId === analyzeSessionId
+        ? sessionRef.current
+        : getSupportSession();
+      if (current.sessionId === analyzeSessionId) analyzeSessionAccess = current;
     }
 
     if (dialogDepth >= 3 && activeModule === "support") {
@@ -2783,7 +2839,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const res = await fetchWithClientToken("/api/analyze", mod, "analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withSessionAccess({
           text: inputText,
           answers: dialogDepth === 0 ? {} : answers,
           conversationHistory,
@@ -2796,9 +2852,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           supportPlan,
           voiceObservations,
           module: mod,
-          session_id: sessionId || undefined,
           followup_answered_topics: followupAnsweredTopics || undefined,
-        }),
+          crisis_mode: crisisMode,
+        }, analyzeSessionId ? {
+          sessionId: analyzeSessionId,
+          accessToken: analyzeSessionAccess?.accessToken,
+        } : null)),
       });
 
       if (!res.ok) {
@@ -2811,7 +2870,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
       const data = await res.json();
 
-      if (data.type === "questions") {
+      if (data.type === "crisis_questions") {
+        setCrisisMode(true);
+        setCrisisBlock(data.crisis || { status: "safety_check_in_progress", emergency_contacts: ["112", "103"] });
+        setQuestions(data.questions || []);
+        setConversationHistory([{ role: "assistant", questions: data.questions || [] }]);
+        setAnswers({});
+        setDialogDepth((d) => d + 1);
+        setPhase("questions");
+        setSupportScreen("questions");
+      } else if (data.type === "questions") {
         const qs = Array.isArray(data.questions)
           ? data.questions.filter(Boolean)
           : [];
@@ -2863,6 +2931,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         await pollReportStatus(sid, (status) => finalizeReportFromStatus(status, inputText));
       } else if (data.type === "final") {
         setResult(data.report || "");
+        if (data.crisis) setCrisisBlock(data.crisis);
         if (data._debug) setDebugInfo(data._debug);
         if (data.care_recommendation) setCareRecommendation(data.care_recommendation);
         setActiveTab("user");
@@ -3253,6 +3322,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setPhase("input");
     setSupportScreen("landing");
     setQuestions(null);
+    setCrisisMode(false);
+    setCrisisBlock(null);
     setAnswers({});
     setResult(null);
     setText("");
@@ -4731,7 +4802,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const adminModuleRoute = adminSubPage || (typeof window !== "undefined"
     ? window.location.pathname === "/admin/body" ? "body" : window.location.pathname === "/admin/council" ? "council" : "support"
     : "support");
-  const isDedicatedSubdomain = typeof window !== "undefined" && (
+  const isDedicatedSubdomain = !APP_BRAND.isSupportPilot && typeof window !== "undefined" && (
     window.location.hostname === "health.tochka-opori.online" || window.location.hostname.startsWith("health.") ||
     new URLSearchParams(window.location.search).get("module") === "body"
   );
@@ -4740,9 +4811,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   );
   const showModuleSwitcher = isDev || adminRole === "super";
 
-  // Update document title based on subdomain
+  // Keep the AnMed pilot's presentation separate from the module selection.
   useEffect(() => {
-    document.title = isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : "Точка опоры";
+    document.title = APP_BRAND.isSupportPilot
+      ? APP_BRAND.title
+      : isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.title;
   }, [isDedicatedSubdomain]);
 
   const s = {
@@ -9731,6 +9804,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     return <SpecialistCabinet />;
   }
 
+  // Keep the legacy expert surface out of the AnMed pilot; its staff entry is /specialist.
+  if (APP_BRAND.isSupportPilot && typeof window !== "undefined" && window.location.pathname.match(/^\/expert\/?$/)) {
+    window.location.replace("/specialist");
+    return null;
+  }
+
   // --- Expert Cabinet page (/expert) ---
   if (typeof window !== "undefined" && window.location.pathname.match(/^\/expert\/?$/)) {
     return <ExpertCabinet />;
@@ -9856,23 +9935,39 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 `}</style>
           <div style={s.wrap}>
-        <header style={{ ...s.header, marginBottom: (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
-          <div
-            style={{ display: "flex", alignItems: "center", gap: 12, cursor: activeModule === "support" && supportScreen !== "landing" ? "pointer" : "default" }}
-            onClick={activeModule === "support" && supportScreen !== "landing" ? goToSupportLanding : undefined}
-            title={activeModule === "support" && supportScreen !== "landing" ? "На главную" : undefined}
-          >
-            <img
-              src="/logo-tochka-opory-header.png"
-              alt={isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : "Точка опоры"}
-              className="app-logo"
-              style={{ display: "block", flexShrink: 0, objectFit: "contain", height: 96, width: "auto" }}
-            />
-            <div>
-              <div style={s.logo}>{isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : "Точка опоры"}</div>
-              {!isDedicatedSubdomain && <div style={s.sub}>Анонимно. Безопасно. Можно просто поговорить.</div>}
+        <header style={{ ...s.header, marginBottom: APP_BRAND.isSupportPilot ? 28 : (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
+          {APP_BRAND.isSupportPilot ? (
+            <a
+              href="/"
+              aria-label={`${APP_BRAND.name} — на главную`}
+              className="app-logo-link"
+              style={{ display: "flex", alignItems: "center", gap: 12, color: "inherit", textDecoration: "none" }}
+            >
+              <div aria-label={APP_BRAND.name} style={{ minWidth: 190 }}>
+                <div style={{ ...s.logo, color: "#14264A", fontSize: 34, fontWeight: 900, letterSpacing: "-0.04em" }}>
+                  {APP_BRAND.isKgmu ? <span style={{ color: "#176B66", letterSpacing: "-0.025em" }}>Казанский ГМУ</span> : <>Ан<span style={{ color: "#E63E4B" }}>Мед</span></>}
+                </div>
+                <div style={s.sub}>{APP_BRAND.subtitle}</div>
+              </div>
+            </a>
+          ) : (
+            <div
+              style={{ display: "flex", alignItems: "center", gap: 12, cursor: activeModule === "support" && supportScreen !== "landing" ? "pointer" : "default" }}
+              onClick={activeModule === "support" && supportScreen !== "landing" ? goToSupportLanding : undefined}
+              title={activeModule === "support" && supportScreen !== "landing" ? "На главную" : undefined}
+            >
+              <img
+                src="/logo-tochka-opory-header.png"
+                alt={isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.name}
+                className="app-logo"
+                style={{ display: "block", flexShrink: 0, objectFit: "contain", height: 96, width: "auto" }}
+              />
+              <div>
+                <div style={s.logo}>{isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.name}</div>
+                {!isDedicatedSubdomain && <div style={s.sub}>{APP_BRAND.subtitle}</div>}
+              </div>
             </div>
-          </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {!isDedicatedSubdomain && (<>
             {!(activeModule === "support" && supportScreen !== "landing") && (
@@ -9892,6 +9987,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </>)}
           </div>
         </header>
+
+        {APP_BRAND.isSupportPilot && (
+          <div role="note" style={{ margin: "0 0 32px", padding: "12px 16px", borderRadius: 12, background: "#FFF1F1", border: "1px solid #E9B4B8", color: "#7D2530", fontSize: 14, lineHeight: 1.5 }}>
+            {APP_BRAND.pilotNotice}
+          </div>
+        )}
 
         {/* Invite banners — only on landing page, never overlay cabinet */}
         {phase !== "cabinet" && supportScreen === "landing" && inviteChecking && (
@@ -10565,7 +10666,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           <section style={s.card} className="app-card">
             <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif" }}>
               {phase === "questions"
-                ? `Раунд уточнения ${dialogDepth}`
+                ? crisisMode ? "Сначала проверим безопасность" : `Раунд уточнения ${dialogDepth}`
                 : activeModule === "body"
                   ? "Готовы начать?"
                   : "С чего начать?"}
@@ -10667,6 +10768,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </>
               ) : phase === "questions" ? (
                 <>
+                  {crisisMode && APP_BRAND.isSupportPilot && (
+                    <div role="alert" aria-live="assertive" style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: "#fff1ed", border: "2px solid #b85c4a", color: "#4a2822", lineHeight: 1.55 }}>
+                      <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>Сначала — ваша безопасность</div>
+                      <div style={{ marginBottom: 12 }}>Если вы можете причинить себе вред или не уверены, что останетесь в безопасности, позвоните сейчас 112 или 103. Перейдите туда, где есть люди, и попросите близкого побыть рядом. Не ждите ответа сервиса.</div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        {["112", "103"].map((number) => (
+                          <a key={number} href={`tel:${number}`} aria-label={`Позвонить ${number}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 112, minHeight: 48, padding: "10px 18px", borderRadius: 10, background: "#9f3425", color: "#fff", fontWeight: 800, textDecoration: "none" }}>
+                            Позвонить {number}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {questions?.map((q, index) => (
                     <div key={index} style={s.questionCard}>
                       <div style={s.questionText}>
@@ -10675,6 +10789,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
                       <textarea
                         style={s.answerInput}
+                        aria-label={`Ответ на вопрос ${index + 1}: ${q}`}
                         value={answers[index] || ""}
                         onChange={(e) =>
                           setAnswers({
@@ -10731,7 +10846,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   >
                     {loading
                       ? loadingMessage || "Анализируем..."
-                      : dialogDepth < 3
+                      : crisisMode && APP_BRAND.isSupportPilot
+                        ? "Продолжить"
+                        : dialogDepth < 3
                         ? "Продолжить уточнение"
                         : "Получить предварительный отчёт"}
                   </button>
@@ -10744,6 +10861,22 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             {phase === "report" && result && (
               <div style={s.result}>
                 <h2 style={{ marginTop: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 22 }}>Результат разбора</h2>
+
+                {APP_BRAND.isSupportPilot && crisisMode && (
+                  <div role="alert" aria-live="assertive" style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: "#fff1ed", border: "2px solid #b85c4a", color: "#4a2822", lineHeight: 1.55 }}>
+                    <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>План безопасности и срочная помощь</div>
+                    <p style={{ margin: "0 0 12px" }}>{crisisBlock?.emergencyRecommended
+                      ? "Безопасность сейчас не подтверждена или есть непосредственная опасность. Позвоните 112 или 103 сейчас и попросите человека, которому доверяете, оставаться рядом."
+                      : "Вы сообщили, что сейчас в безопасности. Свяжитесь сегодня с близким человеком и специалистом. Если опасность появится или безопасность станет неясной — звоните 112 или 103."}</p>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      {["112", "103"].map((number) => (
+                        <a key={number} href={`tel:${number}`} aria-label={`Позвонить ${number}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 112, minHeight: 48, padding: "10px 18px", borderRadius: 10, background: "#9f3425", color: "#fff", fontWeight: 800, textDecoration: "none" }}>
+                          Позвонить {number}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {continuationCode && justFinishedSession && reportSource === "generated" && (
                   <div style={{
@@ -10916,7 +11049,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 {careRecommendation && (
                   <div style={{ marginTop: 20 }}>
                     {/* URGENT_HELP block */}
-                    {careRecommendation.level === "urgent_help" && (
+                    {careRecommendation.level === "urgent_help" && !(APP_BRAND.isSupportPilot && crisisMode) && (
                       <div style={{
                         background: "rgba(184,92,74,.12)", border: "2px solid #B85C4A",
                         borderRadius: 18, padding: 20, marginBottom: 16,
@@ -11312,7 +11445,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             const latestDate = latestSession?.createdAt
               ? new Date(latestSession.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
               : "—";
-            const wallet = supportCabinet.wallet?.visible ? supportCabinet.wallet : null;
+            const wallet = !APP_BRAND.isSupportPilot && supportCabinet.wallet?.visible ? supportCabinet.wallet : null;
 
             return (
               <section style={{ width: "100%" }} className="app-card-support">
@@ -11361,6 +11494,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         {latestSession.status === "followup" ? "продолжение" : "первое обращение"}
                       </div>
                       <div style={{ fontSize: 13, color: "#5F574F", marginBottom: 14 }}>{latestSession.summary?.slice(0, 120)}{latestSession.summary?.length > 120 ? "…" : ""}</div>
+                      {APP_BRAND.isSupportPilot && supportCabinet.latest_report?.crisisBlock && (
+                        <div role="alert" style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "#fff1ed", border: "2px solid #b85c4a", color: "#4a2822", fontSize: 13, lineHeight: 1.5 }}>
+                          <strong>Блок безопасности сохранён.</strong> Если вы сейчас можете быть в опасности или не уверены, звоните 112 или 103 и попросите доверенного человека побыть рядом.
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                            {["112", "103"].map((number) => <a key={number} href={`tel:${number}`} aria-label={`Позвонить ${number}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 104, minHeight: 48, padding: "8px 14px", borderRadius: 9, background: "#9f3425", color: "#fff", fontWeight: 800, textDecoration: "none" }}>Позвонить {number}</a>)}
+                          </div>
+                        </div>
+                      )}
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <button style={{ ...s.primary, fontSize: 13, padding: "8px 14px", flex: 1 }} onClick={startSupportFollowUp}>
                           Продолжить разговор
@@ -11369,6 +11510,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           Открыть отчёт
                         </button>
                       </div>
+                      {APP_BRAND.isSupportPilot && (
+                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(46,42,37,.1)" }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#5F7D6C", marginBottom: 6 }}>Код продолжения</div>
+                          {regeneratedCode ? (
+                            <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 13, wordBreak: "break-all", marginBottom: 8 }}>{regeneratedCode}</div>
+                          ) : (
+                            <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 8 }}>Создайте код, чтобы открыть беседы на другом устройстве. Создание заменит прежний код.</div>
+                          )}
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button style={{ ...s.secondary, fontSize: 12, minHeight: 42 }} onClick={regenerateSupportContinuationCode}>Создать новый код продолжения</button>
+                            {regeneratedCode && <button style={{ ...s.secondary, fontSize: 12, minHeight: 42 }} onClick={() => { navigator.clipboard.writeText(regeneratedCode); showToast("Код скопирован"); }}>Скопировать код</button>}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Поговорим? — Quick AI Chat */}
@@ -11404,7 +11559,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                               {/* CTA buttons for navigation/handoff/error intents */}
                               {(msg.ai_response?.cta === "service_request" || msg.ai_response?.intent_type === "handoff") && (
                                 <div style={{ marginTop: 8 }}>
-                                  <button style={{ fontSize: 12, padding: "6px 12px", background: "#7D9A89", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }} onClick={() => setSupportNewRequestOpen(true)}>
+                                  <button style={{ fontSize: 12, padding: "6px 12px", background: "#7D9A89", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }} onClick={() => openSupportRequestForSession()}>
                                     Связаться со специалистом
                                   </button>
                                 </div>
@@ -11714,6 +11869,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             </div>
                           )}
                         </div>
+                        {APP_BRAND.isSupportPilot && (
+                          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }} aria-label="Отметки состояния по датам и связанным разговорам">
+                            {chartData.map((entry) => {
+                              const sameDaySession = supportCabinet.sessions?.find((session) => String(session.createdAt || "").slice(0, 10) === entry.checkin_date);
+                              return (
+                                <div key={entry.id || entry.checkin_date} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, padding: "8px 10px", borderRadius: 8, background: "#fff", fontSize: 12, color: "#5F574F" }}>
+                                  <span>{new Date(`${entry.checkin_date}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}: состояние {entry.wellbeing_score > 0 ? "+" : ""}{entry.wellbeing_score}/5{entry.anxiety_score != null ? ` · напряжение ${entry.anxiety_score}/10` : ""}</span>
+                                  {sameDaySession && <button style={{ ...s.secondary, fontSize: 11, minHeight: 36, padding: "6px 10px" }} onClick={() => openSupportSessionView(sameDaySession.sessionId)}>Отчёт разговора за этот день</button>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -11734,6 +11902,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       {supportPractices.filter(p => p.status === "active").slice(0, 4).map((p) => {
                         const statusLabels = { not_tried: "Не пробовал(а)", tried: "Пробовал(а)", helped: "Помогло", not_helpful: "Не подошло" };
                         const statusColors = { not_tried: "#7A7268", tried: "#5F7D6C", helped: "#3A6B4A", not_helpful: "#8B6B4A" };
+                        const sourceSessions = APP_BRAND.isSupportPilot ? (p.source_session_ids || []).map((id) => supportCabinet.sessions?.find((session) => session.sessionId === id)).filter(Boolean) : [];
                         return (
                           <div key={p.practice_key} style={{
                             background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
@@ -11741,6 +11910,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           }} onClick={() => setPracticeDetailKey(p.practice_key)}>
                             <div style={{ fontWeight: 700, fontSize: 14, color: "#2E2A25", marginBottom: 4 }}>{p.title}</div>
                             <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 6, lineHeight: 1.4 }}>{p.description?.slice(0, 100)}{p.description?.length > 100 ? "…" : ""}</div>
+                            {sourceSessions.length > 0 && (
+                              <div style={{ margin: "8px 0", padding: "8px 10px", borderRadius: 8, background: "#fff", fontSize: 11, color: "#5F574F" }}>
+                                Предложена в разговоре от {new Date(sourceSessions[0].createdAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+                                <button style={{ display: "block", marginTop: 6, padding: 0, background: "none", border: 0, color: "#5F7D6C", textDecoration: "underline", cursor: "pointer", font: "inherit" }} onClick={(event) => { event.stopPropagation(); openSupportSessionView(sourceSessions[0].sessionId); }}>
+                                  Открыть разговор
+                                </button>
+                              </div>
+                            )}
                             {p.duration_minutes && (
                               <div style={{ fontSize: 11, color: "#8a7e72", marginBottom: 8 }}>{p.duration_minutes} мин</div>
                             )}
@@ -11806,9 +11983,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         const practice = supportPractices.find(p => p.practice_key === practiceDetailKey);
                         if (!practice) return null;
                         const recommendedDate = practice.first_recommended_at ? new Date(practice.first_recommended_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+                        const sourceSessions = APP_BRAND.isSupportPilot ? (practice.source_session_ids || []).map((id) => supportCabinet.sessions?.find((session) => session.sessionId === id)).filter(Boolean) : [];
                         return (
                           <div>
                             <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>Рекомендовано: {recommendedDate}</div>
+                            {sourceSessions.map((sourceSession) => (
+                              <button key={sourceSession.sessionId} style={{ ...s.secondary, display: "block", marginBottom: 8, minHeight: 40 }} onClick={() => openSupportSessionView(sourceSession.sessionId)}>
+                                Предложена в разговоре от {new Date(sourceSession.createdAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} · открыть
+                              </button>
+                            ))}
                             {practice.description && <div style={{ fontSize: 14, color: "#2E2A25", lineHeight: 1.6, marginBottom: 12 }}>{practice.description}</div>}
                             {practice.duration_minutes && (
                               <div style={{ fontSize: 13, color: "#5F7D6C", marginBottom: 12 }}>⏱ {practice.duration_minutes} минут</div>
@@ -11880,7 +12063,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           {supportCabinet.specialist.organizationName}
                         </div>
                       )}
-                      <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => setSupportNewRequestOpen(true)}>
+                      <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => openSupportRequestForSession(latestSession?.sessionId)}>
                         Связаться
                       </button>
                     </div>
@@ -11892,6 +12075,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       <div style={{ fontSize: 14, color: "#5F574F", marginBottom: 6 }}>
                         У вас пока нет закреплённого специалиста.
                       </div>
+                      {APP_BRAND.isSupportPilot && (
+                        <div style={{ fontSize: 12, color: "#7A7268", lineHeight: 1.5, marginBottom: 10 }}>
+                          Нажимая «Запросить специалиста», вы просите подобрать специалиста для этого разговора. До отправки запроса сведения о нём врачу не передаются.
+                        </div>
+                      )}
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px" }} onClick={() => { setPatientInviteModalOpen(true); setPatientInviteCreated(null); }}>
                           Пригласить своего специалиста
@@ -11901,12 +12089,28 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           onClick={async () => { await createMatchRequest(); }}
                           disabled={matchRequestSending}
                         >
-                          {matchRequestSending ? "Отправка..." : "Подобрать специалиста"}
+                          {matchRequestSending ? "Отправка..." : APP_BRAND.isSupportPilot ? "Запросить специалиста" : "Подобрать специалиста"}
                         </button>
                       </div>
                     </div>
                   )}
                 </div>
+
+                {APP_BRAND.isSupportPilot && supportCabinet.match_requests?.length > 0 && (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 10 }}>Статус запроса специалисту</div>
+                    {supportCabinet.match_requests.slice(0, 3).map((request) => (
+                      <div key={request.id} style={{ padding: 12, borderRadius: 12, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", marginBottom: 8 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#2E2A25" }}>
+                          {request.status === "assigned" ? `Специалист назначен${request.assigned_expert_name ? `: ${request.assigned_expert_name}` : ""}` : request.status === "cancelled" ? "Запрос отменён" : "Запрос отправлен — ожидайте подбора специалиста"}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#7A7268", marginTop: 4 }}>
+                          {request.status === "assigned" ? "Следующий шаг: откройте раздел «Специалист» или продолжите разговор в кабинете." : request.status === "cancelled" ? "Если помощь специалиста всё ещё нужна, отправьте новый запрос." : "После назначения специалист появится в этом кабинете. До вашего запроса сведения о разговоре ему не передаются."}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* ROW: Приглашения от специалистов */}
                 {!supportCabinet.specialist && patientInvitations.filter(i => i.direction === "specialist_to_patient" && i.status === "pending").length > 0 && (
@@ -11945,13 +12149,27 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   {supportCabinet.service_requests?.length > 0 ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {supportCabinet.service_requests.map((req) => {
-                        const statusLabels = {
-                          submitted: "Новый", new: "Новый",
-                          accepted: "Принят",
+                        const statusLabels = APP_BRAND.isSupportPilot ? {
+                          submitted: "Отправлен — ожидает ответа", new: "Отправлен — ожидает ответа",
+                          accepted: "Принят специалистом",
+                          needs_clarification: "Нужно уточнение",
                           scheduled: "Запланирован",
                           answered: "Получен ответ",
                           completed: "Завершён",
                           cancelled: "Отменён",
+                        } : {
+                          submitted: "Новый", new: "Новый", accepted: "Принят", scheduled: "Запланирован",
+                          answered: "Получен ответ", completed: "Завершён", cancelled: "Отменён",
+                        };
+                        const nextSteps = {
+                          submitted: "Запрос передан специалисту. Статус и ответ появятся здесь.",
+                          new: "Запрос передан специалисту. Статус и ответ появятся здесь.",
+                          accepted: "Специалист принял запрос. Ожидайте ответ или уточнение в этом кабинете.",
+                          needs_clarification: "Специалист просит уточнение; его сообщение показано ниже.",
+                          scheduled: "Встреча назначена. Проверьте дату и комментарий ниже.",
+                          answered: "Ответ специалиста доступен ниже.",
+                          completed: "Запрос завершён. История и ответ остаются доступны здесь.",
+                          cancelled: "Запрос отменён.",
                         };
                         const statusColors = {
                           submitted: { bg: "#f0f0f0", text: "#666" }, new: { bg: "#f0f0f0", text: "#666" },
@@ -11978,7 +12196,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                               </span>
                             </div>
                             {req.message && <div style={{ fontSize: 13, color: "#5F574F", marginTop: 8 }}>{req.message.slice(0, 150)}{req.message.length > 150 ? "…" : ""}</div>}
-                            {req.scheduled_at && <div style={{ fontSize: 12, color: "#5F7D6C", marginTop: 6 }}>Встреча: {new Date(req.scheduled_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>}
+                            {APP_BRAND.isSupportPilot && <div style={{ fontSize: 12, color: "#7A7268", lineHeight: 1.5, marginTop: 6 }}>{nextSteps[req.status] || "Статус запроса обновится в кабинете."}</div>}
+                            {req.scheduled_at && <div style={{ fontSize: 12, color: "#5F7D6C", marginTop: 6 }}>Встреча: {new Date(req.scheduled_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}{APP_BRAND.isSupportPilot && req.scheduled_comment ? ` · ${req.scheduled_comment}` : ""}</div>}
                             {req.specialist_response && <div style={{ fontSize: 13, color: "#5F7D6C", marginTop: 8, padding: "8px 12px", background: "#E2EBE4", borderRadius: 8 }}>{req.specialist_response.slice(0, 200)}</div>}
                             {["submitted", "new", "accepted"].includes(req.status) && (
                               <button style={{ ...s.secondary, fontSize: 12, padding: "6px 12px", marginTop: 8, color: "#B85C4A", borderColor: "rgba(184,92,74,.3)" }} onClick={() => cancelSupportServiceRequest(req.id)}>
@@ -12159,7 +12378,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   <button style={{ ...s.primary, flex: 1, minWidth: 140 }} onClick={startSupportFollowUp}>
                     Продолжить разговор
                   </button>
-                  <button style={{ ...s.secondary, flex: 1, minWidth: 140 }} onClick={() => setSupportNewRequestOpen(true)}>
+                  <button style={{ ...s.secondary, flex: 1, minWidth: 140 }} onClick={() => openSupportRequestForSession(s_data.sessionId)}>
                     Связаться со специалистом
                   </button>
                 </div>
@@ -12182,6 +12401,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   <h3 style={{ margin: 0, fontFamily: "Georgia, serif", fontSize: 18 }}>Запрос специалисту</h3>
                   <button style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#7A7268" }} onClick={() => setSupportNewRequestOpen(false)}>&times;</button>
                 </div>
+                {APP_BRAND.isSupportPilot && (
+                  <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "#F8FAF8", color: "#5F574F", fontSize: 12, lineHeight: 1.5 }}>
+                    Отправляя запрос, вы разрешаете связанному со своим кабинетом специалисту увидеть эту предварительную сводку и контекст выбранного разговора. До отправки запроса эти сведения врачу не передаются.
+                  </div>
+                )}
 
                 <label style={{ ...s.label, fontWeight: 700 }}>Услуга</label>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
@@ -12485,6 +12709,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               <p style={{ color: "#7A7268", lineHeight: 1.6, marginBottom: 20 }}>
                 Введите единый код продолжения вида ТОЧКА-XXXX-XXXX-XXXX-XXXX-XXXX. Он откроет все ваши разговоры на этом устройстве.
               </p>
+              {APP_BRAND.isSupportPilot && (
+                <p style={{ color: "#7A7268", lineHeight: 1.6, marginTop: -12, marginBottom: 16, fontSize: 13 }}>
+                  Если у вас остался короткий код из старой версии, откройте беседу на устройстве, где она уже доступна, и создайте новый код рядом с кнопкой «Продолжить разговор». Новый код можно использовать на другом устройстве.
+                </p>
+              )}
 
               <input
                 style={s.crisisInput}
@@ -12496,7 +12725,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   if (e.key === "Enter" && continuationCodeInput.trim().length >= 5 && !loadingSession) {
                     e.preventDefault();
                     loadSupportCabinet(continuationCodeInput.trim())
-                      .then(() => { setSessionModalOpen(false); setContinuationCodeInput(""); })
+                      .then((opened) => { if (opened) { setSessionModalOpen(false); setContinuationCodeInput(""); } })
                       .catch(() => {});
                   }
                 }}
@@ -12514,9 +12743,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     setLoadingSession(true);
                     try {
                       const code = continuationCodeInput.trim();
-                      await loadSupportCabinet(code);
-                      setSessionModalOpen(false);
-                      setContinuationCodeInput("");
+                      const opened = await loadSupportCabinet(code);
+                      if (opened) {
+                        setSessionModalOpen(false);
+                        setContinuationCodeInput("");
+                      }
                     } catch (e) {
                       // Error is already shown in the modal.
                     } finally {

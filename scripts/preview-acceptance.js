@@ -59,16 +59,40 @@ async function postAnalyze(body) {
     throw new Error(`client-token failed: ${tokenRes.status} ${err}`);
   }
   const { token } = await tokenRes.json();
+  const accessToken = sessionAccessTokens.get(body.session_id);
+  const requestBody = accessToken ? { ...body, access_token: accessToken } : body;
   const res = await fetchWithRetry(`${PREVIEW_URL}/api/analyze`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(requestBody),
   });
   const data = await res.json().catch(() => ({}));
   return { status: res.status, body: data };
+}
+
+const sessionAccessTokens = new Map();
+
+async function createSupportSession() {
+  const tokenRes = await fetchWithRetry(`${PREVIEW_URL}/api/client-token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "analyze", module: "support" }),
+  });
+  if (!tokenRes.ok) throw new Error(`client-token failed: ${tokenRes.status} ${await tokenRes.text()}`);
+  const { token } = await tokenRes.json();
+  const res = await fetchWithRetry(`${PREVIEW_URL}/api/start-session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok || !data.session_id || !data.access_token) {
+    throw new Error(`start-session failed: ${res.status} ${data.error || "invalid response"}`);
+  }
+  sessionAccessTokens.set(data.session_id, data.access_token);
+  return data;
 }
 
 async function postSession(body) {
@@ -119,7 +143,7 @@ async function getDebits(sessionId, requestId) {
 
 async function runScenarioA() {
   console.log("\n=== Preview Scenario A: normal support session ===");
-  const sessionId = `prev-a-${Date.now()}`;
+  const { session_id: sessionId } = await createSupportSession();
   const text = "Последние недели плохо сплю, тревожусь, не могу собраться, стало трудно заниматься обычными делами.";
 
   const r0 = await postAnalyze({ session_id: sessionId, text, depth: 0, module: "support" });
@@ -183,7 +207,7 @@ async function runScenarioA() {
 
 async function runScenarioB() {
   console.log("\n=== Preview Scenario B: long risk session with recovery ===");
-  const sessionId = `prev-b-${Date.now()}`;
+  const { session_id: sessionId } = await createSupportSession();
   const text = "Я уже несколько дней не сплю, энергии слишком много, купил билет в другой город и потратил все деньги. Слышу голос, который говорит, что за мной следят. Я не могу работать, больше не выхожу из дома. Мне кажется, я могу причинить вред другому, если меня не остановят.";
   const answers = { 0: "Ответ" };
   const history = [
@@ -228,7 +252,7 @@ async function runScenarioB() {
 
 async function runScenarioC() {
   console.log("\n=== Preview Scenario C: third-party suicide event, no own intent ===");
-  const sessionId = `prev-c-${Date.now()}`;
+  const { session_id: sessionId } = await createSupportSession();
   const text = "Мой близкий друг недавно покончил с собой. Мне очень тяжело, я не могу в это поверить, плохо сплю и постоянно плачу. Но сама я не думаю о суициде, мне не нужно умирать.";
   const answers = { 0: "Нет, таких мыслей не было.", 1: "Нет, плана нет.", 2: "Да, есть близкие, с которыми могу поговорить." };
   const history = [
@@ -248,7 +272,7 @@ async function runScenarioC() {
 
 async function runScenarioD() {
   console.log("\n=== Preview Scenario D: own current suicidal thoughts ===");
-  const sessionId = `prev-d-${Date.now()}`;
+  const { session_id: sessionId } = await createSupportSession();
   const text = "Я уже несколько недель думаю, что лучше умереть. У меня есть план: накоплены таблетки, я знаю, когда и как сделаю это. Написала прощальное письмо.";
   const answers = { 0: "Да, мысли есть каждый день.", 1: "Да, план есть.", 2: "Нет, никому не сказала." };
   const history = [
@@ -269,7 +293,7 @@ async function runScenarioD() {
 
 async function runScenarioE() {
   console.log("\n=== Preview Scenario E: continuation opens same owner/wallet ===");
-  const sessionId = `prev-e-${Date.now()}`;
+  const { session_id: sessionId } = await createSupportSession();
   const text = "Тревожусь, не сплю, не могу сосредоточиться.";
   const answers = { 0: "Нет мыслей о вреде себе.", 1: "Сплю плохо.", 2: "Работа страдает.", 3: "Подруга рядом.", 4: "Хочу разобраться.", 5: "Пробовал дыхание.", 6: "Важно понять, куда идти." };
   const history = [
