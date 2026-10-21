@@ -188,7 +188,7 @@ export default function App() {
   const [displayNameInput, setDisplayNameInput] = useState("");
 
   const [activeModule, setActiveModule] = useState(() => {
-    if (!APP_BRAND.isAnMed && typeof window !== "undefined") {
+    if (!APP_BRAND.isSupportPilot && typeof window !== "undefined") {
       const host = window.location.hostname;
       if (host === "health.tochka-opori.online" || host.startsWith("health.")) return "body";
       const params = new URLSearchParams(window.location.search);
@@ -1248,7 +1248,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       let effectiveSessionId;
       let effectiveAccessToken;
 
-      if (accessToken && saved.sessionId && !(APP_BRAND.isAnMed && enteredCode)) {
+      if (accessToken && saved.sessionId && !(APP_BRAND.isSupportPilot && enteredCode)) {
         // Same device: use stored access token.
         const body = { action: "getCabinet", sessionId: saved.sessionId, access_token: accessToken };
         const cabinetRes = await fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -1297,7 +1297,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         wallet: cabinetData.wallet || null,
         specialist: cabinetData.specialist || null,
         service_requests: cabinetData.service_requests || [],
-        match_requests: APP_BRAND.isAnMed ? cabinetData.match_requests || [] : [],
+        match_requests: APP_BRAND.isSupportPilot ? cabinetData.match_requests || [] : [],
         unread_message_count: cabinetData.unread_message_count || 0,
         display_name: cabinetData.display_name || null,
         medication_cards: cabinetData.medication_cards || [],
@@ -1319,7 +1319,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     } catch (e) {
       const msg = e.message || "";
       let userMsg = "Не удалось открыть кабинет. Попробуйте ещё раз.";
-      if (APP_BRAND.isAnMed && msg.includes("старой версии")) {
+      if (APP_BRAND.isSupportPilot && msg.includes("старой версии")) {
         userMsg = msg;
       } else if (msg.includes("код продолжения") || msg.includes("continuation") || msg.includes("401") || msg.includes("403")) {
         userMsg = "Проверьте код продолжения.";
@@ -1327,7 +1327,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         userMsg = "Не удалось связаться с сервисом. Попробуйте ещё раз.";
       }
       setContinuationCodeError(userMsg);
-      if (!(APP_BRAND.isAnMed && msg.includes("старой версии"))) showToast(userMsg, "error");
+      if (!(APP_BRAND.isSupportPilot && msg.includes("старой версии"))) showToast(userMsg, "error");
       return false;
     } finally {
       setCabinetLoading(false);
@@ -1520,7 +1520,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     const latestReport = supportCabinet?.latest_report || {};
     setSessionId(saved.sessionId);
     setPublicCode(latest?.publicCode || supportCabinet?.public_code || saved.sessionId);
-    if (APP_BRAND.isAnMed && latestReport.crisisBlock?.status === "safety_check_in_progress") {
+    if (APP_BRAND.isSupportPilot && latestReport.crisisBlock?.status === "safety_check_in_progress") {
       const safetyQuestions = latestReport.crisisBlock.questions || [
         "Вы сейчас в безопасности? Есть ли риск, что вы причините себе вред в ближайшее время?",
         "Есть ли у вас сейчас намерение или конкретный план причинить себе вред?",
@@ -1705,7 +1705,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "createSupportServiceRequest",
-          session_id: APP_BRAND.isAnMed ? supportRequestSessionId || saved.sessionId : saved.sessionId,
+          session_id: APP_BRAND.isSupportPilot ? supportRequestSessionId || saved.sessionId : saved.sessionId,
           access_token: saved.accessToken,
           service_code: supportNewRequest.service_code,
           reason: supportNewRequest.reason,
@@ -1778,7 +1778,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           wallet: data.wallet || null,
           specialist: data.specialist || null,
           service_requests: data.service_requests || [],
-          match_requests: APP_BRAND.isAnMed ? data.match_requests || [] : [],
+          match_requests: APP_BRAND.isSupportPilot ? data.match_requests || [] : [],
           unread_message_count: data.unread_message_count || 0,
           display_name: data.display_name || null,
           medication_cards: data.medication_cards || [],
@@ -4794,7 +4794,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const adminModuleRoute = adminSubPage || (typeof window !== "undefined"
     ? window.location.pathname === "/admin/body" ? "body" : window.location.pathname === "/admin/council" ? "council" : "support"
     : "support");
-  const isDedicatedSubdomain = !APP_BRAND.isAnMed && typeof window !== "undefined" && (
+  const isDedicatedSubdomain = !APP_BRAND.isSupportPilot && typeof window !== "undefined" && (
     window.location.hostname === "health.tochka-opori.online" || window.location.hostname.startsWith("health.") ||
     new URLSearchParams(window.location.search).get("module") === "body"
   );
@@ -4805,7 +4805,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   // Keep the AnMed pilot's presentation separate from the module selection.
   useEffect(() => {
-    document.title = APP_BRAND.isAnMed
+    document.title = APP_BRAND.isSupportPilot
       ? APP_BRAND.title
       : isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.title;
   }, [isDedicatedSubdomain]);
@@ -9797,7 +9797,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 
   // Keep the legacy expert surface out of the AnMed pilot; its staff entry is /specialist.
-  if (APP_BRAND.isAnMed && typeof window !== "undefined" && window.location.pathname.match(/^\/expert\/?$/)) {
+  if (APP_BRAND.isSupportPilot && typeof window !== "undefined" && window.location.pathname.match(/^\/expert\/?$/)) {
     window.location.replace("/specialist");
     return null;
   }
@@ -9927,17 +9927,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 `}</style>
           <div style={s.wrap}>
-        <header style={{ ...s.header, marginBottom: APP_BRAND.isAnMed ? 28 : (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
-          {APP_BRAND.isAnMed ? (
+        <header style={{ ...s.header, marginBottom: APP_BRAND.isSupportPilot ? 28 : (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
+          {APP_BRAND.isSupportPilot ? (
             <a
               href="/"
-              aria-label="АнМед — на главную"
+              aria-label={`${APP_BRAND.name} — на главную`}
               className="app-logo-link"
               style={{ display: "flex", alignItems: "center", gap: 12, color: "inherit", textDecoration: "none" }}
             >
               <div aria-label={APP_BRAND.name} style={{ minWidth: 190 }}>
                 <div style={{ ...s.logo, color: "#14264A", fontSize: 34, fontWeight: 900, letterSpacing: "-0.04em" }}>
-                  Ан<span style={{ color: "#E63E4B" }}>Мед</span>
+                  {APP_BRAND.isKgmu ? <span style={{ color: "#176B66", letterSpacing: "-0.025em" }}>Казанский ГМУ</span> : <>Ан<span style={{ color: "#E63E4B" }}>Мед</span></>}
                 </div>
                 <div style={s.sub}>{APP_BRAND.subtitle}</div>
               </div>
@@ -9980,7 +9980,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           </div>
         </header>
 
-        {APP_BRAND.isAnMed && (
+        {APP_BRAND.isSupportPilot && (
           <div role="note" style={{ margin: "0 0 32px", padding: "12px 16px", borderRadius: 12, background: "#FFF1F1", border: "1px solid #E9B4B8", color: "#7D2530", fontSize: 14, lineHeight: 1.5 }}>
             {APP_BRAND.pilotNotice}
           </div>
@@ -10746,7 +10746,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </>
               ) : phase === "questions" ? (
                 <>
-                  {crisisMode && APP_BRAND.isAnMed && (
+                  {crisisMode && APP_BRAND.isSupportPilot && (
                     <div role="alert" aria-live="assertive" style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: "#fff1ed", border: "2px solid #b85c4a", color: "#4a2822", lineHeight: 1.55 }}>
                       <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>Сначала — ваша безопасность</div>
                       <div style={{ marginBottom: 12 }}>Если вы можете причинить себе вред или не уверены, что останетесь в безопасности, позвоните сейчас 112 или 103. Перейдите туда, где есть люди, и попросите близкого побыть рядом. Не ждите ответа сервиса.</div>
@@ -10824,7 +10824,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   >
                     {loading
                       ? loadingMessage || "Анализируем..."
-                      : crisisMode && APP_BRAND.isAnMed
+                      : crisisMode && APP_BRAND.isSupportPilot
                         ? "Продолжить"
                         : dialogDepth < 3
                         ? "Продолжить уточнение"
@@ -10840,7 +10840,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               <div style={s.result}>
                 <h2 style={{ marginTop: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 22 }}>Результат разбора</h2>
 
-                {APP_BRAND.isAnMed && crisisMode && (
+                {APP_BRAND.isSupportPilot && crisisMode && (
                   <div role="alert" aria-live="assertive" style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: "#fff1ed", border: "2px solid #b85c4a", color: "#4a2822", lineHeight: 1.55 }}>
                     <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>План безопасности и срочная помощь</div>
                     <p style={{ margin: "0 0 12px" }}>{crisisBlock?.emergencyRecommended
@@ -11027,7 +11027,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 {careRecommendation && (
                   <div style={{ marginTop: 20 }}>
                     {/* URGENT_HELP block */}
-                    {careRecommendation.level === "urgent_help" && !(APP_BRAND.isAnMed && crisisMode) && (
+                    {careRecommendation.level === "urgent_help" && !(APP_BRAND.isSupportPilot && crisisMode) && (
                       <div style={{
                         background: "rgba(184,92,74,.12)", border: "2px solid #B85C4A",
                         borderRadius: 18, padding: 20, marginBottom: 16,
@@ -11423,7 +11423,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             const latestDate = latestSession?.createdAt
               ? new Date(latestSession.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
               : "—";
-            const wallet = !APP_BRAND.isAnMed && supportCabinet.wallet?.visible ? supportCabinet.wallet : null;
+            const wallet = !APP_BRAND.isSupportPilot && supportCabinet.wallet?.visible ? supportCabinet.wallet : null;
 
             return (
               <section style={{ width: "100%" }} className="app-card-support">
@@ -11471,7 +11471,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         {latestSession.status === "followup" ? "продолжение" : "первое обращение"}
                       </div>
                       <div style={{ fontSize: 13, color: "#5F574F", marginBottom: 14 }}>{latestSession.summary?.slice(0, 120)}{latestSession.summary?.length > 120 ? "…" : ""}</div>
-                      {APP_BRAND.isAnMed && supportCabinet.latest_report?.crisisBlock && (
+                      {APP_BRAND.isSupportPilot && supportCabinet.latest_report?.crisisBlock && (
                         <div role="alert" style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "#fff1ed", border: "2px solid #b85c4a", color: "#4a2822", fontSize: 13, lineHeight: 1.5 }}>
                           <strong>Блок безопасности сохранён.</strong> Если вы сейчас можете быть в опасности или не уверены, звоните 112 или 103 и попросите доверенного человека побыть рядом.
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
@@ -11487,7 +11487,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           Открыть отчёт
                         </button>
                       </div>
-                      {APP_BRAND.isAnMed && (
+                      {APP_BRAND.isSupportPilot && (
                         <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(46,42,37,.1)" }}>
                           <div style={{ fontSize: 12, fontWeight: 700, color: "#5F7D6C", marginBottom: 6 }}>Код продолжения</div>
                           {regeneratedCode ? (
@@ -11846,7 +11846,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             </div>
                           )}
                         </div>
-                        {APP_BRAND.isAnMed && (
+                        {APP_BRAND.isSupportPilot && (
                           <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }} aria-label="Отметки состояния по датам и связанным разговорам">
                             {chartData.map((entry) => {
                               const sameDaySession = supportCabinet.sessions?.find((session) => String(session.createdAt || "").slice(0, 10) === entry.checkin_date);
@@ -11879,7 +11879,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       {supportPractices.filter(p => p.status === "active").slice(0, 4).map((p) => {
                         const statusLabels = { not_tried: "Не пробовал(а)", tried: "Пробовал(а)", helped: "Помогло", not_helpful: "Не подошло" };
                         const statusColors = { not_tried: "#7A7268", tried: "#5F7D6C", helped: "#3A6B4A", not_helpful: "#8B6B4A" };
-                        const sourceSessions = APP_BRAND.isAnMed ? (p.source_session_ids || []).map((id) => supportCabinet.sessions?.find((session) => session.sessionId === id)).filter(Boolean) : [];
+                        const sourceSessions = APP_BRAND.isSupportPilot ? (p.source_session_ids || []).map((id) => supportCabinet.sessions?.find((session) => session.sessionId === id)).filter(Boolean) : [];
                         return (
                           <div key={p.practice_key} style={{
                             background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
@@ -11960,7 +11960,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         const practice = supportPractices.find(p => p.practice_key === practiceDetailKey);
                         if (!practice) return null;
                         const recommendedDate = practice.first_recommended_at ? new Date(practice.first_recommended_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
-                        const sourceSessions = APP_BRAND.isAnMed ? (practice.source_session_ids || []).map((id) => supportCabinet.sessions?.find((session) => session.sessionId === id)).filter(Boolean) : [];
+                        const sourceSessions = APP_BRAND.isSupportPilot ? (practice.source_session_ids || []).map((id) => supportCabinet.sessions?.find((session) => session.sessionId === id)).filter(Boolean) : [];
                         return (
                           <div>
                             <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>Рекомендовано: {recommendedDate}</div>
@@ -12052,7 +12052,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                       <div style={{ fontSize: 14, color: "#5F574F", marginBottom: 6 }}>
                         У вас пока нет закреплённого специалиста.
                       </div>
-                      {APP_BRAND.isAnMed && (
+                      {APP_BRAND.isSupportPilot && (
                         <div style={{ fontSize: 12, color: "#7A7268", lineHeight: 1.5, marginBottom: 10 }}>
                           Нажимая «Запросить специалиста», вы просите подобрать специалиста для этого разговора. До отправки запроса сведения о нём врачу не передаются.
                         </div>
@@ -12066,14 +12066,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           onClick={async () => { await createMatchRequest(); }}
                           disabled={matchRequestSending}
                         >
-                          {matchRequestSending ? "Отправка..." : APP_BRAND.isAnMed ? "Запросить специалиста" : "Подобрать специалиста"}
+                          {matchRequestSending ? "Отправка..." : APP_BRAND.isSupportPilot ? "Запросить специалиста" : "Подобрать специалиста"}
                         </button>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {APP_BRAND.isAnMed && supportCabinet.match_requests?.length > 0 && (
+                {APP_BRAND.isSupportPilot && supportCabinet.match_requests?.length > 0 && (
                   <div style={{ marginBottom: 24 }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 10 }}>Статус запроса специалисту</div>
                     {supportCabinet.match_requests.slice(0, 3).map((request) => (
@@ -12126,7 +12126,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   {supportCabinet.service_requests?.length > 0 ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {supportCabinet.service_requests.map((req) => {
-                        const statusLabels = APP_BRAND.isAnMed ? {
+                        const statusLabels = APP_BRAND.isSupportPilot ? {
                           submitted: "Отправлен — ожидает ответа", new: "Отправлен — ожидает ответа",
                           accepted: "Принят специалистом",
                           needs_clarification: "Нужно уточнение",
@@ -12173,8 +12173,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                               </span>
                             </div>
                             {req.message && <div style={{ fontSize: 13, color: "#5F574F", marginTop: 8 }}>{req.message.slice(0, 150)}{req.message.length > 150 ? "…" : ""}</div>}
-                            {APP_BRAND.isAnMed && <div style={{ fontSize: 12, color: "#7A7268", lineHeight: 1.5, marginTop: 6 }}>{nextSteps[req.status] || "Статус запроса обновится в кабинете."}</div>}
-                            {req.scheduled_at && <div style={{ fontSize: 12, color: "#5F7D6C", marginTop: 6 }}>Встреча: {new Date(req.scheduled_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}{APP_BRAND.isAnMed && req.scheduled_comment ? ` · ${req.scheduled_comment}` : ""}</div>}
+                            {APP_BRAND.isSupportPilot && <div style={{ fontSize: 12, color: "#7A7268", lineHeight: 1.5, marginTop: 6 }}>{nextSteps[req.status] || "Статус запроса обновится в кабинете."}</div>}
+                            {req.scheduled_at && <div style={{ fontSize: 12, color: "#5F7D6C", marginTop: 6 }}>Встреча: {new Date(req.scheduled_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}{APP_BRAND.isSupportPilot && req.scheduled_comment ? ` · ${req.scheduled_comment}` : ""}</div>}
                             {req.specialist_response && <div style={{ fontSize: 13, color: "#5F7D6C", marginTop: 8, padding: "8px 12px", background: "#E2EBE4", borderRadius: 8 }}>{req.specialist_response.slice(0, 200)}</div>}
                             {["submitted", "new", "accepted"].includes(req.status) && (
                               <button style={{ ...s.secondary, fontSize: 12, padding: "6px 12px", marginTop: 8, color: "#B85C4A", borderColor: "rgba(184,92,74,.3)" }} onClick={() => cancelSupportServiceRequest(req.id)}>
@@ -12378,7 +12378,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   <h3 style={{ margin: 0, fontFamily: "Georgia, serif", fontSize: 18 }}>Запрос специалисту</h3>
                   <button style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#7A7268" }} onClick={() => setSupportNewRequestOpen(false)}>&times;</button>
                 </div>
-                {APP_BRAND.isAnMed && (
+                {APP_BRAND.isSupportPilot && (
                   <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "#F8FAF8", color: "#5F574F", fontSize: 12, lineHeight: 1.5 }}>
                     Отправляя запрос, вы разрешаете связанному со своим кабинетом специалисту увидеть эту предварительную сводку и контекст выбранного разговора. До отправки запроса эти сведения врачу не передаются.
                   </div>
@@ -12686,7 +12686,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               <p style={{ color: "#7A7268", lineHeight: 1.6, marginBottom: 20 }}>
                 Введите единый код продолжения вида ТОЧКА-XXXX-XXXX-XXXX-XXXX-XXXX. Он откроет все ваши разговоры на этом устройстве.
               </p>
-              {APP_BRAND.isAnMed && (
+              {APP_BRAND.isSupportPilot && (
                 <p style={{ color: "#7A7268", lineHeight: 1.6, marginTop: -12, marginBottom: 16, fontSize: 13 }}>
                   Если у вас остался короткий код из старой версии, откройте беседу на устройстве, где она уже доступна, и создайте новый код рядом с кнопкой «Продолжить разговор». Новый код можно использовать на другом устройстве.
                 </p>

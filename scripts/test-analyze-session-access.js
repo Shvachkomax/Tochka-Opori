@@ -39,6 +39,8 @@ const validateAccess = async (sessionId, token) => (
 assert.equal(isModuleAvailable("support", { supportOnly: "true" }), true);
 assert.equal(isModuleAvailable("body", { supportOnly: "true" }), false);
 assert.equal(isModuleAvailable("body", { brand: "anmed" }), false);
+assert.equal(isModuleAvailable("body", { supportOnly: "false", brand: "kgmu" }), false);
+assert.equal(isModuleAvailable("support", { brand: "kgmu" }), true);
 assert.equal(isModuleAvailable("body", { supportOnly: "false", brand: "anmed" }), false);
 assert.equal(isModuleAvailable("body", { supportOnly: "false", brand: "tochka-opory" }), true);
 assert.equal(hasBodySessionReference({ previousSessionId: "HEALTH-ABCD-123" }), true);

@@ -49,18 +49,18 @@ const SERVICE_FORMAT_LABELS = {
 };
 
 function SpecialistBrand() {
-  if (!APP_BRAND.isAnMed) {
+  if (!APP_BRAND.isSupportPilot) {
     return <img src="/logo-tochka-opory-header.png" alt="Точка опоры" style={{ height: 72, display: "block" }} />;
   }
 
   return (
     <a
       href="/"
-      aria-label="АнМед — на главную"
+      aria-label={`${APP_BRAND.name} — на главную`}
       style={{ display: "block", color: "inherit", textDecoration: "none" }}
     >
       <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: "-0.04em", color: "#14264A" }}>
-        Ан<span style={{ color: "#E63E4B" }}>Мед</span>
+        {APP_BRAND.isKgmu ? <span style={{ color: "#176B66", letterSpacing: "-0.025em" }}>Казанский ГМУ</span> : <>Ан<span style={{ color: "#E63E4B" }}>Мед</span></>}
       </div>
       <div style={{ fontSize: 12, color: "#7A7268" }}>{APP_BRAND.subtitle}</div>
     </a>
@@ -68,7 +68,7 @@ function SpecialistBrand() {
 }
 
 function SpecialistPilotNotice() {
-  if (!APP_BRAND.isAnMed) return null;
+  if (!APP_BRAND.isSupportPilot) return null;
   return (
     <div role="note" style={{ maxWidth: 800, margin: "0 auto 20px", padding: "12px 16px", borderRadius: 12, background: "#FFF1F1", border: "1px solid #E9B4B8", color: "#7D2530", fontSize: 14, lineHeight: 1.5 }}>
       {APP_BRAND.pilotNotice}
@@ -748,7 +748,7 @@ export default function SpecialistCabinet() {
   // ── Authenticated cabinet ────────────────────────────────
 
   const { expert, memberships } = auth;
-  const supportWorkspaceName = APP_BRAND.isAnMed ? APP_BRAND.name : "Точка Опоры";
+  const supportWorkspaceName = APP_BRAND.isSupportPilot ? APP_BRAND.name : "Точка Опоры";
   const orgName = orgId
     ? memberships.find((m) => m.organization_id === orgId)?.organization_name || "Организация"
     : "Частная практика";
@@ -932,7 +932,7 @@ export default function SpecialistCabinet() {
                       invitation={inv}
                       onRevoke={revokeInvitation}
                       onRespond={respondToPatientInvitation}
-                      onResend={APP_BRAND.isAnMed ? createInvitation : null}
+                      onResend={APP_BRAND.isSupportPilot ? createInvitation : null}
                       onToast={showToast}
                     />
                   ))}
@@ -979,7 +979,7 @@ export default function SpecialistCabinet() {
               <p style={{ fontSize: 13, color: "#991B1B" }}>{clientsError}</p>
             ) : clients.length === 0 ? (
               <p style={{ fontSize: 13, color: "#7A7268" }}>
-                {APP_BRAND.isAnMed
+                {APP_BRAND.isSupportPilot
                   ? "Здесь появляются пациенты после того, как они отправят запрос этому специалисту или примут ваше приглашение. Пока пациент не подтвердил связь, его разговоры и отчёты здесь не отображаются."
                   : "В этом рабочем пространстве пока нет закреплённых клиентов."}
               </p>
@@ -1362,7 +1362,7 @@ function InvitationCard({ invitation: inv, onRevoke, onRespond, onResend, onToas
           </button>
         </div>
       )}
-      {APP_BRAND.isAnMed && onResend && inv.status === "expired" && inv.direction !== "patient_to_specialist" && (
+      {APP_BRAND.isSupportPilot && onResend && inv.status === "expired" && inv.direction !== "patient_to_specialist" && (
         <div style={{ marginTop: 8 }}>
           <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 8 }}>
             Срок ссылки закончился. Новая ссылка будет создана отдельно; после этого отправьте её пациенту.
