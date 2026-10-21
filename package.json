@@ -24,7 +24,14 @@
     "test:service-request-finance": "node scripts/test-service-request-finance.js",
     "e2e:service-request-finance": "node scripts/e2e-service-request-finance-browser.mjs",
     "e2e:body-service-request-input": "node scripts/e2e-body-service-request-input-browser.mjs",
-    "test:service-request-input-styles": "node scripts/test-service-request-input-styles.js"
+    "test:service-request-input-styles": "node scripts/test-service-request-input-styles.js",
+    "test:analyze-session-access": "node scripts/test-analyze-session-access.js",
+    "test:practice-sync": "node scripts/test-practice-sync.js",
+    "test:specialist-memberships": "node scripts/test-specialist-memberships.js",
+    "test:support-risk-routing": "node scripts/test-support-risk-routing.js",
+    "test:cabinet-defects": "node scripts/test-cabinet-defects.js",
+    "test:crisis-mobile": "node scripts/test-crisis-mobile.mjs",
+    "test:patient-specialist-workflow": "node scripts/test-patient-specialist-workflow.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

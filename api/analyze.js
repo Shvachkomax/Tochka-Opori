@@ -7,6 +7,8 @@ import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
 import { validateSessionAccess } from "../lib/security/access-token.js";
+import { validateAnalyzeSessionAccess } from "../lib/security/analyze-session-access.js";
+import { isAnMedSupportFeatureEnabled, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { debitCreditsForSession, setSessionVisibleAfterCode } from "../lib/usage/debit.js";
 import { ensureWallet, setWalletVisible } from "../lib/usage/wallet.js";
 import { getOrCreateContinuationCredential } from "../lib/session/continuation-store.js";
@@ -23,6 +25,7 @@ import {
   saveFinalReportToSession,
   createReportArtifacts,
   deterministicUserReportFix,
+  synchronizeUserReportNextStep,
   repairInvalidJson,
   buildReportResponsePayload,
 } from "../lib/report/finalize.js";
@@ -296,25 +299,184 @@ function makeWordBoundaryRegex(words) {
 
 const OWN_RISK_PRONOUNS = makeWordBoundaryRegex(OWN_RISK_WORDS);
 const THIRD_PARTY_SUBJECTS = makeWordBoundaryRegex(THIRD_PARTY_WORDS);
+const EXPLICIT_SELF_REFERENCE = makeWordBoundaryRegex(["я", "мне", "меня", "мной", "хочу", "думаю", "планирую", "собираюсь", "покончу", "сделаю"]);
 
-function isOwnRiskSentence(sentence, riskRegex) {
-  if (!riskRegex.test(sentence)) return false;
+function isExplicitlyNegatedRisk(sentence, riskMatch) {
+  const matchStart = riskMatch.index;
+  const matchEnd = matchStart + riskMatch[0].length;
+  const boundaries = [...sentence.matchAll(/[,;]|(?<![\p{L}\p{N}_])(?:но|однако|зато|а|и)(?![\p{L}\p{N}_])/giu)];
+  let clauseStart = 0;
+  let clauseEnd = sentence.length;
+
+  for (const boundary of boundaries) {
+    const boundaryEnd = boundary.index + boundary[0].length;
+    if (boundary.index < matchStart) clauseStart = boundaryEnd;
+    else if (boundary.index >= matchEnd) {
+      clauseEnd = boundary.index;
+      break;
+    }
+  }
+
+  const clause = sentence.slice(clauseStart, clauseEnd);
+  const beforeRisk = clause.slice(0, matchStart - clauseStart);
+  const negativeThought = /(?<![\p{L}\p{N}_])(?:нет|никаких|не было|не возникало|не появлялось|отсутствует|отсутствуют|отрица(?:ю|ет|ют|ем|ете)|отрицал(?:а|и)?|не испытыва(?:ю|ет|ют|л|ла|ли)|не отмеча(?:ю|ет|ют|л|ла|ли))(?![\p{L}\p{N}_])[^.!?]{0,45}(?<![\p{L}\p{N}_])(?:мысл[\p{L}]*|желан[\p{L}]*|намерен[\p{L}]*|план[\p{L}]*|суицид[\p{L}]*|самоповреж[\p{L}]*|голос[\p{L}]*|причин[\p{L}]*\s+себе\s+вред[\p{L}]*|порез[\p{L}]*\s+себя)(?![\p{L}\p{N}_])/iu.test(clause);
+  const negativeAfterRisk = /(?<![\p{L}\p{N}_])(?:мысл[\p{L}]*|желан[\p{L}]*|намерен[\p{L}]*|план[\p{L}]*|суицид[\p{L}]*|самоповреж[\p{L}]*|голос[\p{L}]*|причин[\p{L}]*\s+себе\s+вред[\p{L}]*|порез[\p{L}]*\s+себя)(?![\p{L}\p{N}_])[^.!?]{0,45}(?<![\p{L}\p{N}_])(?:не было|не возникало|не появлялось|нет|отсутствует|отсутствуют|отрицает|отрицаю|отрицают|не испытывает|не испытываю|не испытывали)(?![\p{L}\p{N}_])/iu.test(clause);
+  const negativeAction = /(?<![\p{L}\p{N}_])не(?![\p{L}\p{N}_])\s+(?:думаю|хочу|планирую|собираюсь|намерен[\p{L}]*|причинял[\p{L}]*|режу|резал[\p{L}]*|порезал[\p{L}]*|слышу|вижу|угрожаю)(?![\p{L}\p{N}_])(?:\s+[\p{L}]+){0,2}\s*$/iu.test(beforeRisk);
+
+  return negativeThought || negativeAfterRisk || negativeAction;
+}
+
+function isOwnRiskSentence(sentence, riskRegex, negationAware = true) {
+  const riskMatch = sentence.match(riskRegex);
+  if (!riskMatch || (negationAware && isExplicitlyNegatedRisk(sentence, riskMatch))) return false;
   // Third-party mention near the risk term should not count as own risk.
   if (THIRD_PARTY_SUBJECTS.test(sentence)) return false;
   // Require a first-person indicator in the same sentence.
   return OWN_RISK_PRONOUNS.test(sentence);
 }
 
-function hasOwnRiskPattern(text, pattern) {
+export function hasOwnRiskPattern(text, pattern, { negationAware = true } = {}) {
   if (!text) return false;
   const sentences = text.split(/[.!?\n]+/).filter(Boolean);
   for (const sentence of sentences) {
-    if (isOwnRiskSentence(sentence, pattern)) return true;
+    if (isOwnRiskSentence(sentence, pattern, negationAware)) return true;
   }
   return false;
 }
 
-function deriveMinimumCareLevel({
+function collectRiskText(value) {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(collectRiskText);
+  if (value && typeof value === "object") return Object.values(value).flatMap(collectRiskText);
+  return [];
+}
+
+export function buildUserRiskAssessmentText({ text, answers, conversationHistory }) {
+  const previousUserText = (Array.isArray(conversationHistory) ? conversationHistory : [])
+    .filter((entry) => entry?.role === "user")
+    .flatMap((entry) => [entry.content, entry.answers].flatMap(collectRiskText));
+
+  return [...previousUserText, ...collectRiskText(text), ...collectRiskText(answers)]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+const SUPPORT_CRISIS_SIGNAL_PATTERN = /(?:мысл[\p{L}]*\s+(?:о|про)\s+(?:смерти|том,?\s+чтобы\s+умереть)|дума[\p{L}]*\s+(?:о|про)\s+смерти|не\s+хочу\s+(?:больше\s+)?жить|жить\s+не\s+хочется|не\s+вижу\s+смысла\s+жить|хочу\s+умереть|лучше\s+бы\s+меня\s+не\s+было|всем\s+было\s+бы\s+легче\s+без\s+меня|(?:хочу\s+)?поконч(?:у|ить)\s+с\s+собой|(?:хочу\s+)?убить\s+себя|убью\s+себя|повеситься|вскрыть\s+вены|перерезать\s+вены|прыгнуть\s+с\s+(?:крыши|моста)|принять\s+много\s+таблеток|суицид[\p{L}]*|самоповреж[\p{L}]*|причин[\p{L}]*\s+себе\s+вред[\p{L}]*)/iu;
+
+export function detectSupportCrisisSignals(text) {
+  const normalized = typeof text === "string" ? text.trim() : "";
+  if (!normalized) return { detected: false, markers: [] };
+  const sentences = normalized.split(/[.!?\n]+/).filter(Boolean);
+  const markers = [];
+  const positiveSignal = sentences.some((sentence) => sentence
+    .split(/[,;]|(?<![\p{L}])(?:но|и|однако)(?![\p{L}])/iu)
+    .some((clause) => {
+      const match = clause.match(SUPPORT_CRISIS_SIGNAL_PATTERN);
+      if (!match) return false;
+      if (/не\s+(?:хочу|планирую|собираюсь)\s+(?:покончить\s+с\s+собой|убить\s+себя|причинить\s+себе\s+вред|умереть)/iu.test(clause)) return false;
+      if (isExplicitlyNegatedRisk(clause, match)) return false;
+      if (THIRD_PARTY_SUBJECTS.test(clause) && !EXPLICIT_SELF_REFERENCE.test(clause)) return false;
+      return true;
+    }));
+  if (positiveSignal) markers.push("мысли о смерти или причинении себе вреда");
+  if (/\b(?:планирую|собираюсь|решил[аи]?|намерен[аы]?)\b[^.!?\n]{0,80}\b(?:умереть|покончу|причинить себе вред|навредить себе)\b/iu.test(normalized)) {
+    markers.push("сообщение о намерении или плане");
+  }
+  if (markers.length === 0 && /\b(?:мысли|мысль)\s+(?:о|про)\s+смерти\b/iu.test(normalized)
+    && !/\b(?:нет|не было|не возникало|не появлялось|отсутствуют?)\b[^.!?\n]{0,45}\b(?:мысли|мысль)\s+(?:о|про)\s+смерти\b/iu.test(normalized)) {
+    markers.push("мысли о смерти");
+  }
+  return { detected: markers.length > 0, markers: [...new Set(markers)] };
+}
+
+export const SUPPORT_CRISIS_QUESTIONS = [
+  "Вы сейчас в безопасности? Есть ли риск, что вы причините себе вред в ближайшее время?",
+  "Есть ли у вас сейчас намерение или конкретный план причинить себе вред?",
+  "Вы сейчас один/одна? Кто может побыть рядом или поговорить с вами?",
+  "Кому вы можете позвонить или написать прямо сейчас?",
+];
+
+export function getSupportCrisisAction(signals, crisisMode) {
+  if (!signals?.detected) return null;
+  return crisisMode ? "finalize" : "ask_safety_questions";
+}
+
+export function detectSupportSomaticSignals(text) {
+  const normalized = typeof text === "string" ? text : "";
+  const palpitations = /сердцебиен|перебо[йя][\p{L}]*\s+в\s+сердц[еа]|сердце\s+сильно\s+бь[её]т/iu.test(normalized);
+  const acutePhysicalSymptoms = /боль\s+в\s+груд|одышк|обморок|сильн\w*\s+головокружен|сдавил\w*\s+виск/iu.test(normalized);
+  const weightChange = /потер[яию][\p{L}]*\s+(?:вес|\d+(?:[.,]\d+)?\s*(?:кг|килограмм))|похудел[а]?|вес\s+(?:снизил|уменьшил|упал)|сильно\s+снизил[а]?\s+вес/iu.test(normalized);
+  const appetiteChange = /(?:аппетит[\p{L}]*\s+(?:(?:почти|сильно|заметно)\s+)?(?:снизил|уменьш|пропал)|(?:снизил|уменьш|пропал)[\p{L}]*\s+аппетит|отказ[а-яё]*\s+от\s+еды|почти\s+ничего\s+не\s+ем|стало\s+трудно\s+есть)/iu.test(normalized);
+  return {
+    palpitations,
+    acutePhysicalSymptoms,
+    weightChange,
+    appetiteChange,
+    hasSomaticSymptoms: palpitations || acutePhysicalSymptoms || weightChange,
+    hasAppetiteOrWeightChange: weightChange || appetiteChange,
+  };
+}
+
+export function buildCrisisResponse({ initialText, answers = {}, markers = [], locale = "ru-RU" }) {
+  const answerText = Object.values(answers || {}).filter((value) => typeof value === "string").join("\n");
+  const combined = `${initialText || ""}\n${answerText}`.trim();
+  const normalizedAnswers = Object.fromEntries(Object.entries(answers || {}).map(([key, value]) => [key, String(value || "").trim().slice(0, 500)]));
+  const safetyAnswer = normalizedAnswers.safety || normalizedAnswers[0] || "";
+  const planAnswer = normalizedAnswers.plan || normalizedAnswers[1] || "";
+  const hasImmediateDanger = /(?:не\s+в\s+безопасности|есть\s+риск|не\s+могу\s+гарантировать\s+безопасность|не\s+уверен[а]?[,]?\s*(?:что\s+)?(?:останусь|смогу\s+быть)\s+в\s+безопасности)/iu.test(safetyAnswer)
+    || /(?:собираюсь\s+(?:сделать\s+это|причинить\s+себе\s+вред)|(?:есть|имею)\s+(?:конкретн[а-яё]*\s+)?(?:намерени[а-яё]*|план)|план\s+есть|намерение\s+есть|подготовил[а]?\s+план)/iu.test(planAnswer);
+  const safetyConfirmed = /(?:я\s+сейчас\s+в\s+безопасности|сейчас\s+в\s+безопасности|в\s+безопасности|нет\s+(?:непосредственн\w*\s+)?(?:риска|опасности))/iu.test(safetyAnswer);
+  const planDenied = /(?:намерени[а-яё]*\s+нет|нет\s+намерени[а-яё]*|план[а-яё]*\s+нет|нет\s+план[а-яё]*|не\s+буду\s+себе\s+вредить|не\s+собираюсь|не\s+планирую|^\s*нет\s*[,.!]?\s*$)/iu.test(planAnswer);
+  const safetyUnclear = !safetyConfirmed || !planDenied;
+  const emergencyRecommended = hasImmediateDanger || safetyUnclear;
+  const status = emergencyRecommended ? "urgent_help" : "same_day_support";
+  const sourceText = (initialText || "").trim().slice(0, 1200);
+  const answer = (key) => normalizedAnswers[key] || "Ответ пока не получен";
+  const userReport = [
+    "Кризисная поддержка",
+    `В разговоре появились важные сигналы: ${markers.join(", ") || "мысли о смерти или безопасности"}. Это стоит воспринимать серьёзно; диагноз по этому разговору не ставится.`,
+    "\nСейчас важно сначала позаботиться о безопасности. Если вы можете причинить себе вред, у вас есть план или вы не уверены, что сможете оставаться в безопасности — позвоните 112 или 103 сейчас, перейдите туда, где есть люди, и попросите близкого побыть рядом. Не ждите ответа сервиса.",
+    "\nКороткий план безопасности",
+    `• Признаки ухудшения: ${sourceText || "усиление мыслей о смерти или чувство, что оставаться одному небезопасно"}.`,
+    `• Ближайшее безопасное действие: ${emergencyRecommended ? "позвонить 112 или 103 и перейти к человеку, который сможет остаться рядом" : "сегодня сообщить близкому о состоянии и договориться, чтобы он был на связи"}.`,
+    `• Поддержка рядом: ${answer("support")}.`,
+    "• Сделать обстановку безопаснее: по возможности не оставаться одному и попросить близкого убрать подальше то, чем можно причинить себе вред; не употреблять алкоголь или другие вещества.",
+    `\nО ваших ответах: безопасность сейчас — ${answer("safety")}; намерение или план — ${answer("plan")}; вы сейчас один/одна — ${answer("alone")}.`,
+    emergencyRecommended
+      ? "\nЕсли пока не получается прояснить безопасность, действуйте как при непосредственной опасности: звоните 112 или 103 и свяжитесь с человеком, которому доверяете."
+      : "\nВы сообщили, что сейчас в безопасности и не собираетесь причинять себе вред. Всё же свяжитесь сегодня с близким человеком и специалистом; если безопасность изменится — звоните 112 или 103.",
+  ].join("\n");
+  const doctorReport = [
+    "Кризисный контекст (ответы пациента; не диагноз):",
+    `Исходное сообщение: ${sourceText || "не предоставлено"}`,
+    `Мысли о смерти/самоповреждении: ${markers.join(", ") || "сигнал выявлен"}`,
+    `Безопасность сейчас: ${answer("safety")}`,
+    `Намерение или план: ${answer("plan")}`,
+    `Одиночество/кто рядом: ${answer("alone")}`,
+    `Доступная поддержка: ${answer("support")}`,
+    `Срочный маршрут: ${emergencyRecommended ? "экстренная помощь сейчас (112/103), безопасность не подтверждена или есть непосредственная опасность" : "связаться со специалистом сегодня; при ухудшении — 112/103"}`,
+  ].join("\n");
+  return {
+    status,
+    emergencyRecommended,
+    locale,
+    userReport,
+    doctorReport,
+    careRecommendation: {
+      level: emergencyRecommended ? "urgent_help" : "professional_contact",
+      timeframe: "today",
+      specialist_types: emergencyRecommended ? ["emergency_service", "crisis_service"] : ["psychiatrist", "clinical_psychologist"],
+      reasons: ["suicidal_thoughts", "social_isolation", ...(/алкогол|выпива|пил(?:а|и)?(?:\s|$)/iu.test(combined) ? ["substance_use"] : [])],
+      interim_support: ["Не оставаться одному", "Связаться с человеком, которому доверяете", "Не употреблять алкоголь или другие вещества"],
+      urgent_triggers: ["появилось намерение или план причинить себе вред", "не удаётся оставаться в безопасности"],
+    },
+    answers: normalizedAnswers,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function deriveMinimumCareLevel({
   riskLevel, suicidalIntent, suicidalPlan, selfHarmRisk,
   psychosisRedFlags, maniaRedFlags, riskToOthers,
   functionalImpairment, severeDistress, somaticSymptoms,
@@ -349,7 +511,7 @@ function deriveMinimumCareLevel({
   return "self_support";
 }
 
-function programmaticCareFix({
+export function programmaticCareFix({
   careRec,
   minimumLevel,
   hasSuicidalIntent,
@@ -1858,18 +2020,34 @@ export default async function handler(req, res) {
   const tokenCheck = requireClientToken(["analyze"])(req, res);
   if (!tokenCheck) return;
 
-  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations, module: reqModule, stage, intake: intakeData, session_id, daily_log, followup_answered_topics } = req.body || {};
+  const { text, answers, mode, conversationHistory: rawHistory, depth = 0, isContinuation = false, previousPatientReport = "", previousDoctorReport = "", homeTasks = "", resourceFactors = "", supportPlan, voiceObservations, module: reqModule, stage, intake: intakeData, session_id, daily_log, followup_answered_topics, crisis_mode: crisisMode = false } = req.body || {};
+  const accessToken = typeof req.body?.access_token === "string" ? req.body.access_token.trim() : "";
 
   const activeModule = isValidModule(reqModule) ? reqModule : DEFAULT_MODULE;
+  const anMedSupportFlow = isAnMedSupportFeatureEnabled(activeModule);
 
   // Validate module
   if (reqModule && !isValidModule(reqModule)) {
     return res.status(400).json({ error: "Invalid module" });
   }
+  if (rejectUnavailableModule(res, activeModule)) return;
 
   // Validate stage
   if (stage && !VALID_STAGES.includes(stage)) {
     return res.status(400).json({ error: "Invalid stage" });
+  }
+
+  const sessionAccess = await validateAnalyzeSessionAccess({
+    sessionId: session_id,
+    module: activeModule,
+    stage,
+    depth,
+    accessToken,
+  });
+  if (!sessionAccess.allowed) {
+    return res.status(sessionAccess.missingSession ? 400 : 403).json({
+      error: sessionAccess.missingSession ? "Missing session_id" : "Session not found or access denied",
+    });
   }
 
   // Body intake stage: one-shot analysis from completed intake form
@@ -1898,15 +2076,18 @@ export default async function handler(req, res) {
     return await handlePlatePhotoAnalysis(req, res);
   }
 
-  if (!text || text.trim().length < 10) {
+  const convHistory = Array.isArray(rawHistory) ? rawHistory : [];
+  const earlyRiskText = buildUserRiskAssessmentText({ text, answers, conversationHistory: convHistory });
+  const earlyCrisisSignals = anMedSupportFlow ? detectSupportCrisisSignals(earlyRiskText) : { detected: false, markers: [] };
+  if ((!text || text.trim().length < 10) && !earlyCrisisSignals.detected) {
     return res.status(400).json({ error: "Опишите состояние подробнее" });
   }
 
-  if (text.length > MAX_TEXT_LENGTH) {
+  if (typeof text === "string" && text.length > MAX_TEXT_LENGTH && !earlyCrisisSignals.detected) {
     return res.status(400).json({ error: `Текст не должен превышать ${MAX_TEXT_LENGTH} символов` });
   }
 
-  if (rawHistory && Array.isArray(rawHistory) && rawHistory.length > MAX_CONVERSATION_TURNS) {
+  if (rawHistory && Array.isArray(rawHistory) && rawHistory.length > MAX_CONVERSATION_TURNS && !earlyCrisisSignals.detected) {
     return res.status(400).json({ error: `История диалога не должна превышать ${MAX_CONVERSATION_TURNS} сообщений` });
   }
   const moduleConfig = getModule(activeModule);
@@ -1914,6 +2095,11 @@ export default async function handler(req, res) {
   const MAX_DEPTH = 8;
 
   const fallbackQuestions_support = [
+    ...(anMedSupportFlow ? [
+      "Как менялись ваше настроение и интерес к привычным занятиям за последние недели?",
+      "Изменились ли аппетит и вес? Если вес снизился, примерно на сколько и за какой срок?",
+      "Когда появляется сердцебиение, как долго длится и сопровождается ли болью в груди, одышкой или обмороком?",
+    ] : []),
     "Было ли в последние месяцы важное событие, потеря, конфликт, болезнь, переезд, военные события, исчезновение или смерть близкого человека, которое могло повлиять на ваше состояние?",
     "Началось ли состояние после конкретного события или постепенно, без понятной причины?",
     "Были ли алкоголь, вещества, новые лекарства, отмена препаратов, гормональные или соматические проблемы, которые совпали с ухудшением?",
@@ -1951,18 +2137,6 @@ export default async function handler(req, res) {
 
 AI-assisted summary не сформирован из-за технической ошибки. Диалог сохранён для ручного разбора.`;
 
-  if (!process.env.OPENAI_API_KEY) {
-    return res.status(200).json({
-      type: "questions",
-      questions: fallbackQuestions,
-      model_used: "none",
-      fallback_used: true,
-      module: activeModule,
-    });
-  }
-
-  const convHistory = Array.isArray(rawHistory) ? rawHistory : [];
-
   let historyText = "";
   if (convHistory.length > 0) {
     historyText = convHistory
@@ -1984,6 +2158,104 @@ AI-assisted summary не сформирован из-за технической
           .map(([key, val]) => `Вопрос ${parseInt(key) + 1}: ${val || "нет ответа"}`)
           .join("\n")
       : "";
+  const riskAssessmentText = activeModule === "support"
+    ? buildUserRiskAssessmentText({ text, answers, conversationHistory: convHistory })
+    : `${historyText || ""} ${text || ""}`;
+
+  const crisisSignals = anMedSupportFlow ? detectSupportCrisisSignals(riskAssessmentText) : { detected: false, markers: [] };
+  const crisisAction = getSupportCrisisAction(crisisSignals, crisisMode);
+  if (crisisAction && session_id) {
+    const supabase = getSupabase();
+
+    if (crisisAction === "ask_safety_questions") {
+      const partialBlock = {
+        status: "safety_check_in_progress",
+        markers: crisisSignals.markers,
+        initial_message: String(text || "").slice(0, 1200),
+        questions: SUPPORT_CRISIS_QUESTIONS,
+        emergency_contacts: ["112", "103"],
+        safety_plan: {
+          warning_signs: String(text || "").slice(0, 1200),
+          immediate_actions: ["Позвонить 112 или 103 при опасности", "Перейти туда, где есть люди", "Связаться с человеком, которому доверяете"],
+          support_contact: "Уточняется в коротком блоке безопасности",
+          safer_environment: "Не оставаться одному; попросить близкого убрать подальше то, чем можно причинить себе вред",
+        },
+        updatedAt: new Date().toISOString(),
+      };
+      const { data: current } = await supabase.from("sessions").select("patient_text, json_data").eq("session_id", session_id).maybeSingle();
+      const { error: saveError } = await supabase.from("sessions").update({
+        json_data: { ...(current?.json_data || {}), crisis_block: partialBlock },
+        patient_text: current?.patient_text || String(text || "").trim().slice(0, 12000),
+      }).eq("session_id", session_id);
+      if (saveError) console.error("[analyze] crisis snapshot save failed:", saveError.code);
+      return res.status(200).json({
+        type: "crisis_questions",
+        questions: SUPPORT_CRISIS_QUESTIONS,
+        crisis: { ...partialBlock, immediate_actions: ["Если можете быть в опасности — звоните 112 или 103", "Перейдите туда, где есть люди", "Свяжитесь с человеком, которому доверяете"], emergency_contacts: ["112", "103"] },
+        module: activeModule,
+      });
+    }
+
+    const mappedAnswers = {
+      safety: answers?.safety ?? answers?.[0] ?? "",
+      plan: answers?.plan ?? answers?.[1] ?? "",
+      alone: answers?.alone ?? answers?.[2] ?? "",
+      support: answers?.support ?? answers?.[3] ?? "",
+    };
+    const crisisBlock = buildCrisisResponse({
+      initialText: convHistory.filter((entry) => entry?.role === "user").map((entry) => entry.content || "").join("\n") || text,
+      answers: mappedAnswers,
+      markers: crisisSignals.markers,
+    });
+    crisisBlock.emergency_contacts = ["112", "103"];
+    const reportRequestId = `support-crisis:${session_id}:${Date.now()}`;
+    const saved = await saveFinalReportToSession({
+      supabase,
+      sessionId: session_id,
+      userReport: crisisBlock.userReport,
+      doctorReport: crisisBlock.doctorReport,
+      careRecommendation: crisisBlock.careRecommendation,
+      reportRequestId,
+      status: REPORT_STATUS.READY,
+      completedAt: crisisBlock.updatedAt,
+      patientText: anMedSupportFlow ? text : undefined,
+      extraJsonData: {
+        dialogDepth: depth,
+        answers: mappedAnswers,
+        questions: SUPPORT_CRISIS_QUESTIONS,
+        crisis_block: crisisBlock,
+      },
+    });
+    if (!saved) console.error("[analyze] crisis report save failed", session_id);
+    const { data: session } = await supabase.from("sessions").select("public_code, anonymous_owner_id").eq("session_id", session_id).maybeSingle();
+    const artifacts = await createReportArtifacts({ supabase, sessionId: session_id, module: "support", anonymousOwnerId: session?.anonymous_owner_id });
+    return res.status(200).json({
+      ...buildReportResponsePayload({
+        userReport: crisisBlock.userReport,
+        doctorReport: crisisBlock.doctorReport,
+        careRecommendation: crisisBlock.careRecommendation,
+        modelUsed: "deterministic_crisis_path",
+        fallbackUsed: false,
+        provider: "local_rules",
+        taskType: "crisis_safety_check",
+        requestDuration: 0,
+        publicCode: session?.public_code,
+        accessToken: artifacts.accessToken,
+        continuationCode: artifacts.continuationCode,
+      }),
+      crisis: crisisBlock,
+    });
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(200).json({
+      type: "questions",
+      questions: fallbackQuestions,
+      model_used: "none",
+      fallback_used: true,
+      module: activeModule,
+    });
+  }
 
   const antiRepeatBlock = buildAntiRepeatBlock(convHistory, activeModule);
 
@@ -1993,6 +2265,10 @@ AI-assisted summary не сформирован из-за технической
   const systemPrompt = (() => {
     const modulePrompt = readModulePrompt(activeModule, "triage-system.md");
     const basePrompt = modulePrompt || `Ты — AI-ассистент сервиса "Точка Опоры". Твоя задача — помогать пользователю описать своё состояние, задавать уточняющие вопросы и формировать предварительное заключение. Ты НЕ ставишь диагноз. Ты НЕ назначаешь лечение.`;
+    const anMedSupportClinicalRules = anMedSupportFlow ? `
+АнМед: если есть бессонница/тревога вместе со снижением аппетита, потерей веса или сердцебиением, коротко уточни настроение и интерес к привычным занятиям, динамику аппетита/веса с примерной величиной и сроком, длительность/обстоятельства сердцебиения и сопутствующие боль в груди, одышку или обморок. В отчёте объясни, что такие телесные изменения могут иметь разные причины и их следует обсудить с врачом; не объясняй их только тревогой и не ставь диагноз.
+При употреблении алкоголя уточни контекст и влияние позже, не предлагай алкоголь как способ совладания.
+` : "";
 
     // Common rules shared by all modules
     const commonRules = `
@@ -2059,6 +2335,8 @@ MAX_DEPTH = 8. После максимальной глубины заверши
 - используй "обнаружены сигналы", "важно уточнить"
 
 ${commonRules}
+
+${anMedSupportClinicalRules}
 
 --- ПРАВИЛА ФОРМИРОВАНИЯ ОТЧЁТА ДЛЯ КЛИЕНТА (user_report) ---
 
@@ -2275,7 +2553,7 @@ ${antiRepeatBlock}
 В разделе 6 user_report "Следующий шаг" обязательно используй маршрутизацию из care_recommendation level:
 - self_support: "Сейчас можно начать с нескольких простых шагов и поддержки близких. Если состояние не начнёт уменьшаться в ближайшие дни или станет сильнее, стоит обратиться к специалисту."
 - professional_contact: "Я бы рекомендовал в ближайшие дни связаться со специалистом." + конкретный тип специалиста, объяснение почему, и если есть телесные симптомы — отдельно рекомендация врача
-- urgent_help: "Здесь нужна срочная помощь сегодня. Пожалуйста, позвоните 112, обратитесь в ближайшее приёмное отделение или попросите близкого помочь вам добраться до помощи. Не оставайтесь сейчас один."
+- urgent_help: "${anMedSupportFlow ? "Здесь нужна срочная помощь сейчас. Позвоните 112 или 103, обратитесь в ближайшее приёмное отделение и попросите близкого побыть рядом. Не оставайтесь сейчас один." : "Здесь нужна срочная помощь сегодня. Пожалуйста, позвоните 112, обратитесь в ближайшее приёмное отделение или попросите близкого помочь вам добраться до помощи. Не оставайтесь сейчас один."}"
 
 Добавь в doctor_report раздел "Маршрутизация:" с care level, сроком, типом специалиста, причинами и interim_support.
 
@@ -2309,7 +2587,7 @@ ${antiRepeatBlock}
         supabase: finalSupabase,
         sessionId: session_id,
         module: activeModule,
-        patientText: text,
+        patientText: anMedSupportFlow ? text : undefined,
         conversationHistory: convHistory,
         dialogDepth: depth,
         inviteToken: req.body.invite_token || null,
@@ -2507,22 +2785,23 @@ ${antiRepeatBlock}
       }
 
       // Deterministic style fix (no AI call).
-      userPart = deterministicUserReportFix(userPart);
+      userPart = deterministicUserReportFix(userPart, { anMed: anMedSupportFlow });
 
       // --- Care recommendation: backend minimum level override ---
-      const fullConversation = (historyText || "") + " " + (text || "");
-      const hasSuicidalIntent = hasOwnRiskPattern(fullConversation, /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu);
-      const hasSuicidalPlan = hasOwnRiskPattern(fullConversation, /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/iu);
-      const hasPsychosis = hasOwnRiskPattern(fullConversation, /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/iu);
-      const hasMania = hasOwnRiskPattern(fullConversation, /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/iu);
-      const hasRiskToOthers = hasOwnRiskPattern(fullConversation, /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/iu);
-      const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/iu.test(fullConversation);
-      const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/iu.test(fullConversation);
-      const hasSomaticSymptoms = /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/iu.test(fullConversation);
-      const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/iu.test(fullConversation);
-      const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/iu.test(fullConversation);
-      const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/iu.test(fullConversation);
-      const hasSelfHarm = hasOwnRiskPattern(fullConversation, /реж.*себ|самоповреж|причин.*себе.*вред/iu);
+      const hasSuicidalIntent = hasOwnRiskPattern(riskAssessmentText, /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu);
+      const hasSuicidalPlan = hasOwnRiskPattern(riskAssessmentText, /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/iu);
+      const hasPsychosis = hasOwnRiskPattern(riskAssessmentText, /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/iu);
+      const hasMania = hasOwnRiskPattern(riskAssessmentText, /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/iu);
+      const hasRiskToOthers = hasOwnRiskPattern(riskAssessmentText, /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/iu);
+      const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/iu.test(riskAssessmentText);
+      const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/iu.test(riskAssessmentText);
+      const hasSomaticSymptoms = anMedSupportFlow
+        ? detectSupportSomaticSignals(riskAssessmentText).hasSomaticSymptoms
+        : /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/iu.test(riskAssessmentText);
+      const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/iu.test(riskAssessmentText);
+      const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/iu.test(riskAssessmentText);
+      const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/iu.test(riskAssessmentText);
+      const hasSelfHarm = hasOwnRiskPattern(riskAssessmentText, /реж.*себ|самоповреж|причин.*себе.*вред/iu);
 
       const minimumLevel = deriveMinimumCareLevel({
         riskLevel: null,
@@ -2561,6 +2840,7 @@ ${antiRepeatBlock}
       if (!userPart) {
         userPart = "Нам не удалось сформулировать итог разговора достаточно точно. Ваш диалог сохранён, и к нему можно вернуться позже по коду доступа.";
       }
+      userPart = synchronizeUserReportNextStep(userPart, careRec, { anMed: anMedSupportFlow });
 
       // Quality check is logged but not blocking — deterministic style fix already applied.
       const qualityCheck = checkReportQuality(userPart, text, historyText);
@@ -2604,6 +2884,7 @@ ${antiRepeatBlock}
         reportRequestId,
         status: REPORT_STATUS.READY,
         completedAt: new Date().toISOString(),
+        patientText: anMedSupportFlow ? text : undefined,
         extraJsonData,
       });
       const saveReportMs = Date.now() - tStep0;
@@ -2715,20 +2996,22 @@ ${antiRepeatBlock}
     let userPart = parsed.user_report || "";
     const doctorPart = parsed.doctor_report || "";
     let careRec = parsed.care_recommendation || null;
-    userPart = deterministicUserReportFix(userPart);
-    const fullConversation = (historyText || "") + " " + (text || "");
-    const hasSuicidalIntent = hasOwnRiskPattern(fullConversation, /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu);
-    const hasSuicidalPlan = hasOwnRiskPattern(fullConversation, /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/iu);
-    const hasPsychosis = hasOwnRiskPattern(fullConversation, /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/iu);
-    const hasMania = hasOwnRiskPattern(fullConversation, /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/iu);
-    const hasRiskToOthers = hasOwnRiskPattern(fullConversation, /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/iu);
-    const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/iu.test(fullConversation);
-    const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/iu.test(fullConversation);
-    const hasSomaticSymptoms = /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/iu.test(fullConversation);
-    const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/iu.test(fullConversation);
-    const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/iu.test(fullConversation);
-    const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/iu.test(fullConversation);
-    const hasSelfHarm = hasOwnRiskPattern(fullConversation, /реж.*себ|самоповреж|причин.*себе.*вред/iu);
+    userPart = deterministicUserReportFix(userPart, { anMed: anMedSupportFlow });
+    const riskDetectionOptions = activeModule === "support" ? undefined : { negationAware: false };
+    const hasSuicidalIntent = hasOwnRiskPattern(riskAssessmentText, /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu, riskDetectionOptions);
+    const hasSuicidalPlan = hasOwnRiskPattern(riskAssessmentText, /подробн.*план|знаю.*как.*сделаю|когда.*сделаю/iu, riskDetectionOptions);
+    const hasPsychosis = hasOwnRiskPattern(riskAssessmentText, /голос|слыш.*голос|вид.*то.*не.*вид|параной|след.*за.*мной|управля.*мысл/iu, riskDetectionOptions);
+    const hasMania = hasOwnRiskPattern(riskAssessmentText, /не.*спал.*дня|энерги.*слишком|бешен.*план|потратил.*все.*деньг|необычн.*сил/iu, riskDetectionOptions);
+    const hasRiskToOthers = hasOwnRiskPattern(riskAssessmentText, /причин.*вред.*друг|убь.*кого|опасен.*для.*окруж/iu, riskDetectionOptions);
+    const hasSevereDistress = /больше.*не.*могу|не.*выдерж|сдавать|край.*тяжел/iu.test(riskAssessmentText);
+    const hasFunctionalImpairment = /не.*работ|увол|не.*учёб|леж.*цел.*день|не.*вста|не.*выхож/iu.test(riskAssessmentText);
+    const hasSomaticSymptoms = activeModule === "support" && anMedSupportFlow
+      ? detectSupportSomaticSignals(riskAssessmentText).hasSomaticSymptoms
+      : /боль.*в.*груд|сердцебиен|одыш|обморок|головокружен|сдавил.*виск/iu.test(riskAssessmentText);
+    const hasTraumaticUncertainty = /пропал.*без.*вест|нет.*информац|судьб.*неизвест|не.*знаю.*жив|потерян.*связь/iu.test(riskAssessmentText);
+    const hasSleepDisruption = /не.*спл|просыпа.*паник|бессонн|спл.*3.*час|спл.*4.*час/iu.test(riskAssessmentText);
+    const hasSubstanceUse = /пил.*бутылк|алкоголь.*помога|выпива|опохмел|трясутся.*рук.*по.*утр/iu.test(riskAssessmentText);
+    const hasSelfHarm = hasOwnRiskPattern(riskAssessmentText, /реж.*себ|самоповреж|причин.*себе.*вред/iu, riskDetectionOptions);
     const minimumLevel = deriveMinimumCareLevel({
       riskLevel: null,
       suicidalIntent: hasSuicidalIntent,
@@ -2762,6 +3045,9 @@ ${antiRepeatBlock}
     });
     if (!userPart) {
       userPart = "Нам не удалось сформулировать итог разговора достаточно точно. Ваш диалог сохранён, и к нему можно вернуться позже по коду доступа.";
+    }
+    if (activeModule === "support") {
+      userPart = synchronizeUserReportNextStep(userPart, careRec, { anMed: anMedSupportFlow });
     }
     const report = userPart.includes("===USER_REPORT===")
       ? userPart

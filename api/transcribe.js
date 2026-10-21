@@ -4,6 +4,7 @@ import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
 import { getSupabase } from "../lib/supabase.js";
 import { validateSessionAccess } from "../lib/security/access-token.js";
+import { rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { debitCreditsForSession } from "../lib/usage/debit.js";
 
 const MAX_AUDIO_SIZE = 20 * 1024 * 1024; // 20 MB
@@ -106,12 +107,14 @@ export default async function handler(req, res) {
   // Require short-lived client token
   const tokenCheck = requireClientToken(["transcribe"])(req, res);
   if (!tokenCheck) return;
+  if (rejectUnavailableModule(res, tokenCheck.module)) return;
 
   // Parse optional session context from query params or headers
   const rawSessionId = (req.query?.session_id || req.headers["x-session-id"] || "").trim();
   const sessionId = rawSessionId && rawSessionId !== "null" && rawSessionId !== "undefined" ? rawSessionId : "";
   const rawModule = (req.query?.module || req.headers["x-module"] || "").trim();
   const module = rawModule && rawModule !== "null" && rawModule !== "undefined" ? rawModule : "";
+  if (rejectUnavailableModule(res, module)) return;
   const accessToken = (req.query?.access_token || req.headers["x-access-token"] || "").trim();
 
   // Validate ownership when session context is provided

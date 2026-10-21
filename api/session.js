@@ -1,3 +1,4 @@
+import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import crypto from "crypto";
 import { getSupabase } from "../lib/supabase.js";
 import { maskText, maskSensitiveData, getPrivacySafeMode } from "../lib/sanitize.js";
@@ -43,6 +44,32 @@ import {
   validatePatientMedicationOrder,
   PATIENT_MEDICATION_SAFETY_INSTRUCTION,
 } from "../lib/clinical/patient-reported-medication.js";
+import { LEGACY_CONTINUATION_CODE_MESSAGE, makeSessionSummary as createSessionSummary, normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
+import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
+
+const BODY_SESSION_ACTIONS = new Set([
+  "listBodyDailyLogs",
+  "getBodyCabinet",
+  "getBodyOnboarding",
+  "saveBodyOnboarding",
+  "updateBodyDisplayName",
+  "getBodyDiaryDay",
+  "savePlateHistory",
+  "getBodyPlateHistory",
+  "getBodyInsights",
+  "dismissBodyInsight",
+  "getBodyWeeklySummary",
+  "generateBodyWeeklySummary",
+  "getBodyAiChat",
+  "sendBodyAiMessage",
+  "getBodyHealthContext",
+  "saveBodyHealthContext",
+  "createBodyServiceRequest",
+  "createLegacyBodyServiceRequest",
+  "getBodyServiceRequests",
+  "getBodyServiceRequest",
+  "cancelBodyServiceRequest",
+]);
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -229,9 +256,11 @@ async function buildCabinetSessions({ module, ownerId, supabase }) {
     }
     const json = s.json_data || {};
     const input = (s.patient_text || "").trim();
-    const summary = input
-      ? `${input.split(/[.!?\n]/)[0].trim().slice(0, 110)}${input.split(/[.!?\n]/)[0].trim().length > 110 ? "…" : ""}`
-      : "Обращение без текстового описания.";
+    const summary = isAnMedSupportOnlyDeployment()
+      ? createSessionSummary(s)
+      : input
+        ? `${input.split(/[.!?\n]/)[0].trim().slice(0, 110)}${input.split(/[.!?\n]/)[0].trim().length > 110 ? "…" : ""}`
+        : "Обращение без текстового описания.";
     return {
       sessionId: s.session_id,
       publicCode: s.public_code,
@@ -289,6 +318,7 @@ async function buildCabinetData({ module, ownerId, supabase }) {
           previousDoctorReport: json.previousDoctorReport || "",
           dialogDepth: json.dialogDepth ?? 0,
           conversationHistory: data.conversation_history || [],
+          crisisBlock: isAnMedSupportOnlyDeployment() ? json.crisis_block || null : null,
         };
       }
     }
@@ -323,7 +353,11 @@ export default async function handler(req, res) {
   const limited = await limit(req, res);
   if (limited) return;
 
-  const { action } = req.body || {};
+  const { action, module } = req.body || {};
+  if (rejectUnavailableModule(res, module)) return;
+  if (isAnMedSupportOnlyDeployment() && (BODY_SESSION_ACTIONS.has(action) || hasBodySessionReference(req.body))) {
+    return res.status(403).json({ ok: false, error: "Модуль недоступен в этой сборке" });
+  }
 
   try {
     switch (action) {
@@ -500,6 +534,9 @@ async function handleSave(req, res) {
       return res.status(500).json({ ok: false, error: "База данных временно недоступна. Попробуйте позже." });
     }
 
+    if (deploymentOrganizationId() && !existing?.data) {
+      return res.status(403).json({ ok: false, error: "Сессия недоступна" });
+    }
     let publicCode = existing?.data?.public_code;
     let organizationId = existing?.data?.organization_id || null;
     let primaryExpertId = existing?.data?.primary_expert_id || null;
@@ -891,7 +928,9 @@ async function handleGetCabinet(req, res) {
     // All sessions for this owner (cabinet view, chronological desc).
     const { data: sessions, error: sessionsError } = await supabase
       .from("sessions")
-      .select("session_id, public_code, module, patient_text, created_at, json_data")
+      .select(isAnMedSupportOnlyDeployment()
+        ? "session_id, public_code, module, patient_text, user_report, support_plan, care_recommendation, conversation_history, created_at, json_data"
+        : "session_id, public_code, module, patient_text, created_at, json_data")
       .eq("anonymous_owner_id", ownerId)
       .eq("module", "support")
       .order("created_at", { ascending: false });
@@ -908,7 +947,7 @@ async function handleGetCabinet(req, res) {
         sessionId: s.session_id,
         publicCode: s.public_code,
         createdAt: s.created_at,
-        summary: makeSessionSummary(s),
+        summary: isAnMedSupportOnlyDeployment() ? createSessionSummary(s) : makeSessionSummary(s),
         status: isContinuation ? "followup" : "first_contact",
         order: idx + 1,
       };
@@ -924,6 +963,7 @@ async function handleGetCabinet(req, res) {
       resourceFactors: latestJson.resourceFactors || "",
       supportPlan: latest.support_plan || null,
       careRecommendation: latest.care_recommendation || null,
+      crisisBlock: isAnMedSupportOnlyDeployment() ? latestJson.crisis_block || null : null,
       dialogDepth: latestJson.dialogDepth ?? 0,
       conversationHistory: latest.conversation_history || [],
       createdAt: latest.created_at,
@@ -954,7 +994,9 @@ async function handleGetCabinet(req, res) {
     try {
       const { data: sr } = await supabase
         .from("service_requests")
-        .select("id, request_type, meeting_format, title, message, status, specialist_name, scheduled_at, created_at")
+        .select(isAnMedSupportOnlyDeployment()
+          ? "id, request_type, meeting_format, title, message, status, specialist_name, specialist_response, scheduled_at, scheduled_comment, answered_at, created_at"
+          : "id, request_type, meeting_format, title, message, status, specialist_name, scheduled_at, created_at")
         .eq("module", "support")
         .eq("owner_type", "anonymous_case")
         .eq("owner_id", ownerId)
@@ -963,6 +1005,29 @@ async function handleGetCabinet(req, res) {
       serviceRequests = sr || [];
     } catch (srError) {
       console.error("[getCabinet] service_requests error (non-blocking):", srError.message);
+    }
+
+    let matchRequests = [];
+    if (isAnMedSupportOnlyDeployment()) {
+      try {
+        const { data: matches } = await supabase
+          .from("specialist_match_requests")
+          .select("id, session_id, status, assigned_expert_id, created_at, assigned_at")
+          .eq("owner_type", "anonymous_case")
+          .eq("owner_id", ownerId)
+          .eq("module", "support")
+          .order("created_at", { ascending: false })
+          .limit(10);
+        matchRequests = matches || [];
+        const assignedIds = [...new Set(matchRequests.map((request) => request.assigned_expert_id).filter(Boolean))];
+        if (assignedIds.length > 0) {
+          const { data: experts } = await supabase.from("experts").select("id, name").in("id", assignedIds);
+          const names = new Map((experts || []).map((expert) => [expert.id, expert.name]));
+          matchRequests = matchRequests.map((request) => ({ ...request, assigned_expert_name: names.get(request.assigned_expert_id) || null }));
+        }
+      } catch (matchError) {
+        console.error("[getCabinet] AnMed specialist_match_requests error (non-blocking):", matchError.message);
+      }
     }
 
     // Owner display_name (optional)
@@ -1008,6 +1073,7 @@ async function handleGetCabinet(req, res) {
         organizationName: specialist.organizationName,
       } : null,
       service_requests: serviceRequests,
+      match_requests: matchRequests,
       unread_message_count: 0,
       display_name: ownerDisplayName,
       medication_cards: medicationCards,
@@ -1135,6 +1201,7 @@ async function handleGetReport(req, res) {
       resourceFactors: jsonData.resourceFactors || "",
       questions: jsonData.questions || null,
       answers: jsonData.answers || {},
+      crisisBlock: isAnMedSupportOnlyDeployment() ? jsonData.crisis_block || null : null,
       createdAt: data.created_at,
     };
 
@@ -1514,7 +1581,7 @@ async function handleExchangeContinuationCredential(req, res) {
     if (!parsed) {
       // Legacy short codes (ТОЧКА-XXXX-XXXX or HEALTH-XXXX-XXX) are never valid alone.
       if (isLegacyShortCode(continuation_code)) {
-        return res.status(403).json({ ok: false, error: LEGACY_CODE_ERROR });
+        return res.status(403).json({ ok: false, error: isAnMedSupportOnlyDeployment() ? LEGACY_CONTINUATION_CODE_MESSAGE : LEGACY_CODE_ERROR });
       }
       return res.status(401).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
     }
@@ -4315,7 +4382,15 @@ async function handleListPatientInvitations(req, res) {
       return res.status(500).json({ ok: false, error: "Не удалось загрузить приглашения" });
     }
 
-    return res.status(200).json({ ok: true, invitations: invitations || [] });
+    const currentInvitations = isAnMedSupportOnlyDeployment() ? normalizeInvitationStatuses(invitations || []) : (invitations || []);
+    const expiredIds = currentInvitations.filter((invitation, index) => invitation.status === "expired" && invitations?.[index]?.status === "pending").map((invitation) => invitation.id);
+    if (isAnMedSupportOnlyDeployment() && expiredIds.length > 0) {
+      await supabase.from("patient_specialist_invitations")
+        .update({ status: "expired", updated_at: new Date().toISOString() })
+        .in("id", expiredIds)
+        .eq("status", "pending");
+    }
+    return res.status(200).json({ ok: true, invitations: currentInvitations });
   } catch (error) {
     console.error("handleListPatientInvitations error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка сервера" });
@@ -4346,15 +4421,32 @@ async function handleCreateMatchRequest(req, res) {
       return res.status(400).json({ ok: false, error: "У вас уже есть закреплённый специалист" });
     }
 
+    if (isAnMedSupportOnlyDeployment()) {
+      const { data: activeRequest } = await supabase
+        .from("specialist_match_requests")
+        .select("id, session_id, status, created_at")
+        .eq("owner_type", "anonymous_case")
+        .eq("owner_id", owner.ownerId)
+        .eq("module", "support")
+        .eq("status", "submitted")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (activeRequest) return res.status(200).json({ ok: true, request: activeRequest, message: "Запрос уже отправлен" });
+    }
+
+    const requestFields = {
+      owner_type: "anonymous_case",
+      owner_id: owner.ownerId,
+      module: "support",
+      message: message || null,
+      status: "submitted",
+    };
+    if (isAnMedSupportOnlyDeployment()) requestFields.session_id = owner.sessionId;
+
     const { data: request, error } = await supabase
       .from("specialist_match_requests")
-      .insert({
-        owner_type: "anonymous_case",
-        owner_id: owner.ownerId,
-        module: "support",
-        message: message || null,
-        status: "submitted",
-      })
+      .insert(requestFields)
       .select("id, status, created_at")
       .single();
 
@@ -5022,7 +5114,7 @@ async function syncPracticesFromReport({ supabase, ownerId, sessionId, userRepor
 }
 
 // Upsert a single practice
-async function supsertPractice(supabase, ownerId, sessionId, practiceKey) {
+async function upsertPractice(supabase, ownerId, sessionId, practiceKey) {
   const def = PRACTICE_DEFS[practiceKey];
   if (!def) return;
 
