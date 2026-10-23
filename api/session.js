@@ -354,7 +354,13 @@ export default async function handler(req, res) {
   // Reuse the existing function slot; speech performs its own strict CORS,
   // client-token, Health availability, session ownership and rate-limit checks.
   if (req.body?.action === 'healthSpeech') {
-    return healthSpeechHandler({ ...req, body: { ...req.body, action: req.body.speech_action } }, res);
+    return healthSpeechHandler({
+      method: req.method,
+      headers: req.headers,
+      url: req.url,
+      socket: req.socket,
+      body: { ...req.body, action: req.body.speech_action },
+    }, res);
   }
 
   const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 60, prefix: "session:" });

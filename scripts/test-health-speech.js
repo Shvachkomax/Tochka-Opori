@@ -55,6 +55,22 @@ const { default: sessionHandler } = await import('../api/session.js');
 const routed = { status(c) { this.code = c; return this; }, setHeader(){}, json(d){this.data=d;} };
 await sessionHandler({ method:'POST', headers:{authorization:'Bearer bad'}, body:{action:'healthSpeech',speech_action:'test'} }, routed);
 assert.equal(routed.code, 401);
+// Node/Vercel requests expose fields through prototype getters, not enumerable
+// own properties. Object spreading such a request silently loses its headers.
+const runtimeRequest = Object.create(Object.defineProperties({}, {
+  method: { get: () => 'POST' },
+  headers: { get: () => ({ authorization: 'Bearer bad', origin: 'https://health.tochka-opori.online' }) },
+  url: { get: () => '/api/session' },
+  socket: { get: () => ({ remoteAddress: '127.0.0.1' }) },
+}));
+runtimeRequest.body = { action: 'healthSpeech', speech_action: 'test' };
+const runtimeResponse = { status(c) { this.code = c; return this; }, setHeader(){}, json(d){this.data=d;} };
+await sessionHandler(runtimeRequest, runtimeResponse);
+assert.equal(runtimeResponse.code, 401);
+runtimeRequest.body.access_token = 'fixture';
+Object.defineProperty(runtimeRequest, 'headers', { value: { authorization: `Bearer ${generateClientToken('analyze','body').token}` } });
+await sessionHandler(runtimeRequest, runtimeResponse);
+assert.equal(runtimeResponse.code, 403); // Reaches session validation, no DB write.
 console.log('Health speech: signing, expiry, ownership, module, origin, kill switch and upstream failure PASS');
 // Existing rate-limit module owns a housekeeping interval.
 process.exit(0);
