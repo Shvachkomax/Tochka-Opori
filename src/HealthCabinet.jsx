@@ -1,4 +1,5 @@
 import HealthConversation from "./HealthConversation.jsx";
+import HealthLiveConversation from "./HealthLiveConversation.jsx";
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { getClientToken } from "./lib/clientToken.js";
@@ -360,6 +361,7 @@ export default function HealthCabinet({
 
   // AI Chat
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [liveOpen, setLiveOpen] = useState(false);
   const chatInFlight = useRef(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
@@ -665,6 +667,11 @@ export default function HealthCabinet({
         <button disabled={chatLoading || recording || transcribing} onClick={() => setVoiceOpen(true)}>🎙 Поговорить</button>
       </div>}
       {voiceOpen && <HealthConversation sessionId={sessionId} accessToken={accessToken} onSend={sendChat} onClose={() => setVoiceOpen(false)} onSpecialist={onOpenServiceRequests} />}
+      {import.meta.env.VITE_HEALTH_LIVE_ENABLED === 'true' && <div className="health-talk-entry">
+        <div><strong>Живой разговор · тест</strong><p>GPT-Live: быстрый ответ голосом и возможность перебивать.</p></div>
+        <button disabled={chatLoading || recording || transcribing || voiceOpen} onClick={() => setLiveOpen(true)}>Попробовать GPT-Live</button>
+      </div>}
+      {liveOpen && <HealthLiveConversation sessionId={sessionId} accessToken={accessToken} onClose={() => setLiveOpen(false)} onSpecialist={onOpenServiceRequests} />}
 
       {/* Compact Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", marginBottom: 16, borderBottom: "1px solid #e8e2d8" }}>

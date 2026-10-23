@@ -22,6 +22,8 @@
     "test:session-access-pair": "node scripts/test-session-access-pair.js",
     "test:voice-audio-mime": "node scripts/test-voice-audio-mime.js",
     "test:health-speech": "node scripts/test-health-speech.js",
+    "test:health-live": "node scripts/test-health-live.js",
+    "e2e:health-live": "node scripts/e2e-health-live.mjs",
     "e2e:health-voice": "node scripts/e2e-health-voice.mjs",
     "test:service-request-finance": "node scripts/test-service-request-finance.js",
     "e2e:service-request-finance": "node scripts/e2e-service-request-finance-browser.mjs",

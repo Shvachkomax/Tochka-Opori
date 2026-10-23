@@ -1,5 +1,6 @@
 import { createSpeechTicket, speechText } from '../lib/voice/speech-ticket.js';
 import healthSpeechHandler from '../lib/voice/health-speech.js';
+import { createLiveHandler } from '../lib/voice/health-live.js';
 import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import crypto from "crypto";
 import { getSupabase } from "../lib/supabase.js";
@@ -353,6 +354,12 @@ export default async function handler(req, res) {
 
   // Reuse the existing function slot; speech performs its own strict CORS,
   // client-token, Health availability, session ownership and rate-limit checks.
+  if (req.body?.action === 'healthLive') {
+    return createLiveHandler({
+      resolveOwner: resolveBodyOwner,
+      buildContext: owner => buildAiChatContext({ supabase: getSupabase(), ownerId: owner.ownerId }),
+    })(req, res);
+  }
   if (req.body?.action === 'healthSpeech') {
     return healthSpeechHandler({
       method: req.method,
