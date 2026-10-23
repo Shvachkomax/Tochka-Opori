@@ -428,7 +428,7 @@ export default function HealthCabinet({
     loadChat();
   }, [sessionId, accessToken]);
 
-  async function sendChat(text) {
+  async function sendChat(text, options = {}) {
     const msg = (text || chatInput).trim();
     if (!msg || chatInFlight.current) return;
     chatInFlight.current = true;
@@ -453,7 +453,7 @@ export default function HealthCabinet({
       const res = await fetch("/api/session", {
         method: "POST",
         headers: hdrs,
-        body: JSON.stringify({ action: "sendBodyAiMessage", session_id: sessionId, access_token: accessToken, message_text: msg }),
+        body: JSON.stringify({ action: "sendBodyAiMessage", session_id: sessionId, access_token: accessToken, message_text: msg, conversation_mode: options.voice ? 'voice' : 'text' }),
       });
       const data = await res.json();
       setChatDebug("api " + res.status + " ok=" + data.ok);

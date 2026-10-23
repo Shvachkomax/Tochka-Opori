@@ -3,6 +3,11 @@ process.env.CLIENT_API_SIGNING_SECRET = 'test-only-health-voice-signing-secret';
 process.env.HEALTH_VOICE_ENABLED = 'true';
 process.env.OPENAI_API_KEY = 'test-only';
 const { createSpeechTicket, verifySpeechTicket, speechText } = await import('../lib/voice/speech-ticket.js');
+const { speechChunks } = await import('../lib/voice/speech-text.js');
+const longAnswer = ('Короткая фраза. Ещё одна мысль для разговора. ').repeat(45) + 'Важное предупреждение в конце.';
+const parts = speechChunks(longAnswer);
+assert.equal(parts.join(''),longAnswer);
+assert.ok(parts[0].length <= 240 && parts.every(p=>p.length <= 420));
 const { createHandler } = await import('../lib/voice/health-speech.js');
 const { generateClientToken } = await import('../lib/security/client-token.js');
 const text = speechText({ answer: 'Ответ.', safety_note: 'Предупреждение.', small_next_step: 'Шаг.' });
@@ -15,11 +20,13 @@ assert.equal(verifySpeechTicket(ticket, 'health-test', text, Date.now() + 601_00
 assert.equal(verifySpeechTicket(ticket + 'x', 'health-test', text), false);
 assert.equal(verifySpeechTicket('invalid', 'health-test', text), false);
 let upstreamCalls = 0;
+const spokenInputs = [];
 const handler = createHandler({
   validateAccess: async (sid, token) => sid === 'health-test' && token === 'owned',
   upstreamFetch: async (_url, options) => {
     upstreamCalls++;
     const payload = JSON.parse(options.body);
+    spokenInputs.push(payload.input);
     assert.equal(payload.response_format, 'mp3');
     return { ok: true, arrayBuffer: async () => new Uint8Array([73, 68, 51]).buffer };
   },
@@ -46,6 +53,16 @@ process.env.HEALTH_VOICE_ENABLED = 'true';
 const test = await request({ ...body, action: 'test', ticket: null });
 assert.equal(test.code, 200); assert.equal(test.headers['Cache-Control'], 'no-store');
 assert.equal(upstreamCalls, 2);
+const longBody = { ...body, text: longAnswer, ticket: createSpeechTicket('health-test', longAnswer), chunk_index: 0 };
+assert.equal((await request(longBody)).code,200);
+assert.equal(spokenInputs.at(-1), parts[0]);
+for (let index = 1; index < parts.length; index++) {
+  assert.equal((await request({...longBody,chunk_index:index})).code,200);
+  assert.equal(spokenInputs.at(-1),parts[index]);
+}
+assert.equal(spokenInputs.slice(-parts.length).join(''),longAnswer);
+assert.equal((await request({...longBody,chunk_index:999})).code,400);
+assert.equal((await request({...longBody,text:longAnswer+'tampered'})).code,400);
 const failing = createHandler({ validateAccess: async () => true, upstreamFetch: async () => { throw new Error('secret must not leak'); } });
 const res = { status(c) { this.code = c; return this; }, setHeader(){}, json(d){this.data=d;} };
 await failing({ method:'POST', headers:{authorization:`Bearer ${generateClientToken('analyze','body').token}`}, body }, res);

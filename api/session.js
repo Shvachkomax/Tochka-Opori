@@ -3082,7 +3082,10 @@ async function handleSendBodyAiMessage(req, res) {
     const medicationSafety = context.patient_medication_context
       ? `\n\nПравило безопасности по лекарствам:\n${PATIENT_MEDICATION_SAFETY_INSTRUCTION}`
       : "";
-    const systemPrompt = `${chatPrompt}\n\n${conversationStyle}${medicationSafety}\n\nКонтекст пользователя:\n${JSON.stringify(context, null, 2)}`;
+    const voiceStyle = req.body?.conversation_mode === 'voice'
+      ? '\n\nФормат голосового разговора: отвечай коротко, обычно 2–4 предложения; одна мысль и не более одного уточняющего вопроса за реплику. Не повторяй одно и то же в полях ответа. Все правила безопасности выше сохраняются: необходимые предупреждения не сокращай ради длины. Сохрани заданную JSON-структуру.'
+      : '';
+    const systemPrompt = `${chatPrompt}\n\n${conversationStyle}${medicationSafety}${voiceStyle}\n\nКонтекст пользователя:\n${JSON.stringify(context, null, 2)}`;
     const userPrompt = trimmed;
 
     const MODEL = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
@@ -3167,7 +3170,7 @@ async function handleSendBodyAiMessage(req, res) {
       ...assistantPayload,
       ai_response: fullResponse,
     }));
-    if (assistantInsertErr && assistantInsertErr.code === "42703") {
+    if (assistantInsertErr && (assistantInsertErr.code === "42703" || (assistantInsertErr.code === "PGRST204" && assistantInsertErr.message?.includes('ai_response')))) {
       // ai_response column does not exist — serialize full response into message_text
       assistantPayload.message_text = JSON.stringify(fullResponse);
       ({ error: assistantInsertErr } = await supabase.from("body_ai_chat").insert(assistantPayload));

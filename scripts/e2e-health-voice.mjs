@@ -12,7 +12,7 @@ const browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
-let chats = 0, transcriptions = 0, speaks = 0;
+let chats = 0, transcriptions = 0, speaks = 0, failSpeech = false;
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:5175';
 try {
   await page.addInitScript(() => {
@@ -44,7 +44,7 @@ try {
     if(req.url().includes('/api/client-token')) return route.fulfill({json:{token:'fixture',expires_at:new Date(Date.now()+900000).toISOString()}});
     if(req.url().includes('/api/transcribe')) { transcriptions++; assert.ok(req.headers()['content-type'].startsWith('audio/')); assert.equal(req.headers()['x-session-id'],'health-test'); return route.fulfill({json:{text:'Завтра хочу обсудить свой режим.'}}); }
     const data=req.postDataJSON();
-    if(data?.action==='healthSpeech') { speaks++; return route.fulfill({contentType:'audio/mpeg',body:Buffer.from('mock-mp3')}); }
+    if(data?.action==='healthSpeech') { speaks++; if(failSpeech) return route.fulfill({status:503,json:{error:'Тестовый сбой озвучивания'}}); return route.fulfill({contentType:'audio/mpeg',body:Buffer.from('mock-mp3')}); }
     if(data?.action==='sendBodyAiMessage') { chats++; return route.fulfill({json:{ok:true,message:{role:'assistant',answer:'Давайте обсудим ваш день. Что для вас важно завтра?',speech_ticket:'fixture-ticket',confidence:'high'}}}); }
     return route.fulfill({json:{ok:true,messages:[],insights:[],logs:[],summaries:[]}});
   });
@@ -56,7 +56,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
   await page.getByRole('button',{name:'🎙 Поговорить'}).click();
   const dialog = page.getByRole('dialog');
   await dialog.waitFor();
-  assert.equal(await dialog.getByRole('button',{name:'Начать разговор',exact:true}).isDisabled(),true);
+  assert.equal(await dialog.getByRole('button',{name:'Говорите',exact:true}).isDisabled(),true);
+  await dialog.getByText('Настройки звука',{exact:true}).click();
   await page.evaluate(() => { window.rejectMicrophone=true; });
   await dialog.getByRole('button',{name:/Проверить микрофон/}).click();
   await dialog.getByRole('alert').filter({hasText:'Разрешите доступ'}).waitFor();
@@ -70,24 +71,32 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
   await dialog.getByRole('button',{name:'Да, слышу'}).click();
   await dialog.getByLabel('Разрешаю отправлять', {exact:false}).check();
   await dialog.getByLabel('Слушать следующую').uncheck();
-  await dialog.getByRole('button',{name:'Начать разговор',exact:true}).click();
+  await dialog.getByRole('button',{name:'Говорите',exact:true}).click();
+  await page.waitForTimeout(1500);
+  await dialog.getByRole('button',{name:'Я закончил',exact:true}).click();
   await dialog.getByText('Распознаю речь…').waitFor({timeout:10000}).catch(()=>{});
   await dialog.getByText('Давайте обсудим ваш день. Что для вас важно завтра?',{exact:false}).waitFor({timeout:10000});
-  await dialog.getByRole('button',{name:'Начать разговор',exact:true}).waitFor();
+  await dialog.getByRole('button',{name:'Говорите',exact:true}).waitFor();
   await page.waitForFunction(()=>document.querySelector('.health-talk-status strong')?.textContent==='Готовы поговорить?');
   assert.equal(chats,1); assert.equal(transcriptions,1); assert.equal(speaks,2);
+  await dialog.getByText('Написать текстом',{exact:true}).click();
+  failSpeech = true;
   await dialog.getByLabel('Можно написать вместо голоса').fill('Хочу обсудить сон');
   await dialog.getByRole('button',{name:'Отправить текст',exact:true}).click();
+  await dialog.getByRole('button',{name:'Повторить озвучивание'}).waitFor();
+  failSpeech = false;
+  await dialog.getByRole('button',{name:'Повторить озвучивание'}).click();
   await page.waitForFunction(()=>document.querySelector('.health-talk-status strong')?.textContent==='Готовы поговорить?');
   assert.equal(chats,2);
   // No horizontal overflow at a phone-sized viewport.
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
-  await dialog.getByRole('button',{name:'Начать разговор',exact:true}).click();
+  await dialog.getByRole('button',{name:'Говорите',exact:true}).click();
   await page.waitForTimeout(350);
-  await dialog.getByRole('button',{name:'Пауза / остановить ответ'}).click();
+  await dialog.getByRole('button',{name:'Закрыть разговор'}).click();
   await page.waitForTimeout(300);
   assert.equal(await page.evaluate(()=>window.testTracks.every(t=>t.readyState==='ended')),true);
   assert.equal(transcriptions,1);
+  await page.getByRole('button',{name:'🎙 Поговорить'}).click();
   await page.screenshot({path:'/tmp/health-voice-mobile.png',fullPage:true});
   await dialog.getByRole('button',{name:'Связаться со специалистом'}).click();
   assert.equal(await page.evaluate(()=>window.specialistOpened),true);
