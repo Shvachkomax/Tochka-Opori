@@ -43,8 +43,8 @@ try {
     const req = route.request();
     if(req.url().includes('/api/client-token')) return route.fulfill({json:{token:'fixture',expires_at:new Date(Date.now()+900000).toISOString()}});
     if(req.url().includes('/api/transcribe')) { transcriptions++; assert.ok(req.headers()['content-type'].startsWith('audio/')); assert.equal(req.headers()['x-session-id'],'health-test'); return route.fulfill({json:{text:'Завтра хочу обсудить свой режим.'}}); }
-    if(req.url().includes('/api/health-speech')) { speaks++; return route.fulfill({contentType:'audio/mpeg',body:Buffer.from('mock-mp3')}); }
     const data=req.postDataJSON();
+    if(data?.action==='healthSpeech') { speaks++; return route.fulfill({contentType:'audio/mpeg',body:Buffer.from('mock-mp3')}); }
     if(data?.action==='sendBodyAiMessage') { chats++; return route.fulfill({json:{ok:true,message:{role:'assistant',answer:'Давайте обсудим ваш день. Что для вас важно завтра?',speech_ticket:'fixture-ticket',confidence:'high'}}}); }
     return route.fulfill({json:{ok:true,messages:[],insights:[],logs:[],summaries:[]}});
   });

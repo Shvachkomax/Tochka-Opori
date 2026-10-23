@@ -1,4 +1,5 @@
 import { createSpeechTicket, speechText } from '../lib/voice/speech-ticket.js';
+import healthSpeechHandler from '../lib/voice/health-speech.js';
 import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import crypto from "crypto";
 import { getSupabase } from "../lib/supabase.js";
@@ -348,6 +349,12 @@ export default async function handler(req, res) {
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  // Reuse the existing function slot; speech performs its own strict CORS,
+  // client-token, Health availability, session ownership and rate-limit checks.
+  if (req.body?.action === 'healthSpeech') {
+    return healthSpeechHandler({ ...req, body: { ...req.body, action: req.body.speech_action } }, res);
   }
 
   const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 60, prefix: "session:" });

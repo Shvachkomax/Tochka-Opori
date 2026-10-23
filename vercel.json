@@ -11,9 +11,6 @@
     },
     "api/transcribe.js": {
       "includeFiles": "node_modules/opusscript/build/**"
-    },
-    "api/health-speech.js": {
-      "maxDuration": 60
     }
   }
 }

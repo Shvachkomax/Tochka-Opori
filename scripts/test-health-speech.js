@@ -3,7 +3,7 @@ process.env.CLIENT_API_SIGNING_SECRET = 'test-only-health-voice-signing-secret';
 process.env.HEALTH_VOICE_ENABLED = 'true';
 process.env.OPENAI_API_KEY = 'test-only';
 const { createSpeechTicket, verifySpeechTicket, speechText } = await import('../lib/voice/speech-ticket.js');
-const { createHandler } = await import('../api/health-speech.js');
+const { createHandler } = await import('../lib/voice/health-speech.js');
 const { generateClientToken } = await import('../lib/security/client-token.js');
 const text = speechText({ answer: 'Ответ.', safety_note: 'Предупреждение.', small_next_step: 'Шаг.' });
 assert.equal(text, 'Ответ.\n\nПредупреждение.\n\nШаг.');
@@ -50,6 +50,11 @@ const failing = createHandler({ validateAccess: async () => true, upstreamFetch:
 const res = { status(c) { this.code = c; return this; }, setHeader(){}, json(d){this.data=d;} };
 await failing({ method:'POST', headers:{authorization:`Bearer ${generateClientToken('analyze','body').token}`}, body }, res);
 assert.equal(res.code, 503); assert.ok(!JSON.stringify(res.data).includes('secret'));
+// Verify the deployed /api/session dispatcher reaches the same protected handler.
+const { default: sessionHandler } = await import('../api/session.js');
+const routed = { status(c) { this.code = c; return this; }, setHeader(){}, json(d){this.data=d;} };
+await sessionHandler({ method:'POST', headers:{authorization:'Bearer bad'}, body:{action:'healthSpeech',speech_action:'test'} }, routed);
+assert.equal(routed.code, 401);
 console.log('Health speech: signing, expiry, ownership, module, origin, kill switch and upstream failure PASS');
 // Existing rate-limit module owns a housekeeping interval.
 process.exit(0);

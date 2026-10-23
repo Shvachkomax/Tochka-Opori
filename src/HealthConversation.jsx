@@ -149,7 +149,7 @@ export default function HealthConversation({ sessionId, accessToken, onSend, onC
   }
   async function speak(payload, id) {
     setPhase('loading');
-    const res = await request('/api/health-speech', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, session_id: sessionId, access_token: accessToken }) }, id);
+    const res = await request('/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, action: 'healthSpeech', speech_action: payload.action, session_id: sessionId, access_token: accessToken }) }, id);
     if (!res) return;
     const blob = await res.blob();
     if (payload.action === 'test' && id === run.current) setTested(true);
