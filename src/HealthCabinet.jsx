@@ -1,3 +1,4 @@
+import HealthConversation from "./HealthConversation.jsx";
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { getClientToken } from "./lib/clientToken.js";
@@ -358,6 +359,8 @@ export default function HealthCabinet({
   }
 
   // AI Chat
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const chatInFlight = useRef(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -427,7 +430,8 @@ export default function HealthCabinet({
 
   async function sendChat(text) {
     const msg = (text || chatInput).trim();
-    if (!msg || chatLoading) return;
+    if (!msg || chatInFlight.current) return;
+    chatInFlight.current = true;
     setChatInput("");
     setChatError("");
     setChatLoading(true);
@@ -479,12 +483,14 @@ export default function HealthCabinet({
         }, 0);
       });
       setChatDebug("done");
+      return assistantMsg;
     } catch (e) {
       setChatError(e.message || "Ошибка.");
       setChatDebug("error: " + e.message);
       setChatMessages(prev => prev.filter(m => m.id !== userMsg.id));
     } finally {
       setChatLoading(false);
+      chatInFlight.current = false;
     }
   }
 
@@ -654,6 +660,12 @@ export default function HealthCabinet({
 
   return (
     <div style={{ width: "100%" }}>
+      {import.meta.env.VITE_HEALTH_VOICE_ENABLED === 'true' && <div className="health-talk-entry">
+        <div><strong>Поговорим о вашем дне?</strong><p>Питание, сон, самочувствие и планы — можно просто рассказать.</p></div>
+        <button disabled={chatLoading || recording || transcribing} onClick={() => setVoiceOpen(true)}>🎙 Поговорить</button>
+      </div>}
+      {voiceOpen && <HealthConversation sessionId={sessionId} accessToken={accessToken} onSend={sendChat} onClose={() => setVoiceOpen(false)} onSpecialist={onOpenServiceRequests} />}
+
       {/* Compact Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", marginBottom: 16, borderBottom: "1px solid #e8e2d8" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

@@ -5,6 +5,7 @@ import { Readable } from "node:stream";
 dotenv.config({ path: ".env.local" });
 
 import analyzeHandler from "./api/analyze.js";
+import healthSpeechHandler from "./api/health-speech.js";
 import transcribeHandler from "./api/transcribe.js";
 import sessionHandler from "./api/session.js";
 import reviewsHandler from "./api/reviews.js";
@@ -30,6 +31,7 @@ function createReqRes(nodeReq, nodeRes, bodyBuffer) {
     headers: {},
     status(code) { this.statusCode = code; return this; },
     setHeader(name, value) { this.headers[name] = value; },
+    end() { nodeRes.writeHead(this.statusCode, this.headers); nodeRes.end(); return this; },
     json(data) {
       nodeRes.writeHead(this.statusCode, { "Content-Type": "application/json", ...this.headers });
       nodeRes.end(JSON.stringify(data));
@@ -73,6 +75,7 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     if (nodeReq.url.startsWith("/api/analyze")) {
       return analyzeHandler(req, res);
     }
+    if (nodeReq.url.startsWith("/api/health-speech")) return healthSpeechHandler(req, res);
     if (nodeReq.url.startsWith("/api/transcribe")) {
       return transcribeHandler(req, res);
     }

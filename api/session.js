@@ -1,3 +1,4 @@
+import { createSpeechTicket, speechText } from '../lib/voice/speech-ticket.js';
 import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import crypto from "crypto";
 import { getSupabase } from "../lib/supabase.js";
@@ -3027,6 +3028,7 @@ async function handleSendBodyAiMessage(req, res) {
         message: {
           id: crypto.randomUUID(),
           role: "assistant",
+          speech_ticket: createSpeechTicket(session_id, speechText({ answer: intentResult.answer, safety_note: intentResult.safety_note })),
           answer: intentResult.answer,
           small_next_step: null,
           question_for_specialist: null,
@@ -3168,6 +3170,7 @@ async function handleSendBodyAiMessage(req, res) {
       message: {
         id: assistantMsgId,
         role: "assistant",
+        speech_ticket: createSpeechTicket(session_id, speechText(fullResponse)),
         answer: aiAnswer,
         small_next_step: aiSmallStep,
         question_for_specialist: aiQuestion,
