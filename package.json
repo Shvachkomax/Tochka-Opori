@@ -29,6 +29,7 @@
     "test:practice-sync": "node scripts/test-practice-sync.js",
     "test:specialist-memberships": "node scripts/test-specialist-memberships.js",
     "test:support-risk-routing": "node scripts/test-support-risk-routing.js",
+    "test:support-dialogue-invitation": "node scripts/test-support-dialogue-invitation.js",
     "test:cabinet-defects": "node scripts/test-cabinet-defects.js",
     "test:crisis-mobile": "node scripts/test-crisis-mobile.mjs",
     "test:patient-specialist-workflow": "node scripts/test-patient-specialist-workflow.mjs"

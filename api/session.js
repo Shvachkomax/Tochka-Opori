@@ -46,6 +46,12 @@ import {
 } from "../lib/clinical/patient-reported-medication.js";
 import { LEGACY_CONTINUATION_CODE_MESSAGE, makeSessionSummary as createSessionSummary, normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
 import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
+import {
+  buildDialogueInvitationContext,
+  buildDialogueInvitationPromptNote,
+  getCabinetInvitationById,
+  getPreviousVisitGapDays,
+} from "../lib/support/dialogue-invitations.js";
 
 const BODY_SESSION_ACTIONS = new Set([
   "listBodyDailyLogs",
@@ -5481,7 +5487,7 @@ function getModuleConfig(module) {
 
 async function handleSendSupportMessage(req, res) {
   try {
-    const { session_id, access_token, message } = req.body || {};
+    const { session_id, access_token, message, dialogue_invitation_id } = req.body || {};
     const owner = await resolveSupportOwner(session_id, access_token);
     if (!owner) {
       return res.status(401).json({ ok: false, error: "Требуется авторизация." });
@@ -5550,6 +5556,15 @@ async function handleSendSupportMessage(req, res) {
 
     // Build context for AI
     const context = await buildSupportChatContext(supabase, owner.ownerId);
+    const trustedInvitation = !isAnMedSupportOnlyDeployment()
+      ? getCabinetInvitationById(dialogue_invitation_id)
+      : null;
+    const dialogueInvitation = trustedInvitation
+      ? buildDialogueInvitationContext(dialogue_invitation_id, {
+        gapDays: getPreviousVisitGapDays(context.latest_session_date),
+      })
+      : null;
+    if (dialogueInvitation) context.dialogue_invitation = dialogueInvitation;
 
     // Read prompt
     const { readModulePrompt, readCorePrompt } = await import("../lib/prompts.js");
@@ -5558,7 +5573,10 @@ async function handleSendSupportMessage(req, res) {
     const medicationSafety = context.patient_medication_context
       ? `\n\nПравило безопасности по лекарствам:\n${PATIENT_MEDICATION_SAFETY_INSTRUCTION}`
       : "";
-    const systemPrompt = `${chatPrompt}\n\n${conversationStyle}${medicationSafety}\n\nКонтекст пользователя:\n${JSON.stringify(context, null, 2)}`;
+    const invitationNote = dialogueInvitation
+      ? `\n\n${buildDialogueInvitationPromptNote(dialogueInvitation)}`
+      : "";
+    const systemPrompt = `${chatPrompt}\n\n${conversationStyle}${medicationSafety}${invitationNote}\n\nКонтекст пользователя:\n${JSON.stringify(context, null, 2)}`;
 
     // Call AI
     const { runTask, TASK_TYPES } = await import("../lib/modelRouter.js");

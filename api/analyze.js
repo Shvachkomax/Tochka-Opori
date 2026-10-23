@@ -16,6 +16,7 @@ import { generateSessionAccessToken } from "../lib/security/access-token.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
 import { buildHealthDiaryLogicalSourceId, buildHealthDiaryObservationSnapshot } from "../lib/clinical/observation-mappings.js";
 import { recordClinicalObservation } from "../lib/clinical/projection.js";
+import { buildDialogueInvitationContext, buildDialogueInvitationPromptNote, getFirstScreenInvitationById } from "../lib/support/dialogue-invitations.js";
 import {
   REPORT_STATUS,
   getStableReportRequestId,
@@ -2079,7 +2080,14 @@ export default async function handler(req, res) {
   const convHistory = Array.isArray(rawHistory) ? rawHistory : [];
   const earlyRiskText = buildUserRiskAssessmentText({ text, answers, conversationHistory: convHistory });
   const earlyCrisisSignals = anMedSupportFlow ? detectSupportCrisisSignals(earlyRiskText) : { detected: false, markers: [] };
-  if ((!text || text.trim().length < 10) && !earlyCrisisSignals.detected) {
+  const dialogueInvitation = !anMedSupportFlow
+    && activeModule === "support"
+    && Number(depth) === 0
+    && !isContinuation
+    ? buildDialogueInvitationContext(getFirstScreenInvitationById(req.body?.dialogue_invitation_id)?.id)
+    : null;
+  const invitationAllowsShortText = Boolean(dialogueInvitation && typeof text === "string" && text.trim());
+  if ((!text || text.trim().length < 10) && !earlyCrisisSignals.detected && !invitationAllowsShortText) {
     return res.status(400).json({ error: "Опишите состояние подробнее" });
   }
 
@@ -2383,6 +2391,9 @@ ${antiRepeatBlock}
   })();
 
   let userPrompt = "";
+  const dialogueInvitationBlock = dialogueInvitation
+    ? `\n\n${buildDialogueInvitationPromptNote(dialogueInvitation)}`
+    : "";
 
   if (isContinuation && depth === 0) {
     const followupAnsweredBlock = buildFollowupAnsweredBlock(followup_answered_topics);
@@ -2465,6 +2476,7 @@ ${text}
 - Что раньше помогало переживать трудные периоды?
 - Есть ли возможность в ближайшие 24 часа снизить нагрузку?
 Вопросы должны быть адаптивными к тексту пользователя, а не шаблонными.
+${dialogueInvitationBlock}
 
 Верни JSON:
 { "type": "questions", "questions": ["вопрос 1", "вопрос 2", "вопрос 3", "вопрос 4"] }`;

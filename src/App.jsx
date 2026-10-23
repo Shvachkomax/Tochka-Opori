@@ -18,6 +18,8 @@ import ExpertInvitePage from "./pages/expert/ExpertInvitePage.jsx";
 import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
 import SpecialistCabinet from "./pages/specialist/SpecialistCabinet.jsx";
 import { APP_BRAND } from "./lib/appBrand.js";
+import SupportDialogueInvitation from "./SupportDialogueInvitation.jsx";
+import { FIRST_SCREEN_INVITATIONS, buildCabinetInvitations } from "../lib/support/dialogue-invitations.js";
 
 class AdminErrorBoundary extends Component {
   constructor(props) {
@@ -73,6 +75,8 @@ export default function App() {
 
   const quickChatContainerRef = useRef(null);
   const quickChatInputRef = useRef(null);
+  const supportTextareaRef = useRef(null);
+  const cabinetDialogueInvitationPendingRef = useRef(false);
 
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -182,6 +186,14 @@ export default function App() {
   const [quickChatShowHistory, setQuickChatShowHistory] = useState(false);
   const [quickChatScrolledUp, setQuickChatScrolledUp] = useState(false);
   const [quickChatHasNewResponse, setQuickChatHasNewResponse] = useState(false);
+  // Live dialogue invitations (main Support only)
+  const [firstDialogueInvitation, setFirstDialogueInvitation] = useState(null);
+  const [firstDialogueInvitationActive, setFirstDialogueInvitationActive] = useState(null);
+  const [firstDialogueInvitationLocked, setFirstDialogueInvitationLocked] = useState(false);
+  const [cabinetDialogueInvitation, setCabinetDialogueInvitation] = useState(null);
+  const [cabinetDialogueInvitationActive, setCabinetDialogueInvitationActive] = useState(null);
+  const [cabinetDialogueInvitationLocked, setCabinetDialogueInvitationLocked] = useState(false);
+  const [dialogueInvitationResetToken, setDialogueInvitationResetToken] = useState(0);
   // Follow-up answered topics for AI dedup
   const [followupAnsweredTopics, setFollowupAnsweredTopics] = useState(null);
   // Display name
@@ -371,6 +383,42 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setBodyScreen("cabinet");
   }
 
+  // Support dialogue invitations
+  function markFirstDialogueInvitationInteraction() {
+    if (APP_BRAND.isSupportPilot || activeModule !== "support" || supportScreen !== "landing" || phase !== "input") return;
+    if (firstDialogueInvitationLocked) return;
+    const invitation = firstDialogueInvitation || FIRST_SCREEN_INVITATIONS[0];
+    if (!invitation) return;
+    setFirstDialogueInvitationActive(invitation);
+    setFirstDialogueInvitationLocked(true);
+  }
+
+  function markCabinetDialogueInvitationInteraction() {
+    if (APP_BRAND.isSupportPilot || activeModule !== "support" || supportScreen !== "cabinet") return;
+    if (cabinetDialogueInvitationLocked) return;
+    const invitation = cabinetDialogueInvitation;
+    if (!invitation) return;
+    setCabinetDialogueInvitationActive(invitation);
+    setCabinetDialogueInvitationLocked(true);
+    cabinetDialogueInvitationPendingRef.current = true;
+  }
+
+  function handleFirstDialogueInvitationTalk(invitation) {
+    if (!invitation) return;
+    setFirstDialogueInvitationActive(invitation);
+    setFirstDialogueInvitationLocked(true);
+    setMode("text");
+    window.setTimeout(() => supportTextareaRef.current?.focus(), 0);
+  }
+
+  function handleCabinetDialogueInvitationTalk(invitation) {
+    if (!invitation) return;
+    setCabinetDialogueInvitationActive(invitation);
+    setCabinetDialogueInvitationLocked(true);
+    cabinetDialogueInvitationPendingRef.current = true;
+    window.setTimeout(() => quickChatInputRef.current?.focus(), 0);
+  }
+
   // Support navigation: go to landing (no logout)
   function goToSupportLanding() {
     setSupportScreen("landing");
@@ -378,6 +426,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setSupportNewRequestOpen(false);
     setSupportViewingSession(null);
     setSupportViewingSessionData(null);
+    setFirstDialogueInvitationActive(null);
+    setFirstDialogueInvitationLocked(false);
+    setCabinetDialogueInvitationActive(null);
+    setCabinetDialogueInvitationLocked(false);
+    cabinetDialogueInvitationPendingRef.current = false;
+    setDialogueInvitationResetToken((previous) => previous + 1);
   }
 
   // Support navigation: go to cabinet
@@ -1316,6 +1370,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setQuickChatMessages([]);
       setQuickChatInput("");
       setQuickChatShowHistory(false);
+      setCabinetDialogueInvitation(null);
+      setCabinetDialogueInvitationActive(null);
+      setCabinetDialogueInvitationLocked(false);
+      cabinetDialogueInvitationPendingRef.current = false;
       return true;
     } catch (e) {
       const msg = e.message || "";
@@ -2154,6 +2212,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     if (!saved.sessionId || !saved.accessToken) return;
     const trimmed = (text || quickChatInput).trim();
     if (!trimmed) return;
+    const dialogueInvitationId = !APP_BRAND.isSupportPilot && cabinetDialogueInvitationPendingRef.current
+      ? cabinetDialogueInvitationActive?.id
+      : undefined;
 
     // Optimistic add
     const tempId = "temp-" + Date.now();
@@ -2168,11 +2229,18 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const res = await fetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "sendSupportMessage", session_id: saved.sessionId, access_token: saved.accessToken, message: trimmed }),
+        body: JSON.stringify({
+          action: "sendSupportMessage",
+          session_id: saved.sessionId,
+          access_token: saved.accessToken,
+          message: trimmed,
+          dialogue_invitation_id: dialogueInvitationId,
+        }),
       });
       const data = await res.json();
       if (res.ok && data.ok) {
         // Success: clear input and replace temp with real messages
+        cabinetDialogueInvitationPendingRef.current = false;
         setQuickChatInput("");
         setQuickChatMessages(prev => {
           const withoutTemp = prev.filter(m => m.id !== tempId);
@@ -2382,6 +2450,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       return;
     }
 
+    if (target === "quick_chat" && supportScreen === "cabinet") {
+      markCabinetDialogueInvitationInteraction();
+    }
     setCabinetVoiceError("");
     setCabinetVoiceTarget(target);
     cabinetVoiceIgnoreStopRef.current = false;
@@ -2470,7 +2541,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           {active && cabinetVoiceTranscribing
             ? "Расшифровываем..."
             : active && cabinetVoiceRecording
-              ? "■ Остановить и расшифровать"
+              ? (!APP_BRAND.isSupportPilot ? "Я закончил" : "■ Остановить и расшифровать")
               : `🎙 ${idleLabel}`}
         </button>
         {active && cabinetVoiceRecording && (
@@ -2484,6 +2555,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   }
 
   async function startRecording() {
+    if (activeModule === "support" && supportScreen === "landing" && phase === "input") {
+      markFirstDialogueInvitationInteraction();
+    }
     setVoiceError("");
 
     try {
@@ -2785,7 +2859,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   async function submitRound(overrideText) {
     const inputText = typeof overrideText === "string" ? overrideText : text;
-    if (dialogDepth === 0 && inputText.trim().length < 10) {
+    const dialogueInvitationId = !APP_BRAND.isSupportPilot
+      && activeModule === "support"
+      && dialogDepth === 0
+      && !isContinuation
+      ? firstDialogueInvitationActive?.id
+      : undefined;
+    const hasInvitationContext = Boolean(dialogueInvitationId && inputText.trim());
+    if (dialogDepth === 0 && inputText.trim().length < 10 && !hasInvitationContext) {
       setError("Напишите хотя бы 2–3 предложения.");
       return;
     }
@@ -2852,6 +2933,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           supportPlan,
           voiceObservations,
           module: mod,
+          dialogue_invitation_id: dialogueInvitationId,
           followup_answered_topics: followupAnsweredTopics || undefined,
           crisis_mode: crisisMode,
         }, analyzeSessionId ? {
@@ -3369,6 +3451,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setContinuationCodeInput("");
     setContinuationCodeError("");
     setRegeneratedCode(null);
+    setFirstDialogueInvitationActive(null);
+    setFirstDialogueInvitationLocked(false);
+    setCabinetDialogueInvitation(null);
+    setCabinetDialogueInvitationActive(null);
+    setCabinetDialogueInvitationLocked(false);
+    cabinetDialogueInvitationPendingRef.current = false;
+    setDialogueInvitationResetToken((previous) => previous + 1);
     setBodyIntakeStage("idle");
     setBodyIntakeResult(null);
     setBodyScreen("landing");
@@ -10679,6 +10768,16 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
             )}
 
+            {activeModule === "support" && !APP_BRAND.isSupportPilot && phase === "input" && !isContinuation && !crisisMode && (
+              <SupportDialogueInvitation
+                invitations={FIRST_SCREEN_INVITATIONS}
+                onSelectionChange={setFirstDialogueInvitation}
+                onTalk={handleFirstDialogueInvitationTalk}
+                engagementLocked={firstDialogueInvitationLocked}
+                resetToken={dialogueInvitationResetToken}
+              />
+            )}
+
             {activeModule === "body" && localStorage.getItem("body_referral_source") === "alena_client" && bodyScreen === "landing" && (
               <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "#e8f0ea", border: "1px solid #c4d0c6" }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "#2f2925", marginBottom: 2 }}>
@@ -10728,7 +10827,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     </button>
                   ) : (
                     <button style={{ ...s.wide, background: "#B85C4A", color: "white" }} onClick={stopRecording}>
-                      Остановить и расшифровать
+                      {activeModule === "support" && !APP_BRAND.isSupportPilot ? "Я закончил" : "Остановить и расшифровать"}
                     </button>
                   )}
 
@@ -10751,9 +10850,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               ) : phase === "input" ? (
                 <>
                   <textarea
+                    ref={supportTextareaRef}
                     style={s.textarea}
                     value={text}
-                    onChange={(e) => setText(e.target.value)}
+                    onFocus={markFirstDialogueInvitationInteraction}
+                    onChange={(e) => {
+                      setText(e.target.value);
+                      markFirstDialogueInvitationInteraction();
+                    }}
                     placeholder={isDedicatedSubdomain ? "Например: хочу снизить вес, наладить питание, больше двигаться, лучше спать и понять, с чего начать…" : "Например: последние недели плохо сплю, тревожусь, не могу собраться, стало трудно заниматься обычными делами…"}
                   />
                   <button
@@ -10819,7 +10923,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         {questionTranscribingIndex === index
                           ? "Расшифровываем..."
                           : recordingQuestionIndex === index
-                            ? "Остановить и расшифровать"
+                            ? (activeModule === "support" && !APP_BRAND.isSupportPilot ? "Я закончил" : "Остановить и расшифровать")
                             : "Ответить голосом"}
                       </button>
 
@@ -11446,6 +11550,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               ? new Date(latestSession.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
               : "—";
             const wallet = !APP_BRAND.isSupportPilot && supportCabinet.wallet?.visible ? supportCabinet.wallet : null;
+            const cabinetInvitations = buildCabinetInvitations({
+              hasPreviousConversation: Boolean(latestSession),
+              previousVisitAt: latestSession?.createdAt || null,
+            });
+            const cabinetCrisisActive = Boolean(supportCabinet.latest_report?.crisisBlock) || Boolean(careNextStep?.urgent);
 
             return (
               <section style={{ width: "100%" }} className="app-card-support">
@@ -11471,6 +11580,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
                 <PatientMedicationOrders module="support" />
                 <MedicationCard cards={supportCabinet.medication_cards} />
+
+                {!APP_BRAND.isSupportPilot && !cabinetCrisisActive && (
+                  <SupportDialogueInvitation
+                    eyebrow="Можно продолжить с этого"
+                    invitations={cabinetInvitations}
+                    onSelectionChange={setCabinetDialogueInvitation}
+                    onTalk={handleCabinetDialogueInvitationTalk}
+                    engagementLocked={cabinetDialogueInvitationLocked}
+                    resetToken={dialogueInvitationResetToken}
+                  />
+                )}
 
                 {/* ROW 1: Последний разговор + Следующий шаг */}
                 {latestSession && (
@@ -11594,7 +11714,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                         ref={quickChatInputRef}
                         style={{ ...s.answerInput, width: "100%", minHeight: 60, maxHeight: 120, marginBottom: 8, resize: "vertical" }}
                         value={quickChatInput}
-                        onChange={(e) => setQuickChatInput(e.target.value)}
+                        onFocus={markCabinetDialogueInvitationInteraction}
+                        onChange={(e) => {
+                          setQuickChatInput(e.target.value);
+                          markCabinetDialogueInvitationInteraction();
+                        }}
                         placeholder="Что у вас сегодня? Можно спросить о чём угодно…"
                          rows={2}
                          onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); sendQuickChatMessage(); } }}
