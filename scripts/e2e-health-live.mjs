@@ -74,7 +74,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
   await dialog.getByText('Слушаю вас — можно говорить и перебивать').waitFor();
   await dialog.locator('audio[controls]').waitFor();
   await dialog.locator('summary').click();
-  await dialog.getByText('Давайте обсудим ваш режим.', { exact: true }).waitFor();
+  await dialog.getByLabel('Текст ответа ИИ').waitFor();
   await page.evaluate(() => {
     const peer = window.peers.at(-1);
     const event = { type: 'response.event', event: { type: 'response.completed', response: { id: 'resp_1', usage: { total_tokens: 30 } } } };
@@ -82,6 +82,17 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
   });
   await dialog.getByText('Получено токенов backend: 30', { exact: false }).waitFor();
   await dialog.getByRole('button', { name: 'Я закончил', exact: true }).click();
+  await dialog.getByText('Микрофон на паузе — слушаем ответ').waitFor();
+  assert.equal(await page.evaluate(() => window.commands.some(e => e.type === 'session.close')), false);
+  assert.equal(await page.evaluate(() => window.peers.at(-1).track.enabled), false);
+  await page.evaluate(() => window.peers.at(-1).emit({ type: 'session.output_transcript.delta', delta: ' Ответ после вашей реплики.' }));
+  await dialog.getByLabel('Текст ответа ИИ').filter({ hasText: 'Ответ после вашей реплики.' }).waitFor();
+  await dialog.getByRole('button', { name: 'Говорите', exact: true }).click();
+  assert.equal(await page.evaluate(() => window.peers.at(-1).track.enabled), true);
+  assert.equal(creates, 1);
+  await page.evaluate(() => navigator.mediaDevices.dispatchEvent(new Event('devicechange')));
+  assert.equal(await dialog.getByRole('button', { name: 'Я закончил', exact: true }).count(), 1);
+  await dialog.getByRole('button', { name: 'Завершить разговор', exact: true }).click();
   await dialog.getByText('Итог подтверждён.', { exact: false }).waitFor();
   assert.equal(await page.evaluate(() => window.tracks.every(t => t.readyState === 'ended')), true);
   assert.equal(await page.evaluate(() => window.peers.every(p => p.closed)), true);

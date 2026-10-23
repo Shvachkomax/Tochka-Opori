@@ -9,6 +9,8 @@ export default function HealthLiveConversation({ sessionId, accessToken, onClose
   const [transcript, setTranscript] = useState({ user: '', assistant: '' });
   const [seconds, setSeconds] = useState(0), [confirmed, setConfirmed] = useState(false), [blocked, setBlocked] = useState(false);
   const [level, setLevel] = useState(0), [backendTokens, setBackendTokens] = useState(0);
+  const [micPaused, setMicPaused] = useState(false);
+  const [diagnostic, setDiagnostic] = useState('');
   const audio = useRef(null), box = useRef(null), current = useRef(null), mounted = useRef(true);
   const busy = ['checking', 'connecting', 'active', 'closing'].includes(phase);
 
@@ -53,7 +55,12 @@ export default function HealthLiveConversation({ sessionId, accessToken, onClose
     const previous = document.activeElement, overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden'; box.current?.focus();
     const hidden = () => { if (document.hidden) end('Разговор остановлен при уходе со страницы.'); };
-    const changed = () => end('Устройство звука изменилось. Начните новый разговор.');
+    // Chrome can fire devicechange when permission reveals device labels.
+    // Only an ended capture track is evidence that our microphone disappeared.
+    const changed = () => {
+      const run = current.current;
+      if (run?.stream?.getAudioTracks().some(t => t.readyState === 'ended')) end('Микрофон отключён. Начните новый разговор.');
+    };
     document.addEventListener('visibilitychange', hidden); navigator.mediaDevices?.addEventListener?.('devicechange', changed);
     return () => {
       mounted.current = false; end(); current.current?.stream?.getTracks().forEach(t => t.stop());
@@ -70,7 +77,7 @@ export default function HealthLiveConversation({ sessionId, accessToken, onClose
     if (current.current && !current.current.finished) return;
     const run = { started: Date.now(), lastActivity: Date.now(), analysers: [], pending: new Set(), completed: new Set() };
     current.current = run;
-    setError(''); setConfirmed(false); setBlocked(false); setTranscript({ user: '', assistant: '' }); setSeconds(0); setBackendTokens(0); setPhase('connecting');
+    setError(''); setMicPaused(false); setDiagnostic('Запрашиваю микрофон'); setConfirmed(false); setBlocked(false); setTranscript({ user: '', assistant: '' }); setSeconds(0); setBackendTokens(0); setPhase('connecting');
     try {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) throw new Error('Нужен браузер с WebRTC и микрофоном по HTTPS.');
       const Context = window.AudioContext || window.webkitAudioContext;
@@ -78,11 +85,15 @@ export default function HealthLiveConversation({ sessionId, accessToken, onClose
       run.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
       if (run.finished || run.closing || !mounted.current) { run.stream.getTracks().forEach(t => t.stop()); cleanup(run); return; }
       observeAudio(run, run.stream);
+      run.stream.getAudioTracks().forEach(track => track.addEventListener('ended', () => {
+        if (!run.finished && !run.closing) end('Микрофон отключён. Начните новый разговор.');
+      }));
       const peer = new RTCPeerConnection(); run.peer = peer;
       run.stream.getAudioTracks().forEach(track => peer.addTrack(track, run.stream));
       peer.ontrack = event => {
         if (run.finished || !audio.current) return;
         const stream = new MediaStream([event.track]); observeAudio(run, stream); audio.current.srcObject = stream;
+        if (mounted.current) setDiagnostic('Аудиоканал ответа подключён');
         if (!run.closing) audio.current.play().catch(() => { if (mounted.current && !run.finished) setBlocked(true); });
       };
       peer.onconnectionstatechange = () => { if (['failed', 'disconnected'].includes(peer.connectionState) && !run.finished) end('Соединение прервалось. Можно начать разговор заново.'); };
@@ -93,10 +104,16 @@ export default function HealthLiveConversation({ sessionId, accessToken, onClose
         if (event.type === 'session.started') {
           run.ready = true; run.started = Date.now(); run.lastActivity = Date.now(); clearTimeout(run.startTimer);
           if (run.closing || !mounted.current) { run.closeWhenReady?.(); return; }
-          setPhase('active');
+          setPhase('active'); setDiagnostic('GPT-Live подтвердил начало разговора');
         }
         if (['session.usage.updated', 'session.closed'].includes(event.type) && Number.isFinite(event.usage?.seconds) && mounted.current) setSeconds(event.usage.seconds);
-        if (event.type === 'session.closed') { cleanup(run, true); return; }
+        if (event.type === 'session.closed') {
+          if (mounted.current) {
+            setDiagnostic(`Причина завершения: ${event.reason || 'не указана провайдером'}`);
+            if (!run.closing) setError('Голосовой сервис завершил соединение. Причина указана в диагностике ниже.');
+          }
+          cleanup(run, true); return;
+        }
         if (event.type === 'error') { end('Голосовой сервис сообщил об ошибке. Используйте обычный режим или попробуйте позже.'); return; }
         if (event.type === 'response.event') {
           const nested = event.event, id = nested?.response?.id;
@@ -123,6 +140,7 @@ export default function HealthLiveConversation({ sessionId, accessToken, onClose
       if (run.finished || run.closing) { cleanup(run); return; }
       const result = await request('create', { sdp: peer.localDescription.sdp, consent: true });
       if (run.finished) return;
+      if (mounted.current) setDiagnostic('Сессия создана; устанавливаю аудиосоединение');
       await peer.setRemoteDescription({ type: 'answer', sdp: result.transport.sdp });
       run.timer = setInterval(() => {
         if (run.finished || run.closing || !run.ready) return;
@@ -147,6 +165,15 @@ export default function HealthLiveConversation({ sessionId, accessToken, onClose
     catch (e) { if (mounted.current) setError(e.message); }
     finally { if (mounted.current) setPhase('idle'); }
   }
+  function toggleTurn() {
+    const run = current.current;
+    if (!run?.ready || run.closing || run.finished) return;
+    run.micPaused = !run.micPaused;
+    run.stream?.getAudioTracks().forEach(track => { track.enabled = !run.micPaused; });
+    run.lastActivity = Date.now();
+    setMicPaused(run.micPaused);
+    // Keep receiving audio. Finishing a turn must never send session.close.
+  }
   const close = () => { end(); onClose(); };
   return <div className="health-talk-overlay"><section className="health-talk" ref={box} role="dialog" aria-modal="true" aria-labelledby="health-live-title" tabIndex={-1} onKeyDown={e => {
     if (e.key === 'Escape') close();
@@ -157,14 +184,17 @@ export default function HealthLiveConversation({ sessionId, accessToken, onClose
     }
   }}>
     <header><div><p className="health-talk-eyebrow">HEALTH · ТЕСТ GPT-LIVE</p><h2 id="health-live-title">Поговорим?</h2></div><button aria-label="Закрыть разговор" onClick={close}>✕</button></header>
-    <p>ИИ-помощник слушает и отвечает голосом. Можно перебивать. Тест — до 5 минут.</p>
+    <p>Говорите, затем сделайте паузу или нажмите «Я закончил» — помощник сможет ответить. Для новой реплики нажмите «Говорите». Тест — до 5 минут.</p>
     <label className="health-talk-check"><input type="checkbox" checked={consent} disabled={busy} onChange={e => setConsent(e.target.checked)} />Согласен передавать речь и контекст моего Health в OpenAI для этого разговора.</label>
-    <div className="health-talk-status"><div className={`health-talk-orb ${phase === 'active' ? 'listening' : ''}`}>🎙</div><span role="status">{labels[phase]}</span><meter min="0" max="100" value={level} aria-label="Уровень звука" /></div>
-    <button className="primary health-talk-main" disabled={phase === 'checking' || phase === 'closing' || (!busy && !consent)} onClick={() => busy ? end() : start()}>{['active', 'connecting'].includes(phase) ? 'Я закончил' : phase === 'closing' ? 'Завершаю…' : 'Говорите'}</button>
+    <div className="health-talk-status"><div className={`health-talk-orb ${phase === 'active' && !micPaused ? 'listening' : ''}`}>🎙</div><span role="status">{phase === 'active' && micPaused ? 'Микрофон на паузе — слушаем ответ' : labels[phase]}</span><meter min="0" max="100" value={level} aria-label="Уровень звука" /></div>
+    <button className="primary health-talk-main" disabled={['checking', 'connecting', 'closing'].includes(phase) || (!busy && !consent)} onClick={() => phase === 'active' ? toggleTurn() : start()}>{phase === 'active' && !micPaused ? 'Я закончил' : phase === 'connecting' ? 'Подключаю…' : phase === 'closing' ? 'Завершаю…' : 'Говорите'}</button>
+    {['connecting', 'active'].includes(phase) && <div className="health-talk-actions"><button onClick={() => end()}>Завершить разговор</button></div>}
     <audio ref={audio} autoPlay playsInline controls={blocked} style={{ width: '100%', display: blocked ? 'block' : 'none' }} />
     {blocked && <p>Браузер приостановил звук. Нажмите ▶ на плеере.</p>}
     {error && <p className="health-talk-error" role="status">{error}</p>}
+    {transcript.assistant && <div className="health-talk-transcript" aria-label="Текст ответа ИИ">{transcript.assistant}</div>}
     <details><summary>Расшифровка и стоимость теста</summary>
+      <p>{diagnostic}</p>
       <p>Время по данным API: {Math.round(seconds)} сек. Голос: ≈ ${(seconds / 60 * 0.05).toFixed(3)}. {confirmed ? 'Итог подтверждён.' : 'Окончательный расход пока не подтверждён.'}</p>
       <p>Рассуждения оплачиваются отдельно. Получено токенов backend: {backendTokens}. Это не итоговый счёт.</p>
       <div className="health-talk-transcript"><strong>Вы:</strong><p>{transcript.user || 'Пока нет речи'}</p><strong>ИИ:</strong><p>{transcript.assistant || 'Пока нет ответа'}</p></div>
