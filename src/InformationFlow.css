@@ -1,0 +1,12 @@
+.information-flow{height:198px;margin-top:18px;padding:12px 18px;border:1px solid #d5ddd3;border-radius:16px;background:linear-gradient(110deg,#f5f8f2,#faf6f1);color:#2e2a25;min-width:0}
+.information-flow__viewport{height:132px;overflow:hidden;mask-image:linear-gradient(to bottom,transparent,#000 5%,#000 94%,transparent)}
+.information-flow__viewport.is-readable{overflow-y:auto;mask-image:none;overscroll-behavior:contain}
+.information-flow__track{will-change:transform}
+.information-flow__block{padding-bottom:22px;font:18px/22px Georgia,serif;overflow-wrap:anywhere}
+.information-flow__block strong{display:block;font:700 10px/22px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#5c7869}
+.information-flow__block p{margin:0;font:inherit;color:inherit}
+.information-flow__controls{display:flex;justify-content:flex-end;align-items:center;margin-top:4px}
+.information-flow__controls button{background:transparent;color:#5c7869;border:0;border-radius:4px;font:600 12px/20px system-ui,sans-serif;padding:8px 0;text-decoration:underline;cursor:pointer}
+.information-flow__controls button:disabled{cursor:default;opacity:.7}
+.information-flow :focus-visible{outline:2px solid #7d9a89;outline-offset:2px}
+@media(max-width:768px){.information-flow__block{font-size:17px}}
