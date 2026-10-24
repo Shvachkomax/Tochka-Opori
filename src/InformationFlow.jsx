@@ -58,28 +58,43 @@ export default function InformationFlow({ module = 'support', engaged = false })
     if (stopped || hovered || hidden || reduced) return;
     let frame;
     let previous;
+    let cancelled = false;
     const animate = (now) => {
+      // React can detach refs while the component is being unmounted.
+      // Never let an animation callback crash the entire landing page.
+      if (cancelled) return;
+      const activeTrack = track.current;
+      const activeGroup = group.current;
+      if (!activeTrack || !activeGroup) return;
       const seconds = previous === undefined ? 0 : Math.min((now - previous) / 1000, 0.05);
       previous = now;
-      const height = group.current?.getBoundingClientRect().height || 1;
-      offset.current = (offset.current + seconds * 12) % height;
-      track.current.style.transform = `translateY(-${offset.current}px)`;
+      const height = activeGroup.getBoundingClientRect().height;
+      if (height > 0) {
+        offset.current = (offset.current + seconds * 12) % height;
+        activeTrack.style.transform = `translateY(-${offset.current}px)`;
+      }
       frame = requestAnimationFrame(animate);
     };
     frame = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
   }, [stopped, hovered, hidden, reduced]);
 
   // When paused, allow reading the entire copy with normal scrolling.
   const readable = stopped || reduced;
   useEffect(() => {
+    const activeTrack = track.current;
+    const activeViewport = viewport.current;
+    if (!activeTrack || !activeViewport) return;
     if (readable) {
-      track.current.style.transform = 'none';
-      viewport.current.scrollTop = offset.current;
+      activeTrack.style.transform = 'none';
+      activeViewport.scrollTop = offset.current;
     } else {
-      offset.current = viewport.current.scrollTop || offset.current;
-      viewport.current.scrollTop = 0;
-      track.current.style.transform = `translateY(-${offset.current}px)`;
+      offset.current = activeViewport.scrollTop || offset.current;
+      activeViewport.scrollTop = 0;
+      activeTrack.style.transform = `translateY(-${offset.current}px)`;
     }
   }, [readable]);
 
