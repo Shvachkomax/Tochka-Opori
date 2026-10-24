@@ -1,3 +1,4 @@
+import InformationFlow from "./InformationFlow.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -387,7 +388,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   function markFirstDialogueInvitationInteraction() {
     if (APP_BRAND.isSupportPilot || activeModule !== "support" || supportScreen !== "landing" || phase !== "input") return;
     if (firstDialogueInvitationLocked) return;
-    const invitation = firstDialogueInvitation || FIRST_SCREEN_INVITATIONS[0];
+    const invitation = firstDialogueInvitation;
     if (!invitation) return;
     setFirstDialogueInvitationActive(invitation);
     setFirstDialogueInvitationLocked(true);
@@ -10768,15 +10769,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
             )}
 
-            {activeModule === "support" && !APP_BRAND.isSupportPilot && phase === "input" && !isContinuation && !crisisMode && (
-              <SupportDialogueInvitation
-                invitations={FIRST_SCREEN_INVITATIONS}
-                onSelectionChange={setFirstDialogueInvitation}
-                onTalk={handleFirstDialogueInvitationTalk}
-                engagementLocked={firstDialogueInvitationLocked}
-                resetToken={dialogueInvitationResetToken}
-              />
-            )}
 
             {activeModule === "body" && localStorage.getItem("body_referral_source") === "alena_client" && bodyScreen === "landing" && (
               <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "#e8f0ea", border: "1px solid #c4d0c6" }}>
@@ -10808,6 +10800,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     : "предыдущего раза"}
                 </div>
               </div>
+            )}
+
+            {phase === "input" && !isContinuation && !crisisMode && mode !== "voice" && (
+              <InformationFlow key={activeModule} module={activeModule} engaged={Boolean(text.trim())} />
             )}
 
             <div style={s.inner}>
