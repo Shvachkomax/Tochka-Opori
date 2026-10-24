@@ -63,6 +63,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("user");
   const [crisisOpen, setCrisisOpen] = useState(false);
+  const [aboutProjectOpen, setAboutProjectOpen] = useState(false);
   const [crisisText, setCrisisText] = useState("");
   const [crisisContact, setCrisisContact] = useState("");
   const [crisisSubmitting, setCrisisSubmitting] = useState(false);
@@ -9962,6 +9963,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {((activeModule === "support" && supportScreen === "landing") || (activeModule === "body" && bodyScreen === "landing")) && (
+              <button
+                style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
+                onClick={() => setAboutProjectOpen(true)}
+              >
+                О проекте
+              </button>
+            )}
             {!isDedicatedSubdomain && (<>
             {!(activeModule === "support" && supportScreen !== "landing") && (
             <button
@@ -12611,6 +12620,93 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         </main>
         );
         })()}
+
+        {aboutProjectOpen && (
+          <div style={s.overlay} onClick={() => setAboutProjectOpen(false)}>
+            <div
+              style={{
+                ...s.modal,
+                position: "relative",
+                maxWidth: activeModule === "support" ? 640 : 640,
+                maxHeight: "calc(100vh - 40px)",
+                overflowY: "auto",
+              }}
+              className="modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                aria-label="Закрыть"
+                onClick={() => setAboutProjectOpen(false)}
+                style={{
+                  position: "absolute",
+                  top: 18,
+                  right: 20,
+                  border: 0,
+                  background: "transparent",
+                  color: "#7A7268",
+                  fontSize: 28,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  padding: 4,
+                }}
+              >
+                ×
+              </button>
+
+              <div style={{ ...s.modalTitle, paddingRight: 40 }}>О проекте</div>
+
+              {activeModule === "body" ? (
+                <div style={{ color: "#2E2A25", fontSize: 16, lineHeight: 1.65 }}>
+                  <p style={{ margin: "18px 0" }}>
+                    Есть много приложений, которые помогают похудеть и поддерживать форму. В Health мы предлагаем поддержку ИИ-компаньона и специалистов — нутрициологов и эндокринологов, которых можно подключить в любой момент.
+                  </p>
+                  <p style={{ margin: "18px 0" }}>
+                    Здесь вы найдете помощь с питанием, повседневными привычками и активностью — чтобы вести здоровый образ жизни, обрести спортивную форму и поддерживать желаемые пропорции тела.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ color: "#2E2A25", fontSize: 16, lineHeight: 1.65 }}>
+                  <p style={{ margin: "18px 0" }}>
+                    Вам тяжело? Вы чувствуете тревогу, тоску, растерянность? Переживаете утрату, расставание или другой сложный период?
+                  </p>
+                  <p style={{ margin: "18px 0", fontWeight: 700 }}>
+                    Поговорите с нами об этом.
+                  </p>
+                  <p style={{ margin: "18px 0" }}>
+                    Начните с небольшого шага — голосом или текстом расскажите, что с вами происходит и что беспокоит сейчас.
+                  </p>
+                  <p style={{ margin: "18px 0" }}>
+                    Мы зададим несколько уточняющих вопросов и поможем бережно разобраться в вашем состоянии: понять, на что стоит обратить внимание и куда двигаться дальше.
+                  </p>
+                  <p style={{ margin: "18px 0" }}>
+                    Первый разговор может остаться анонимным — вы сами решаете, продолжать ли его.
+                  </p>
+                  <p style={{ margin: "18px 0" }}>
+                    А если вам нужна дальнейшая помощь, мы поможем найти подходящего специалиста и организовать сопровождение.
+                  </p>
+                  <p style={{ margin: "18px 0" }}>
+                    Захотите вернуться к разговору — <strong>сохраните свой анонимный код доступа.</strong> По нему вы сможете продолжить диалог.
+                  </p>
+                  <p style={{ margin: "18px 0" }}>
+                    Хотите общаться здесь со своим врачом? Мы подготовим ссылку. Отправьте её врачу — когда он примет приглашение, вы сможете общаться в сервисе.
+                  </p>
+                  <p style={{ margin: "18px 0", fontWeight: 700 }}>
+                    Не нужно заранее знать, как правильно сформулировать проблему. Просто начните говорить. Диалог подскажет следующие вопросы.
+                  </p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                style={{ ...s.primary, marginTop: 4 }}
+                onClick={() => setAboutProjectOpen(false)}
+              >
+                Понятно
+              </button>
+            </div>
+          </div>
+        )}
 
         {crisisOpen && (
           <div style={s.overlay} onClick={handleCrisisClose}>
