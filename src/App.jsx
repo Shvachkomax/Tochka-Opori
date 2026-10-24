@@ -1,3 +1,4 @@
+import InformationFlow from "./InformationFlow.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -10687,6 +10688,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     : "предыдущего раза"}
                 </div>
               </div>
+            )}
+
+            {phase === "input" && !isContinuation && !crisisMode && mode !== "voice" && (
+              <InformationFlow key={activeModule} module={activeModule} engaged={Boolean(text.trim())} />
             )}
 
             <div style={s.inner}>
