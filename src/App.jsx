@@ -10594,7 +10594,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
             )}
 
-            {phase === "input" && !isContinuation && !crisisMode && mode !== "voice" && (
+            {phase === "input" && !isContinuation && mode !== "voice" && (
               <InformationFlow key={activeModule} module={activeModule} engaged={Boolean(text.trim())} />
             )}
 
