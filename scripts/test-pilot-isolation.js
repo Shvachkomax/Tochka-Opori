@@ -73,11 +73,24 @@ assert.equal(isPilotSessionMatch({}), true, "default host accepts an untagged le
 
 console.log("PASS pilot session ownership check");
 
+// Tagged sessions from another pilot are denied, while untagged legacy sessions remain compatible.
+const tenantSessions = [
+  { pilot_id: "pneumointegration" },
+  { pilot_id: "anmed" },
+  { pilot_id: "health" },
+  {},
+];
+process.env.PILOT_ID = "pneumointegration";
+assert.deepEqual(tenantSessions.map((session) => isPilotSessionMatch(session)), [true, false, false, true]);
+
+console.log("PASS cross-pilot session and wallet boundary");
+
 // ── 4. Pilot ID injection in usage metadata ───────────────────────────────
 
 process.env.PILOT_ID = "pneumointegration";
 
 const { enrichMetadataWithPilot } = await import("../lib/usage/wallet.js");
+assert.equal(enrichMetadataWithPilot({ pilot_id: "anmed" }).pilot_id, "pneumointegration", "wallet metadata cannot switch tenant");
 
 // Test: pilot_id is injected into metadata
 const meta1 = enrichMetadataWithPilot({});

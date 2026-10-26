@@ -2,7 +2,7 @@ import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { getSupabase } from "../lib/supabase.js";
 import { validateSessionAccess } from "../lib/security/access-token.js";
-import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { hasBodySessionReference, isAnMedSupportOnlyDeployment, isPilotSessionMatch, rejectUnavailableModule } from "../lib/security/module-availability.js";
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
@@ -39,10 +39,10 @@ async function resolveOwnerId(sessionId, module, accessToken) {
   if (module === "support") {
     const { data } = await supabase
       .from("sessions")
-      .select("session_id, anonymous_owner_id, legacy_access")
+      .select("session_id, anonymous_owner_id, legacy_access, json_data")
       .eq("session_id", sessionId)
       .maybeSingle();
-    if (!data) return null;
+    if (!data || !isPilotSessionMatch(data.json_data)) return null;
     if (!data.legacy_access && accessToken) {
       const valid = await validateSessionAccess(data.session_id, accessToken);
       if (!valid) return null;
@@ -72,11 +72,11 @@ async function resolveSessionByCode(publicCode) {
 
   const { data } = await supabase
     .from("sessions")
-    .select("session_id, anonymous_owner_id")
+    .select("session_id, anonymous_owner_id, json_data")
     .eq("public_code", normalized)
     .maybeSingle();
 
-  if (data) {
+  if (data && isPilotSessionMatch(data.json_data)) {
     return { sessionId: data.session_id, ownerId: data.anonymous_owner_id, module: isSupportCode ? "support" : "body" };
   }
 

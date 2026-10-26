@@ -91,11 +91,11 @@ async function resolveSupportOwner(sessionId, accessToken) {
   const supabase = getSupabase();
   const { data: session, error } = await supabase
     .from("sessions")
-    .select("session_id, public_code, anonymous_owner_id, module")
+    .select("session_id, public_code, anonymous_owner_id, module, json_data")
     .eq("session_id", sessionId)
     .eq("module", "support")
     .maybeSingle();
-  if (error || !session || !session.anonymous_owner_id) return null;
+  if (error || !session || !session.anonymous_owner_id || !isPilotSessionMatch(session.json_data)) return null;
   return { ownerId: session.anonymous_owner_id, sessionId: session.session_id, publicCode: session.public_code };
 }
 
@@ -108,11 +108,11 @@ async function resolveMedicationSupportOwner(sessionId, accessToken) {
   const supabase = getSupabase();
   const { data: session, error } = await supabase
     .from("sessions")
-    .select("session_id, public_code, anonymous_owner_id, module, legacy_access")
+    .select("session_id, public_code, anonymous_owner_id, module, legacy_access, json_data")
     .eq("session_id", sessionId)
     .eq("module", "support")
     .maybeSingle();
-  if (error || !isMedicationSessionEligible(session) || !session.anonymous_owner_id) return null;
+  if (error || !isMedicationSessionEligible(session) || !session.anonymous_owner_id || !isPilotSessionMatch(session.json_data)) return null;
   return { ownerId: session.anonymous_owner_id, sessionId: session.session_id, publicCode: session.public_code };
 }
 

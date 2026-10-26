@@ -65,6 +65,20 @@ const ownSession = await validateAnalyzeSessionAccess({
 }, { supabase: mockSupabase({ sessions: sessionA }), validateAccess });
 assert.deepEqual(ownSession, { allowed: true, missingSession: false });
 
+const originalPilot = process.env.PILOT_ID;
+process.env.PILOT_ID = "pneumointegration";
+const foreignPilotSession = await validateAnalyzeSessionAccess({
+  sessionId: "session-a",
+  module: "support",
+  accessToken: "token-a",
+}, {
+  supabase: mockSupabase({ sessions: { ...sessionA, json_data: { pilot_id: "anmed" } } }),
+  validateAccess: async () => true,
+});
+assert.equal(foreignPilotSession.allowed, false, "a tagged session from another pilot must not authorize analysis");
+if (originalPilot === undefined) delete process.env.PILOT_ID;
+else process.env.PILOT_ID = originalPilot;
+
 const foreignSession = await validateAnalyzeSessionAccess({
   sessionId: "session-b",
   module: "support",

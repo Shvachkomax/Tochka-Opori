@@ -2,6 +2,7 @@ import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import { getSupabase } from "../lib/supabase.js";
 import { getPrivacySafeMode } from "../lib/sanitize.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
+import { isPilotSessionMatch } from "../lib/security/module-availability.js";
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
@@ -50,6 +51,17 @@ async function handleSave(req, res) {
 
     if (!crisis_text && !contact) {
       return res.status(400).json({ ok: false, error: "Опишите ситуацию или укажите контакт" });
+    }
+
+    if (session_id) {
+      const { data: session } = await getSupabase()
+        .from("sessions")
+        .select("json_data")
+        .eq("session_id", session_id)
+        .maybeSingle();
+      if (session && !isPilotSessionMatch(session.json_data)) {
+        return res.status(403).json({ ok: false, error: "Сессия недоступна в этом сервисе" });
+      }
     }
 
     const { error } = await getSupabase()

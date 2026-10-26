@@ -4,7 +4,7 @@ import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
 import { getSupabase } from "../lib/supabase.js";
 import { validateSessionAccess } from "../lib/security/access-token.js";
-import { rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { isPilotSessionMatch, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { debitCreditsForSession } from "../lib/usage/debit.js";
 
 const MAX_AUDIO_SIZE = 20 * 1024 * 1024; // 20 MB
@@ -39,13 +39,13 @@ async function validateSessionOwnership(sessionId, module, accessToken) {
   if (module === "support") {
     const { data: session } = await supabase
       .from("sessions")
-      .select("session_id, anonymous_owner_id, legacy_access")
+      .select("session_id, anonymous_owner_id, legacy_access, json_data")
       .eq("session_id", sessionId)
       .maybeSingle();
     check.session_exists = !!session;
     check.has_owner = !!session?.anonymous_owner_id;
     check.legacy_access = !!session?.legacy_access;
-    if (!session || !session.anonymous_owner_id) {
+    if (!session || !session.anonymous_owner_id || !isPilotSessionMatch(session.json_data)) {
       console.log("[transcribe] session ownership check:", check);
       return false;
     }
@@ -74,6 +74,12 @@ async function validateSessionOwnership(sessionId, module, accessToken) {
       console.log("[transcribe] session ownership check:", check);
       return false;
     }
+    const { data: session } = await supabase
+      .from("sessions")
+      .select("json_data")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+    if (session && !isPilotSessionMatch(session.json_data)) return false;
     // Body sessions are always non-legacy; token is mandatory.
     if (!accessToken) {
       check.access_token_present = false;
