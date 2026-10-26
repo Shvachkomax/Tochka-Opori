@@ -9,18 +9,19 @@ const base = createClient('https://example.supabase.co', 'test-only-key', {globa
   return new Response('[]', {status:200,headers:{'Content-Type':'application/json'}});
 }}});
 const db = scopeDatabase(base, own);
-for (const table of ['sessions','patient_assignments','patient_access','expert_organization_memberships','patient_specialist_invitations','specialist_match_requests','doctor_invite_links','case_reviews']) {
-  await db.from(table).select('*').eq('organization_id', foreign);
-  assert.deepEqual(requests.at(-1).url.searchParams.getAll('organization_id'), [`eq.${own}`,`eq.${foreign}`]);
-  await db.from(table).insert({organization_id:null});
-  assert.equal(requests.at(-1).body.organization_id,own);
-  assert.throws(()=>db.from(table).insert({organization_id:foreign}));
-  assert.throws(()=>db.from(table).update({organization_id:foreign}));
-  assert.throws(()=>db.from(table).upsert({organization_id:own}));
+for (const table of ['sessions','patient_assignments','patient_access','expert_organization_memberships','patient_specialist_invitations','specialist_match_requests','doctor_invite_links','case_reviews','service_requests','expert_requests','crisis_requests']) {
+  const scopeColumn = ['service_requests','expert_requests','crisis_requests'].includes(table) ? 'tenant_id' : 'organization_id';
+  await db.from(table).select('*').eq(scopeColumn, foreign);
+  assert.deepEqual(requests.at(-1).url.searchParams.getAll(scopeColumn), [`eq.${own}`,`eq.${foreign}`]);
+  await db.from(table).insert({[scopeColumn]:null});
+  assert.equal(requests.at(-1).body[scopeColumn],own);
+  assert.throws(()=>db.from(table).insert({[scopeColumn]:foreign}));
+  assert.throws(()=>db.from(table).update({[scopeColumn]:foreign}));
+  assert.throws(()=>db.from(table).upsert({[scopeColumn]:own}));
   await db.from(table).update({status:'active'}).eq('id','synthetic');
-  assert.equal(requests.at(-1).url.searchParams.get('organization_id'),`eq.${own}`);
+  assert.equal(requests.at(-1).url.searchParams.get(scopeColumn),`eq.${own}`);
   await db.from(table).delete().eq('id','synthetic');
-  assert.equal(requests.at(-1).url.searchParams.get('organization_id'),`eq.${own}`);
+  assert.equal(requests.at(-1).url.searchParams.get(scopeColumn),`eq.${own}`);
 }
 await db.from('organizations').select('*');
 assert.equal(requests.at(-1).url.searchParams.get('id'),`eq.${own}`);
@@ -28,6 +29,10 @@ const denied = await db.rpc('accept_specialist_invitation',{p_token_hash:'foreig
 assert.equal(denied.data.code,'NOT_FOUND');
 assert.equal(scopeDatabase(base,null),base);
 process.env.VITE_APP_BRAND='kgmu';delete process.env.DEPLOYMENT_ORGANIZATION_ID;
+assert.throws(()=>deploymentOrganizationId());
+process.env.DEPLOYMENT_ORGANIZATION_ID=own;
+assert.equal(deploymentOrganizationId(),own);
+process.env.VITE_APP_BRAND='pneumointegration';delete process.env.DEPLOYMENT_ORGANIZATION_ID;
 assert.throws(()=>deploymentOrganizationId());
 process.env.DEPLOYMENT_ORGANIZATION_ID=own;
 assert.equal(deploymentOrganizationId(),own);

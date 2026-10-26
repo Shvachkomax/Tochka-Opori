@@ -53,15 +53,21 @@ async function handleSave(req, res) {
       return res.status(400).json({ ok: false, error: "Опишите ситуацию или укажите контакт" });
     }
 
+    const deploymentOrgId = deploymentOrganizationId();
+    let linkedSession = null;
     if (session_id) {
-      const { data: session } = await getSupabase()
+      const { data: session, error: sessionError } = await getSupabase()
         .from("sessions")
-        .select("json_data")
+        .select("session_id, public_code, organization_id, json_data")
         .eq("session_id", session_id)
         .maybeSingle();
-      if (session && !isPilotSessionMatch(session.json_data)) {
+      if (sessionError || !session || (deploymentOrgId && session.organization_id !== deploymentOrgId)) {
         return res.status(403).json({ ok: false, error: "Сессия недоступна в этом сервисе" });
       }
+      if (!isPilotSessionMatch(session.json_data)) {
+        return res.status(403).json({ ok: false, error: "Сессия недоступна в этом сервисе" });
+      }
+      linkedSession = session;
     }
 
     const { error } = await getSupabase()
@@ -69,8 +75,8 @@ async function handleSave(req, res) {
       .insert({
         crisis_text: crisis_text || null,
         contact: contact || null,
-        public_code: public_code || null,
-        session_id: session_id || null,
+        public_code: linkedSession ? linkedSession.public_code : deploymentOrgId ? null : public_code || null,
+        session_id: linkedSession?.session_id || null,
         high_risk_detected: high_risk_detected || false,
         risk_markers: risk_markers || null,
       });

@@ -28,6 +28,8 @@
     "test:analyze-session-access": "node scripts/test-analyze-session-access.js",
     "test:openai-model-routing": "node scripts/test-openai-model-routing.js",
     "test:pilot-isolation": "node scripts/test-pilot-isolation.js",
+    "test:usage-session-owner": "node scripts/test-usage-session-owner.js",
+    "test:bound-review-session": "node scripts/test-bound-review-session.js",
     "test:practice-sync": "node scripts/test-practice-sync.js",
     "test:specialist-memberships": "node scripts/test-specialist-memberships.js",
     "test:support-risk-routing": "node scripts/test-support-risk-routing.js",

@@ -19,7 +19,8 @@ const CODES_FILE_MODE = 0o600;
 
 const TEST_PROJECT_REF = "jvezfycyztaqtracmesu";
 const REQUIRED_SUPABASE_URL = "https://jvezfycyztaqtracmesu.supabase.co";
-const ORG_ID = "df9b9ce5-be70-4904-899e-b285d60974c3";
+const ORG_SLUG = "pneumointegration";
+let ORG_ID = null;
 const PILOT_ID = "pneumointegration";
 
 // Deterministic row IDs (idempotent cleanup on --cleanup)
@@ -145,6 +146,30 @@ async function run() {
     return result.data;
   }
 
+  async function resolveOrganizationId({ createIfMissing }) {
+    const { data, error } = await supabase.from("organizations")
+      .select("id").eq("slug", ORG_SLUG).maybeSingle();
+    if (error) throw new Error(`Pneumo organization lookup: ${error.message}`);
+    if (data?.id) return data.id;
+    if (!createIfMissing) throw new Error("Refusing cleanup: Pneumo organization is missing.");
+    const created = await ensure(await supabase.from("organizations").insert({
+      name: "Pneumointegration",
+      slug: ORG_SLUG,
+      type: "private_clinic",
+      status: "active",
+    }).select("id").single(), "create Pneumo organization");
+    return created.id;
+  }
+
+  if (cleanupOnly) {
+    if (!existingCodes?.organization_id || existingCodes.project_ref !== TEST_PROJECT_REF) {
+      throw new Error("Refusing cleanup: local fixture metadata does not identify this TEST project and organization.");
+    }
+    ORG_ID = existingCodes.organization_id;
+  } else {
+    ORG_ID = await resolveOrganizationId({ createIfMissing: true });
+  }
+
   async function remove(table, column, values) {
     const result = await supabase.from(table).delete().in(column, values);
     if (result.error) throw new Error(`cleanup ${table}: ${result.error.message}`);
@@ -153,6 +178,51 @@ async function run() {
   // --cleanup deletes ONLY rows with fixture IDs from the `ids` constant.
   // No wildcard or ownerless deletes. Each table is scoped by exact ID match.
   async function cleanup() {
+    if (!existingCodes?.wallet_id || existingCodes.organization_id !== ORG_ID) {
+      throw new Error("Refusing cleanup: fixture metadata is incomplete or does not match the Pneumo organization.");
+    }
+
+    const [expertRow, sessionRow, credentialRow, assignmentRow, membershipRow, walletRows] = await Promise.all([
+      supabase.from("experts").select("id, name, specialty").eq("id", ids.expert).maybeSingle(),
+      supabase.from("sessions").select("id, session_id, public_code, anonymous_owner_id, organization_id, json_data").eq("id", ids.session).maybeSingle(),
+      supabase.from("continuation_credentials").select("id, owner_type, owner_id, module, lookup_code").eq("id", ids.credential).maybeSingle(),
+      supabase.from("patient_assignments").select("id, public_code, owner_id, organization_id, source").eq("id", ids.assignment).maybeSingle(),
+      supabase.from("expert_organization_memberships").select("id, organization_id, expert_id").eq("id", ids.membership).maybeSingle(),
+      supabase.from("usage_wallets").select("id, owner_id, module").eq("id", existingCodes.wallet_id),
+    ]);
+    for (const [label, result] of [["expert", expertRow], ["session", sessionRow], ["credential", credentialRow], ["assignment", assignmentRow], ["membership", membershipRow], ["wallet", walletRows]]) {
+      if (result.error) throw new Error(`Refusing cleanup: ${label} verification failed: ${result.error.message}`);
+    }
+    if (expertRow.data && (expertRow.data.name !== "Тестовый Специалист Пневмо" || expertRow.data.specialty !== "Психологическая поддержка (тест)")) {
+      throw new Error("Refusing cleanup: expert ID is not owned by this fixture.");
+    }
+    if (sessionRow.data && (
+      sessionRow.data.session_id !== SESSION_ID
+      || sessionRow.data.public_code !== PUBLIC_CODE
+      || sessionRow.data.anonymous_owner_id !== ids.owner
+      || sessionRow.data.organization_id !== ORG_ID
+      || sessionRow.data.json_data?.pilot_id !== PILOT_ID
+      || sessionRow.data.json_data?.demo_fixture !== "pneumointegration-test-001"
+    )) throw new Error("Refusing cleanup: session ID is not owned by this fixture.");
+    if (credentialRow.data && (
+      credentialRow.data.owner_type !== "anonymous_case"
+      || credentialRow.data.owner_id !== ids.owner
+      || credentialRow.data.module !== "support"
+      || credentialRow.data.lookup_code !== existingCodes.patient?.lookup_code
+    )) throw new Error("Refusing cleanup: continuation credential is not owned by this fixture.");
+    if (assignmentRow.data && (
+      assignmentRow.data.public_code !== PUBLIC_CODE
+      || assignmentRow.data.owner_id !== ids.owner
+      || assignmentRow.data.organization_id !== ORG_ID
+      || assignmentRow.data.source !== "test_fixture"
+    )) throw new Error("Refusing cleanup: assignment ID is not owned by this fixture.");
+    if (membershipRow.data && (membershipRow.data.organization_id !== ORG_ID || membershipRow.data.expert_id !== ids.expert)) {
+      throw new Error("Refusing cleanup: membership ID is not owned by this fixture.");
+    }
+    if (walletRows.data?.length > 1 || walletRows.data?.some(row => row.owner_id !== ids.owner || row.module !== "support")) {
+      throw new Error("Refusing cleanup: wallet identity is not owned by this fixture.");
+    }
+
     const walletId = existingCodes?.wallet_id;
     if (walletId) {
       await ensure(await supabase.from("usage_ledger").delete().eq("wallet_id", walletId), "cleanup usage_ledger");
