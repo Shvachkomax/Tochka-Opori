@@ -149,7 +149,10 @@ async function handleSave(req, res) {
       if (!fs.existsSync(REVIEWS_DIR)) {
         fs.mkdirSync(REVIEWS_DIR, { recursive: true });
       }
-      const filePath = path.join(REVIEWS_DIR, `${review.case_id || review.sessionId || Date.now()}.json`);
+      const fileId = String(boundSession?.session_id || review.case_id || review.sessionId || Date.now())
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .slice(0, 128) || String(Date.now());
+      const filePath = path.join(REVIEWS_DIR, `${fileId}.json`);
       fs.writeFileSync(filePath, JSON.stringify(localReview, null, 2));
     } catch {}
 
