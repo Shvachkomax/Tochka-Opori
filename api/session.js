@@ -45,7 +45,7 @@ import {
   PATIENT_MEDICATION_SAFETY_INSTRUCTION,
 } from "../lib/clinical/patient-reported-medication.js";
 import { LEGACY_CONTINUATION_CODE_MESSAGE, makeSessionSummary as createSessionSummary, normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
-import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { getPilotId, hasBodySessionReference, isAnMedSupportOnlyDeployment, isPilotSessionMatch, rejectUnavailableModule } from "../lib/security/module-availability.js";
 
 const BODY_SESSION_ACTIONS = new Set([
   "listBodyDailyLogs",
@@ -644,6 +644,9 @@ async function handleSave(req, res) {
       primary_expert_id: primaryExpertId,
       invite_token: inviteToken,
       json_data: {
+        ...(existingRow?.json_data?.pilot_id || getPilotId()
+          ? { pilot_id: getPilotId() || existingRow.json_data.pilot_id }
+          : {}),
         dialogDepth: dialogDepth ?? 0,
         previousPatientReport: previousPatientReport || "",
         previousDoctorReport: previousDoctorReport || "",
@@ -1237,7 +1240,7 @@ async function handleCreateFollowUpSession(req, res) {
     const supabase = getSupabase();
     const { data: parent, error: parentError } = await supabase
       .from("sessions")
-      .select("anonymous_owner_id, module, public_code")
+      .select("anonymous_owner_id, module, public_code, json_data")
       .eq("session_id", previousSessionId)
       .maybeSingle();
 
@@ -1247,6 +1250,9 @@ async function handleCreateFollowUpSession(req, res) {
     }
     if (!parent || !parent.anonymous_owner_id) {
       return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+    }
+    if (!isPilotSessionMatch(parent.json_data)) {
+      return res.status(403).json({ ok: false, error: "Сессия недоступна в этом сервисе." });
     }
 
     const { generatePublicCode } = await import("../lib/publicCode.js");
@@ -1263,6 +1269,9 @@ async function handleCreateFollowUpSession(req, res) {
       patient_text: "",
       conversation_history: [],
       json_data: {
+        ...(getPilotId() || parent.json_data?.pilot_id
+          ? { pilot_id: getPilotId() || parent.json_data.pilot_id }
+          : {}),
         previousPublicCode: parent.public_code,
         isContinuation: true,
       },
@@ -1682,7 +1691,7 @@ async function handleExchangeContinuationCredential(req, res) {
     const targetTable = reqModule === "body" ? "body_clients" : "sessions";
     let targetQuery = supabase
       .from(targetTable)
-      .select("session_id")
+      .select(reqModule === "body" ? "session_id" : "session_id, json_data")
       .eq("anonymous_owner_id", credential.owner_id);
 
     if (reqModule !== "body") {
@@ -1701,6 +1710,10 @@ async function handleExchangeContinuationCredential(req, res) {
     if (!targetSession?.session_id) {
       console.log("[exchange] no target session for owner");
       return res.status(404).json({ ok: false, error: "Не удалось найти запись для этого кода. Обратитесь к специалисту." });
+    }
+
+    if (!isPilotSessionMatch(targetSession.json_data)) {
+      return res.status(403).json({ ok: false, error: "Код продолжения не принадлежит этому сервису." });
     }
 
     console.log("[exchange] target session found");
@@ -1744,7 +1757,7 @@ async function handleExchangeContinuationCredential(req, res) {
         public_code: cabinet.sessions?.[0]?.publicCode || null,
         patient_text: "",
         conversation_history: [],
-        json_data: {},
+        json_data: getPilotId() ? { pilot_id: getPilotId() } : {},
         access_token_hash: fallbackHash,
         access_token_generated_at: new Date().toISOString(),
         legacy_access: false,

@@ -9943,12 +9943,22 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               className="app-logo-link"
               style={{ display: "flex", alignItems: "center", gap: 12, color: "inherit", textDecoration: "none" }}
             >
-              <div aria-label={APP_BRAND.name} style={{ minWidth: 190 }}>
-                <div style={{ ...s.logo, color: "#14264A", fontSize: 34, fontWeight: 900, letterSpacing: "-0.04em" }}>
-                  {APP_BRAND.isKgmu ? <span style={{ color: "#176B66", letterSpacing: "-0.025em" }}>Казанский ГМУ</span> : <>Ан<span style={{ color: "#E63E4B" }}>Мед</span></>}
+              {APP_BRAND.isPneumo ? (
+                <img src={APP_BRAND.logoHeader} alt={APP_BRAND.name} style={{ height: 72, width: "auto", display: "block", objectFit: "contain", flexShrink: 0 }} />
+              ) : (
+                <div aria-label={APP_BRAND.name} style={{ minWidth: 190 }}>
+                  <div style={{ ...s.logo, color: "#14264A", fontSize: 34, fontWeight: 900, letterSpacing: "-0.04em" }}>
+                    {APP_BRAND.isKgmu ? <span style={{ color: "#176B66", letterSpacing: "-0.025em" }}>Казанский ГМУ</span> : <>Ан<span style={{ color: "#E63E4B" }}>Мед</span></>}
+                  </div>
+                  <div style={s.sub}>{APP_BRAND.subtitle}</div>
                 </div>
-                <div style={s.sub}>{APP_BRAND.subtitle}</div>
-              </div>
+              )}
+              {APP_BRAND.isPneumo && (
+                <div>
+                  <div style={{ ...s.logo, fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>{APP_BRAND.name}</div>
+                  <div style={s.sub}>{APP_BRAND.subtitle}</div>
+                </div>
+              )}
             </a>
           ) : (
             <div

@@ -60,10 +60,20 @@ function SpecialistBrand() {
       aria-label={`${APP_BRAND.name} — на главную`}
       style={{ display: "block", color: "inherit", textDecoration: "none" }}
     >
-      <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: "-0.04em", color: "#14264A" }}>
-        {APP_BRAND.isKgmu ? <span style={{ color: "#176B66", letterSpacing: "-0.025em" }}>Казанский ГМУ</span> : <>Ан<span style={{ color: "#E63E4B" }}>Мед</span></>}
-      </div>
-      <div style={{ fontSize: 12, color: "#7A7268" }}>{APP_BRAND.subtitle}</div>
+      {APP_BRAND.isPneumo ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <img src={APP_BRAND.logoHeader} alt={APP_BRAND.name} style={{ height: 56, width: "auto", objectFit: "contain" }} />
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.2 }}>{APP_BRAND.name}</div>
+            <div style={{ fontSize: 12, color: "#7A7268" }}>{APP_BRAND.subtitle}</div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: "-0.04em", color: "#14264A" }}>
+          {APP_BRAND.isKgmu ? <span style={{ color: "#176B66", letterSpacing: "-0.025em" }}>Казанский ГМУ</span> : <>Ан<span style={{ color: "#E63E4B" }}>Мед</span></>}
+        </div>
+      )}
+      {!APP_BRAND.isPneumo && <div style={{ fontSize: 12, color: "#7A7268" }}>{APP_BRAND.subtitle}</div>}
     </a>
   );
 }

@@ -7,3 +7,4 @@ data/
 *.log
 uploads/
 .env*
+.pneumointegration-codes.json
