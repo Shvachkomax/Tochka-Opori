@@ -2,7 +2,8 @@ import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { getSupabase } from "../lib/supabase.js";
 import { validateSessionAccess } from "../lib/security/access-token.js";
-import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { resolveUsageOwnerFromSession } from "../lib/security/usage-session-owner.js";
+import { hasBodySessionReference, isAnMedSupportOnlyDeployment, isPilotSessionMatch, rejectUnavailableModule } from "../lib/security/module-availability.js";
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
@@ -39,15 +40,10 @@ async function resolveOwnerId(sessionId, module, accessToken) {
   if (module === "support") {
     const { data } = await supabase
       .from("sessions")
-      .select("session_id, anonymous_owner_id, legacy_access")
+      .select("session_id, anonymous_owner_id, legacy_access, json_data")
       .eq("session_id", sessionId)
       .maybeSingle();
-    if (!data) return null;
-    if (!data.legacy_access && accessToken) {
-      const valid = await validateSessionAccess(data.session_id, accessToken);
-      if (!valid) return null;
-    }
-    return data.anonymous_owner_id;
+    return resolveUsageOwnerFromSession(data, accessToken, validateSessionAccess);
   }
 
   if (module === "body") {
@@ -63,7 +59,7 @@ async function resolveOwnerId(sessionId, module, accessToken) {
   return null;
 }
 
-async function resolveSessionByCode(publicCode) {
+async function resolveSessionByCode(publicCode, accessToken) {
   const supabase = getSupabase();
   const normalized = publicCode.trim().toUpperCase();
   const isSupportCode = /^ТОЧКА-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(normalized);
@@ -72,12 +68,14 @@ async function resolveSessionByCode(publicCode) {
 
   const { data } = await supabase
     .from("sessions")
-    .select("session_id, anonymous_owner_id")
+    .select("session_id, anonymous_owner_id, legacy_access, json_data")
     .eq("public_code", normalized)
     .maybeSingle();
 
   if (data) {
-    return { sessionId: data.session_id, ownerId: data.anonymous_owner_id, module: isSupportCode ? "support" : "body" };
+    if (!isPilotSessionMatch(data.json_data)) return null;
+    const ownerId = await resolveUsageOwnerFromSession(data, accessToken, validateSessionAccess);
+    return ownerId ? { sessionId: data.session_id, ownerId, module: isSupportCode ? "support" : "body" } : null;
   }
 
   // For body codes not in sessions table (legacy), try body_clients
@@ -112,7 +110,7 @@ async function handleGetUsageBalance(req, res) {
   let resolvedModule = module;
 
   if (publicCode) {
-    const resolved = await resolveSessionByCode(publicCode);
+    const resolved = await resolveSessionByCode(publicCode, access_token);
     if (!resolved) {
       return res.status(404).json({ ok: false, error: "Code not found" });
     }
@@ -155,7 +153,7 @@ async function handleGetRecentUsage(req, res) {
   let resolvedModule = module;
 
   if (publicCode) {
-    const resolved = await resolveSessionByCode(publicCode);
+    const resolved = await resolveSessionByCode(publicCode, access_token);
     if (!resolved) {
       return res.status(404).json({ ok: false, error: "Code not found" });
     }

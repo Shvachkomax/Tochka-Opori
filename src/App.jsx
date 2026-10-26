@@ -2246,7 +2246,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         body: JSON.stringify({
           action: "save",
           case_id: sessionId,
-          sessionId: sessionId,
+          sessionId: saved.sessionId,
+          access_token: saved.accessToken,
           publicCode: publicCode || "",
           module: "support",
           createdAt: new Date().toISOString(),
@@ -2968,6 +2969,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         // Save case review (local + Supabase)
         const review = {
           case_id: sid, sessionId: sid, publicCode: data.public_code || publicCode || "",
+          access_token: data.access_token || getSupportSession().accessToken || "",
           module: activeModule,
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
           environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
@@ -3088,6 +3090,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     // Save review
     const review = {
       case_id: status.session_id, sessionId: status.session_id, publicCode: status.public_code || "",
+      access_token: status.access_token || getSupportSession().accessToken || "",
       module: activeModule,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
@@ -9945,12 +9948,22 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               className="app-logo-link"
               style={{ display: "flex", alignItems: "center", gap: 12, color: "inherit", textDecoration: "none" }}
             >
-              <div aria-label={APP_BRAND.name} style={{ minWidth: 190 }}>
-                <div style={{ ...s.logo, color: "#14264A", fontSize: 34, fontWeight: 900, letterSpacing: "-0.04em" }}>
-                  {APP_BRAND.isKgmu ? <span style={{ color: "#176B66", letterSpacing: "-0.025em" }}>Казанский ГМУ</span> : <>Ан<span style={{ color: "#E63E4B" }}>Мед</span></>}
+              {APP_BRAND.isPneumo ? (
+                <img src={APP_BRAND.logoHeader} alt={APP_BRAND.name} style={{ height: 72, width: "auto", display: "block", objectFit: "contain", flexShrink: 0 }} />
+              ) : (
+                <div aria-label={APP_BRAND.name} style={{ minWidth: 190 }}>
+                  <div style={{ ...s.logo, color: "#14264A", fontSize: 34, fontWeight: 900, letterSpacing: "-0.04em" }}>
+                    {APP_BRAND.isKgmu ? <span style={{ color: "#176B66", letterSpacing: "-0.025em" }}>Казанский ГМУ</span> : <>Ан<span style={{ color: "#E63E4B" }}>Мед</span></>}
+                  </div>
+                  <div style={s.sub}>{APP_BRAND.subtitle}</div>
                 </div>
-                <div style={s.sub}>{APP_BRAND.subtitle}</div>
-              </div>
+              )}
+              {APP_BRAND.isPneumo && (
+                <div>
+                  <div style={{ ...s.logo, fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>{APP_BRAND.name}</div>
+                  <div style={s.sub}>{APP_BRAND.subtitle}</div>
+                </div>
+              )}
             </a>
           ) : (
             <div

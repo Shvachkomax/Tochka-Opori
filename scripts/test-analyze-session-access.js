@@ -43,6 +43,8 @@ assert.equal(isModuleAvailable("body", { supportOnly: "false", brand: "kgmu" }),
 assert.equal(isModuleAvailable("support", { brand: "kgmu" }), true);
 assert.equal(isModuleAvailable("body", { supportOnly: "false", brand: "anmed" }), false);
 assert.equal(isModuleAvailable("body", { supportOnly: "false", brand: "tochka-opory" }), true);
+assert.equal(isModuleAvailable("body", { supportOnly: "false", brand: "pneumointegration" }), false);
+assert.equal(isModuleAvailable("support", { supportOnly: "false", brand: "pneumointegration" }), true);
 assert.equal(hasBodySessionReference({ previousSessionId: "HEALTH-ABCD-123" }), true);
 assert.equal(hasBodySessionReference({ sessionId: "sess_support_123" }), false);
 
@@ -62,6 +64,20 @@ const ownSession = await validateAnalyzeSessionAccess({
   accessToken: "token-a",
 }, { supabase: mockSupabase({ sessions: sessionA }), validateAccess });
 assert.deepEqual(ownSession, { allowed: true, missingSession: false });
+
+const originalPilot = process.env.PILOT_ID;
+process.env.PILOT_ID = "pneumointegration";
+const foreignPilotSession = await validateAnalyzeSessionAccess({
+  sessionId: "session-a",
+  module: "support",
+  accessToken: "token-a",
+}, {
+  supabase: mockSupabase({ sessions: { ...sessionA, json_data: { pilot_id: "anmed" } } }),
+  validateAccess: async () => true,
+});
+assert.equal(foreignPilotSession.allowed, false, "a tagged session from another pilot must not authorize analysis");
+if (originalPilot === undefined) delete process.env.PILOT_ID;
+else process.env.PILOT_ID = originalPilot;
 
 const foreignSession = await validateAnalyzeSessionAccess({
   sessionId: "session-b",
@@ -219,6 +235,7 @@ async function requestAnMedBodyAnalysis(clientTokenModule) {
 }
 
 const originalSupportOnly = process.env.ANMED_SUPPORT_ONLY;
+const originalBrand = process.env.VITE_APP_BRAND;
 process.env.ANMED_SUPPORT_ONLY = "true";
 const supportTokenBodyRequest = await requestAnMedBodyAnalysis("support");
 assert.equal(supportTokenBodyRequest.statusCode, 403, "the shared API must reject Body even with a valid Support client token");
@@ -265,7 +282,18 @@ assert.equal(bodyAdminResponse.statusCode, 403, "AnMed must reject Body admin AP
 const bodyReviewsResponse = createApiResponse();
 await reviewsHandler(createApiRequest({ action: "save", module: "body" }), bodyReviewsResponse);
 assert.equal(bodyReviewsResponse.statusCode, 403, "AnMed must reject Body review API requests");
+
+process.env.ANMED_SUPPORT_ONLY = "false";
+process.env.VITE_APP_BRAND = "pneumointegration";
+const pneumoResponse = createApiResponse();
+assert.equal(rejectUnavailableModule(pneumoResponse, "body"), true, "Pneumointegration must reject Body by brand without support-only env");
+assert.equal(pneumoResponse.statusCode, 403);
+const pneumoSupportResponse = createApiResponse();
+assert.equal(rejectUnavailableModule(pneumoSupportResponse, "support"), false, "Pneumointegration must keep Support available");
+
 if (originalSupportOnly === undefined) delete process.env.ANMED_SUPPORT_ONLY;
 else process.env.ANMED_SUPPORT_ONLY = originalSupportOnly;
+if (originalBrand === undefined) delete process.env.VITE_APP_BRAND;
+else process.env.VITE_APP_BRAND = originalBrand;
 
 console.log("Analyze session access regression tests passed.");

@@ -7,6 +7,8 @@ import { normalizeConversationHistory, normalizeSessionDetails, extractUserRepor
 import { readFileSync, existsSync } from "node:fs";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { validateSessionAccess } from "../lib/security/access-token.js";
+import { resolveBoundReviewSession } from "../lib/security/bound-review-session.js";
 
 const ALLOWED_STATUSES = ["pending", "approved", "rejected", "needs_review", "local_auto_saved"];
 const TRAINING_STATUSES = ["new", "reviewed", "needs_prompt_update", "approved_for_learning", "rejected", "archived"];
@@ -113,7 +115,32 @@ async function handleSave(req, res) {
 
     const supabase = getSupabase();
 
+    // Patient feedback and generated case summaries may be saved from a public
+    // client. In a dedicated partner deployment, bind that write to a session
+    // in the deployment's organization and prove possession of its access token.
+    const deploymentOrgId = deploymentOrganizationId();
+    let boundSession = null;
+    if (deploymentOrgId) {
+      const sessionId = review.sessionId || review.session_id || null;
+      const accessToken = review.access_token || null;
+      if (!sessionId || !accessToken) {
+        return res.status(401).json({ ok: false, error: "Требуется доступ к сессии" });
+      }
+      const { session, ok } = await resolveBoundReviewSession({
+        supabase,
+        sessionId,
+        accessToken,
+        deploymentOrganizationId: deploymentOrgId,
+        validateAccess: validateSessionAccess,
+      });
+      if (!ok) {
+        return res.status(403).json({ ok: false, error: "Сессия недоступна" });
+      }
+      boundSession = session;
+    }
+
     const localReview = { ...review, status: "local_auto_saved" };
+    delete localReview.access_token;
     try {
       const fs = await import("node:fs");
       const path = await import("node:path");
@@ -122,17 +149,31 @@ async function handleSave(req, res) {
       if (!fs.existsSync(REVIEWS_DIR)) {
         fs.mkdirSync(REVIEWS_DIR, { recursive: true });
       }
-      const filePath = path.join(REVIEWS_DIR, `${review.case_id || review.sessionId || Date.now()}.json`);
+      const fileId = String(boundSession?.session_id || review.case_id || review.sessionId || Date.now())
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .slice(0, 128) || String(Date.now());
+      const filePath = path.join(REVIEWS_DIR, `${fileId}.json`);
       fs.writeFileSync(filePath, JSON.stringify(localReview, null, 2));
     } catch {}
 
     const privacy = getPrivacySafeMode();
     const cleanedReview = privacy ? maskSensitiveData(localReview) : localReview;
+    const storedReview = { ...cleanedReview };
+    delete storedReview.access_token;
+    if (boundSession) {
+      delete storedReview.expert_id;
+      delete storedReview.expert_name;
+      delete storedReview.expert_role;
+      delete storedReview.expert_specialty;
+      delete storedReview.organization_id;
+      delete storedReview.primary_expert_id;
+    }
 
     // Try to enrich with organization_id / primary_expert_id from session or assignment
-    let orgId = null;
-    let primExpertId = null;
-    if (cleanedReview.publicCode) {
+    let orgId = boundSession?.organization_id || null;
+    let primExpertId = boundSession?.primary_expert_id || null;
+    const publicCode = boundSession?.public_code || cleanedReview.publicCode;
+    if (!boundSession && cleanedReview.publicCode) {
       const { data: sessionData } = await supabase
         .from("sessions")
         .select("organization_id, primary_expert_id")
@@ -162,17 +203,19 @@ async function handleSave(req, res) {
 
     const payload = {
       case_id: cleanedReview.case_id || cleanedReview.sessionId || `review-${Date.now()}`,
-      session_id: cleanedReview.sessionId || null,
-      public_code: cleanedReview.publicCode || null,
-      module: cleanedReview.module || 'support',
-      json_data: cleanedReview,
-      expert_id: cleanedReview.expert_id || null,
-      expert_name: cleanedReview.expert_name || null,
-      expert_role: cleanedReview.expert_role || null,
-      expert_specialty: cleanedReview.expert_specialty || null,
+      session_id: boundSession?.session_id || cleanedReview.sessionId || null,
+      public_code: publicCode || null,
+      module: boundSession?.module || cleanedReview.module || 'support',
+      json_data: storedReview,
+      // In the partner client path, expert identity is server-derived from the
+      // session row above; client-supplied expert fields are not authoritative.
+      expert_id: boundSession ? null : cleanedReview.expert_id || null,
+      expert_name: boundSession ? null : cleanedReview.expert_name || null,
+      expert_role: boundSession ? null : cleanedReview.expert_role || null,
+      expert_specialty: boundSession ? null : cleanedReview.expert_specialty || null,
       organization_id: orgId,
       primary_expert_id: primExpertId,
-      assigned_expert_id: cleanedReview.expert_id || null,
+      assigned_expert_id: boundSession ? null : cleanedReview.expert_id || null,
     };
 
     const { error } = await supabase.from("case_reviews").insert(payload);
