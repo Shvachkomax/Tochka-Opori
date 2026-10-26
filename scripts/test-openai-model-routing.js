@@ -21,11 +21,13 @@ await runCompletion({ systemPrompt: "system", userPrompt: "reasoning", model: "g
 const reasoningChatBody = requests.at(-1);
 assert.equal(reasoningChatBody.max_completion_tokens, 4096);
 assert.equal("max_tokens" in reasoningChatBody, false);
+assert.equal("temperature" in reasoningChatBody, false);
 
 await runCompletion({ systemPrompt: "system", userPrompt: "ordinary", model: "gpt-4.1-mini" });
 const ordinaryChatBody = requests.at(-1);
 assert.equal(ordinaryChatBody.max_tokens, 4096);
 assert.equal("max_completion_tokens" in ordinaryChatBody, false);
+assert.equal(ordinaryChatBody.temperature, 0.3);
 
 process.env.AI_USE_RESPONSES_API = "true";
 await runCompletion({ systemPrompt: "system", userPrompt: "responses", model: "gpt-5.5", reasoningEffort: "medium" });
