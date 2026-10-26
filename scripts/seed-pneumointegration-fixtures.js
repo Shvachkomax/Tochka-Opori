@@ -134,6 +134,11 @@ async function run() {
   const { hashContinuationSecret } = await import("../lib/session/continuation-credential.js");
   const { ensureWallet, setWalletVisible } = await import("../lib/usage/wallet.js");
   const cleanupOnly = process.argv.includes("--cleanup");
+  const existingCodes = loadCodes();
+
+  if (existingCodes && existingCodes.project_ref !== TEST_PROJECT_REF) {
+    throw new Error("Refusing: local fixture codes belong to another project.");
+  }
 
   async function ensure(result, label) {
     if (result.error) throw new Error(`${label}: ${result.error.message}`);
@@ -148,14 +153,21 @@ async function run() {
   // --cleanup deletes ONLY rows with fixture IDs from the `ids` constant.
   // No wildcard or ownerless deletes. Each table is scoped by exact ID match.
   async function cleanup() {
-    const { data: wallets, error: walletError } = await supabase
-      .from("usage_wallets").select("id").eq("owner_id", ids.owner);
-    if (walletError) throw new Error(`cleanup usage_wallets lookup: ${walletError.message}`);
-    for (const wallet of wallets || []) {
-      await ensure(await supabase.from("usage_ledger").delete().eq("wallet_id", wallet.id), "cleanup usage_ledger");
-      await ensure(await supabase.from("usage_reservations").delete().eq("wallet_id", wallet.id), "cleanup usage_reservations");
+    const walletId = existingCodes?.wallet_id;
+    if (walletId) {
+      await ensure(await supabase.from("usage_ledger").delete().eq("wallet_id", walletId), "cleanup usage_ledger");
+      await ensure(await supabase.from("usage_reservations").delete().eq("wallet_id", walletId), "cleanup usage_reservations");
+      await ensure(
+        await supabase.from("usage_wallets").delete()
+          .eq("id", walletId).eq("owner_id", ids.owner).eq("module", "support"),
+        "cleanup usage_wallets",
+      );
+    } else {
+      const { data: wallets, error: walletError } = await supabase
+        .from("usage_wallets").select("id").eq("owner_id", ids.owner).eq("module", "support");
+      if (walletError) throw new Error(`cleanup usage_wallets lookup: ${walletError.message}`);
+      if (wallets?.length) throw new Error("Refusing cleanup: fixture wallet identity is not recorded locally.");
     }
-    await remove("usage_wallets", "owner_id", [ids.owner]);
     await remove("continuation_credentials", "id", [ids.credential]);
     await remove("patient_assignments", "id", [ids.assignment]);
     await remove("sessions", "id", [ids.session]);
@@ -173,13 +185,53 @@ async function run() {
 
   // ── Idempotency: detect existing fixture rows ──────────────────────────
 
-  const existingCodes = loadCodes();
   const { data: existingExpert } = await supabase
-    .from("experts").select("id, access_code").eq("id", ids.expert).maybeSingle();
+    .from("experts").select("id, name, specialty, allowed_modules").eq("id", ids.expert).maybeSingle();
   const { data: existingSession } = await supabase
-    .from("sessions").select("id, session_id").eq("id", ids.session).maybeSingle();
+    .from("sessions").select("id, session_id, public_code, anonymous_owner_id, organization_id, json_data").eq("id", ids.session).maybeSingle();
   const { data: existingCred } = await supabase
     .from("continuation_credentials").select("id, lookup_code").eq("id", ids.credential).maybeSingle();
+  const { data: existingAssignment } = await supabase
+    .from("patient_assignments").select("id, public_code, owner_id, organization_id, source").eq("id", ids.assignment).maybeSingle();
+  const { data: existingMembership } = await supabase
+    .from("expert_organization_memberships").select("id, organization_id, expert_id").eq("id", ids.membership).maybeSingle();
+  const { data: existingWallets, error: walletLookupError } = await supabase
+    .from("usage_wallets").select("id, owner_id, module").eq("owner_id", ids.owner).eq("module", "support");
+
+  if (walletLookupError) throw new Error(`fixture wallet lookup failed: ${walletLookupError.message}`);
+  if (existingExpert && (existingExpert.name !== "Тестовый Специалист Пневмо" || existingExpert.specialty !== "Психологическая поддержка (тест)")) {
+    throw new Error("Refusing cleanup: expert ID is not owned by this fixture.");
+  }
+  if (existingSession && (
+    existingSession.session_id !== SESSION_ID
+    || existingSession.public_code !== PUBLIC_CODE
+    || existingSession.anonymous_owner_id !== ids.owner
+    || existingSession.organization_id !== ORG_ID
+    || existingSession.json_data?.pilot_id !== PILOT_ID
+    || existingSession.json_data?.demo_fixture !== "pneumointegration-test-001"
+  )) {
+    throw new Error("Refusing cleanup: session ID is not owned by this fixture.");
+  }
+  if (existingCred && !String(existingCred.lookup_code || "").startsWith("ТОЧКА-PN")) {
+    throw new Error("Refusing cleanup: continuation credential is not owned by this fixture.");
+  }
+  if (existingAssignment && (
+    existingAssignment.public_code !== PUBLIC_CODE
+    || existingAssignment.owner_id !== ids.owner
+    || existingAssignment.organization_id !== ORG_ID
+    || existingAssignment.source !== "test_fixture"
+  )) {
+    throw new Error("Refusing cleanup: assignment ID is not owned by this fixture.");
+  }
+  if (existingMembership && (
+    existingMembership.organization_id !== ORG_ID
+    || existingMembership.expert_id !== ids.expert
+  )) {
+    throw new Error("Refusing cleanup: membership ID is not owned by this fixture.");
+  }
+  if (existingWallets?.length && (!existingCodes?.wallet_id || existingWallets.length !== 1 || existingWallets[0].id !== existingCodes.wallet_id)) {
+    throw new Error("Refusing cleanup: wallet identity is not owned by this fixture.");
+  }
 
   if (existingExpert && existingSession && existingCred && existingCodes) {
     console.log(JSON.stringify({
@@ -312,6 +364,7 @@ async function run() {
       continuation_code: continuationCode,
       lookup_code: lookupCode,
     },
+    wallet_id: wallet.id,
   };
   saveCodes(codesData);
 
