@@ -1,4 +1,4 @@
-# GPT-Live: закрытый тест Health
+# Живое общение: тестовые кабинеты Support и Health
 
 Отдельная кнопка в кабинете, старый голосовой режим остаётся доступным.
 «Я закончил» только выключает передачу микрофона, оставляя соединение и звук
@@ -8,14 +8,17 @@
 Браузер → WebRTC → gpt-live-1; Responses backend → gpt-5.5 (можно задать
 HEALTH_LIVE_BACKEND_MODEL). Контекст анкеты/дневника/лекарств читается через
 существующую проверку владельца. Инструкции Health сохраняются, формат — речь.
-Серверный API использует существующий слот /api/session, action=healthLive.
+Серверный API использует существующий слот /api/session, action=healthLive
+или supportLive.
 
 ## Включение
 
-Только закрытый Preview с Vercel Authentication, для внутренних тестировщиков:
-VITE_HEALTH_LIVE_ENABLED=true и HEALTH_LIVE_ENABLED=true. Ключ — существующий
-OPENAI_API_KEY с доступом к GPT-Live и выбранному backend. В production
-сервер принудительно блокирует пилот независимо от флага. Новых миграций нет.
+Для тестировщиков в Preview либо на явно разрешённых тестовых проектах:
+VITE_HEALTH_LIVE_ENABLED=true и HEALTH_LIVE_ENABLED=true для Health;
+VITE_SUPPORT_LIVE_ENABLED=true и SUPPORT_LIVE_ENABLED=true для Support. Ключ — существующий
+OPENAI_API_KEY с доступом к GPT-Live и выбранному backend. В основном production
+сервер принудительно блокирует пилот независимо от флага. На стабильных
+доменах тестовых проектов действует явный список разрешённых project ID. Новых миграций нет.
 Проверка /models/gpt-live-1 подтверждает лишь видимость модели: полноценный
 доступ к Live проверяется созданием настоящего WebRTC-соединения.
 
@@ -43,12 +46,13 @@ store=false; приложение не сохраняет аудио. Расши
 несохранённую Live-беседу. Записывающие инструменты и hosted search отключены.
 Браузеру разрешён только session.close: смена моделей, инструкций, tools и
 store через data channel запрещена. Полный API-ключ остаётся на сервере.
-Перед созданием нужны согласие, Health client token и доступ к сессии.
+Перед созданием нужны согласие, client token соответствующего модуля и доступ к сессии.
 
 Содержательные вопросы направляются к backend инструкцией, а не детерминированным
 шлюзом. Пилот не включает прежнюю обработку sendBodyAiMessage (intent routing,
 сохранение/кошелёк). Поэтому это тест качества общения, не клинический релиз.
-Существующие Support-маршруты не меняются. Перед пациентским запуском нужны
+Существующие текстовые Support-маршруты не меняются; новый supportLive
+использует промпт и контекст Support, но не детерминированный текстовый роутер. Перед пациентским запуском нужны
 серверное наблюдение, сохранение подтверждённых событий, бюджет, клиническая
 проверка кризисных сценариев и анализ передачи/хранения данных.
 
@@ -69,3 +73,26 @@ https://developers.openai.com/api/docs/guides/voice-webrtc
 https://developers.openai.com/api/docs/guides/live-conversations
 https://developers.openai.com/api/docs/guides/live-delegation
 https://developers.openai.com/api/reference/typescript/resources/live/methods/create
+
+## Расширение на тестовые кабинеты
+
+Кнопка «Живое общение» размещена только в кабинетах. Для Health используются
+VITE_HEALTH_LIVE_ENABLED / HEALTH_LIVE_ENABLED, для Support —
+VITE_SUPPORT_LIVE_ENABLED / SUPPORT_LIVE_ENABLED (значение true).
+Support использует action=supportLive, свою проверку владельца, свой контекст
+и prompts/support/ai-chat.md. Health использует action=healthLive.
+Модули не принимают токены друг друга; Support-only сборки блокируют Health.
+
+Исключение из прежней блокировки production: разрешены стабильные тестовые
+домены только проектов, явно перечисленных в TEST_PROJECT_IDS. Основной
+production проекта tochka-opori остаётся заблокирован независимо от флагов.
+Список: общий тест, АнМед, Пневмо, КГМУ, клинический тест.
+
+Перед публикацией перенести только изменения Live в соответствующие ветки,
+сохранить настройки брендов, SITE_URL, изоляцию БД и ключи каждой площадки.
+Не сливать целиком старую ветку health-voice-conversation.
+
+Проверки: npm run test:health-live; npm run e2e:health-live;
+LIVE_TEST_MODULE=support npm run e2e:health-live; npm run build.
+Браузерные проверки используют mock API и WebRTC; не подтверждают качество
+реального голоса и полную стоимость. Серверного журнала расходов Live пока нет.

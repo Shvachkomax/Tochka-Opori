@@ -354,12 +354,17 @@ export default async function handler(req, res) {
 
   // Reuse the existing function slot; speech performs its own strict CORS,
   // client-token, Health availability, session ownership and rate-limit checks.
-  if (req.body?.action === 'healthLive') {
+  if (['healthLive', 'supportLive'].includes(req.body?.action)) {
+    const liveModule = req.body.action === 'supportLive' ? 'support' : 'body';
     return createLiveHandler({
-      resolveOwner: resolveBodyOwner,
-      buildContext: owner => buildAiChatContext({ supabase: getSupabase(), ownerId: owner.ownerId }),
+      module: liveModule,
+      resolveOwner: liveModule === 'support' ? resolveSupportOwner : resolveBodyOwner,
+      buildContext: owner => liveModule === 'support'
+        ? buildSupportChatContext(getSupabase(), owner.ownerId)
+        : buildAiChatContext({ supabase: getSupabase(), ownerId: owner.ownerId }),
     })(req, res);
   }
+
   if (req.body?.action === 'healthSpeech') {
     return healthSpeechHandler({
       method: req.method,

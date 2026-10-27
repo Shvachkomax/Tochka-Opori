@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 process.env.VITE_HEALTH_LIVE_ENABLED = 'true';
+const support = process.env.LIVE_TEST_MODULE === 'support';
 const server = await createServer({ server: { host: '127.0.0.1', port: 5176, strictPort: true } });
 await server.listen();
 const browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox', '--disable-dev-shm-usage'] } : {}) });
@@ -49,7 +50,7 @@ try {
   await page.route('**/api/**', async route => {
     if (route.request().url().includes('/api/client-token')) return route.fulfill({ json: { token: 'fixture', expires_at: new Date(Date.now() + 900000).toISOString() } });
     const body = route.request().postDataJSON();
-    if (body.action === 'healthLive') {
+    if (body.action === (support ? 'supportLive' : 'healthLive')) {
       if (body.live_action === 'check') return route.fulfill({ json: { note: 'Модель видна проекту' } });
       creates++; assert.equal(body.consent, true); assert.equal(body.session_id, 'health-test');
       return route.fulfill(fail ? { status: 502, json: { error: 'Тестовый сбой API' } } : { status: 201, json: { session: { id: 'live_test' }, transport: { sdp: 'answer' }, max_seconds: maxSeconds, idle_seconds: idleSeconds } });
@@ -58,10 +59,10 @@ try {
   });
   await page.route('**/__live-test', route => route.fulfill({ contentType: 'text/html', body: `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
 import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;
-import '/src/style.css';import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';const {default:HealthCabinet}=await import('/src/HealthCabinet.jsx');
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(HealthCabinet,{sessionId:'health-test',accessToken:'fixture',profile:{},history:[]}));</script></body></html>` }));
+import '/src/style.css';import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';const {default:HealthCabinet}=await import('/src/HealthCabinet.jsx');const {default:Live}=await import('/src/HealthLiveConversation.jsx');
+const root=ReactDOM.createRoot(document.getElementById('root'));root.render(React.createElement(${support ? 'Live' : 'HealthCabinet'},{module:'support',sessionId:'health-test',accessToken:'fixture',profile:{},history:[],onClose:()=>root.unmount()}));</script></body></html>` }));
   await page.goto('http://127.0.0.1:5176/__live-test');
-  await page.getByRole('button', { name: 'Попробовать GPT-Live' }).click();
+  if (!support) await page.getByRole('button', { name: 'Живое общение' }).click();
   const dialog = page.getByRole('dialog');
   assert.equal(await dialog.getByRole('button', { name: 'Говорите', exact: true }).isDisabled(), true);
   await dialog.getByRole('checkbox').check();

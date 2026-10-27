@@ -668,8 +668,8 @@ export default function HealthCabinet({
       </div>}
       {voiceOpen && <HealthConversation sessionId={sessionId} accessToken={accessToken} onSend={sendChat} onClose={() => setVoiceOpen(false)} onSpecialist={onOpenServiceRequests} />}
       {import.meta.env.VITE_HEALTH_LIVE_ENABLED === 'true' && <div className="health-talk-entry">
-        <div><strong>Живой разговор · тест</strong><p>GPT-Live: быстрый ответ голосом и возможность перебивать.</p></div>
-        <button disabled={chatLoading || recording || transcribing || voiceOpen} onClick={() => setLiveOpen(true)}>Попробовать GPT-Live</button>
+        <div><strong>Живое общение · тест</strong><p>GPT-Live: быстрый ответ голосом и возможность перебивать.</p></div>
+        <button disabled={chatLoading || recording || transcribing || voiceOpen} onClick={() => setLiveOpen(true)}>Живое общение</button>
       </div>}
       {liveOpen && <HealthLiveConversation sessionId={sessionId} accessToken={accessToken} onClose={() => setLiveOpen(false)} onSpecialist={onOpenServiceRequests} />}
 

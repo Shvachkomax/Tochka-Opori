@@ -4,7 +4,7 @@ import './health-conversation.css';
 
 const labels = { idle: 'Готовы поговорить?', checking: 'Проверяю доступ…', connecting: 'Подключаю голос…', active: 'Слушаю вас — можно говорить и перебивать', closing: 'Завершаю соединение…', closed: 'Разговор завершён' };
 
-export default function HealthLiveConversation({ sessionId, accessToken, onClose, onSpecialist }) {
+export default function HealthLiveConversation({ sessionId, accessToken, onClose, onSpecialist, module = 'body' }) {
   const [phase, setPhase] = useState('idle'), [consent, setConsent] = useState(false), [error, setError] = useState('');
   const [transcript, setTranscript] = useState({ user: '', assistant: '' });
   const [seconds, setSeconds] = useState(0), [confirmed, setConfirmed] = useState(false), [blocked, setBlocked] = useState(false);
@@ -15,9 +15,9 @@ export default function HealthLiveConversation({ sessionId, accessToken, onClose
   const busy = ['checking', 'connecting', 'active', 'closing'].includes(phase);
 
   async function request(live_action, extra = {}) {
-    const response = await fetchWithClientToken('/api/session', 'body', 'analyze', {
+    const response = await fetchWithClientToken('/api/session', module, 'analyze', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'healthLive', live_action, session_id: sessionId, access_token: accessToken, ...extra }),
+      body: JSON.stringify({ action: module === 'support' ? 'supportLive' : 'healthLive', live_action, session_id: sessionId, access_token: accessToken, ...extra }),
       signal: AbortSignal.timeout(40000),
     });
     if (!response.json) throw new Error(response.error || 'Не удалось подтвердить доступ.');
@@ -183,9 +183,9 @@ export default function HealthLiveConversation({ sessionId, accessToken, onClose
       else if (!e.shiftKey && document.activeElement === list.at(-1)) { e.preventDefault(); list[0]?.focus(); }
     }
   }}>
-    <header><div><p className="health-talk-eyebrow">HEALTH · ТЕСТ GPT-LIVE</p><h2 id="health-live-title">Поговорим?</h2></div><button aria-label="Закрыть разговор" onClick={close}>✕</button></header>
+    <header><div><p className="health-talk-eyebrow">{module === 'support' ? 'SUPPORT' : 'HEALTH'} · ТЕСТ</p><h2 id="health-live-title">Живое общение</h2></div><button aria-label="Закрыть разговор" onClick={close}>✕</button></header>
     <p>Говорите, затем сделайте паузу или нажмите «Я закончил» — помощник сможет ответить. Для новой реплики нажмите «Говорите». Тест — до 5 минут.</p>
-    <label className="health-talk-check"><input type="checkbox" checked={consent} disabled={busy} onChange={e => setConsent(e.target.checked)} />Согласен передавать речь и контекст моего Health в OpenAI для этого разговора.</label>
+    <label className="health-talk-check"><input type="checkbox" checked={consent} disabled={busy} onChange={e => setConsent(e.target.checked)} />Согласен передавать речь и контекст моего кабинета в OpenAI для этого разговора.</label>
     <div className="health-talk-status"><div className={`health-talk-orb ${phase === 'active' && !micPaused ? 'listening' : ''}`}>🎙</div><span role="status">{phase === 'active' && micPaused ? 'Микрофон на паузе — слушаем ответ' : labels[phase]}</span><meter min="0" max="100" value={level} aria-label="Уровень звука" /></div>
     <button className="primary health-talk-main" disabled={['checking', 'connecting', 'closing'].includes(phase) || (!busy && !consent)} onClick={() => phase === 'active' ? toggleTurn() : start()}>{phase === 'active' && !micPaused ? 'Я закончил' : phase === 'connecting' ? 'Подключаю…' : phase === 'closing' ? 'Завершаю…' : 'Говорите'}</button>
     {['connecting', 'active'].includes(phase) && <div className="health-talk-actions"><button onClick={() => end()}>Завершить разговор</button></div>}
@@ -201,6 +201,6 @@ export default function HealthLiveConversation({ sessionId, accessToken, onClose
       <p>Расшифровка видна только в этом окне и не записывается в дневник. При закрытии она исчезнет. Текст не гарантирует, что вся реплика прозвучала.</p>
       <button disabled={busy} onClick={check}>Проверить доступ к GPT-Live</button>
     </details>
-    <footer><span>ИИ не заменяет врача.</span><button onClick={() => { close(); onSpecialist?.(); }}>Связаться со специалистом</button></footer>
+    <footer><span>ИИ не заменяет врача. Срочная помощь: <a href="tel:112">112</a> / <a href="tel:103">103</a>.</span><button onClick={() => { close(); onSpecialist?.(); }}>Связаться со специалистом</button></footer>
   </section></div>;
 }
