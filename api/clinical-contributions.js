@@ -15,7 +15,7 @@ const PRIVATE_DATA_PATTERNS = [
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
   /(?:\+7|8)[\s()-]*\d{3}[\s()-]*\d{3}[\s()-]*\d{2}[\s()-]*\d{2}/,
   /\b\d{2}[./-]\d{2}[./-](?:19|20)\d{2}\b/,
-  /\b(?:паспорт|снилс|номер карты пациента|адрес проживания|телефон пациента|фио пациента)\b/i,
+  /(?:паспорт|снилс|номер карты пациента|адрес проживания|телефон пациента|фио пациента)/i,
 ];
 function enabled() {
   if (process.env.CLINICAL_CONTRIBUTIONS_ENABLED === "true") return true;
@@ -88,7 +88,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true, items: (data || []).filter((r) => modules.includes(r.module)),
         demo_points: (bonuses || []).reduce((s, x) => s + x.points, 0),
-        points_redeemable: false, is_demo: true, reviewer: isReviewer(expert),
+        points_redeemable: false, is_demo: true, reviewer: isReviewer(expert), allowed_modules: modules,
       });
     }
 
