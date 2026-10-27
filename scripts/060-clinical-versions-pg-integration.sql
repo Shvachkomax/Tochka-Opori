@@ -94,6 +94,18 @@ BEGIN
  EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
  END;
 
+ -- TRUNCATE would bypass row triggers; both source and history forbid it.
+ BEGIN
+  EXECUTE 'TRUNCATE TABLE clinical_internal.record_revisions';
+  RAISE EXCEPTION 'revision truncate unexpectedly allowed';
+ EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
+ END;
+ BEGIN
+  EXECUTE 'TRUNCATE TABLE clinical_outbox_lab.synthetic_support';
+  RAISE EXCEPTION 'source truncate unexpectedly allowed';
+ EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
+ END;
+
  -- Changing patient identity without explicit transfer workflow must fail.
  BEGIN
   UPDATE clinical_outbox_lab.synthetic_support SET owner_id='ANOTHER-PATIENT'
@@ -108,6 +120,11 @@ BEGIN
     AND operation='DELETE';
  IF s3->'medication_schedule'->>'dose_amount'<>'50' THEN
   RAISE EXCEPTION 'deleted source was not preserved';
+ END IF;
+ IF NOT EXISTS (SELECT 1 FROM clinical_internal.record_revisions
+   WHERE source_key='SYN-V3-SUPPORT' AND version_no=3
+     AND author_claim IS NULL AND author_status='not_captured') THEN
+   RAISE EXCEPTION 'delete actor falsely attributed to previous treating clinician';
  END IF;
 
  -- A reused source key must NOT rewrite old versions.
