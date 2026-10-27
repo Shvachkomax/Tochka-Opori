@@ -54,6 +54,14 @@ const health = assembleLongitudinalEvents({
 }, "body", now);
 assert.equal(health.events[0].at, "2026-10-02T00:00:00.000Z");
 assert.equal(health.events[0].details.weight_kg, 68.5);
+const medicationRevision = assembleLongitudinalEvents({
+  patient_medication_order_events: [
+    { id: "med-change-1", created_at: later,
+      event_type: "status_changed", previous_status: "active", new_status: "paused" },
+  ],
+}, "body", now);
+assert.equal(medicationRevision.events[0].type, "medication_history_changed");
+assert.equal(medicationRevision.events[0].details.new_status, "paused");
 assert(!JSON.stringify(health.events).includes("Скрытое"));
 
 // Fake database lets us inspect the exact owner/organization filters without PHI.
