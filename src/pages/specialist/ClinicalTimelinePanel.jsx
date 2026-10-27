@@ -62,8 +62,8 @@ const friendly = (value) => {
   return String(value);
 };
 const NOTES = {
-  note: "Описание", medication_name: "Препарат", strength_value: "Дозировка",
-  strength_unit: "Единица", weight_kg: "Масса, кг", sleep_hours: "Сон, ч",
+  note: "Описание", medication_name: "Препарат", strength_value: "Сила лекарственной формы",
+  strength_unit: "Единица силы", weight_kg: "Масса, кг", sleep_hours: "Сон, ч",
   value_numeric: "Значение", unit: "Единица измерения", concept: "Показатель",
   outcome_type: "Оцениваемый результат", direction: "Динамика",
   followup_complete: "Оценка завершена", clinician_assessed: "Проверено врачом",
@@ -83,6 +83,17 @@ function EventCard({ entry: item }) {
     {details.map(([key, val]) => <div key={key} style={{ fontSize: 13, lineHeight: 1.6 }}>
       <span style={{ color: "#6D716A" }}>{NOTES[key]}: </span>{friendly(val)}
     </div>)}
+    {Array.isArray(item.details?.schedules) && item.details.schedules.length > 0 && (
+      <div style={{ marginTop: 7, padding: 9, background: "#F8F2EA", borderRadius: 8, fontSize: 12 }}>
+        <strong>Схема, зафиксированная врачом:</strong>
+        {item.details.schedules.map((p, i) => <div key={i} style={{ marginTop: 5 }}>
+          Этап {p.phase_number ?? i + 1}: {p.dose_amount ?? "доза не указана"} {p.dose_unit || ""}
+          {p.frequency_code ? ` · ${p.frequency_code}` : ""}
+          {p.phase_start_at ? ` · с ${formatDate(p.phase_start_at)}` : ""}
+          {p.phase_end_at ? ` до ${formatDate(p.phase_end_at)}` : ""}
+        </div>)}
+      </div>
+    )}
     {item.validation_status && item.validation_status !== "clinician_confirmed"
       && <div style={{ fontSize: 11, color: "#997A55", marginTop: 4 }}>Статус проверки: {item.validation_status === "unreviewed" ? "не проверено" : item.validation_status}</div>}
   </div>;
