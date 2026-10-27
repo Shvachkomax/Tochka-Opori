@@ -28,6 +28,14 @@ function makePool(initial, options={}) {
           }
           if(s==="ROLLBACK"){pending=null;shared.rollbacks++;return {rowCount:0,rows:[]};}
           if(!pending)throw Error("query outside transaction");
+          if(s.startsWith("UPDATE clinical_internal.source_outbox")&&s.includes("LEASE_EXHAUSTED")) {
+            const expired=pending.rows.filter(r=>r.status==="processing"&&r.expired&&r.attempts>=args[0]);
+            for(const row of expired) {
+              row.status="dead_letter";row.error_code="LEASE_EXHAUSTED";
+              row.leased_until=null;row.lease_token=null;
+            }
+            return {rows:expired.map(r=>({id:r.id})),rowCount:expired.length};
+          }
           if(s.startsWith("WITH candidates")) {
             const [limit,maxAttempts]=args;
             const eligible=pending.rows.filter(r=>r.attempts<maxAttempts&&(
@@ -89,6 +97,12 @@ const exhausted=makePool([{id:9,attempts:5}],{failAckOnce:true});
 r=await runOutboxBatch(exhausted);
 assert.equal(r.dead_letter,1);
 assert.equal(exhausted.shared.receipts.size,0);
+const crashedAtLimit=makePool([{id:19,status:"processing",attempts:6,expired:true,
+  lease_token:"00000000-0000-4000-8000-000000000222"}]);
+const expiredResult=await runOutboxBatch(crashedAtLimit);
+assert.equal(expiredResult.claimed,0);
+assert.equal(crashedAtLimit.shared.rows[0].status,"dead_letter");
+assert.equal(crashedAtLimit.shared.rows[0].error_code,"LEASE_EXHAUSTED");
 const lost=makePool([{id:11,status:"processed"}]);
 assert.equal(await processOutboxRecord(lost,{id:11,lease_token:"00000000-0000-4000-8000-000000000111",attempts:1}),"lease_lost");
-console.log("Clinical outbox worker: 16 synthetic assertions passed; no EHR connections");
+console.log("Clinical outbox worker: 19 synthetic assertions passed; no EHR connections");
