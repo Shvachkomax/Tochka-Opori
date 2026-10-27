@@ -6,6 +6,7 @@ import { rateLimit } from "../lib/security/rate-limit.js";
 import { hashToken } from "../lib/security/council-token.js";
 import { getInviteUrl } from "../lib/config/site-url.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
+import { loadLongitudinalFromSources } from "../lib/clinical/longitudinal.js";
 import { getPilotId, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { handlePartnerProgram } from "../lib/partners/program-handler.js";
 import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
@@ -159,6 +160,8 @@ export default async function handler(req, res) {
         return await handleGetClientOverview(req, res);
       case "getClientProfessionalAnalysis":
         return await handleGetClientProfessionalAnalysis(req, res);
+      case "getClinicalTimeline":
+        return await handleGetClinicalTimeline(req, res);
       case "getBodyClientOverview":
         return await handleGetBodyClientOverview(req, res);
       case "listMedicationConcepts":
@@ -885,6 +888,77 @@ async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRe
   }
 
   return { ok: true, publicCode, ownerType, ownerId, relationship, accessRole };
+}
+
+
+// ── CLINICAL LONGITUDINAL REGISTRY (read-only, opt-in) ───────────
+// Never expose owner identifiers, raw session text or research exports.
+async function handleGetClinicalTimeline(req, res) {
+  // Never turned on implicitly by a new deployment or merge.
+  if (process.env.CLINICAL_LONGITUDINAL_READ_ENABLED !== "true") {
+    return res.status(404).json({ ok: false, error: "Клиническая хронология ещё не включена" });
+  }
+  const origin = req.headers.origin;
+  const requestHost = req.headers.host;
+  try {
+    if (!origin || new URL(origin).host !== requestHost) {
+      return res.status(403).json({ ok: false, error: "Недопустимый источник запроса" });
+    }
+  } catch {
+    return res.status(403).json({ ok: false, error: "Недопустимый источник запроса" });
+  }
+  const auth = await authorizeSpecialist(req);
+  if (auth.error) return res.status(auth.status).json({ ok: false, error: auth.error });
+  const { client_ref: clientRef, organization_id: organizationId = null, module } = req.body || {};
+  if (typeof clientRef !== "string" || !/^(assignment|access):[a-f0-9-]{36}$/i.test(clientRef)) {
+    return res.status(400).json({ ok: false, error: "Неверная ссылка на пациента" });
+  }
+  const ctx = validateSpecialistContext({
+    memberships: auth.memberships, organizationId, module, allowedModules: auth.expert.allowed_modules,
+  });
+  if (!ctx.ok) return res.status(403).json({ ok: false, error: ctx.error });
+  const resolved = await resolveAuthorizedSpecialistClient({
+    expert: auth.expert, memberships: auth.memberships, clientRef,
+    organizationId, module,
+  });
+  if (!resolved.ok) return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
+  let ownerType = resolved.ownerType;
+  let ownerId = resolved.ownerId;
+  if (module === "support") {
+    if (!resolved.publicCode) return res.status(403).json({ ok: false, error: "Пациент не определён" });
+    const { data, error } = await getSupabase().from("sessions")
+      .select("anonymous_owner_id").eq("public_code", resolved.publicCode)
+      .eq("module", "support").limit(1).maybeSingle();
+    if (error || !data?.anonymous_owner_id) {
+      return res.status(404).json({ ok: false, error: "История пациента недоступна" });
+    }
+    ownerType = "anonymous_case";
+    ownerId = data.anonymous_owner_id;
+  }
+  try {
+    const timeline = await loadLongitudinalFromSources({
+      supabase: getSupabase(), module, ownerType, ownerId, organizationId,
+    });
+    if (!timeline.coverage.complete) {
+      console.warn("[clinical-longitudinal] incomplete coverage", {
+        sources: timeline.coverage.unavailable_sources,
+        truncated: timeline.coverage.truncated_sources,
+        module,
+      });
+      return res.status(503).json({
+        ok: false, error: "Клиническая хронология неполна. Показывать её как полную нельзя.",
+        coverage: timeline.coverage,
+      });
+    }
+    return res.status(200).json({
+      ok: true, module, events: timeline.events, summary: timeline.summary,
+      coverage: timeline.coverage, read_only: true,
+      research_export_allowed: false,
+    });
+  } catch (error) {
+    console.error("[clinical-longitudinal] loading failed", error.code || error.name || "unknown");
+    return res.status(503).json({ ok: false, error: "История временно недоступна" });
+  }
 }
 
 // ── GET CLIENT OVERVIEW ───────────────────────────────────
