@@ -147,7 +147,7 @@ await assert.rejects(
 );
 const fails = await loadLongitudinalFromSources({
   supabase: fakeDb({ clinical_outcomes: { data: null, error: { code: "missing_table" } } }, []),
-  module: "support", ownerType: "anonymous_case", ownerId, organizationId: orgId, now,
+  module: "support", ownerType: "anonymous_case", ownerId, organizationId: null, now,
 });
 assert.equal(fails.coverage.complete, false);
 assert(fails.coverage.unavailable_sources.includes("clinical_outcomes"));
