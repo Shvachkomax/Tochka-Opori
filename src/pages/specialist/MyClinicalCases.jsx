@@ -61,6 +61,7 @@ export default function MyClinicalCases() {
   const [queue, setQueue] = useState([]);
   const [tab, setTab] = useState("mine");
   const [reviewer, setReviewer] = useState(false);
+  const [allowedCaseModules, setAllowedCaseModules] = useState(["support"]);
   const [demoPoints, setDemoPoints] = useState(0);
   const [currentId, setCurrentId] = useState(null);
   const [form, setForm] = useState(emptyCase);
@@ -77,6 +78,7 @@ export default function MyClinicalCases() {
     setItems(mine.items || []);
     setDemoPoints(mine.demo_points || 0);
     setReviewer(!!mine.reviewer);
+    setAllowedCaseModules(mine.allowed_modules || ["support"]);
     if (mine.reviewer) {
       const review = await request("reviewQueue");
       setQueue(review.items || []);
@@ -90,7 +92,7 @@ export default function MyClinicalCases() {
     setDirty(false);
     setError(""); setNotice(""); setTab("mine");
   };
-  const newItem = () => { setCurrentId(null); setForm(emptyCase()); setDirty(false); setNotice(""); setError(""); setTab("mine"); };
+  const newItem = () => { setCurrentId(null); setForm({ ...emptyCase(), module: allowedCaseModules.includes(emptyCase().module) ? emptyCase().module : allowedCaseModules[0] || "support" }); setDirty(false); setNotice(""); setError(""); setTab("mine"); };
   const run = async (callback) => {
     setBusy(true); setError(""); setNotice("");
     try { await callback(); } catch (err) { setError(err.message); } finally { setBusy(false); }
@@ -150,8 +152,8 @@ export default function MyClinicalCases() {
           {canEdit ? <>
             <label style={{ fontSize: 13, fontWeight: 700 }}>Направление
               <select style={INPUT} value={form.module} onChange={(e) => editField("module", e.target.value)}>
-                <option value="support">Support — психология и психиатрия</option>
-                <option value="health">Health — здоровье и стройность</option>
+                {allowedCaseModules.includes("support") && <option value="support">Support — психология и психиатрия</option>}
+                {allowedCaseModules.includes("health") && <option value="health">Health — здоровье и стройность</option>}
               </select>
             </label>
             <Field label="Название случая" rows={1} value={form.title} onChange={(v) => editField("title", v)} />
@@ -211,7 +213,7 @@ export default function MyClinicalCases() {
           <label style={{ fontSize: 13 }}>Решение<select value={decision} onChange={(e) => setDecision(e.target.value)} style={INPUT}>
             <option value="changes_requested">Вернуть на доработку</option>
             <option value="rejected">Отклонить</option>
-            <option value="accept">Принять в тестовую библиотеку (+100 демонстрационных баллов автору)</option>
+            <option value="accept">Принять описание для тестовой библиотеки (+100 демонстрационных баллов автору)</option>
           </select></label>
           <Field label="Обязательное экспертное заключение" value={reviewComment} onChange={setReviewComment} />
           <p style={TXT}>Оценка относится к качеству описания, не к правильности лечения. Принятие не публикует сведения пациентам и не начисляет реальные деньги.</p>
