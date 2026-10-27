@@ -783,6 +783,7 @@ export default function SpecialistCabinet() {
             Рабочее пространство: {module === "body" ? "Здоровье & Стройность" : "Точка Опоры"}
           </div>
           <a href="/specialist/knowledge" style={{ display: "inline-block", marginTop: 12, ...S.btnSecondary, textDecoration: "none" }}>Клиническая библиотека</a>
+          <a href="/specialist/clinical-cases" style={{ display: "inline-block", marginTop: 12, marginLeft: 8, ...S.btnSecondary, textDecoration: "none" }}>Мои клинические случаи</a>
           {auth?.expert?.role === "clinical_reviewer" && (
             <a href="/specialist/knowledge/review" style={{ display: "inline-block", marginTop: 12, marginLeft: 8, ...S.btnSecondary, textDecoration: "none" }}>Экспертиза публикаций</a>
           )}
