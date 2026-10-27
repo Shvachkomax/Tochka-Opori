@@ -6,7 +6,8 @@ import { rateLimit } from "../lib/security/rate-limit.js";
 import { hashToken } from "../lib/security/council-token.js";
 import { getInviteUrl } from "../lib/config/site-url.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
-import { isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { getPilotId, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { handlePartnerProgram } from "../lib/partners/program-handler.js";
 import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
 import { buildSpecialistClientList } from "../lib/specialist-client-list.js";
 import { normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
@@ -152,6 +153,8 @@ export default async function handler(req, res) {
         return await handleLogout(req, res);
       case "listClients":
         return await handleListClients(req, res);
+      case "getPartnerProgram":
+        return await handlePartnerProgram(req, res, { authorizeSpecialist, validateSpecialistContext, getSupabase, getPilotId });
       case "getClientOverview":
         return await handleGetClientOverview(req, res);
       case "getClientProfessionalAnalysis":
