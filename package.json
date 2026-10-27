@@ -39,7 +39,9 @@
     "test:partner-accounting": "node scripts/test-partner-accounting.js",
     "test:partner-database": "node scripts/test-partner-database.mjs",
     "test:partner-api": "node scripts/test-partner-api.js",
-    "test:partner-browser": "node scripts/test-partner-browser.mjs"
+    "test:partner-browser": "node scripts/test-partner-browser.mjs",
+    "test:health-live": "node scripts/test-health-live.js",
+    "e2e:health-live": "node scripts/e2e-health-live.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

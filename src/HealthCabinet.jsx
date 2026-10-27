@@ -1,3 +1,4 @@
+import HealthLiveConversation from "./HealthLiveConversation.jsx";
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { getClientToken } from "./lib/clientToken.js";
@@ -357,6 +358,8 @@ export default function HealthCabinet({
     });
   }
 
+  const [liveOpen, setLiveOpen] = useState(false);
+
   // AI Chat
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
@@ -654,6 +657,12 @@ export default function HealthCabinet({
 
   return (
     <div style={{ width: "100%" }}>
+      {import.meta.env.VITE_HEALTH_LIVE_ENABLED === 'true' && <div className="health-talk-entry">
+        <div><strong>Живое общение · тест</strong><p>Расскажите о вашем дне, питании и самочувствии. До 5 минут.</p></div>
+        <button disabled={chatLoading || recording || transcribing} onClick={() => setLiveOpen(true)}>Живое общение</button>
+      </div>}
+      {liveOpen && <HealthLiveConversation sessionId={sessionId} accessToken={accessToken} onClose={() => setLiveOpen(false)} onSpecialist={onOpenServiceRequests} />}
+
       {/* Compact Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", marginBottom: 16, borderBottom: "1px solid #e8e2d8" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
