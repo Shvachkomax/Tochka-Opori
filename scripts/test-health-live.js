@@ -66,6 +66,13 @@ for (const project of ['prj_BSzyfSJjjrCTI0RieWuVxR8qh3el', 'prj_FoIS93e41Jhmwhcm
   process.env.VERCEL_PROJECT_ID = project;
   assert.equal((await call({}, 'support')).code, 201);
 }
+process.env.VERCEL_PROJECT_ID = 'prj_BSzyfSJjjrCTI0RieWuVxR8qh3el';
+delete process.env.OPENAI_API_KEY;
+process.env.OPENAI_API_KEY_test = 'test-only-legacy';
+assert.equal((await call({}, 'support')).code, 201);
+process.env.VERCEL_PROJECT_ID = 'prj_FoIS93e41JhmwhcmQKmnKwXDQgjv';
+assert.equal((await call({}, 'support')).code, 503);
+process.env.OPENAI_API_KEY = 'test-only';
 process.env.SUPPORT_ONLY = 'true';
 handler = makeHandler('body');
 assert.equal((await call()).code, 403);
