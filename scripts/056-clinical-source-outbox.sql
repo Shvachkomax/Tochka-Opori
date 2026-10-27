@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS public.clinical_source_outbox (
   source_table text NOT NULL,
   source_key text NOT NULL,
   operation text NOT NULL CHECK (operation IN ('INSERT','UPDATE','DELETE')),
-  row_sha256 text NOT NULL CHECK (length(row_sha256)=64),
   owner_type text,
   owner_id uuid,
   organization_id uuid,
@@ -19,9 +18,7 @@ CREATE TABLE IF NOT EXISTS public.clinical_source_outbox (
   next_attempt_at timestamptz,
   leased_until timestamptz,
   processed_at timestamptz,
-  last_error_code text,
-  CONSTRAINT clinical_source_outbox_unique_revision
-    UNIQUE (source_table,source_key,operation,row_sha256)
+  last_error_code text
 );
 CREATE INDEX IF NOT EXISTS clinical_source_outbox_pending
   ON public.clinical_source_outbox(status,next_attempt_at,id)
@@ -58,12 +55,11 @@ BEGIN
   IF v_owner_text IS NOT NULL THEN v_owner := v_owner_text::uuid; END IF;
   IF v_org_text IS NOT NULL THEN v_org := v_org_text::uuid; END IF;
   INSERT INTO public.clinical_source_outbox (
-    source_table,source_key,operation,row_sha256,owner_type,owner_id,organization_id
+    source_table,source_key,operation,owner_type,owner_id,organization_id
   ) VALUES (
     TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, v_id, TG_OP,
-    encode(extensions.digest(convert_to(v::text, 'UTF8'),'sha256'),'hex'),
     v->>'owner_type',v_owner,v_org
-  ) ON CONFLICT (source_table,source_key,operation,row_sha256) DO NOTHING;
+  );
   IF TG_OP='DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
 END;
 $$;
