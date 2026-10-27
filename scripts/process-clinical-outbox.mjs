@@ -36,6 +36,15 @@ WHERE o.id=c.id
 RETURNING o.id,o.lease_token,o.attempts
 `;
 
+const EXPIRE_SQL = `
+UPDATE ${SOURCE_SCHEMA}.source_outbox
+SET status='dead_letter',error_code='LEASE_EXHAUSTED',
+    lease_token=NULL,leased_until=NULL,available_at=NULL
+WHERE status='processing' AND attempts >= $1
+  AND leased_until IS NOT NULL AND leased_until < now()
+RETURNING id
+`;
+
 const LOCK_SQL = `
 SELECT id FROM ${SOURCE_SCHEMA}.source_outbox
 WHERE id=$1 AND lease_token=$2::uuid AND status='processing'
@@ -92,8 +101,11 @@ export async function claimOutbox(pool, { batchSize=25, maxAttempts=MAX_ATTEMPTS
     throw new Error("Invalid batch size");
   if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 12)
     throw new Error("Invalid max attempts");
-  return transaction(pool, async (c) =>
-    (await c.query(CLAIM_SQL, [batchSize,maxAttempts])).rows || []);
+  return transaction(pool, async (c) => {
+    // A worker crash at the retry limit must not strand a processing row forever.
+    await c.query(EXPIRE_SQL,[maxAttempts]);
+    return (await c.query(CLAIM_SQL, [batchSize,maxAttempts])).rows || [];
+  });
 }
 
 export async function processOutboxRecord(pool, job, maxAttempts=MAX_ATTEMPTS) {
@@ -140,8 +152,8 @@ if (process.argv[1]?.endsWith("/process-clinical-outbox.mjs")) {
   if (process.env.CLINICAL_OUTBOX_WORKER_APPROVED !== "YES_STAGING_ONLY") {
     process.stderr.write("Outbox worker disabled: staging approval is required.\\n");
     process.exitCode=2;
-  } else if (!process.env.DATABASE_URL) {
-    process.stderr.write("DATABASE_URL is missing.\\n");
+  } else if (!process.env.DATABASE_URL || !process.env.CLINICAL_OUTBOX_EXPECTED_DATABASE) {
+    process.stderr.write("DATABASE_URL / CLINICAL_OUTBOX_EXPECTED_DATABASE missing.\\n");
     process.exitCode=2;
   } else {
     const { default: pg }=await import("pg");
@@ -149,6 +161,9 @@ if (process.argv[1]?.endsWith("/process-clinical-outbox.mjs")) {
       max:2,connectionTimeoutMillis:5000,statement_timeout:10000,
       application_name:"clinical-outbox-worker" });
     try {
+      const check=await pool.query("SELECT current_database() AS db");
+      if (check.rows?.[0]?.db !== process.env.CLINICAL_OUTBOX_EXPECTED_DATABASE)
+        throw Object.assign(new Error("Unexpected database"),{code:"DB_MISMATCH"});
       const result=await runOutboxBatch(pool);
       process.stdout.write(JSON.stringify(result)+"\\n");
       if(result.dead_letter||result.lease_recovery_required)process.exitCode=1;
