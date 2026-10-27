@@ -922,6 +922,11 @@ async function handleGetClinicalTimeline(req, res) {
     organizationId, module,
   });
   if (!resolved.ok) return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
+  // A shared invitation alone is not permission to disclose previous clinical history.
+  // Transfer needs a distinct, auditable consent workflow before shared access is enabled.
+  if (resolved.relationship !== "primary") {
+    return res.status(403).json({ ok: false, error: "Просмотр прошлой клинической истории требует отдельного разрешения пациента" });
+  }
   let ownerType = resolved.ownerType;
   let ownerId = resolved.ownerId;
   if (module === "support") {
