@@ -3,6 +3,7 @@ import SpecialistMedicationOrders from "../../SpecialistMedicationOrders.jsx";
 import PatientReportedMedicationSummary from "../../PatientReportedMedicationSummary.jsx";
 import { buildSpecialistContextKey, isCurrentSpecialistContext } from "./specialistContext.js";
 import { APP_BRAND } from "../../lib/appBrand.js";
+import PartnerProgram from "./PartnerProgram.jsx";
 
 // ── Styles ────────────────────────────────────────────────
 
@@ -890,6 +891,9 @@ export default function SpecialistCabinet() {
             );
           })()}
         </div>
+
+        {!selectedClient && <PartnerProgram key={`${expert.id}:${orgId || "private"}:${module}`}
+          module={module} organizationId={orgId} styles={S} />}
 
         {/* ── Service Requests ─────────────────────────── */}
         {!selectedClient && (

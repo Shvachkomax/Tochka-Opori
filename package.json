@@ -35,7 +35,11 @@
     "test:support-risk-routing": "node scripts/test-support-risk-routing.js",
     "test:cabinet-defects": "node scripts/test-cabinet-defects.js",
     "test:crisis-mobile": "node scripts/test-crisis-mobile.mjs",
-    "test:patient-specialist-workflow": "node scripts/test-patient-specialist-workflow.mjs"
+    "test:patient-specialist-workflow": "node scripts/test-patient-specialist-workflow.mjs",
+    "test:partner-accounting": "node scripts/test-partner-accounting.js",
+    "test:partner-database": "node scripts/test-partner-database.mjs",
+    "test:partner-api": "node scripts/test-partner-api.js",
+    "test:partner-browser": "node scripts/test-partner-browser.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
@@ -51,6 +55,7 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.12",
     "concurrently": "^9.1.0",
     "pg": "^8.21.0",
     "playwright": "^1.62.1"
