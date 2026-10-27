@@ -4,6 +4,7 @@ import PatientReportedMedicationSummary from "../../PatientReportedMedicationSum
 import { buildSpecialistContextKey, isCurrentSpecialistContext } from "./specialistContext.js";
 import { APP_BRAND } from "../../lib/appBrand.js";
 import PartnerProgram from "./PartnerProgram.jsx";
+import ClinicalTimelinePanel from "./ClinicalTimelinePanel.jsx";
 
 // ── Styles ────────────────────────────────────────────────
 
@@ -891,6 +892,13 @@ export default function SpecialistCabinet() {
             );
           })()}
         </div>
+
+        <ClinicalTimelinePanel
+          key={`${expert.id}:${orgId || "private"}:${module}:${selectedClient || "demo"}`}
+          module={module}
+          organizationId={orgId}
+          clientRef={selectedClient}
+        />
 
         {!selectedClient && <PartnerProgram key={`${expert.id}:${orgId || "private"}:${module}`}
           module={module} organizationId={orgId} styles={S} />}
