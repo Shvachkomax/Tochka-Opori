@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { getSupabase } from "../lib/supabase.js";
+import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { hashToken } from "../lib/security/council-token.js";
@@ -22,7 +23,7 @@ const TOKEN_BYTES = 32; // 256-bit token
 const GENERIC_AUTH_ERROR = "Неверный код специалиста";
 const COOKIE_NAME = "tochka_specialist_session";
 const COOKIE_MAX_AGE = Math.floor(SESSION_TTL_MS / 1000); // seconds
-const COOKIE_PATH = "/api/specialist";
+const COOKIE_PATH = "/api";
 
 // ── Allowed origins for cookie-authenticated requests ─────
 
@@ -56,6 +57,7 @@ function isLocalhostOrigin(origin) {
 function isAllowedOrigin(origin) {
   if (!origin) return false;
   if (ALLOWED_ORIGINS.includes(origin)) return true;
+  try { if (new URL(origin).hostname.endsWith('.vercel.app')) return true; } catch {}
   if (isLocalhostOrigin(origin)) return true;
   return false;
 }
@@ -610,21 +612,8 @@ async function handleLogin(req, res) {
     return res.status(500).json({ ok: false, error: "Ошибка сервера" });
   }
 
-  // Fetch all active memberships
-  const { data: memberships } = await supabase
-    .from("expert_organization_memberships")
-    .select("id, organization_id, role, status, organizations(name, slug, type)")
-    .eq("expert_id", expert.id)
-    .eq("status", "active");
-
-  const membershipsList = (memberships || []).map((m) => ({
-    membership_id: m.id,
-    organization_id: m.organization_id,
-    organization_name: m.organizations?.name || null,
-    organization_slug: m.organizations?.slug || null,
-    organization_type: m.organizations?.type || null,
-    role_in_organization: m.role,
-  }));
+  const membershipResult = await loadSpecialistMemberships(supabase, expert.id);
+  const membershipsList = membershipResult.memberships || [];
 
   // Set HttpOnly cookie — raw token never exposed to JavaScript
   res.setHeader("Set-Cookie", buildCookie(COOKIE_NAME, rawToken, COOKIE_MAX_AGE));
@@ -1973,21 +1962,8 @@ export async function authorizeSpecialist(req) {
     .then(() => {})
     .catch(() => {});
 
-  // Fetch memberships
-  const { data: memberships } = await supabase
-    .from("expert_organization_memberships")
-    .select("id, organization_id, role, status, organizations(name, slug, type)")
-    .eq("expert_id", expert.id)
-    .eq("status", "active");
-
-  const membershipsList = (memberships || []).map((m) => ({
-    membership_id: m.id,
-    organization_id: m.organization_id,
-    organization_name: m.organizations?.name || null,
-    organization_slug: m.organizations?.slug || null,
-    organization_type: m.organizations?.type || null,
-    role_in_organization: m.role,
-  }));
+  const membershipResult = await loadSpecialistMemberships(supabase, expert.id);
+  const membershipsList = membershipResult.memberships || [];
 
   return {
     expert,

@@ -16,6 +16,7 @@ import usageHandler from "./api/usage.js";
 import startSessionHandler from "./api/start-session.js";
 import specialistHandler from "./api/specialist.js";
 import clientTokenHandler from "./api/client-token.js";
+import clinicalKnowledgeHandler from "./api/clinical-knowledge.js";
 
 const PORT = 3001;
 
@@ -96,6 +97,9 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     }
     if (nodeReq.url.startsWith("/api/usage")) {
       return usageHandler(req, res);
+    }
+    if (nodeReq.url.startsWith("/api/clinical-knowledge")) {
+      return clinicalKnowledgeHandler(req, res);
     }
 
     nodeRes.writeHead(404, { "Content-Type": "application/json" });

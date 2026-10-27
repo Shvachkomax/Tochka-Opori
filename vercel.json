@@ -4,13 +4,5 @@
       "source": "/((?!api/.*|support-practices/.*).*)",
       "destination": "/index.html"
     }
-  ],
-  "functions": {
-    "api/analyze.js": {
-      "maxDuration": 300
-    },
-    "api/transcribe.js": {
-      "includeFiles": "node_modules/opusscript/build/**"
-    }
-  }
+  ]
 }

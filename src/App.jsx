@@ -17,6 +17,8 @@ import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
 import ExpertInvitePage from "./pages/expert/ExpertInvitePage.jsx";
 import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
 import SpecialistCabinet from "./pages/specialist/SpecialistCabinet.jsx";
+import ClinicalKnowledge from "./pages/specialist/ClinicalKnowledge.jsx";
+import ClinicalKnowledgeDemo from "./pages/specialist/ClinicalKnowledgeDemo.jsx";
 
 class AdminErrorBoundary extends Component {
   constructor(props) {
@@ -9729,6 +9731,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   // --- Specialist Cabinet page (/specialist) ---
   if (typeof window !== "undefined" && window.location.pathname.match(/^\/specialist\/?$/)) {
     return <SpecialistCabinet />;
+  }
+  if (typeof window !== "undefined" && window.location.pathname.match(/^\/specialist\/knowledge\/?$/)) {
+    return <ClinicalKnowledge />;
+  }
+  if (typeof window !== "undefined" && window.location.pathname.match(/^\/specialist\/knowledge\/demo\/?$/)) {
+    return <ClinicalKnowledgeDemo />;
   }
 
   // --- Expert Cabinet page (/expert) ---
