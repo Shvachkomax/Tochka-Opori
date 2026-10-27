@@ -22,7 +22,9 @@
     "test:cabinet-defects": "node scripts/test-cabinet-defects.js",
     "test:crisis-mobile": "node scripts/test-crisis-mobile.mjs",
     "test:patient-specialist-workflow": "node scripts/test-patient-specialist-workflow.mjs",
-    "e2e:service-request-finance": "node scripts/e2e-service-request-finance-browser.mjs"
+    "e2e:service-request-finance": "node scripts/e2e-service-request-finance-browser.mjs",
+    "test:health-live": "node scripts/test-health-live.js",
+    "e2e:health-live": "node scripts/e2e-health-live.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

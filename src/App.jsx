@@ -1,3 +1,4 @@
+import HealthLiveConversation from "./HealthLiveConversation.jsx";
 import InformationFlow from "./InformationFlow.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
@@ -146,6 +147,7 @@ export default function App() {
 
   // Support Cabinet MVP
   const [supportCabinet, setSupportCabinet] = useState(null);
+  const [supportLiveOpen, setSupportLiveOpen] = useState(false);
   const [patientInvitations, setPatientInvitations] = useState([]);
   const [patientInvitationsLoading, setPatientInvitationsLoading] = useState(false);
   const [patientInviteModalOpen, setPatientInviteModalOpen] = useState(false);
@@ -11462,6 +11464,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </div>
 
                 <MedicationCard cards={supportCabinet.medication_cards} />
+
+                {import.meta.env.VITE_SUPPORT_LIVE_ENABLED === 'true' && <div className="health-talk-entry">
+                  <div><strong>Живое общение · тест</strong><p>Расскажите, что вас волнует. Можно говорить и перебивать. До 5 минут.</p></div>
+                  <button disabled={cabinetVoiceRecording || cabinetVoiceTranscribing} onClick={() => setSupportLiveOpen(true)}>Живое общение</button>
+                </div>}
+                {supportLiveOpen && <HealthLiveConversation module="support" sessionId={getSupportSession().sessionId} accessToken={getSupportSession().accessToken} onClose={() => setSupportLiveOpen(false)} onSpecialist={() => setSupportNewRequestOpen(true)} />}
 
                 {/* ROW 1: Последний разговор + Следующий шаг */}
                 {latestSession && (
