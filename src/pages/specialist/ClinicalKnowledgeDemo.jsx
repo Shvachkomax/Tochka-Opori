@@ -69,7 +69,7 @@ export default function ClinicalKnowledgeDemo() {
       <div style={S.card}>
         <label style={S.small}>Введите запрос (например: {section === "drugs" ? "сертралин" : section === "guidelines" ? "тревога" : "снижение настроения"})</label>
         <input style={S.input} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Введите запрос" />
-        <div style={{ marginTop: 8, ...S.small }}>Условная стоимость запроса: {price} ₽. Реальное списание не выполняется.</div>
+        <div style={{ marginTop: 8, ...S.small }}>Расчётная стоимость: {price} ₽. В тестовом режиме бесплатно. Реальное списание не выполняется.</div>
         <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button style={S.btn} onClick={runSearch} disabled={loading}>{loading ? "Поиск…" : "Найти"}</button>
           {section === "drugs" && <button style={{ ...S.btn, background: "#7A7268" }} onClick={() => setQuery("сертралин")}>Пример: сертралин</button>}
@@ -80,7 +80,7 @@ export default function ClinicalKnowledgeDemo() {
       {loading && <div style={S.card}>Выполняется поиск…</div>}
       {results && !loading && (
         <div style={S.card}>
-          {results.length === 0 ? <div>Ничего не найдено. Попробуйте другой запрос.</div> : results.map((item) => (
+          {results.length === 0 ? <div>По вашему запросу пока ничего не найдено. Уточните поиск.</div> : results.map((item) => (
             <div key={item.id} style={{ border: "1px solid rgba(46,42,37,.1)", borderRadius: 12, padding: 12, marginBottom: 10 }}>
               <div style={{ fontWeight: 700 }}>{item.name || item.title}</div>
               <div style={S.small}>{item.summary || item.dosing || item.outcome}</div>

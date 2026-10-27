@@ -782,6 +782,10 @@ export default function SpecialistCabinet() {
           <div data-testid="active-specialist-context" style={{ fontSize: 13, color: "#5F7D6C", marginTop: 10, fontWeight: 600 }}>
             Рабочее пространство: {module === "body" ? "Здоровье & Стройность" : "Точка Опоры"}
           </div>
+          <a href="/specialist/knowledge" style={{ display: "inline-block", marginTop: 12, ...S.btnSecondary, textDecoration: "none" }}>Клиническая библиотека</a>
+          {auth?.expert?.role === "clinical_reviewer" && (
+            <a href="/specialist/knowledge/review" style={{ display: "inline-block", marginTop: 12, marginLeft: 8, ...S.btnSecondary, textDecoration: "none" }}>Экспертиза публикаций</a>
+          )}
         </div>
 
         {/* Context selection */}
