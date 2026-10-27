@@ -3,6 +3,7 @@ import {
   assembleLongitudinalEvents,
   buildLongitudinalSummary,
   loadLongitudinalFromSources,
+  auditLongitudinalProjection,
 } from "../lib/clinical/longitudinal.js";
 
 const ownerId = "11111111-1111-4111-8111-111111111111";
@@ -85,7 +86,7 @@ const fake = fakeDb({
 }, queries);
 const timeline = await loadLongitudinalFromSources({
   supabase: fake, module: "support", ownerType: "anonymous_case", ownerId,
-  organizationId: orgId, now,
+  organizationId: null, now,
 });
 assert.equal(timeline.coverage.complete, true);
 assert.equal(timeline.read_only, true);
@@ -100,11 +101,37 @@ for (const r of queries) {
       `Missing owner type: ${r.table}`);
   }
 }
-for (const name of ["clinical_events", "clinician_decisions", "service_requests", "medication_orders"]) {
+for (const name of ["clinical_events", "clinical_observations", "clinical_outcomes",
+  "clinician_decisions", "service_requests", "medication_orders"]) {
   const q = queries.find(x => x.table === name);
-  assert(q?.filters.some(x => x[0] === "organization_id" && x[2] === orgId),
-    `Missing organization isolation: ${name}`);
+  assert(q?.filters.some(x => x[0] === "organization_id" && x[1] === "is" && x[2] === null),
+    `Missing private-practice isolation: ${name}`);
 }
+await assert.rejects(
+  () => loadLongitudinalFromSources({ supabase: fake, module: "support",
+    ownerType: "anonymous_case", ownerId, organizationId: orgId }),
+  /контексте организации/,
+);
+const revisions = assembleLongitudinalEvents({
+  clinical_observations: [
+    { id: "o1", observed_at: at, concept: "weight", value_numeric: 69,
+      provenance: "patient_reported" },
+    { id: "o2", observed_at: at, concept: "weight", value_numeric: 68.5,
+      supersedes_observation_id: "o1", provenance: "patient_reported" },
+  ],
+}, "body", now);
+assert.equal(revisions.events.find(e => e.details.value_numeric === 69)?.details.superseded_by_newer_record, true);
+assert.equal(revisions.events.find(e => e.details.value_numeric === 68.5)?.details.superseded_by_newer_record, false);
+const audit = auditLongitudinalProjection({
+  clinical_events: [{ source_type: "service_request", source_id: "req-1",
+    event_type: "service_request_created" }],
+  service_requests: [{ id: "req-1", created_at: at }, { id: "req-2", created_at: at }],
+  medication_orders: [{ id: "med-1", clinical_event_id: null }],
+});
+assert.equal(audit.missing_projection_count, 2);
+assert(audit.reconciliation_required);
+assert(!JSON.stringify(audit).includes("req-2"));
+
 await assert.rejects(
   () => loadLongitudinalFromSources({ supabase: fake, module: "support",
     ownerType: "anonymous_profile", ownerId, organizationId: orgId }),
@@ -116,4 +143,4 @@ const fails = await loadLongitudinalFromSources({
 });
 assert.equal(fails.coverage.complete, false);
 assert(fails.coverage.unavailable_sources.includes("clinical_outcomes"));
-console.log("clinical longitudinal: 16 checks passed (synthetic fixtures; no patient data)");
+console.log("clinical longitudinal: synthetic checks passed; read-only and tenant safe");
