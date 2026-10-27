@@ -952,8 +952,8 @@ async function handleGetClinicalTimeline(req, res) {
     }
     return res.status(200).json({
       ok: true, module, events: timeline.events, summary: timeline.summary,
-      coverage: timeline.coverage, read_only: true,
-      research_export_allowed: false,
+      coverage: timeline.coverage, integrity: timeline.integrity,
+      read_only: true, research_export_allowed: false,
     });
   } catch (error) {
     console.error("[clinical-longitudinal] loading failed", error.code || error.name || "unknown");
