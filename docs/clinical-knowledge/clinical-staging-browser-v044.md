@@ -72,3 +72,57 @@
 - Runtime routing unit test `scripts/test-clinical-medication-rpc-routing.js`
   passed for all three mutations and forbidden actions.
 - No HTTP physician-auth browser test has yet been executed.
+
+
+## Обновление 28.10.2026 — после включения защиты владельцем
+
+**Подтверждено Vercel API:**
+- `tochka-opori-medical-staging` has `ssoProtection.enabled=true`,
+  `deploymentType=all`; deployed initial shell is `READY`.
+- Непосредственный анонимный HTTP-пробный запрос к корневой странице и
+  `/api/specialist` не удалось проверить из-за сетевого/DNS ограничения
+  среды проверки. Поэтому не называем это независимым HTTP E2E.
+- Данных `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` в новом Vercel проекте
+  нет. Медицинские флаги `false` для первого production target и Preview.
+- В `api/specialist.js` внедрён новый fail-closed guard по
+  `MEDICAL_STAGING_NO_PATIENT_DATA=true`: все запросы специалиста
+  должны отклоняться с `503 MEDICAL_STAGING_DATA_DISABLED`.
+  Добавлен тест `scripts/test-medical-staging-api-guard.js` и npm-команда.
+  **Этот код ещё не опубликован на Vercel**.
+- В `Tochka-Opori-Preview-Test` проверены 44/44 полей четырёх
+  медицинских таблиц C2. На момент установки 0 действующих назначений.
+  Миграция `scripts/065-clinical-medication-archive-staging-ONLY.sql`
+  применена к **этому тестовому проекту**, а НЕ к production.
+- После применения проверены архив, все три адаптера, права и нулевые
+  записи: `anon`/ `authenticated` не читают закрытую схему,
+  `anon` не вызывает RPC создания назначения.
+- `scripts/069-clinical-installed-archive-smoke.sql` выполнил все
+  реальные C2 RPC через **установленный** архив, завершился `ROLLBACK`;
+  0 оставшихся учебных назначений, 0 строк архива; архив остался
+  пустым и установленным.
+- В базе `Preview-Test` уже имелись 80 сессий до этой работы.
+  Не считаем их автоматически синтетическими и не подключаем их
+  к новой площадке до отдельной проверки/изоляции. Не читаем и не
+  переносим их клинические сведения.
+- Новую публикацию commit `fa8540c...` Vercel отклонил: `402`,
+  `api-deployments-free-per-day`, примерно 24 часа до повтора.
+  Предыдущие READY развертывания **не включают** новый guard.
+  Повторный deploy без снятия лимита не выполнять.
+
+**До E2E врача необходимо:**
+1. Подтвердить фактическую unauthenticated блокировку корня и API
+   (например, Safari Private и отдельная автоматизированная HTTP-проверка).
+2. Подтвердить, что новое развертывание содержит guard и по умолчанию
+   `MEDICAL_STAGING_NO_PATIENT_DATA=true`.
+3. Использовать только выделенный набор полностью искусственных
+   врачей и пациентов в Preview-Test, не затрагивая и не выдавая
+   прежние 80 сессий как учебные.
+4. Добавить `SUPABASE_URL` и `SUPABASE_SERVICE_ROLE_KEY`
+   **непосредственно в Vercel Environment Variables** для этого
+   отдельного staging проекта; секреты не передавать в чат или GitHub.
+   Интеграция Vercel не позволяет извлечь значения чувствительных ключей
+   для автоматического копирования.
+5. Лишь после этого через отдельный E2E проверить cookie/Origin,
+   врачебные полномочия, действия 3 RPC, историю версий и отказ
+   специалисту из другой клиники. Затем включать архивный флаг в
+   выделенном тестовом окружении.
