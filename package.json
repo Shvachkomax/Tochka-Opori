@@ -43,7 +43,8 @@
     "test:clinical-longitudinal": "node scripts/test-clinical-longitudinal.js",
     "test:clinical-outbox": "node scripts/test-clinical-outbox.mjs",
     "clinical:outbox:once": "node scripts/process-clinical-outbox.mjs",
-    "test:clinical-medication-routing": "node scripts/test-clinical-medication-rpc-routing.js"
+    "test:clinical-medication-routing": "node scripts/test-clinical-medication-rpc-routing.js",
+    "test:medical-staging-guard": "node scripts/test-medical-staging-api-guard.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
