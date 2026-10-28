@@ -146,4 +146,64 @@ BEGIN
  THEN RAISE EXCEPTION 'partial medication transaction survived failure'; END IF;
  ALTER TABLE clinical_support_lab.medication_group_history DROP CONSTRAINT v04_test_failure;
 END $test$;
+-- A real PostgreSQL queue pass using the exact worker SQL against the
+-- three synthetic prescription transitions in this same rollback-only test.
+DO $queue$
+DECLARE job record; locked record; ack record; n integer:=0; receipts integer;
+BEGIN
+ FOR job IN EXECUTE $claim$
+WITH candidates AS (
+ SELECT id FROM clinical_internal.source_outbox
+ WHERE attempts < $2
+   AND (
+     (status IN ('pending','retry') AND (available_at IS NULL OR available_at <= now()))
+     OR (status='processing' AND leased_until IS NOT NULL AND leased_until < now())
+   )
+ ORDER BY id
+ LIMIT $1
+ FOR UPDATE SKIP LOCKED
+)
+UPDATE clinical_internal.source_outbox o
+SET status='processing', attempts=attempts+1,
+    lease_token=gen_random_uuid(), leased_until=now()+interval '120 seconds',
+    available_at=NULL
+FROM candidates c
+WHERE o.id=c.id
+RETURNING o.id,o.lease_token,o.attempts
+$claim$ USING 3,6 LOOP
+   locked:=null;
+   EXECUTE $lock$
+SELECT id FROM clinical_internal.source_outbox
+WHERE id=$1 AND lease_token=$2::uuid AND status='processing'
+  AND leased_until>now() FOR UPDATE
+$lock$ INTO locked USING job.id,job.lease_token;
+   IF locked.id IS DISTINCT FROM job.id THEN RAISE EXCEPTION 'lost lease'; END IF;
+   EXECUTE $receipt$
+INSERT INTO clinical_internal.source_receipts (
+  outbox_id,source_table,source_key,operation,
+  owner_type,owner_key,organization_key,captured_at
+)
+SELECT id,source_table,source_key,operation,
+       owner_type,owner_key,organization_key,captured_at
+FROM clinical_internal.source_outbox
+WHERE id=$1 AND lease_token=$2::uuid AND status='processing'
+ON CONFLICT (outbox_id) DO NOTHING
+$receipt$ USING job.id,job.lease_token;
+   ack:=null;
+   EXECUTE $ack$
+UPDATE clinical_internal.source_outbox
+SET status='processed',processed_at=now(),leased_until=NULL,
+    lease_token=NULL,error_code=NULL
+WHERE id=$1 AND lease_token=$2::uuid AND status='processing'
+RETURNING id
+$ack$ INTO ack USING job.id,job.lease_token;
+   IF ack.id IS DISTINCT FROM job.id THEN RAISE EXCEPTION 'outbox ACK failed'; END IF;
+   n:=n+1;
+ END LOOP;
+ IF n<>3 THEN RAISE EXCEPTION 'Expected 3 processed medical transitions got %',n; END IF;
+ SELECT count(*) INTO receipts FROM clinical_internal.source_receipts
+   WHERE source_table='clinical_support_lab.medication_group'
+   AND source_key='SYN-MEDICATION-GROUP-0001';
+ IF receipts<>3 THEN RAISE EXCEPTION 'Expected 3 unique receipts got %',receipts; END IF;
+END $queue$;
 ROLLBACK;
