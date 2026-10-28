@@ -4,6 +4,7 @@ import {
   buildLongitudinalSummary,
   loadLongitudinalFromSources,
   auditLongitudinalProjection,
+  assembleMedicationTreatmentCourses,
 } from "../lib/clinical/longitudinal.js";
 
 const ownerId = "11111111-1111-4111-8111-111111111111";
@@ -151,4 +152,42 @@ const fails = await loadLongitudinalFromSources({
 });
 assert.equal(fails.coverage.complete, false);
 assert(fails.coverage.unavailable_sources.includes("clinical_outcomes"));
+const courses = assembleMedicationTreatmentCourses({
+  medication_orders: [
+    { id:"old-order",order_group_id:"synthetic-group",version_number:1,
+      issued_at:at,medication_name_snapshot:"Препарат А",strength_value:20,
+      strength_unit:"мг",prescriber_expert_id:"SYNTHETIC-DOCTOR" },
+    { id:"new-order",order_group_id:"synthetic-group",version_number:2,
+      supersedes_order_id:"old-order",issued_at:later,
+      medication_name_snapshot:"Препарат А",strength_value:20,
+      strength_unit:"мг",prescriber_expert_id:"SYNTHETIC-DOCTOR" },
+  ],
+  medication_order_schedules: [
+    { medication_order_id:"old-order",phase_number:1,dose_amount:5,
+      dose_unit:"мг",frequency_code:"once_daily" },
+    { medication_order_id:"new-order",phase_number:1,dose_amount:10,
+      dose_unit:"мг",frequency_code:"once_daily" },
+  ],
+  medication_order_lifecycle_events: [
+    { medication_order_id:"old-order",event_type:"activated" },
+    { medication_order_id:"old-order",event_type:"superseded" },
+    { medication_order_id:"new-order",event_type:"activated" },
+    { medication_order_id:"new-order",event_type:"revoked" },
+  ],
+});
+assert.equal(courses.complete,true);
+assert.equal(courses.courses.length,1);
+assert.equal(courses.courses[0].versions.length,2);
+assert.equal(courses.courses[0].versions[0].schedules[0].dose_amount,5);
+assert.equal(courses.courses[0].versions[1].schedules[0].dose_amount,10);
+assert.equal(courses.courses[0].latest_recorded_state,"revoked");
+assert(!JSON.stringify(courses).includes("synthetic-group"));
+assert(!JSON.stringify(courses).includes("SYNTHETIC-DOCTOR"));
+const brokenCourse=assembleMedicationTreatmentCourses({
+  medication_orders:[{id:"version-2",order_group_id:"group",version_number:2}],
+});
+assert.equal(brokenCourse.complete,false);
+assert(brokenCourse.issues.includes("medication_version_gap_or_duplicate"));
+assert(brokenCourse.issues.includes("medication_order_schedule_missing"));
+
 console.log("clinical longitudinal: synthetic checks passed; read-only and tenant safe");
