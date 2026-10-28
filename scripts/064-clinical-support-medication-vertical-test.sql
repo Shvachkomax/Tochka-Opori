@@ -128,6 +128,24 @@ BEGIN
  EXCEPTION WHEN check_violation THEN NULL;
  END;
 
+ -- Organization scoping is strict even when patient ID matches.
+ PERFORM clinical_support_lab.apply_medication_command(
+   'activate','SYN-COMMAND-CLINIC-A-1','SYN-MEDICATION-GROUP-CLINIC',
+   'SYNTHETIC-SUPPORT-OWNER-0003','SYNTHETIC-CLINIC-A','SYNTHETIC-DOCTOR-A',
+   'Вымышленный препарат А',20,'мг',5,'мг','once_daily',0
+ );
+ BEGIN
+  PERFORM clinical_support_lab.apply_medication_command(
+   'supersede','SYN-COMMAND-CLINIC-ATTACK','SYN-MEDICATION-GROUP-CLINIC',
+   'SYNTHETIC-SUPPORT-OWNER-0003','SYNTHETIC-CLINIC-B','SYNTHETIC-DOCTOR-B',
+   'Вымышленный препарат А',20,'мг',10,'мг','once_daily',1);
+  RAISE EXCEPTION 'cross-clinic update accepted';
+ EXCEPTION WHEN insufficient_privilege THEN NULL;
+ END;
+ IF EXISTS(SELECT 1 FROM clinical_support_lab.medication_group_history
+ WHERE group_key='SYN-MEDICATION-GROUP-CLINIC' AND version_no>1)
+ THEN RAISE EXCEPTION 'cross-clinic history contaminated'; END IF;
+
  -- Inject failure at history append, which must roll back source rows and outbox.
  ALTER TABLE clinical_support_lab.medication_group_history ADD CONSTRAINT
   v04_test_failure CHECK(command_key<>'SYN-COMMAND-FORCED-FAIL');
