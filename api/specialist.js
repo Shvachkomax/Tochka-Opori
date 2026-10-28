@@ -155,7 +155,7 @@ export default async function handler(req, res) {
     let connectedRef = null;
     try {
       connectedRef = new URL(process.env.SUPABASE_URL || "").hostname
-        .match(/^([a-z0-9]{20})\\.supabase\\.co$/)?.[1] || null;
+        .match(/^([a-z0-9]{20})\.supabase\.co$/)?.[1] || null;
     } catch {
       connectedRef = null;
     }
