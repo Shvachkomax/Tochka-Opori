@@ -419,6 +419,49 @@ BEGIN
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  SELECT count(*) INTO n FROM clinical_rpc_test.medication_orders;
  IF n<>2 THEN RAISE EXCEPTION 'invalid operation left persisted orders, count %',n; END IF;
+ -- A new snapshot cannot begin in the middle of an existing treatment without
+ -- controlled historical backfill. The base RPC change must roll back too.
+ UPDATE clinical_rpc_test.clinician_medication_authorizations SET verification_status='verified'
+ WHERE id=auth_id;
+ SELECT clinical_rpc_test.activate_medication_order(
+  'anonymous_case',patient_id,org_id,auth_id,concept_id,NULL,NULL,20,'mg','oral',
+  NULL,NULL,now(),now(),NULL,
+  '[{"phase_number":1,"dose_amount":5,"dose_unit":"mg","frequency_code":"once_daily","dosing_mode":"fixed"}]'::jsonb,
+  ARRAY[]::text[],'До включения архива',NULL,'SYN-LEGACY-ORDER-01',expert_id
+ ) INTO replay;
+ BEGIN
+  PERFORM clinical_rpc_test.clinical_supersede_medication_order(
+   (replay->>'order_id')::uuid,'anonymous_case',patient_id,org_id,auth_id,concept_id,
+   NULL,NULL,20,'mg','oral',NULL,NULL,now(),now(),NULL,
+   '[{"phase_number":1,"dose_amount":12,"dose_unit":"mg","frequency_code":"once_daily","dosing_mode":"fixed"}]'::jsonb,
+   ARRAY[]::text[],'Попытка без базовой версии',NULL,'SYN-LEGACY-CHANGE-02',expert_id);
+  RAISE EXCEPTION 'unarchived group was allowed';
+ EXCEPTION WHEN check_violation THEN NULL; END;
+ SELECT count(*) INTO n FROM clinical_rpc_test.medication_orders
+  WHERE creation_idempotency_key='SYN-LEGACY-CHANGE-02';
+ IF n<>0 THEN RAISE EXCEPTION 'failed archive did not roll back legacy group change'; END IF;
+
+ -- Failure after a real base mutation must roll back its medication order,
+ -- schedule and lifecycle; not only the archive entry.
+ ALTER TABLE clinical_rpc_archive_test.order_history ADD CONSTRAINT
+  synthetic_archive_write_failure CHECK(action<>'activate');
+ BEGIN
+  PERFORM clinical_rpc_test.clinical_activate_medication_order(
+   'anonymous_case',patient_id,org_id,auth_id,concept_id,NULL,NULL,20,'mg','oral',
+   NULL,NULL,now(),now(),NULL,
+   '[{"phase_number":1,"dose_amount":5,"dose_unit":"mg","frequency_code":"once_daily","dosing_mode":"fixed"}]'::jsonb,
+   ARRAY[]::text[],'Архив намеренно недоступен',NULL,'SYN-ARCHIVE-FAIL-01',expert_id);
+  RAISE EXCEPTION 'archive failure did not roll back clinical order';
+ EXCEPTION WHEN check_violation THEN NULL; END;
+ IF EXISTS(SELECT 1 FROM clinical_rpc_test.medication_orders
+    WHERE creation_idempotency_key='SYN-ARCHIVE-FAIL-01') OR
+    EXISTS(SELECT 1 FROM clinical_rpc_test.medication_order_lifecycle_events e
+    JOIN clinical_rpc_test.medication_orders o ON e.medication_order_id=o.id
+    WHERE o.creation_idempotency_key='SYN-ARCHIVE-FAIL-01') THEN
+  RAISE EXCEPTION 'archive failure left partial clinical mutation';
+ END IF;
+ ALTER TABLE clinical_rpc_archive_test.order_history
+  DROP CONSTRAINT synthetic_archive_write_failure;
 END;
 $verify$;
 ROLLBACK;
