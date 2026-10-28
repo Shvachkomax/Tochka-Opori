@@ -444,7 +444,7 @@ BEGIN
  -- Failure after a real base mutation must roll back its medication order,
  -- schedule and lifecycle; not only the archive entry.
  ALTER TABLE clinical_rpc_archive_test.order_history ADD CONSTRAINT
-  synthetic_archive_write_failure CHECK(action<>'activate');
+  synthetic_archive_write_failure CHECK(action<>'activate') NOT VALID;
  BEGIN
   PERFORM clinical_rpc_test.clinical_activate_medication_order(
    'anonymous_case',patient_id,org_id,auth_id,concept_id,NULL,NULL,20,'mg','oral',
