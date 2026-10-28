@@ -81,3 +81,60 @@
 Exactly one permanent production Supabase project plus one permanent shared test Supabase
 project. New paid projects only when an exception is justified and pre-approved.
 Do NOT auto-merge production data with synthetic fixtures or raw research metadata.
+
+
+## Verified shared-preview consolidation (2026-10-28 evening)
+**The work below supersedes earlier 'pending' items where explicitly listed.**
+- Applied synthetic-only longitudinal migrations 057, 059, 061 and 063 to
+  `Tochka-Opori-Preview-Test`. **No triggers were attached to actual patient
+  tables**. All scripts 058, 060, 064 completed SQL tests with transactional ROLLBACK.
+- Applied `scripts/072-clinical-knowledge-verified-approval.sql` (service-only,
+  SECURITY INVOKER) and ran `scripts/073-clinical-knowledge-approval-smoke.sql`;
+  tests passed for reviewer authorization, author conflict, stale versions,
+  idempotency, append-only reviews and anon/authenticated denial.
+- Applied `scripts/074-clinical-contributions-shared-preview-schema.sql`
+  and `scripts/075-clinical-contributions-demo-review.sql`. Tested with
+  `scripts/076-clinical-contributions-demo-smoke.sql`: role/module checks,
+  nonredeemable 100-point demo credit, duplicate prevention, incomplete
+  consent/deidentification rejection and ROLLBACK all passed.
+- Final Preview-Test data inventory: 12 synthetic CK cases; 8 unverified
+  `pending_review` publication metadata cards; 0 approved; 0 actual
+  prescriptions; 0 clinical revisions/outbox; 0 contribution cards/bonuses.
+- Merged all changed-added Longitudinal application files from the remote branch
+  into `feature/clinical-consolidation-preview`, and integrated its
+  `api/specialist.js`, SpecialistCabinet and package scripts on top of current
+  main, alongside Clinical Knowledge v0.6 API/UI/providers.
+- Two test routes prepared in `src/main.jsx`:
+  `/specialist/knowledge/demo` is **local synthetic UI only, with no API calls**;
+  `/specialist/knowledge` calls a default-disabled clinical API. On
+  `tochka-opori-medical-staging`, consolidation branch Preview flags explicitly
+  set: MEDICAL_STAGING_NO_PATIENT_DATA=true and the CK, contribution,
+  longitudinal-read and archive flags=false; no service-role key.
+- GitHub Actions test run `40725958323`: SUCCESS including `npm ci`,
+  Vite build, Clinical Knowledge tests, Clinical Longitudinal tests, medical
+  staging guard tests and medication routing tests.
+  https://github.com/Shvachkomax/Tochka-Opori/actions/runs/40725958323
+- Vercel attempt to deploy consolidated branch to the separate
+  `tochka-opori-medical-staging` project failed HTTP 402
+  `api-deployments-free-per-day`. **No browser test/deployment of this
+  consolidated commit has succeeded.** Existing deployed staging remains a
+  previous branch/commit.
+- Found old Vercel project `tochka-opori-clinical-test`
+  (id `prj_l0gddWYlTlMB09OXDVzU7gWrY1mA`) still has Preview-scoped
+  SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY configured, with
+  Vercel Authentication disabled. The connector was denied 403 when trying to
+  enable All Deployments SSO. **Owner must turn on project-level Vercel
+  Authentication via dashboard immediately or retire that old test deployment.**
+  Do not assume Vercel URL's DB ref equals Clinical-ISO without verifying the
+  secret-scoped SUPABASE_URL.
+- Supabase billing docs say extra paid projects incur compute while running;
+  only free projects can be manually paused. **Do not claim $10 savings yet.**
+- Clinical-ISO still contains 15 rejected public-literature test records and
+  5 historical review-log entries (plus synthetic doctors/sessions). Those have
+  not been migrated: user should explicitly decide whether to preserve an
+  anonymized audit snapshot before deleting the original database.
+- The original Supabase Clinical-ISO is **not deleted**; deletion requires
+  an explicit final backup, dependency confirmation and separate go-ahead.
+- Production DB and `main` not modified; patient data not copied. All
+  application functionality remains off on new staging branch until browser
+  security checks and credentials are explicitly authorized.
