@@ -33,9 +33,9 @@ window.addEventListener('unhandledrejection', function (e) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {window.location.pathname.replace(/\\/+$/, '') === '/specialist/knowledge/demo'
+    {window.location.pathname.replace(/\/+$/, '') === '/specialist/knowledge/demo'
       ? <ClinicalKnowledgeDemo />
-      : window.location.pathname.replace(/\\/+$/, '') === '/specialist/knowledge'
+      : window.location.pathname.replace(/\/+$/, '') === '/specialist/knowledge'
         ? <ClinicalKnowledge />
         : <App />}
   </React.StrictMode>,
