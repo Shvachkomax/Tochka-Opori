@@ -135,6 +135,18 @@ export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   applyCors(req, res);
 
+  // Strictly prohibit all specialist data access in the isolated
+  // build-only medical staging shell until staging credentials,
+  // Deployment Protection, and synthetic-only fixtures are approved.
+  if (process.env.MEDICAL_STAGING_NO_PATIENT_DATA === "true") {
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(503).json({
+      ok: false,
+      error: "Медицинский тестовый стенд ещё не подключён к учебной базе",
+      code: "MEDICAL_STAGING_DATA_DISABLED",
+    });
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
