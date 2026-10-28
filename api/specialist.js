@@ -7,6 +7,7 @@ import { hashToken } from "../lib/security/council-token.js";
 import { getInviteUrl } from "../lib/config/site-url.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
 import { loadLongitudinalFromSources } from "../lib/clinical/longitudinal.js";
+import { medicationRpcForClinicalArchive } from "../lib/clinical/medication-archive-route.js";
 import { getPilotId, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { handlePartnerProgram } from "../lib/partners/program-handler.js";
 import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
@@ -492,10 +493,10 @@ function medicationRpcParams(body, resolved, expertId, authorizationId, permissi
   };
 }
 
-function medicationRpcForClinicalArchive(name) {
-  const eligible = ["activate_medication_order","supersede_medication_order","revoke_medication_order"];
-  if (!eligible.includes(name)) throw new Error("Unsupported medication mutation");
-  return process.env.CLINICAL_MEDICATION_ARCHIVE_ENABLED === "true" ? "clinical_" + name : name;
+function selectMedicationMutationRpc(name) {
+  return medicationRpcForClinicalArchive(
+    name, process.env.CLINICAL_MEDICATION_ARCHIVE_ENABLED === "true",
+  );
 }
 async function executeMedicationMutation(req, res, { action, rpcName, previousOrderId = null } = {}) {
   const authResult = await authorizeSpecialist(req);
@@ -513,7 +514,7 @@ async function executeMedicationMutation(req, res, { action, rpcName, previousOr
   if (!authorizationId) return res.status(403).json({ ok: false, error: "Нет подтвержденного права на назначение." });
   const params = medicationRpcParams(body, resolved, authResult.expert.id, authorizationId, payload.permissionKeys);
   if (previousOrderId) params.p_previous_order_id = previousOrderId;
-  const { data, error } = await getSupabase().rpc(medicationRpcForClinicalArchive(rpcName), params);
+  const { data, error } = await getSupabase().rpc(selectMedicationMutationRpc(rpcName), params);
   if (error) return medicationErrorResponse(res, error);
   const orderId = data?.order_id || previousOrderId;
   const order = orderId ? await getMedicationOrderForOwner({
@@ -546,7 +547,7 @@ async function handleRevokeMedicationOrder(req, res) {
   if (!resolved.ok) return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
   const authorizationId = await getVerifiedMedicationAuthorizationId({ expertId: authResult.expert.id, organizationId: body.organization_id ?? null });
   if (!authorizationId) return res.status(403).json({ ok: false, error: "Нет подтвержденного права на отзыв назначения." });
-  const { data, error } = await getSupabase().rpc(medicationRpcForClinicalArchive("revoke_medication_order"), {
+  const { data, error } = await getSupabase().rpc(selectMedicationMutationRpc("revoke_medication_order"), {
     p_order_id: orderId,
     p_owner_type: resolved.ownerType,
     p_owner_id: resolved.ownerId,
