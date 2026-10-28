@@ -147,6 +147,28 @@ export default async function handler(req, res) {
     });
   }
 
+  // In this specific medical staging project, reject accidental connections
+  // to a different Supabase project or to an environment without server-only
+  // credentials. This gate is checked before any specialist action.
+  const stagingRef = process.env.MEDICAL_STAGING_ALLOWED_SUPABASE_REF;
+  if (stagingRef) {
+    let connectedRef = null;
+    try {
+      connectedRef = new URL(process.env.SUPABASE_URL || "").hostname
+        .match(/^([a-z0-9]{20})\\.supabase\\.co$/)?.[1] || null;
+    } catch {
+      connectedRef = null;
+    }
+    if (connectedRef !== stagingRef || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(503).json({
+        ok: false,
+        error: "Учебная медицинская база ещё не подключена",
+        code: "MEDICAL_STAGING_DATABASE_NOT_READY",
+      });
+    }
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
