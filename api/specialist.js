@@ -132,6 +132,16 @@ const loginLimiter = rateLimit({
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   applyCors(req, res);
+  // Fail closed on the dedicated medical Preview while synthetic-only access
+  // and real patient-data separation are being validated.
+  if (process.env.MEDICAL_STAGING_NO_PATIENT_DATA === "true") {
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(503).json({
+      ok: false,
+      code: "MEDICAL_STAGING_DATA_DISABLED",
+      error: "Медицинский тестовый стенд пока работает только с учебными материалами",
+    });
+  }
 
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
