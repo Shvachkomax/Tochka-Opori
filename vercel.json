@@ -1,16 +1,33 @@
 {
-  "rewrites": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/((?!api/.*|support-practices/.*).*)",
-      "destination": "/index.html"
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
+      "src": "api/clinical-knowledge.js",
+      "use": "@vercel/node"
     }
   ],
-  "functions": {
-    "api/analyze.js": {
-      "maxDuration": 300
+  "routes": [
+    {
+      "src": "/api/clinical-knowledge",
+      "dest": "/api/clinical-knowledge.js"
     },
-    "api/transcribe.js": {
-      "includeFiles": "node_modules/opusscript/build/**"
+    {
+      "src": "/api/.*",
+      "status": 404
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/((?!support-practices/).*)",
+      "dest": "/index.html"
     }
-  }
+  ]
 }
