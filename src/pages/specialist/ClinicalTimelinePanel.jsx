@@ -51,6 +51,25 @@ const SYNTHETIC = Object.freeze({
       details: { note: "Изменение показателей зарегистрировано. Причина изменений неизвестна." } },
   ],
 });
+// Educational example, not a treatment instruction.
+const SYNTHETIC_TREATMENT = [{
+  latest_recorded_state: "revoked",
+  versions: [
+    { version: 1, issued_at: D(4), medication_name: "Препарат А",
+      formulation_strength: 20, strength_unit: "мг",
+      order_record_state: "superseded",author_status: "prescriber_recorded_not_signed",
+      schedules: [{phase_number:1,dose_amount:5,dose_unit:"мг",frequency_code:"once_daily"}] },
+    { version: 2, issued_at: D(20), medication_name: "Препарат А",
+      formulation_strength: 20, strength_unit: "мг",
+      order_record_state: "revoked",author_status: "prescriber_recorded_not_signed",
+      schedules: [{phase_number:1,dose_amount:10,dose_unit:"мг",frequency_code:"once_daily"}] },
+  ],
+}];
+const MEDICATION_STATES = {
+  revoked:"отменено врачом", superseded:"заменено последующей версией",
+  activation_recorded:"начало назначения зарегистрировано",not_confirmed:"статус не подтверждён",
+};
+
 const formatDate = (x) => {
   const t = new Date(x);
   return Number.isNaN(t.getTime()) ? "Дата не определена"
@@ -133,6 +152,8 @@ export default function ClinicalTimelinePanel({ module = "support", clientRef = 
   };
   const demo = view === "demo";
   const events = demo ? SYNTHETIC[demoModule] : (history?.events || []);
+  const courses = demo ? (demoModule === "support" ? SYNTHETIC_TREATMENT : [])
+    : (history?.treatment_courses || []);
   return <section data-testid="clinical-timeline-panel" style={{
     marginBottom: 20, padding: 20, border: `1px solid ${COLORS.line}`, borderRadius: 16,
     background: "#FFFDF9", color: COLORS.ink,
@@ -196,6 +217,45 @@ export default function ClinicalTimelinePanel({ module = "support", clientRef = 
         {events.length ? events.map((e, i) => <EventCard key={`${e.at}:${e.source || e.type}:${i}`} entry={e} />)
           : <p style={{ fontSize: 13 }}>Клинических событий пока нет.</p>}
       </div>}
+      {(demo || history) && courses.length > 0 && (
+        <div style={{ marginTop: 16, padding: 12,
+          border: `1px solid ${COLORS.line}`, borderRadius: 12 }}>
+          <strong style={{ display: "block", marginBottom: 10 }}>
+            История врачебных назначений
+          </strong>
+          {courses.map((course, ci) => <div key={ci} style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 13, color: "#765F54" }}>
+              Курс {ci + 1}: {MEDICATION_STATES[course.latest_recorded_state] || "статус неизвестен"}
+            </div>
+            {course.versions.map((version, vi) => <div key={vi}
+              style={{ padding: "10px 12px", borderLeft: `2px solid ${COLORS.accent}`,
+                background: COLORS.faint, borderRadius: 8, marginTop: 9 }}>
+              <div style={{ fontWeight: 650 }}>
+                Версия № {version.version} · {formatDate(version.issued_at)}
+              </div>
+              <div style={{ fontSize: 13, marginTop: 5 }}>
+                {version.medication_name || "Название не указано"}
+                {" · "}Сила формы: {version.formulation_strength ?? "?"} {version.strength_unit || ""}
+              </div>
+              {version.schedules.map((phase, pi) => <div key={pi}
+                style={{ fontSize: 13, marginTop: 4 }}>
+                Этап {phase.phase_number ?? pi + 1}: доза приёма {phase.dose_amount ?? "?"}
+                {" "}{phase.dose_unit || ""}
+                {phase.frequency_code ? ` · ${phase.frequency_code}` : ""}
+              </div>)}
+              <div style={{ fontSize: 12, marginTop: 5, color: "#78695E" }}>
+                {MEDICATION_STATES[version.order_record_state] || "статус неизвестен"}.
+                {" "}Автор: {version.author_status === "prescriber_recorded_not_signed"
+                  ? "указан в записи назначения, электронная подпись не проверена"
+                  : "не подтверждён"}.
+              </div>
+            </div>)}
+          </div>)}
+          <div style={{ fontSize: 12, color: "#7B746A" }}>
+            Пример не является рекомендацией по дозировке или лечению.
+          </div>
+        </div>
+      )}
       <p style={{ fontSize: 12, color: "#817B70" }}>
         Это хронология записей, а не подтверждение диагноза, эффективности терапии или выздоровления.
         Публикация в Clinical Knowledge и исследовательский экспорт здесь отключены.
