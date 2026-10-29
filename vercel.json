@@ -11,12 +11,20 @@
     {
       "src": "api/clinical-knowledge.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/medical-staging-specialist-disabled.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/clinical-knowledge",
       "dest": "/api/clinical-knowledge.js"
+    },
+    {
+      "src": "/api/specialist",
+      "dest": "/api/medical-staging-specialist-disabled.js"
     },
     {
       "src": "/api/.*",
