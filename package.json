@@ -39,7 +39,14 @@
     "test:partner-accounting": "node scripts/test-partner-accounting.js",
     "test:partner-database": "node scripts/test-partner-database.mjs",
     "test:partner-api": "node scripts/test-partner-api.js",
-    "test:partner-browser": "node scripts/test-partner-browser.mjs"
+    "test:partner-browser": "node scripts/test-partner-browser.mjs",
+    "test:clinical-longitudinal": "node scripts/test-clinical-longitudinal.js",
+    "test:clinical-outbox": "node scripts/test-clinical-outbox.mjs",
+    "clinical:outbox:once": "node scripts/process-clinical-outbox.mjs",
+    "test:clinical-medication-routing": "node scripts/test-clinical-medication-rpc-routing.js",
+    "test:medical-staging-guard": "node scripts/test-medical-staging-api-guard.js",
+    "test:clinical-knowledge": "node scripts/test-clinical-knowledge.js",
+    "test:clinical-medication-rpc-routing": "node scripts/test-clinical-medication-rpc-routing.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

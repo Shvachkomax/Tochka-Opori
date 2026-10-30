@@ -1,0 +1,33 @@
+name: Clinical consolidated Preview checks
+on:
+  push:
+    branches:
+      - feature/clinical-consolidation-preview
+      - feature/clinical-main-integration
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Build shared clinical UI (no secrets)
+        run: npm run build
+      - name: Clinical preview synthetic UI and API guard contract
+        run: node scripts/test-clinical-preview-contract.js
+      - name: Clinical Knowledge unit tests (mock-only)
+        run: npm run test:clinical-knowledge
+      - name: Longitudinal unit tests (mock-only)
+        run: npm run test:clinical-longitudinal
+      - name: Medical staging guard unit tests
+        run: npm run test:medical-staging-guard
+      - name: Medication RPC routing unit tests
+        run: npm run test:clinical-medication-rpc-routing

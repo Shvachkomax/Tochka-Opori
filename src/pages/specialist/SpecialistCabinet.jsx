@@ -4,6 +4,7 @@ import PatientReportedMedicationSummary from "../../PatientReportedMedicationSum
 import { buildSpecialistContextKey, isCurrentSpecialistContext } from "./specialistContext.js";
 import { APP_BRAND } from "../../lib/appBrand.js";
 import PartnerProgram from "./PartnerProgram.jsx";
+import ClinicalTimelinePanel from "./ClinicalTimelinePanel.jsx";
 
 // ── Styles ────────────────────────────────────────────────
 
@@ -891,6 +892,24 @@ export default function SpecialistCabinet() {
             );
           })()}
         </div>
+
+        {/* Synthetic clinical reference only; no API or patient-data access. */}
+        <div style={S.card} data-testid="clinical-library-demo-entry">
+          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Клиническая библиотека</div>
+          <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
+            Демонстрационный справочник на синтетических данных. Без клинического API и реальных списаний.
+          </div>
+          <a href="/specialist/knowledge/demo" data-testid="clinical-library-demo-link" style={{ color: "#B85C4A", fontWeight: 700 }}>
+            Открыть демоверсию библиотеки
+          </a>
+        </div>
+
+        <ClinicalTimelinePanel
+          key={`${expert.id}:${orgId || "private"}:${module}:${selectedClient || "demo"}`}
+          module={module}
+          organizationId={orgId}
+          clientRef={selectedClient}
+        />
 
         {!selectedClient && <PartnerProgram key={`${expert.id}:${orgId || "private"}:${module}`}
           module={module} organizationId={orgId} styles={S} />}

@@ -6,6 +6,8 @@ import { rateLimit } from "../lib/security/rate-limit.js";
 import { hashToken } from "../lib/security/council-token.js";
 import { getInviteUrl } from "../lib/config/site-url.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
+import { loadLongitudinalFromSources } from "../lib/clinical/longitudinal.js";
+import { medicationRpcForClinicalArchive } from "../lib/clinical/medication-archive-route.js";
 import { getPilotId, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { handlePartnerProgram } from "../lib/partners/program-handler.js";
 import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
@@ -133,6 +135,40 @@ export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   applyCors(req, res);
 
+  // Strictly prohibit all specialist data access in the isolated
+  // build-only medical staging shell until staging credentials,
+  // Deployment Protection, and synthetic-only fixtures are approved.
+  if (process.env.MEDICAL_STAGING_NO_PATIENT_DATA === "true") {
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(503).json({
+      ok: false,
+      error: "Медицинский тестовый стенд ещё не подключён к учебной базе",
+      code: "MEDICAL_STAGING_DATA_DISABLED",
+    });
+  }
+
+  // In this specific medical staging project, reject accidental connections
+  // to a different Supabase project or to an environment without server-only
+  // credentials. This gate is checked before any specialist action.
+  const stagingRef = process.env.MEDICAL_STAGING_ALLOWED_SUPABASE_REF;
+  if (stagingRef) {
+    let connectedRef = null;
+    try {
+      connectedRef = new URL(process.env.SUPABASE_URL || "").hostname
+        .match(/^([a-z0-9]{20})\.supabase\.co$/)?.[1] || null;
+    } catch {
+      connectedRef = null;
+    }
+    if (connectedRef !== stagingRef || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(503).json({
+        ok: false,
+        error: "Учебная медицинская база ещё не подключена",
+        code: "MEDICAL_STAGING_DATABASE_NOT_READY",
+      });
+    }
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
@@ -159,6 +195,8 @@ export default async function handler(req, res) {
         return await handleGetClientOverview(req, res);
       case "getClientProfessionalAnalysis":
         return await handleGetClientProfessionalAnalysis(req, res);
+      case "getClinicalTimeline":
+        return await handleGetClinicalTimeline(req, res);
       case "getBodyClientOverview":
         return await handleGetBodyClientOverview(req, res);
       case "listMedicationConcepts":
@@ -489,6 +527,11 @@ function medicationRpcParams(body, resolved, expertId, authorizationId, permissi
   };
 }
 
+function selectMedicationMutationRpc(name) {
+  return medicationRpcForClinicalArchive(
+    name, process.env.CLINICAL_MEDICATION_ARCHIVE_ENABLED === "true",
+  );
+}
 async function executeMedicationMutation(req, res, { action, rpcName, previousOrderId = null } = {}) {
   const authResult = await authorizeSpecialist(req);
   if (authResult.error) return res.status(authResult.status).json({ ok: false, error: authResult.error });
@@ -505,7 +548,7 @@ async function executeMedicationMutation(req, res, { action, rpcName, previousOr
   if (!authorizationId) return res.status(403).json({ ok: false, error: "Нет подтвержденного права на назначение." });
   const params = medicationRpcParams(body, resolved, authResult.expert.id, authorizationId, payload.permissionKeys);
   if (previousOrderId) params.p_previous_order_id = previousOrderId;
-  const { data, error } = await getSupabase().rpc(rpcName, params);
+  const { data, error } = await getSupabase().rpc(selectMedicationMutationRpc(rpcName), params);
   if (error) return medicationErrorResponse(res, error);
   const orderId = data?.order_id || previousOrderId;
   const order = orderId ? await getMedicationOrderForOwner({
@@ -538,7 +581,7 @@ async function handleRevokeMedicationOrder(req, res) {
   if (!resolved.ok) return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
   const authorizationId = await getVerifiedMedicationAuthorizationId({ expertId: authResult.expert.id, organizationId: body.organization_id ?? null });
   if (!authorizationId) return res.status(403).json({ ok: false, error: "Нет подтвержденного права на отзыв назначения." });
-  const { data, error } = await getSupabase().rpc("revoke_medication_order", {
+  const { data, error } = await getSupabase().rpc(selectMedicationMutationRpc("revoke_medication_order"), {
     p_order_id: orderId,
     p_owner_type: resolved.ownerType,
     p_owner_id: resolved.ownerId,
@@ -885,6 +928,83 @@ async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRe
   }
 
   return { ok: true, publicCode, ownerType, ownerId, relationship, accessRole };
+}
+
+
+// ── CLINICAL LONGITUDINAL REGISTRY (read-only, opt-in) ───────────
+// Never expose owner identifiers, raw session text or research exports.
+async function handleGetClinicalTimeline(req, res) {
+  // Never turned on implicitly by a new deployment or merge.
+  if (process.env.CLINICAL_LONGITUDINAL_READ_ENABLED !== "true") {
+    return res.status(404).json({ ok: false, error: "Клиническая хронология ещё не включена" });
+  }
+  const origin = req.headers.origin;
+  const requestHost = req.headers.host;
+  try {
+    if (!origin || new URL(origin).host !== requestHost) {
+      return res.status(403).json({ ok: false, error: "Недопустимый источник запроса" });
+    }
+  } catch {
+    return res.status(403).json({ ok: false, error: "Недопустимый источник запроса" });
+  }
+  const auth = await authorizeSpecialist(req);
+  if (auth.error) return res.status(auth.status).json({ ok: false, error: auth.error });
+  const { client_ref: clientRef, organization_id: organizationId = null, module } = req.body || {};
+  if (typeof clientRef !== "string" || !/^(assignment|access):[a-f0-9-]{36}$/i.test(clientRef)) {
+    return res.status(400).json({ ok: false, error: "Неверная ссылка на пациента" });
+  }
+  const ctx = validateSpecialistContext({
+    memberships: auth.memberships, organizationId, module, allowedModules: auth.expert.allowed_modules,
+  });
+  if (!ctx.ok) return res.status(403).json({ ok: false, error: ctx.error });
+  const resolved = await resolveAuthorizedSpecialistClient({
+    expert: auth.expert, memberships: auth.memberships, clientRef,
+    organizationId, module,
+  });
+  if (!resolved.ok) return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
+  // A shared invitation alone is not permission to disclose previous clinical history.
+  // Transfer needs a distinct, auditable consent workflow before shared access is enabled.
+  if (resolved.relationship !== "primary") {
+    return res.status(403).json({ ok: false, error: "Просмотр прошлой клинической истории требует отдельного разрешения пациента" });
+  }
+  let ownerType = resolved.ownerType;
+  let ownerId = resolved.ownerId;
+  if (module === "support") {
+    if (!resolved.publicCode) return res.status(403).json({ ok: false, error: "Пациент не определён" });
+    const { data, error } = await getSupabase().from("sessions")
+      .select("anonymous_owner_id").eq("public_code", resolved.publicCode)
+      .eq("module", "support").limit(1).maybeSingle();
+    if (error || !data?.anonymous_owner_id) {
+      return res.status(404).json({ ok: false, error: "История пациента недоступна" });
+    }
+    ownerType = "anonymous_case";
+    ownerId = data.anonymous_owner_id;
+  }
+  try {
+    const timeline = await loadLongitudinalFromSources({
+      supabase: getSupabase(), module, ownerType, ownerId, organizationId,
+    });
+    if (!timeline.coverage.complete) {
+      console.warn("[clinical-longitudinal] incomplete coverage", {
+        sources: timeline.coverage.unavailable_sources,
+        truncated: timeline.coverage.truncated_sources,
+        module,
+      });
+      return res.status(503).json({
+        ok: false, error: "Клиническая хронология неполна. Показывать её как полную нельзя.",
+        coverage: timeline.coverage,
+      });
+    }
+    return res.status(200).json({
+      ok: true, module, events: timeline.events, summary: timeline.summary,
+      coverage: timeline.coverage, integrity: timeline.integrity,
+      treatment_courses: timeline.treatment_courses,
+      read_only: true, research_export_allowed: false,
+    });
+  } catch (error) {
+    console.error("[clinical-longitudinal] loading failed", error.code || error.name || "unknown");
+    return res.status(503).json({ ok: false, error: "История временно недоступна" });
+  }
 }
 
 // ── GET CLIENT OVERVIEW ───────────────────────────────────
