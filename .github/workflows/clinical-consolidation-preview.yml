@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/clinical-consolidation-preview
+      - feature/clinical-main-integration
   workflow_dispatch:
 permissions:
   contents: read
