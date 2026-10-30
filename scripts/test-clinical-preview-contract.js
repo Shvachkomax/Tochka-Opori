@@ -20,6 +20,10 @@ const source = readFileSync(new URL("../src/pages/specialist/ClinicalKnowledgeDe
 for (const label of ["Препараты", "Клинические рекомендации", "Похожие случаи", "Тестовые данные", "Реальные списания отключены"]) {
   assert.ok(source.includes(label), "Missing demo notice/section: " + label);
 }
+const cabinetSource = readFileSync(new URL("../src/pages/specialist/SpecialistCabinet.jsx", import.meta.url), "utf8");
+assert.ok(cabinetSource.includes('data-testid="clinical-library-demo-entry"'), "Specialist cabinet must expose demo entry");
+assert.ok(cabinetSource.includes('href="/specialist/knowledge/demo"'), "Demo link must point to synthetic-only UI");
+assert.ok(!cabinetSource.includes('href="/specialist/knowledge"'), "Live clinical route must not be promoted before authorization tests");
 const oldFlag = process.env.CLINICAL_KNOWLEDGE_ENABLED;
 const oldPatientFlag = process.env.MEDICAL_STAGING_NO_PATIENT_DATA;
 try {
