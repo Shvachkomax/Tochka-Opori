@@ -1,41 +1,16 @@
 {
-  "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "api/clinical-knowledge.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/medical-staging-specialist-disabled.js",
-      "use": "@vercel/node"
+      "source": "/((?!api/.*|support-practices/.*).*)",
+      "destination": "/index.html"
     }
   ],
-  "routes": [
-    {
-      "src": "/api/clinical-knowledge",
-      "dest": "/api/clinical-knowledge.js"
+  "functions": {
+    "api/analyze.js": {
+      "maxDuration": 300
     },
-    {
-      "src": "/api/specialist",
-      "dest": "/api/medical-staging-specialist-disabled.js"
-    },
-    {
-      "src": "/api/.*",
-      "status": 404
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/((?!support-practices/).*)",
-      "dest": "/index.html"
+    "api/transcribe.js": {
+      "includeFiles": "node_modules/opusscript/build/**"
     }
-  ]
+  }
 }
