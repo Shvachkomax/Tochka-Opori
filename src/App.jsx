@@ -9832,9 +9832,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const healthLanding = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "landing" && phase === "input";
   const healthIntake = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "intake";
   const healthResult = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "result" && Boolean(bodyIntakeResult);
+  const healthGuide = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "onboarding";
   const healthDiary = isDedicatedSubdomain && activeModule === "body" && ["diary_edit", "diary_view"].includes(bodyScreen);
   return (
-    <div style={s.page} className={healthDiary ? "app-page health-landing health-diary" : healthResult ? "app-page health-landing health-result" : healthIntake ? "app-page health-landing health-intake" : healthLanding ? "app-page health-landing" : "app-page"}>
+    <div style={s.page} className={healthGuide ? "app-page health-landing health-guide" : healthDiary ? "app-page health-landing health-diary" : healthResult ? "app-page health-landing health-result" : healthIntake ? "app-page health-landing health-intake" : healthLanding ? "app-page health-landing" : "app-page"}>
       <style>{`
   * {
     box-sizing: border-box;
@@ -9970,7 +9971,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </div>
               )}
             </a>
-          ) : (healthLanding || healthIntake || healthResult || healthDiary) ? (
+          ) : (healthLanding || healthIntake || healthResult || healthDiary || healthGuide) ? (
             <img className="health-wordmark" src="/health-design/brand.webp" alt="Земляничные поляны. Здоровье & Стройность" />
           ) : (
             <div

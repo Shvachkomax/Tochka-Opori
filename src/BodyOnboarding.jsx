@@ -188,14 +188,15 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
   // Step 0: Intro
   if (step === 0) {
     return (
-      <div style={s.page}>
-        <div style={s.h2}>Как работает дневник</div>
+      <div className="guide-page" style={s.page}>
+        <span className="guide-step">Дневник здоровья · 1 из 2</span>
+        <h1 style={s.h2}>Как работает дневник</h1>
         <div style={s.p}>
           Дневник помогает замечать связи между питанием, активностью и самочувствием.
           Здесь нет строгих норм — только наблюдение и поддержка.
         </div>
 
-        <div style={s.section}>
+        <div className="guide-card" style={s.section}>
           <div style={{ fontSize: 16, fontWeight: 700, color: "#2f2925", marginBottom: 12 }}>Зачем отмечать питание?</div>
           <div style={{ fontSize: 14, color: "#5f574f", lineHeight: 1.6, marginBottom: 12 }}>
             Чтобы увидеть привычки и связи: как состав тарелки влияет на энергию, сон и настроение.
@@ -203,7 +204,7 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
           </div>
         </div>
 
-        <div style={s.section}>
+        <div className="guide-card" style={s.section}>
           <div style={{ fontSize: 16, fontWeight: 700, color: "#2f2925", marginBottom: 12 }}>Зачем фотографировать тарелки?</div>
           <div style={{ fontSize: 14, color: "#5f574f", lineHeight: 1.6 }}>
             Фото помогает увидеть, из чего состоит приём пищи: достаточно ли овощей, белка, клетчатки.
@@ -212,11 +213,11 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
         </div>
 
         {/* Plate scheme */}
-        <div style={s.section}>
+        <div className="guide-card" style={s.section}>
           <PlateGuide />
         </div>
 
-        <div style={s.section}>
+        <div className="guide-card" style={s.section}>
           <div style={{ fontSize: 14, color: "#5f574f", lineHeight: 1.6 }}>
             • Оценка по фотографии приблизительная<br/>
             • Это не точный расчёт калорий<br/>
@@ -225,7 +226,7 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
           </div>
         </div>
 
-        <button onClick={() => setStep(1)} style={s.primary}>Понятно, продолжить</button>
+        <button className="guide-primary" onClick={() => { setStep(1); window.scrollTo(0, 0); }} style={s.primary}>Понятно, продолжить</button>
         <div style={{ height: 12 }} />
         <button onClick={onSkip} style={s.secondary}>Вернуться в кабинет</button>
       </div>
@@ -234,13 +235,14 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
 
   // Step 1: Preferences
   return (
-    <div style={s.page}>
-      <div style={s.h2}>Настройте дневник под себя</div>
+    <div className="guide-page" style={s.page}>
+      <span className="guide-step">Дневник здоровья · 2 из 2</span>
+      <h1 style={s.h2}>Настройте дневник под себя</h1>
       <div style={s.p}>Эти настройки помогут AI лучше понимать ваш контекст.</div>
 
       {error && <div style={{ color: "#b5473f", fontSize: 14, marginBottom: 12 }}>{error}</div>}
 
-      <div style={s.section}>
+      <div className="guide-card" style={s.section}>
         <div style={s.label}>Пользуетесь ли вы трекером активности?</div>
         <div style={s.row}>
           {TRACKERS.map(t => (
@@ -252,7 +254,7 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
         )}
       </div>
 
-      <div style={s.section}>
+      <div className="guide-card" style={s.section}>
         <div style={s.label}>Какие данные доступны?</div>
         <div style={s.row}>
           {TRACKED_METRICS.map(m => (
@@ -261,7 +263,7 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
         </div>
       </div>
 
-      <div style={s.section}>
+      <div className="guide-card" style={s.section}>
         <div style={s.label}>Ведёте ли вы подсчёт калорий?</div>
         <div style={s.row}>
           {CALORIE_MODES.map(c => (
@@ -270,7 +272,7 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
         </div>
       </div>
 
-      <div style={s.section}>
+      <div className="guide-card" style={s.section}>
         <div style={s.label}>Как предпочитаете вносить данные?</div>
         <div style={s.row}>
           {DATA_ENTRY.map(d => (
@@ -279,7 +281,7 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
         </div>
       </div>
 
-      <div style={s.section}>
+      <div className="guide-card" style={s.section}>
         <div style={s.label}>Что важнее всего отслеживать?</div>
         <div style={s.row}>
           {PRIORITY_METRICS.map(p => (
@@ -288,7 +290,7 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
         </div>
       </div>
 
-      <div style={s.section}>
+      <div className="guide-card" style={s.section}>
         <div style={s.label}>Стиль поддержки</div>
         <div style={s.row}>
           {SUPPORT_STYLES.map(st => (
@@ -297,7 +299,7 @@ export default function BodyOnboarding({ onComplete, onSkip }) {
         </div>
       </div>
 
-      <button onClick={saveAndComplete} disabled={loading} style={{ ...s.primary, opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}>
+      <button className="guide-primary" onClick={saveAndComplete} disabled={loading} style={{ ...s.primary, opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}>
         {loading ? "Сохранение..." : "Готово"}
       </button>
       <div style={{ height: 12 }} />
