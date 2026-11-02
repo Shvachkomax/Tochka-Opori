@@ -1,10 +1,13 @@
 import React, { useState } from "react";
 import { foods } from "./lib/portionFoods.js";
 
+import { detectedItem, portionSuggestions } from "./lib/portionMatch.js";
+
 export function calculatePortion(items) {
   const totals = { kcal: 0, protein: 0, fat: 0, carbs: 0 };
-  if (!items.length) return null;
-  for (const item of items) {
+  const counted = items.filter(item => item.id && !item.skip);
+  if (!counted.length) return null;
+  for (const item of counted) {
     const food = foods.find(f => f.id === item.id);
     const grams = Number(item.grams);
     if (!food || !Number.isFinite(grams) || grams <= 0 || grams > 10000) return null;
@@ -19,13 +22,11 @@ export default function PlatePortion({ analysis, manual, onConfirm }) {
   const [overlap, setOverlap] = useState("");
   const prior = analysis.portion;
   const estimate = calculatePortion(items);
+  const omitted = items.filter(item => !item.id || item.skip);
   const needsChoice = !prior && Number(manual) > 0;
   function edit() {
     const guesses = (Array.isArray(analysis.detected_foods) ? analysis.detected_foods : []).filter(x => typeof x === "string");
-    setItems(prior?.items || [...new Set(guesses)].map(name => ({
-      id: foods.find(f => f.name.toLowerCase().startsWith(name.toLowerCase()))?.id || "",
-      hint: name, grams: "",
-    })));
+    setItems(prior?.items || [...new Set(guesses)].map(detectedItem));
     if (!prior && !guesses.length) setItems([{ id: "", grams: "" }]);
     setOverlap("");
     setOpen(true);
@@ -37,16 +38,29 @@ export default function PlatePortion({ analysis, manual, onConfirm }) {
     {prior && <p>Учтено за день · ≈{prior.kcal} ккал · Б {prior.protein} / Ж {prior.fat} / У {prior.carbs} г</p>}
     {!open ? <button type="button" onClick={edit}>{prior ? "Изменить порцию" : "Уточнить порцию"}</button> : <>
       <h3>Состав и вес порции</h3>
-      {items.map((item,i) => <div key={i} className="portion-row">
-        <label>{item.hint || "Продукт"}<select value={item.id} onChange={e => update(i,{id:e.target.value})}>
-          <option value="">Выберите продукт</option>
-          {foods.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-        </select></label>
-        <label>Вес, г<input type="number" min="0.1" step="any" value={item.grams} onChange={e => update(i,{grams:e.target.value})}/></label>
-        <button type="button" onClick={() => setItems(items.filter((_,j) => j !== i))}>Убрать</button>
-      </div>)}
+      <p>Введите вес для продуктов, которые хотите учесть. Если состав неизвестен, оставьте строку без расчёта.</p>
+      {items.map((item,i) => {
+        const suggestions = portionSuggestions(item.hint || "");
+        return <div key={i} className="portion-ingredient">
+          <strong>{item.hint || "Дополнительный продукт"}</strong>
+          {!item.id && suggestions.length > 0 && <div>Уточните, что было в порции:
+            {suggestions.map(id => <button type="button" key={id} onClick={() => update(i,{id,skip:false})}>{foods.find(f => f.id === id).name}</button>)}
+          </div>}
+          {!item.id && !suggestions.length && item.hint && <p>Совпадения в справочнике нет. Название останется в записи.</p>}
+          <div className="portion-row">
+            <label>Для расчёта<select value={item.id} onChange={e => update(i,{id:e.target.value,skip:!e.target.value})}>
+              <option value="">Оставить без расчёта</option>
+              {foods.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select></label>
+            {item.id && <label>Вес, г<input type="number" min="0.1" step="any" value={item.grams} onChange={e => update(i,{grams:e.target.value})}/></label>}
+            <button type="button" onClick={() => setItems(items.filter((_,j) => j !== i))}>Убрать</button>
+          </div>
+        </div>;
+      })}
       <button type="button" onClick={() => setItems([...items,{id:"",grams:""}])}>+ Продукт</button>
       <p>Расчёт по весу и справочнику USDA FoodData Central. Укажите вес съеденной части.</p>
+      {omitted.length > 0 && <p>Вне расчёта: {omitted.map(item => item.hint || "неуказанный продукт").join(", ")}. Итог относится только к учтённым продуктам.</p>}
+      {!estimate && <p>Для подсчёта выберите хотя бы один продукт и заполните вес у каждой выбранной строки. Фото и его разбор можно сохранить без подсчёта.</p>}
       {estimate && <p>≈{estimate.kcal} ккал · Белки {estimate.protein} г · Жиры {estimate.fat} г · Углеводы {estimate.carbs} г</p>}
       {needsChoice && <label>Эта порция входит во введённые вручную {manual} ккал?
         <select value={overlap} onChange={e => setOverlap(e.target.value)}><option value="">Выберите</option><option value="yes">Да, уже входит</option><option value="no">Нет, прибавить порцию</option></select>

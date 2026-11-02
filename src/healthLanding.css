@@ -108,3 +108,6 @@
 .portion input,.portion select { display:block; border:1px solid #c9d3c6; background:white; color:#244333; padding:8px; border-radius:8px; max-width:100%; }
 .portion input { width:90px; }
 .portion-total { background:#eff3e9; padding:16px; border-radius:14px; margin:12px 0; color:#244333; }
+
+.portion-ingredient { margin:12px 0; padding-bottom:8px; border-bottom:1px solid #e4e6dc; }
+.portion-ingredient > div > button { margin:4px; }

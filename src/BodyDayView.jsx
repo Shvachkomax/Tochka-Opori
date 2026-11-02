@@ -102,7 +102,7 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
         <h2>Подтверждённые порции</h2>
         {day.plate_analysis.filter(row => row.portion).map((row,i) => <p key={i}>
           <strong>{row.photo_name || "Тарелка"} · ≈{row.portion.kcal} ккал</strong><br />
-          {row.portion.items.map(item => (portionFoods.find(food => food.id === item.id)?.name || item.hint || "Продукт") + " · " + item.grams + " г").join(", ")}
+          {row.portion.items.map(item => (portionFoods.find(food => food.id === item.id)?.name || item.hint || "Продукт") + (item.id && !item.skip ? " · " + item.grams + " г" : " · вне расчёта")).join(", ")}
           <br />Б {row.portion.protein} / Ж {row.portion.fat} / У {row.portion.carbs} г
         </p>)}
       </section>}
