@@ -64,3 +64,15 @@
 .health-guide .guide-card { background:#fffef9!important; border-color:#dfdfcf!important; box-shadow:0 4px 18px #38432909; }
 .health-guide .guide-primary { background:#204634!important; }
 @media(max-width:640px){ .health-guide .guide-page { padding:0!important; } }
+
+.overview-head { display:flex; align-items:start; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin:0 0 22px; }
+.overview-head h1 { font:500 clamp(32px,3.6vw,54px)/1.1 Georgia,serif; color:#19392c; margin:8px 0; }
+.overview-kicker { color:#466149; font:600 .88rem system-ui,sans-serif; }
+.overview-head p,.overview-today p { color:#536354; margin:7px 0; }
+.overview-account { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.overview-today { padding:clamp(18px,3vw,36px); margin-bottom:22px; border-radius:18px; background:linear-gradient(95deg,#eef2e8 40%,#eef2e8df 70%,#eef2e840),url('/health-design/ripe.webp') right 60%/auto 190% no-repeat; }
+.overview-today h2 { margin:0; font:500 31px Georgia,serif; color:#19392c; }
+.overview-today button { background:#204634!important; width:auto!important; margin-top:12px; }
+.overview-panel { border:1px solid #dfdfd1!important; border-radius:18px; padding:clamp(16px,2vw,26px)!important; background:#fffef9!important; }
+.overview-panel > div:first-child:not(:has(button)),.overview-panel > div:first-child:has(button) > div:first-child { font:500 clamp(21px,2vw,28px) Georgia,serif!important; color:#19392c!important; }
+.overview-panel > div:first-child:has(button) { flex-wrap:wrap; gap:8px; }

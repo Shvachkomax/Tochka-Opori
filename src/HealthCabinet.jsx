@@ -654,16 +654,12 @@ export default function HealthCabinet({
 
   return (
     <div style={{ width: "100%" }}>
-      {/* Compact Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", marginBottom: 16, borderBottom: "1px solid #e8e2d8" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: "#7D9A89", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 700 }}>О</div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#2f2925" }}>Личный кабинет{displayName ? ` ${displayName}` : ""}</div>
-            <div style={{ fontSize: 12, color: "#8a7e72" }}>Опора. Здоровье & Стройность</div>
-          </div>
+      <div className="overview-head">
+        <div><span className="overview-kicker">Личный кабинет{displayName ? " · " + displayName : ""}</span>
+          <h1>Ваше пространство здоровья</h1>
+          <p>Здесь можно записать, как прошёл день, и посмотреть, что меняется со временем.</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="overview-account">
           {wallet && (
             <div style={{ fontSize: 13, color: "#5f574f" }}>
               <span style={{ color: "#8a7e72" }}>Баланс </span>
@@ -682,7 +678,8 @@ export default function HealthCabinet({
       </div>
 
       {/* Today CTA */}
-      <div style={{ marginBottom: 20 }}>
+      <div className="overview-today">
+        <div><h2>Сегодня</h2><p>{todayLog ? "Запись уже есть. Её можно дополнить." : "Отметьте питание, движение и самочувствие."}</p></div>
         <button onClick={onNewDiary} style={{ width: "100%", padding: "14px 22px", borderRadius: 14, border: 0, background: "#7D9A89", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
           {todayLog ? "Изменить запись сегодня" : "Заполнить дневник"}
         </button>
@@ -809,7 +806,7 @@ export default function HealthCabinet({
       )}
 
       {/* AI Companion — always visible */}
-      <div style={{ marginBottom: 24, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", borderRadius: 16, padding: 20 }}>
+      <div className="overview-panel" style={{ marginBottom: 24, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", borderRadius: 16, padding: 20 }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: "#2f2925", marginBottom: 4 }}>Спросить AI-компаньона</div>
         <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
           Можно задать вопрос о питании, активности, сне, дневнике или самочувствии.
@@ -901,7 +898,7 @@ export default function HealthCabinet({
       </div>
 
       {/* History */}
-      <div style={{ marginBottom: 24 }}>
+      <div className="overview-panel" style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div style={{ fontSize: 17, fontWeight: 700, color: "#2f2925" }}>Дневник по дням</div>
           <div style={{ display: "flex", gap: 4 }}>
@@ -1037,7 +1034,7 @@ export default function HealthCabinet({
       )}
 
       {/* Weekly Summary */}
-      <div style={{ marginBottom: 24 }}>
+      <div className="overview-panel" style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: "#2f2925", marginBottom: 12 }}>Итог недели</div>
 
         {weeklyLoading && weeklySummaries.length === 0 && (
