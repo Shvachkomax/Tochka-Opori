@@ -3,8 +3,9 @@
 .health-landing .app-header { margin-bottom:18px!important; align-items:flex-start!important; }
 .health-wordmark { width:clamp(200px,34vw,430px); max-width:100%; height:auto; mix-blend-mode:multiply; }
 .health-landing .app-grid { display:grid!important; grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important; gap:clamp(20px,3vw,48px)!important; align-items:start; }
-.health-landing .app-grid > section:first-child { min-width:0; padding-bottom:clamp(190px,22vw,355px); background:linear-gradient(to bottom,#faf9f3,transparent 23%) bottom/100% clamp(190px,22vw,355px) no-repeat,url('/health-design/still-life.webp') center bottom/100% auto no-repeat; }
-.health-landing .app-hero-title { font:500 clamp(38px,4.7vw,76px)/1.02 Georgia,serif!important; letter-spacing:-.045em; color:#132e23!important; }
+.health-landing .app-grid > section:first-child { min-width:0; }
+.health-landing .app-grid > section:first-child::after { content:""; display:block; width:100%; aspect-ratio:758/428; background:linear-gradient(to bottom,#faf9f3 0%,transparent 38%),url('/health-design/still-life.webp') center/cover no-repeat; }
+.health-landing .app-hero-title { font:500 clamp(30.4px,3.76vw,60.8px)/1.02 Georgia,serif!important; letter-spacing:-.045em; color:#132e23!important; }
 .health-landing .app-hero-text { font:400 clamp(20px,2vw,31px)/1.24 Georgia,serif!important; color:#304b3b!important; }
 .health-landing .health-code,.health-landing .app-card { background:#fffef9f5!important; border:1px solid #e0dfd1!important; box-shadow:0 7px 24px #3843290c!important; }
 .health-landing .health-code input { min-width:0; }
@@ -17,7 +18,6 @@
 @media(max-width:800px){
  .health-landing .app-grid { grid-template-columns:minmax(0,1fr)!important; }
  .health-landing .app-header { flex-direction:row!important; flex-wrap:wrap; gap:10px; }
- .health-landing .app-grid > section:first-child { padding-bottom:100px; background-size:100% 100px,100% auto; background-position:bottom,center bottom; }
  .health-landing .health-code { margin-top:12px!important; }
  .health-landing .health-code input { width:0!important; }
 }
