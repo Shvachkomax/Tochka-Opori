@@ -64,14 +64,14 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
   };
 
   return (
-    <div style={{ maxWidth: 780, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" }}>
+    <div className="diary-saved" style={{ maxWidth: 780, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" }}>
       <div style={{ marginBottom: 16 }}>
         <button onClick={onBack} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5f574f", marginBottom: 8 }}>
           ← Назад в кабинет
         </button>
-        <div onClick={onBack} style={{ fontSize: 22, fontWeight: 700, color: "#2f2925", fontFamily: "Georgia, serif", cursor: "pointer" }}>
+        <h1 className="diary-date">Запись за{" "}
           {new Date(day.log_date + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
-        </div>
+        </h1>
       </div>
 
       {/* Parameters */}

@@ -3,6 +3,7 @@ import { getClientToken, clearCachedToken } from "./lib/clientToken.js";
 import { withAccessToken, getBodySession } from "./lib/sessionAccess.js";
 import { parseApiResponse, classifyHttpError, classifyNetworkError, estimateRequestSize, countPhotos } from "./lib/apiResponse.js";
 import { compressPhotosToBudget } from "./lib/photoCompress.js";
+import PlateGuide from "./PlateGuide.jsx";
 import PatientMedicationOrders from "./PatientMedicationOrders.jsx";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 
@@ -596,16 +597,17 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
 
   function chip(label, value, current, setter) {
     return (
-      <div
+      <button key={value} type="button" aria-pressed={current === value}
         onClick={() => setter(current === value ? "" : value)}
         style={current === value ? s.chipActive : s.chip}
       >
         {label}
-      </div>
+      </button>
     );
   }
 
   return (
+    <div className="diary-layout">
     <form data-body-diary onSubmit={handleSubmit} style={s.form}>
       <style>{`
         form[data-body-diary] input:focus,
@@ -634,14 +636,14 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
         </div>
       )}
 
-      <h2 style={s.heading}>Дневник дня</h2>
-      <p style={s.subheading}>Отметьте, как прошёл день. Не нужно идеально — нам важна честная картина.</p>
+      <h1 style={s.heading}>Дневник здоровья</h1>
+      <p style={s.subheading}>Запишите то, что важно сегодня.</p>
 
       <PatientMedicationOrders module="health" mode="schedule" scheduledDate={logDate} sessionId={sessionId} />
 
       {/* Date + body measurements */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Дата и измерения</div>
+      <section className="diary-group" style={s.section}>
+        <h2 style={s.sectionTitle}>Дата и измерения</h2>
         <div style={s.row2}>
           <div style={s.field}>
             <label style={s.label}>Дата</label>
@@ -656,11 +658,11 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
           <label style={s.label}>Талия, см <span style={s.optional}>(необязательно)</span></label>
           <input style={s.input} type="number" step="0.5" placeholder="—" value={waistCm} onChange={e => setWaistCm(e.target.value)} />
         </div>
-      </div>
+      </section>
 
       {/* Activity */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Активность</div>
+      <section className="diary-group" style={s.section}>
+        <h2 style={s.sectionTitle}>Активность</h2>
         <div style={s.field}>
           <label style={s.label}>Шаги</label>
           <input style={s.input} type="number" placeholder="Например: 7000" value={steps} onChange={e => setSteps(e.target.value)} />
@@ -669,11 +671,11 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
           <label style={s.label}>Комментарий по активности <span style={s.optional}>(необязательно)</span></label>
           <textarea style={s.textarea} placeholder="Была ли ходьба, движение в течение дня..." value={activityComment} onChange={e => setActivityComment(e.target.value)} />
         </div>
-      </div>
+      </section>
 
       {/* Workout */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Тренировка</div>
+      <section className="diary-group" style={s.section}>
+        <h2 style={s.sectionTitle}>Тренировка</h2>
         <div role="radiogroup" aria-label="Тренировка" style={{ display: "flex", gap: 0, marginBottom: workoutDone ? 16 : 0, borderRadius: 12, overflow: "hidden", border: "1px solid #d8cec1" }}>
           <button
             type="button"
@@ -748,7 +750,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
               <div key={idx} style={{ padding: 12, borderRadius: 10, background: "#faf6ef", border: "1px solid #e8e2d8", marginBottom: 8 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "#2f2925" }}>Тренировка {idx + 2}</div>
-                  <button onClick={() => removeWorkoutEntry(idx)} style={{ padding: "2px 8px", borderRadius: 6, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 11, color: "#b5473f" }}>
+                  <button type="button" onClick={() => removeWorkoutEntry(idx)} style={{ padding: "2px 8px", borderRadius: 6, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 11, color: "#b5473f" }}>
                     Убрать
                   </button>
                 </div>
@@ -785,16 +787,16 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
               </div>
             ))}
 
-            <button onClick={addWorkoutEntry} style={{ width: "100%", padding: "8px 16px", borderRadius: 8, border: "1px dashed #d8cec1", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5f8b7a", fontWeight: 600, marginTop: 4 }}>
+            <button type="button" onClick={addWorkoutEntry} style={{ width: "100%", padding: "8px 16px", borderRadius: 8, border: "1px dashed #d8cec1", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5f8b7a", fontWeight: 600, marginTop: 4 }}>
               + Добавить тренировку
             </button>
           </>
         )}
-      </div>
+      </section>
 
       {/* Nutrition */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Питание</div>
+      <section className="diary-group" style={s.section}>
+        <h2 style={s.sectionTitle}>Питание</h2>
         <div style={{ fontSize: 13, color: "#8d8378", marginBottom: 14, lineHeight: 1.5 }}>
           Если калории не считали — ничего страшного. Просто кратко опишите еду.
         </div>
@@ -867,11 +869,11 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
           <label style={s.label}>Комментарий по питанию</label>
           <textarea style={s.textarea} placeholder="Было ли что-то необычное, сложности..." value={nutritionComment} onChange={e => setNutritionComment(e.target.value)} />
         </div>
-      </div>
+      </section>
 
       {/* Overeating / cravings */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Переедание и тяга</div>
+      <section className="diary-group" style={s.section}>
+        <h2 style={s.sectionTitle}>Переедание и тяга</h2>
         <div style={{ marginBottom: 14 }}>
           <label style={s.label}>Было ли переедание?</label>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -884,11 +886,11 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
             {CRAVINGS.map(o => chip(o.label, o.value, sweetCravings, setSweetCravings))}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Water + Sleep */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Сон и вода</div>
+      <section className="diary-group" style={s.section}>
+        <h2 style={s.sectionTitle}>Сон и вода</h2>
         <div style={s.row2}>
           <div style={s.field}>
             <label style={s.label}>Вода, литры</label>
@@ -939,11 +941,11 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
             {SLEEP_QUALITY.map(o => chip(o.label, o.value, sleepQuality, setSleepQuality))}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Energy + Mood */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Самочувствие</div>
+      <section className="diary-group" style={s.section}>
+        <h2 style={s.sectionTitle}>Самочувствие</h2>
         <div style={s.row2}>
           <div style={s.field}>
             <label style={s.label}>Энергия: {energyLevel}/10</label>
@@ -954,11 +956,11 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
             <input style={{ width: "100%", accentColor: "#86a08f" }} type="range" min="1" max="10" value={moodLevel} onChange={e => setMoodLevel(Number(e.target.value))} />
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Day comment + Voice */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Комментарий дня</div>
+      <section className="diary-group" style={s.section}>
+        <h2 style={s.sectionTitle}>Комментарий дня</h2>
         <div style={s.field}>
           <textarea style={s.textarea} placeholder="Коротко опишите день: что получилось, что помешало, где было сложнее всего..." value={dayText} onChange={e => setDayText(e.target.value)} />
         </div>
@@ -976,11 +978,11 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
             <span style={{ fontSize: 12, color: "#86a08f" }}>✓ расшифровка добавлена</span>
           )}
         </div>
-      </div>
+      </section>
 
       {/* Photos */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Фото тарелок</div>
+      <section className="diary-group" style={s.section}>
+        <h2 style={s.sectionTitle}>Фото тарелок</h2>
         <div style={{ fontSize: 13, color: "#8d8378", marginBottom: 14, lineHeight: 1.5 }}>
           Сфотографируйте тарелку, чтобы увидеть примерный состав блюда. Это не точный расчёт калорий.
         </div>
@@ -1066,7 +1068,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
             </div>
           </div>
         )}
-      </div>
+      </section>
 
       {submitError && (
         <div style={{ color: "#b5473f", fontSize: 14, marginTop: 12, lineHeight: 1.5 }}>
@@ -1084,9 +1086,14 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
           </button>
         )}
         <button type="submit" disabled={submitting} style={submitting ? { ...s.buttonDisabled, flex: onCancel ? 1 : undefined } : { ...s.button, flex: onCancel ? 1 : undefined }}>
-          {submitting ? "Сохраняем…" : "Сохранить дневник"}
+          {submitting ? "Сохраняем…" : "Сохранить запись"}
         </button>
       </div>
     </form>
+    <aside className="diary-aside">
+      <details open><summary>Ориентир для питания</summary><PlateGuide /></details>
+      <div className="diary-photo" aria-hidden="true" />
+    </aside>
+    </div>
   );
 }

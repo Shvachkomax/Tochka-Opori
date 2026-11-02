@@ -40,3 +40,19 @@
 .result-steps [aria-current] span { background:#204634; color:#fff; border-color:#204634; }
 .health-result .app-card { overflow-wrap:anywhere; }
 @media(max-width:800px){ .health-result .app-grid > section:first-child::after { height:105px; background-position:center,center 53%; } }
+
+.health-diary main { max-width:1140px!important; }
+.diary-layout { display:grid; grid-template-columns:minmax(0,2fr) minmax(230px,1fr); align-items:start; gap:clamp(14px,3vw,42px); }
+.diary-layout [data-body-diary] { margin:0!important; width:100%; min-width:0; padding:0!important; }
+.diary-layout h1,.diary-date { margin:0; font:500 clamp(32px,3.65vw,56px)/1.12 Georgia,serif!important; color:#19392c!important; }
+.diary-group,.diary-aside details,.diary-saved { border:1px solid #e1dfd1!important; background:#fffef9!important; box-shadow:0 4px 18px #38432909; border-radius:16px; }
+.diary-group { margin-bottom:14px!important; }
+.diary-group h2 { margin-top:0; font:500 23px/1.2 Georgia,serif!important; color:#244333!important; }
+.diary-group input,.diary-group textarea,.diary-group select { max-width:100%; min-width:0; box-sizing:border-box; }
+.diary-layout button[type=submit]:enabled { background:#204634!important; }
+.diary-aside { min-width:0; position:sticky; top:16px; }
+.diary-aside details { padding:18px; }
+.diary-aside summary { font:500 21px Georgia,serif; cursor:pointer; padding-bottom:12px; }
+.diary-photo { margin-top:18px; aspect-ratio:670/479; background:linear-gradient(to bottom,#faf9f3,transparent 32%),url('/health-design/ripe.webp') center/cover; }
+.diary-saved { padding:clamp(16px,3vw,32px)!important; }
+@media(max-width:800px){ .diary-layout { display:flex; flex-direction:column; } .diary-aside { position:static; width:100%; } .diary-photo { display:none; } .diary-group { padding:15px!important; } }
