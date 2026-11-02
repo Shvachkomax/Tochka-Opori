@@ -601,6 +601,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       onComplete({
         ...savedData,
         ...(aiResult || {}),
+        nutrition: { rows: plateAnalysis, calories: log.calories },
         saved: true,
         ai_analysis_status: aiResult?.ai_analysis_status || "pending",
       });

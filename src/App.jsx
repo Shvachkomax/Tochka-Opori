@@ -1,3 +1,4 @@
+import DayMacros from "./DayMacros.jsx";
 import "./healthLanding.css";
 import InformationFlow from "./InformationFlow.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
@@ -10633,6 +10634,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               <span className="overview-kicker">Дневник здоровья · Запись сохранена</span>
               <h1 className="diary-date">Итог дня</h1>
               <p>{bodyDiaryResult.ai_day_summary || "День записан. Разбор пока недоступен. Запись можно открыть в кабинете."}</p>
+              <DayMacros rows={bodyDiaryResult.nutrition?.rows} calories={bodyDiaryResult.nutrition?.calories} />
               {bodyDiaryResult.ai_focus_tomorrow && (
                 <aside className="day-focus">
                   <h2>Фокус на завтра</h2>

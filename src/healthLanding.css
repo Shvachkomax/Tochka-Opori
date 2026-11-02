@@ -111,3 +111,13 @@
 
 .portion-ingredient { margin:12px 0; padding-bottom:8px; border-bottom:1px solid #e4e6dc; }
 .portion-ingredient > div > button { margin:4px; }
+
+.day-nutrition { margin:20px 0; padding:18px; background:#f5f7ef; border:1px solid #dce2d5; border-radius:16px; color:#244333; }
+.day-nutrition h2 { margin:0 0 12px; font:500 25px Georgia,serif; }
+.nutrition-switch { display:flex; gap:6px; }
+.nutrition-switch button { border:1px solid #b4c2b4; border-radius:10px; padding:8px 15px; color:#244333; background:white; cursor:pointer; }
+.nutrition-switch button[aria-pressed=true] { background:#244333; color:white; }
+.macro-bar { display:flex; height:14px; border-radius:7px; overflow:hidden; margin:12px 0; }
+.day-nutrition details { padding:10px 0; border-bottom:1px solid #dce2d5; }
+.day-nutrition summary { cursor:pointer; }
+.day-nutrition details > div { padding:8px 0 0 16px; font-size:.9rem; }

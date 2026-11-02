@@ -1,3 +1,4 @@
+import DayMacros from "./DayMacros.jsx";
 import { foods as portionFoods } from "./lib/portionFoods.js";
 import React, { useState, useEffect } from "react";
 import { getClientToken } from "./lib/clientToken.js";
@@ -106,6 +107,8 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
           <br />Б {row.portion.protein} / Ж {row.portion.fat} / У {row.portion.carbs} г
         </p>)}
       </section>}
+
+      <DayMacros rows={day.plate_analysis} calories={day.calories} />
 
       {/* Calorie Balance */}
       {day.calories != null && day.activity_calories != null && (
