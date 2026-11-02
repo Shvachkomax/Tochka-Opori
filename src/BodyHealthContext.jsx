@@ -11,9 +11,7 @@ const LAB_ITEMS = [
 const s = {
   page: { maxWidth: 780, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" },
   section: { padding: 20, borderRadius: 16, background: "#faf6ef", border: "1px solid #e8e2d8", marginBottom: 20 },
-  title: { fontSize: 22, fontWeight: 700, color: "#2f2925", marginBottom: 8, fontFamily: "Georgia, serif" },
   subtitle: { color: "#665c52", fontSize: 14, lineHeight: 1.5, marginBottom: 16 },
-  sectionTitle: { fontSize: 15, fontWeight: 700, color: "#2f2925", marginBottom: 8 },
   note: { color: "#8a7e72", fontSize: 13, lineHeight: 1.5, marginBottom: 12 },
   input: { width: "100%", height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 15, outline: "none", fontFamily: "inherit", boxSizing: "border-box" },
   textarea: { width: "100%", minHeight: 80, padding: 12, borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 15, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" },
@@ -119,15 +117,16 @@ export default function BodyHealthContext({ onCancel, onComplete }) {
   const hasAnything = conditions.length > 0 || medications.length > 0 || supplements.length > 0 || labNotes.has_recent_labs;
 
   return (
-    <div style={s.page}>
-      <div style={s.title}>Здоровье, анализы и препараты</div>
+    <div className="guide-page context-form" style={s.page}>
+      <span className="overview-kicker">Личный кабинет · Здоровье &amp; Стройность</span>
+      <h1>Сведения о здоровье</h1>
       <div style={s.subtitle}>
-        Этот раздел помогает специалисту учитывать ваш контекст. Сервис не назначает и не отменяет лекарства, БАДы или лечение.
+        Здесь можно записать сведения о здоровье, лекарствах и анализах, которыми вы хотите поделиться со специалистом. Сервис не назначает и не отменяет лекарства, БАДы или лечение.
       </div>
 
       {/* Conditions */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Что важно знать о здоровье</div>
+      <div className="guide-card" style={s.section}>
+        <h2>Что важно знать о здоровье</h2>
         <div style={s.note}>Есть ли состояния или диагнозы, которые важно учитывать?</div>
         {conditions.map((c, i) => (
           <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-start" }}>
@@ -144,8 +143,8 @@ export default function BodyHealthContext({ onCancel, onComplete }) {
       <PatientMedicationOrders module="health" />
 
       {(medications.length > 0 || supplements.length > 0) && (
-        <div style={{ ...s.section, background: "#f5f1ea" }}>
-          <div style={s.sectionTitle}>Ранее сохранённые сведения</div>
+        <div className="guide-card" style={s.section}>
+          <h2>Ранее сохранённые сведения</h2>
           <div style={s.note}>Это старый свободный список без расписания. Он сохранён как был и не считается подтверждённым назначением. Актуальные сведения можно внести в раздел «Лекарства и БАДы» выше.</div>
           {medications.map((item, index) => <div key={`med-${index}`} style={{ fontSize: 13, color: "#5f574f", marginBottom: 6 }}>{item.name || "Препарат"}{item.dosage ? ` · ${item.dosage}` : ""}{item.frequency ? ` · ${item.frequency}` : ""}</div>)}
           {supplements.map((item, index) => <div key={`supp-${index}`} style={{ fontSize: 13, color: "#5f574f", marginBottom: 6 }}>{item.name || "БАД"}{item.dosage ? ` · ${item.dosage}` : ""}{item.frequency ? ` · ${item.frequency}` : ""}</div>)}
@@ -153,14 +152,14 @@ export default function BodyHealthContext({ onCancel, onComplete }) {
       )}
 
       {/* Labs */}
-      <div style={s.section}>
-        <div style={s.sectionTitle}>Анализы и выписки</div>
+      <div className="guide-card" style={s.section}>
+        <h2>Анализы и выписки</h2>
         <div style={s.note}>Пока можно описать анализы словами. Загрузку файлов добавим позже.</div>
         <div style={s.field}>
           <label style={s.label}>Есть ли свежие анализы?</label>
           <div style={{ display: "flex", gap: 8 }}>
             {[{ v: true, l: "Да" }, { v: false, l: "Нет" }].map(o => (
-              <button key={String(o.v)} onClick={() => setLabNotes({ ...labNotes, has_recent_labs: o.v })} style={labNotes.has_recent_labs === o.v ? s.chipActive : s.chip}>{o.l}</button>
+              <button key={String(o.v)} aria-pressed={labNotes.has_recent_labs === o.v} onClick={() => setLabNotes({ ...labNotes, has_recent_labs: o.v })} style={labNotes.has_recent_labs === o.v ? s.chipActive : s.chip}>{o.l}</button>
             ))}
           </div>
         </div>
@@ -172,7 +171,7 @@ export default function BodyHealthContext({ onCancel, onComplete }) {
                 {LAB_ITEMS.map(item => {
                   const active = (labNotes.items || []).includes(item);
                   return (
-                    <button key={item} onClick={() => {
+                    <button key={item} aria-pressed={active} onClick={() => {
                       const items = labNotes.items || [];
                       setLabNotes({ ...labNotes, items: active ? items.filter(x => x !== item) : [...items, item] });
                     }} style={active ? s.chipActive : s.chip}>{item}</button>
@@ -207,8 +206,8 @@ export default function BodyHealthContext({ onCancel, onComplete }) {
       {error && <div style={{ color: "#b5473f", fontSize: 14, marginBottom: 12 }}>{error}</div>}
 
       {/* Actions */}
-      <div style={{ display: "flex", gap: 12 }}>
-        <button onClick={handleSave} disabled={saving} style={{ ...s.button, flex: 1, opacity: saving ? 0.6 : 1, cursor: saving ? "not-allowed" : "pointer" }}>
+      <div className="context-actions">
+        <button className="guide-primary" onClick={handleSave} disabled={saving} style={{ ...s.button, flex: 1, opacity: saving ? 0.6 : 1, cursor: saving ? "not-allowed" : "pointer" }}>
           {saving ? "Сохранение..." : "Сохранить"}
         </button>
         <button onClick={onCancel} disabled={saving} style={{ padding: "12px 20px", borderRadius: 16, border: "1px solid #d8cec1", background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>

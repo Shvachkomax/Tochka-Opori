@@ -87,3 +87,9 @@
 .day-history { overflow-wrap:anywhere; }
 .day-history .overview-kicker { margin-top:14px; }
 .day-history > div:first-child { border-bottom:1px solid #dce2d5; padding-bottom:14px; }
+
+.context-form h2 { margin:0 0 10px; font:500 23px/1.2 Georgia,serif; color:#244333; }
+.health-guide .context-form > section { background:#fffef9!important; border-color:#dfdfcf!important; }
+.context-form :is(input,textarea,select,button):focus-visible { outline:2px solid #476451!important; outline-offset:2px; }
+.context-actions { display:flex; gap:12px; }
+@media(max-width:540px){ .context-actions { flex-direction:column; } .context-actions button { flex:none!important; } }

@@ -9835,7 +9835,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const healthIntake = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "intake";
   const healthResult = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "result" && Boolean(bodyIntakeResult);
   const healthOverview = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "cabinet";
-  const healthGuide = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "onboarding";
+  const healthGuide = isDedicatedSubdomain && activeModule === "body" && ["onboarding", "health_context"].includes(bodyScreen);
   const healthDiary = isDedicatedSubdomain && activeModule === "body" && ["diary_edit", "diary_view", "diary_result"].includes(bodyScreen);
   return (
     <div style={s.page} className={healthOverview ? "app-page health-landing health-overview" : healthGuide ? "app-page health-landing health-guide" : healthDiary ? "app-page health-landing health-diary" : healthResult ? "app-page health-landing health-result" : healthIntake ? "app-page health-landing health-intake" : healthLanding ? "app-page health-landing" : "app-page"}>
