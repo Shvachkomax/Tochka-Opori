@@ -1,3 +1,4 @@
+import "./healthLanding.css";
 import InformationFlow from "./InformationFlow.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
@@ -9828,8 +9829,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     ["specialist_to_patient", "patient_to_specialist"].includes(inviteInfo.direction)
   );
 
+  const healthLanding = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "landing" && phase === "input";
   return (
-    <div style={s.page} className="app-page">
+    <div style={s.page} className={healthLanding ? "app-page health-landing" : "app-page"}>
       <style>{`
   * {
     box-sizing: border-box;
@@ -9965,6 +9967,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </div>
               )}
             </a>
+          ) : healthLanding ? (
+            <img className="health-wordmark" src="/health-design/brand.webp" alt="Земляничные поляны. Здоровье & Стройность" />
           ) : (
             <div
               style={{ display: "flex", alignItems: "center", gap: 12, cursor: activeModule === "support" && supportScreen !== "landing" ? "pointer" : "default" }}
@@ -10184,14 +10188,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             )}
 
             {activeModule === "body" && bodyScreen === "landing" && (
-              <div style={{ marginTop: 16, padding: 16, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
+              <div className="health-code" style={{ marginTop: 16, padding: 16, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 8 }}>
                   Уже есть код продолжения?
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input
                     type="text"
-                    placeholder="HEALTH-XXXX-XXX-XXXX-XXXX-XXXX"
+                    aria-label="Код продолжения Health"
+                    placeholder="Ваш HEALTH-код"
                     value={bodyContinuationInput || ""}
                     onChange={(e) => setBodyContinuationInput(e.target.value.toUpperCase())}
                     onKeyDown={(e) => e.key === "Enter" && continueBodyByCode()}
@@ -10220,7 +10225,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               </div>
             )}
 
-            {phase === "input" && showModuleSwitcher && (
+            {phase === "input" && showModuleSwitcher && !healthLanding && (
             <div style={{ ...s.row, marginTop: 8, gap: 6 }} className="app-actions">
               <button
                 style={activeModule === "support" ? s.primary : s.secondary}
@@ -10781,6 +10786,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     style={s.textarea}
                     value={text}
                     onChange={(e) => setText(e.target.value)}
+                    aria-label={isDedicatedSubdomain ? "Что хотите изменить?" : "Описание состояния"}
                     placeholder={isDedicatedSubdomain ? "Например: хочу снизить вес, наладить питание, больше двигаться, лучше спать и понять, с чего начать…" : "Например: последние недели плохо сплю, тревожусь, не могу собраться, стало трудно заниматься обычными делами…"}
                   />
                   <button
