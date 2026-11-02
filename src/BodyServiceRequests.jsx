@@ -235,7 +235,7 @@ export default function BodyServiceRequests({ onBack }) {
 
           {serviceTopic === "medications_supplements" && (
             <div style={{ padding: 12, borderRadius: 10, background: "#fdf6ee", border: "1px solid #e8d5b8", marginBottom: 16, fontSize: 13, color: "#92400e" }}>
-              Специалист не заменяет врача. Не меняйте лекарства и дозировки без назначения врача.
+              Не меняйте назначения, дозировки самостоятельно!!
             </div>
           )}
 
