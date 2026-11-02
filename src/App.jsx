@@ -10520,7 +10520,29 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                wallet={bodyCabinetData.wallet}
                todayLog={bodyCabinetData.today_log}
                history={bodyCabinetData.history}
-               onNewDiary={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }}
+               onNewDiary={async () => {
+                 clearToast();
+                 const today = bodyCabinetData.today_log;
+                 let day = null;
+                 if (today) {
+                   try {
+                     const session = getBodySession();
+                     const token = await getClientToken("body", "session");
+                     const response = await fetch("/api/session", {
+                       method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+                       body: JSON.stringify({ action: "getBodyDiaryDay", session_id: session.sessionId, access_token: session.accessToken, log_date: today.log_date }),
+                     });
+                     const data = await response.json();
+                     if (!response.ok || !data.day) throw new Error();
+                     day = data.day;
+                   } catch {
+                     showToast("Не удалось загрузить запись за сегодня.", "error");
+                     return;
+                   }
+                 }
+                 setBodyDiaryDayData(day);
+                 setBodyScreen("diary_edit");
+               }}
                onViewDiary={(log) => { clearToast(); setBodyDiaryDayData(log); setBodyScreen("diary_view"); }}
                onLogout={() => { clearBodySession(); setBodyScreen("landing"); setBodyCabinetData(null); setBodyDiarySessionId(null); }}
                onRotateCode={regenerateBodyContinuationCode}

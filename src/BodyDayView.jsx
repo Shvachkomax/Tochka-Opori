@@ -1,3 +1,4 @@
+import { foods as portionFoods } from "./lib/portionFoods.js";
 import React, { useState, useEffect } from "react";
 import { getClientToken } from "./lib/clientToken.js";
 import { getBodySession } from "./lib/sessionAccess.js";
@@ -96,6 +97,15 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
           {field("Настроение", day.mood_level, "/10")}
         </div>
       </div>
+
+      {day.plate_analysis?.some(row => row.portion) && <section className="portion-total">
+        <h2>Подтверждённые порции</h2>
+        {day.plate_analysis.filter(row => row.portion).map((row,i) => <p key={i}>
+          <strong>{row.photo_name || "Тарелка"} · ≈{row.portion.kcal} ккал</strong><br />
+          {row.portion.items.map(item => (portionFoods.find(food => food.id === item.id)?.name || item.hint || "Продукт") + " · " + item.grams + " г").join(", ")}
+          <br />Б {row.portion.protein} / Ж {row.portion.fat} / У {row.portion.carbs} г
+        </p>)}
+      </section>}
 
       {/* Calorie Balance */}
       {day.calories != null && day.activity_calories != null && (

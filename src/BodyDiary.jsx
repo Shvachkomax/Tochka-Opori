@@ -3,6 +3,7 @@ import { getClientToken, clearCachedToken } from "./lib/clientToken.js";
 import { withAccessToken, getBodySession } from "./lib/sessionAccess.js";
 import { parseApiResponse, classifyHttpError, classifyNetworkError, estimateRequestSize, countPhotos } from "./lib/apiResponse.js";
 import { compressPhotosToBudget } from "./lib/photoCompress.js";
+import PlatePortion from "./PlatePortion.jsx";
 import PlateGuide from "./PlateGuide.jsx";
 import PatientMedicationOrders from "./PatientMedicationOrders.jsx";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
@@ -90,7 +91,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
   const [workoutIntensity, setWorkoutIntensity] = useState(dayData?.workout_intensity || "");
   const [workoutComment, setWorkoutComment] = useState(dayData?.workout_comment || "");
   const [workoutEntries, setWorkoutEntries] = useState(dayData?.workout_entries || []);
-  const [calories, setCalories] = useState(dayData?.calories ?? "");
+  const [calories, setCalories] = useState(() => dayData?.calories == null ? "" : Math.max(0, dayData.calories - (dayData.plate_analysis || []).reduce((sum, row) => sum + (row.portion?.kcal || 0), 0)));
   const [calorieIntakeSource, setCalorieIntakeSource] = useState(dayData?.calorie_intake_source || "");
   const [activityCalories, setActivityCalories] = useState(dayData?.activity_calories ?? "");
   const [activityCaloriesSource, setActivityCaloriesSource] = useState(dayData?.activity_calories_source || "");
@@ -113,6 +114,13 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
   const [voiceTranscript, setVoiceTranscript] = useState(dayData?.voice_transcript || "");
   const [photos, setPhotos] = useState(dayData?.plate_photos?.map((p, i) => ({ dataUrl: p, name: `Фото ${i + 1}` })) || []);
   const [plateAnalysis, setPlateAnalysis] = useState(dayData?.plate_analysis || []);
+  const portionCalories = plateAnalysis.reduce((sum, row) => sum + (row.portion?.kcal || 0), 0);
+  const hasPortions = plateAnalysis.some(row => row.portion);
+  const intakeTotal = hasPortions ? Number(calories || 0) + portionCalories : calories;
+  function confirmPortion(index, portion, included) {
+    if (included) setCalories(value => Number(value) - portion.kcal);
+    setPlateAnalysis(rows => rows.map((row, i) => i === index ? { ...row, portion } : row));
+  }
   const [plateAnalysisLoading, setPlateAnalysisLoading] = useState(false);
   const [plateAnalysisError, setPlateAnalysisError] = useState("");
   const [heicWarning, setHeicWarning] = useState("");
@@ -294,7 +302,6 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
   }, []);
 
   function handlePhotoUpload(e) {
-    setPlateAnalysis([]);
     setHeicWarning("");
     const files = Array.from(e.target.files || []);
     const heicFiles = files.filter(f => /\.(heic|heif)$/i.test(f.name));
@@ -333,8 +340,14 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
   }
 
   function removePhoto(idx) {
+    if (plateAnalysis.some((row,i) => (row.photo_index ?? i) === idx && row.portion) && !window.confirm("Удалить фото и вычесть эту порцию из итога дня?")) return;
     setPhotos(prev => prev.filter((_, i) => i !== idx));
-    setPlateAnalysis([]);
+    plateAnalysisRequestRef.current = null;
+    setPlateAnalysisLoading(false);
+    setPlateAnalysis(rows => rows.flatMap((row,i) => {
+      const old = row.photo_index ?? i;
+      return old === idx ? [] : [{ ...row, photo_index: old > idx ? old - 1 : old }];
+    }));
   }
 
   async function analyzePlatePhotos() {
@@ -386,7 +399,11 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
       if (parsed.json?.ok && Array.isArray(parsed.json.results)) {
         const hasAnySuccess = parsed.json.results.some(r => !r.error);
         if (hasAnySuccess) {
-          setPlateAnalysis(parsed.json.results);
+          setPlateAnalysis(rows => parsed.json.results.map((next,i) => {
+            const previous = rows.find((row,j) => (row.photo_index ?? j) === (next.photo_index ?? i));
+            if (!previous?.portion) return next;
+            return next.error ? previous : { ...next, portion: previous.portion };
+          }));
         } else {
           const firstError = parsed.json.results.find(r => r.error);
           setPlateAnalysisError(firstError?.error || "Не удалось проанализировать фото.");
@@ -450,7 +467,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
         activity_calories_source: e.activity_calories_source || null,
         comment: e.comment || null,
       })) : null,
-      calories: num(calories),
+      calories: num(intakeTotal),
       calorie_intake_source: calorieIntakeSource || null,
       activity_calories: num(activityCalories),
       activity_calories_source: activityCaloriesSource || null,
@@ -803,11 +820,11 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
         <div style={s.row2}>
           <div style={s.field}>
             <label style={s.label}>
-              Калории за день
+              {hasPortions ? "Остальные калории за день" : "Калории за день"}
               {calorieIntakeSource && <span style={s.optional}> · {calorieIntakeSource}</span>}
               {!calorieIntakeSource && <span style={s.optional}> · по данным приложения</span>}
             </label>
-            <input style={s.input} type="number" placeholder="Например, 1850" value={calories} onChange={e => setCalories(e.target.value)} />
+            <input style={s.input} type="number" min="0" placeholder="Например, 1850" value={calories} onChange={e => setCalories(e.target.value)} />
             <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 4 }}>
               {!showIntakeSourceEdit ? (
                 <span onClick={() => setShowIntakeSourceEdit(true)} style={{ cursor: "pointer", textDecoration: "underline" }}>Изменить источник</span>
@@ -1059,6 +1076,7 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
                         Точность оценки: {Math.round(a.confidence * 100)}%
                       </div>
                     )}
+                    <PlatePortion key={photos[a.photo_index ?? i]?.dataUrl} analysis={a} manual={calories} onConfirm={(portion,included) => confirmPortion(i,portion,included)} />
                   </>
                 )}
               </div>
@@ -1070,6 +1088,9 @@ export default function BodyDiary({ sessionId, dayData, onComplete, onCancel }) 
         )}
       </section>
 
+      {hasPortions && <div className="portion-total" role="status"><strong>Получено с пищей за день: ≈{intakeTotal} ккал</strong><br />
+        Подтверждённые порции: {portionCalories} ккал. Остальное: {Number(calories || 0)} ккал.
+        <br />Нажмите «Сохранить запись», чтобы сохранить итог за выбранную дату.</div>}
       {submitError && (
         <div style={{ color: "#b5473f", fontSize: 14, marginTop: 12, lineHeight: 1.5 }}>
           {submitError}

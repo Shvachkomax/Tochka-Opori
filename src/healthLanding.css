@@ -99,3 +99,12 @@
 .requests-page h2 { margin:0 0 16px; font:500 24px Georgia,serif; color:#244333; }
 .request-item { width:100%; min-width:0; text-align:left; font:inherit; }
 .requests-page :is(button,input,textarea):focus-visible { outline:2px solid #476451!important; outline-offset:2px; }
+
+.portion { margin-top:12px; padding-top:12px; border-top:1px solid #dce2d5; }
+.portion button { padding:8px 12px; border-radius:10px; border:1px solid #c9d3c6; background:#f6f8f0; color:#244333; cursor:pointer; }
+.portion button:disabled { opacity:.55; cursor:default; }
+.portion-row { display:flex; align-items:end; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+.portion label { display:block; min-width:0; }
+.portion input,.portion select { display:block; border:1px solid #c9d3c6; background:white; color:#244333; padding:8px; border-radius:8px; max-width:100%; }
+.portion input { width:90px; }
+.portion-total { background:#eff3e9; padding:16px; border-radius:14px; margin:12px 0; color:#244333; }
