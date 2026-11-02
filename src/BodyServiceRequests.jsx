@@ -147,22 +147,21 @@ export default function BodyServiceRequests({ onBack }) {
   const needContact = selectedService && ["phone", "video", "offline"].includes(selectedService.meeting_format);
 
   return (
-    <div style={{ maxWidth: 780, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" }}>
+    <div className="guide-page requests-page" style={{ maxWidth: 780, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" }}>
       <button onClick={onBack} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5f574f", marginBottom: 16 }}>
         ← Назад в кабинет
       </button>
 
-      <div style={{ fontSize: 22, fontWeight: 700, color: "#2f2925", marginBottom: 8, fontFamily: "Georgia, serif" }}>
-        Связаться со специалистом
-      </div>
-      <div style={{ fontSize: 14, color: "#8a7e72", marginBottom: 20, lineHeight: 1.5 }}>
-        Это запрос человеку-специалисту, а не AI-ответ.
-      </div>
+      <header>
+        <span className="overview-kicker">Личный кабинет · Здоровье &amp; Стройность</span>
+        <h1>Обращения к специалисту</h1>
+        <p>Здесь можно задать вопрос специалисту, посмотреть статус обращения и прочитать ответ.</p>
+      </header>
 
       {/* List view */}
       {view === "list" && (
         <>
-          <button onClick={() => setView("new")} style={{ width: "100%", padding: "12px 20px", borderRadius: 14, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 20, fontFamily: "inherit" }}>
+          <button className="guide-primary" onClick={() => setView("new")} style={{ width: "100%", padding: "12px 20px", borderRadius: 14, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 20, fontFamily: "inherit" }}>
             Новый запрос
           </button>
 
@@ -173,7 +172,7 @@ export default function BodyServiceRequests({ onBack }) {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {requests.map(r => (
-                <div key={r.id} onClick={() => { setSelectedRequest(r); setView("detail"); }} style={{ padding: "12px 16px", borderRadius: 12, border: `1px solid ${r.status === "answered" ? "#c4d0c6" : "#e8e2d8"}`, background: r.status === "answered" ? "#f0f5f1" : "#faf6ef", cursor: "pointer" }}>
+                <button type="button" className="request-item" key={r.id} onClick={() => { setSelectedRequest(r); setView("detail"); }} style={{ padding: "12px 16px", borderRadius: 12, border: `1px solid ${r.status === "answered" ? "#c4d0c6" : "#e8e2d8"}`, background: r.status === "answered" ? "#f0f5f1" : "#faf6ef", cursor: "pointer" }}>
                   <div className="body-service-request-detail-head" style={{ marginBottom: 4 }}>
                     <div className="body-service-request-detail-title" style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{r.title || r.request_type}</div>
                     <div className="body-service-request-badges">
@@ -185,9 +184,9 @@ export default function BodyServiceRequests({ onBack }) {
                   <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.message}</div>
                   <div style={{ fontSize: 12, color: "#8a7e72" }}>
                     {new Date(r.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
-                    {r.price_credits != null ? ` · ${r.price_credits.toLocaleString("ru-RU")} кредитов` : " · Legacy"}
+                    {r.price_credits != null ? ` · ${r.price_credits.toLocaleString("ru-RU")} кредитов` : " · Ранее созданный запрос"}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -196,12 +195,12 @@ export default function BodyServiceRequests({ onBack }) {
 
       {/* New request form */}
       {view === "new" && (
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: "#2f2925", marginBottom: 12 }}>С чем хотите обратиться?</div>
+        <div className="guide-card request-form">
+          <h2>С чем хотите обратиться?</h2>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
             {BODY_TOPICS.map((topic) => (
-              <button key={topic.value} onClick={() => { setServiceTopic(topic.value); setServiceCode(""); setSubmitError(""); }} style={{
+              <button key={topic.value} aria-pressed={serviceTopic === topic.value} onClick={() => { setServiceTopic(topic.value); setServiceCode(""); setSubmitError(""); }} style={{
                 padding: "12px 16px", borderRadius: 12, border: `1px solid ${serviceTopic === topic.value ? "#7D9A89" : "#e8e2d8"}`,
                 background: serviceTopic === topic.value ? "#e8f0ea" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
               }}>
@@ -218,7 +217,7 @@ export default function BodyServiceRequests({ onBack }) {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {availableServices.map((service) => (
-                    <button key={service.service_code} onClick={() => setServiceCode(service.service_code)} style={{
+                    <button key={service.service_code} aria-pressed={serviceCode === service.service_code} onClick={() => setServiceCode(service.service_code)} style={{
                       padding: "12px 16px", borderRadius: 12, border: `1px solid ${serviceCode === service.service_code ? "#7D9A89" : "#e8e2d8"}`,
                       background: serviceCode === service.service_code ? "#e8f0ea" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
                     }}>
@@ -241,8 +240,8 @@ export default function BodyServiceRequests({ onBack }) {
           )}
 
           <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 6, display: "block" }}>Что хотите уточнить?</label>
-            <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Опишите вопрос своими словами..." style={{ width: "100%", minHeight: 120, padding: 12, borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
+            <label htmlFor="health-request-message" style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 6, display: "block" }}>Что хотите уточнить?</label>
+            <textarea id="health-request-message" value={message} onChange={e => setMessage(e.target.value)} placeholder="Опишите вопрос своими словами..." style={{ width: "100%", minHeight: 120, padding: 12, borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
           </div>
 
           <div style={{ marginBottom: 16 }}>
@@ -284,7 +283,7 @@ export default function BodyServiceRequests({ onBack }) {
           {submitError && <div style={{ color: "#b5473f", fontSize: 14, marginBottom: 12 }}>{submitError}</div>}
 
           <div className="body-service-request-actions">
-            <button onClick={handleSubmit} disabled={submitting} className="body-service-request-primary" style={{ flex: 1, padding: "12px 20px", borderRadius: 16, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 15, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.6 : 1, fontFamily: "inherit" }}>
+            <button onClick={handleSubmit} disabled={submitting} className="body-service-request-primary guide-primary" style={{ flex: 1, padding: "12px 20px", borderRadius: 16, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 15, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.6 : 1, fontFamily: "inherit" }}>
               {submitting ? "Отправка..." : "Отправить запрос"}
             </button>
             <button onClick={() => setView("list")} disabled={submitting} className="body-service-request-secondary" style={{ padding: "12px 20px", borderRadius: 16, border: "1px solid #d8cec1", background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
@@ -297,7 +296,7 @@ export default function BodyServiceRequests({ onBack }) {
       {/* Detail view */}
       {view === "detail" && selectedRequest && (
         <div>
-          <div style={{ padding: 16, borderRadius: 12, border: "1px solid #e8e2d8", marginBottom: 16 }}>
+          <div className="guide-card" style={{ padding: 16, borderRadius: 12, border: "1px solid #e8e2d8", marginBottom: 16 }}>
             <div className="body-service-request-detail-head">
               <div className="body-service-request-detail-title" style={{ fontSize: 16, fontWeight: 600, color: "#2f2925" }}>{selectedRequest.title || selectedRequest.request_type}</div>
               <div className="body-service-request-badges">
@@ -313,7 +312,7 @@ export default function BodyServiceRequests({ onBack }) {
               {selectedRequest.specialist_name && ` · ${selectedRequest.specialist_name}`}
               {selectedRequest.service_topic && ` · тема: ${TOPIC_LABELS[selectedRequest.service_topic] || selectedRequest.service_topic}`}
               {selectedRequest.meeting_format && ` · формат: ${FORMAT_LABELS[selectedRequest.meeting_format] || selectedRequest.meeting_format}`}
-              {selectedRequest.price_credits != null ? ` · Стоимость: ${selectedRequest.price_credits.toLocaleString("ru-RU")} кредитов` : " · Legacy без snapshot-цены"}
+              {selectedRequest.price_credits != null ? ` · Стоимость: ${selectedRequest.price_credits.toLocaleString("ru-RU")} кредитов` : " · Ранее созданный запрос без snapshot-цены"}
             </div>
             <div style={{ fontSize: 14, color: "#2f2925", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{selectedRequest.message}</div>
             {/* Contact info */}

@@ -93,3 +93,9 @@
 .context-form :is(input,textarea,select,button):focus-visible { outline:2px solid #476451!important; outline-offset:2px; }
 .context-actions { display:flex; gap:12px; }
 @media(max-width:540px){ .context-actions { flex-direction:column; } .context-actions button { flex:none!important; } }
+
+.requests-page header p { margin:0 0 20px; color:#536354; line-height:1.55; }
+.requests-page .request-form { padding:clamp(16px,3vw,28px); border:1px solid; border-radius:16px; }
+.requests-page h2 { margin:0 0 16px; font:500 24px Georgia,serif; color:#244333; }
+.request-item { width:100%; min-width:0; text-align:left; font:inherit; }
+.requests-page :is(button,input,textarea):focus-visible { outline:2px solid #476451!important; outline-offset:2px; }
