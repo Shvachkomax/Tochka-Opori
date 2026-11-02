@@ -9831,8 +9831,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   const healthLanding = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "landing" && phase === "input";
   const healthIntake = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "intake";
+  const healthResult = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "result" && Boolean(bodyIntakeResult);
   return (
-    <div style={s.page} className={healthIntake ? "app-page health-landing health-intake" : healthLanding ? "app-page health-landing" : "app-page"}>
+    <div style={s.page} className={healthResult ? "app-page health-landing health-result" : healthIntake ? "app-page health-landing health-intake" : healthLanding ? "app-page health-landing" : "app-page"}>
       <style>{`
   * {
     box-sizing: border-box;
@@ -9968,7 +9969,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </div>
               )}
             </a>
-          ) : (healthLanding || healthIntake) ? (
+          ) : (healthLanding || healthIntake || healthResult) ? (
             <img className="health-wordmark" src="/health-design/brand.webp" alt="Земляничные поляны. Здоровье & Стройность" />
           ) : (
             <div
@@ -9989,7 +9990,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            {((activeModule === "support" && supportScreen === "landing") || (activeModule === "body" && bodyScreen === "landing") || healthIntake) && (
+            {((activeModule === "support" && supportScreen === "landing") || (activeModule === "body" && bodyScreen === "landing") || healthIntake || healthResult) && (
               <button
                 style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
                 onClick={() => setAboutProjectOpen(true)}
@@ -10124,13 +10125,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           const fullWidthMax = isSupportCabinet ? 1180 : (bodyMaxWidth || 1120);
           return (
         <main style={isFullWidth ? { maxWidth: fullWidthMax, margin: "0 auto", padding: "0 16px", width: "100%", boxSizing: "border-box" } : s.grid} className={isFullWidth ? "" : "app-grid"}>
-          {healthIntake && (
+          {(healthIntake || healthResult) && (
             <section className="health-intake-intro">
-              <h1 style={s.h1} className="app-hero-title">Начнём с вас</h1>
-              <p style={s.p} className="app-hero-text">Расскажите о своих целях и привычках. Это поможет подготовить первый план.</p>
+              <h1 style={s.h1} className="app-hero-title">{healthResult ? "Ваш первый шаг к переменам" : "Начнём с вас"}</h1>
+              <p style={s.p} className="app-hero-text">{healthResult ? "Посмотрим на ваши привычки и выберем, с чего начать." : "Расскажите о своих целях и привычках. Это поможет подготовить первый план."}</p>
             </section>
           )}
-          {!isFullWidth && !healthIntake && (
+          {!isFullWidth && !healthIntake && !healthResult && (
           <section>
             <h1 style={s.h1} className="app-hero-title">
               {activeModule === "body" ? "Разберёмся с питанием, движением и режимом" : "Найдём точку опоры"}
@@ -10278,13 +10279,20 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           {/* Body intake result — step-by-step flow */}
           {activeModule === "body" && bodyScreen === "result" && bodyIntakeResult && (
             <section style={s.card} className="app-card">
+              {healthResult && (
+                <ol className="result-steps" aria-label="Этапы результата">
+                  {["Разбор", "Код доступа", "План на 3 дня", "Дневник"].map((label, index) => (
+                    <li key={label} aria-current={index === bodyIntakeStep ? "step" : undefined}>
+                      <span>{index + 1}</span>{label}
+                    </li>
+                  ))}
+                </ol>
+              )}
 
               {/* Step 1: Summary */}
               {bodyIntakeStep === 0 && (
                 <>
-                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16, color: "#2f2925" }}>
-                    Ваш первый разбор
-                  </div>
+                  <h2 className="result-title">Ваш первый разбор</h2>
 
                   <div style={{ fontSize: 16, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#2f2925" }}>
                     {bodyIntakeResult.user_report}
@@ -10312,7 +10320,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     marginTop: 24, width: "100%", height: 52, borderRadius: 16, border: 0,
                     background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
                   }}>
-                    Дальше
+                    Перейти к коду доступа
                   </button>
                 </>
               )}
@@ -10320,9 +10328,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               {/* Step 2: Continuation code */}
               {bodyIntakeStep === 1 && (
                 <>
-                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16, color: "#2f2925" }}>
-                    Ваш код продолжения
-                  </div>
+                  <h2 className="result-title">Ваш код продолжения</h2>
                   <div style={{ color: "#665c52", fontSize: 14, marginBottom: 16, lineHeight: 1.6 }}>
                     Сохраните этот код. Он открывает ваш профиль, план и дневник на любом устройстве.
                   </div>
@@ -10368,16 +10374,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               )}
 
               {/* Step 3: 3-day plan */}
-              {bodyIntakeStep === 2 && bodyIntakeResult.body_plan?.days && (
+              {bodyIntakeStep === 2 && (
                 <>
-                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 4, color: "#2f2925" }}>
-                    План на 3 дня
-                  </div>
+                  <h2 className="result-title">План на 3 дня</h2>
                   <div style={{ color: "#665c52", fontSize: 14, marginBottom: 20, fontStyle: "italic" }}>
-                    {bodyIntakeResult.body_plan.focus}
+                    {bodyIntakeResult.body_plan?.focus}
                   </div>
 
-                  {bodyIntakeResult.body_plan.days.slice(0, 3).map(d => (
+                  {!bodyIntakeResult.body_plan?.days?.length && <p>В этом разборе нет плана на три дня. Вы можете перейти к дневнику.</p>}
+                  {(bodyIntakeResult.body_plan?.days || []).slice(0, 3).map(d => (
                     <div key={d.day} style={{
                       border: "1px solid #d8cec1", borderRadius: 16, padding: "16px 18px",
                       marginBottom: 10, background: "#faf6ef",
@@ -10428,9 +10433,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
               {bodyIntakeStep === 3 && (
                 <>
                   <div style={{ textAlign: "center", padding: "20px 0" }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 12, color: "#2f2925" }}>
-                      Готовы продолжить?
-                    </div>
+                    <h2 className="result-title">Готовы продолжить?</h2>
                     <div style={{ color: "#665c52", fontSize: 15, lineHeight: 1.6, marginBottom: 28 }}>
                       В личном кабинете можно вести дневник, смотреть историю и управлять доступом.
                     </div>

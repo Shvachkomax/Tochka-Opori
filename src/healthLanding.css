@@ -30,3 +30,13 @@
 .health-intake .health-intake-intro { align-self:start; }
 @media(min-width:801px) { .health-intake .health-intake-intro { position:sticky; top:20px; } }
 @media(max-width:800px) { .health-intake .app-grid > .health-intake-intro::after { display:none; } }
+
+.health-result .app-grid > section:first-child::after { aspect-ratio:670/579; background-image:linear-gradient(to bottom,#faf9f3,transparent 30%),url('/health-design/ripe.webp'); }
+.health-result .result-title { font:500 clamp(28px,3vw,48px)/1.12 Georgia,serif; color:#132e23; margin:1.25rem 0 1rem; }
+.health-result .result-steps { display:flex; list-style:none; padding:0; margin:0; gap:4px; }
+.result-steps li { flex:1; text-align:center; font:500 .85rem/1.3 system-ui,sans-serif; color:#586557; }
+.result-steps li span { display:grid; place-items:center; width:29px; height:29px; border:1px solid #aeb8ac; border-radius:50%; margin:0 auto .45rem; }
+.result-steps [aria-current] { font-weight:700; color:#204634; }
+.result-steps [aria-current] span { background:#204634; color:#fff; border-color:#204634; }
+.health-result .app-card { overflow-wrap:anywhere; }
+@media(max-width:800px){ .health-result .app-grid > section:first-child::after { height:105px; background-position:center,center 53%; } }
