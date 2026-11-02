@@ -45,10 +45,10 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
     return <div style={{ padding: 20, textAlign: "center", color: "#8a7e72" }}>Загрузка...</div>;
   }
 
-  if (error) {
+  if (error || !day) {
     return (
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "20px 16px" }}>
-        <div style={{ color: "#b5473f", fontSize: 14, marginBottom: 12 }}>{error}</div>
+        <div style={{ color: "#b5473f", fontSize: 14, marginBottom: 12 }}>{error || "Запись за этот день не найдена."}</div>
         <button onClick={onBack} style={{ padding: "10px 20px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 14, color: "#5f574f" }}>
           ← Назад в кабинет
         </button>
@@ -56,7 +56,6 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
     );
   }
 
-  if (!day) return null;
 
   const field = (label, value, unit) => {
     if (value == null || value === "") return null;
@@ -64,11 +63,12 @@ export default function BodyDayView({ logDate, onEdit, onBack }) {
   };
 
   return (
-    <div className="diary-saved" style={{ maxWidth: 780, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" }}>
+    <div className="diary-saved day-history" style={{ maxWidth: 780, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" }}>
       <div style={{ marginBottom: 16 }}>
         <button onClick={onBack} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5f574f", marginBottom: 8 }}>
           ← Назад в кабинет
         </button>
+        <div className="overview-kicker">Дневник здоровья · История записей</div>
         <h1 className="diary-date">Запись за{" "}
           {new Date(day.log_date + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
         </h1>

@@ -1401,6 +1401,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setBodyCabinetData(cabinetData);
       setBodyDiarySessionId(effectiveSessionId);
 
+      if (options.refreshOnly) return;
+
       // Check if onboarding is needed
       try {
         let token;
@@ -9834,7 +9836,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const healthResult = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "result" && Boolean(bodyIntakeResult);
   const healthOverview = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "cabinet";
   const healthGuide = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "onboarding";
-  const healthDiary = isDedicatedSubdomain && activeModule === "body" && ["diary_edit", "diary_view"].includes(bodyScreen);
+  const healthDiary = isDedicatedSubdomain && activeModule === "body" && ["diary_edit", "diary_view", "diary_result"].includes(bodyScreen);
   return (
     <div style={s.page} className={healthOverview ? "app-page health-landing health-overview" : healthGuide ? "app-page health-landing health-guide" : healthDiary ? "app-page health-landing health-diary" : healthResult ? "app-page health-landing health-result" : healthIntake ? "app-page health-landing health-intake" : healthLanding ? "app-page health-landing" : "app-page"}>
       <style>{`
@@ -10587,8 +10589,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             <BodyDiary
               sessionId={bodyDiarySessionId}
               dayData={bodyDiaryDayData}
-              onComplete={async (result) => {
-                await loadBodyCabinet();
+              onComplete={(result) => {
+                if (!result?.saved) return;
+                setBodyDiaryResult(result);
+                setBodyScreen("diary_result");
+                void loadBodyCabinet(undefined, { refreshOnly: true });
                 setBodyDiaryDayData(null);
                 if (result?.ok && result?.saved) {
                   showToast("Дневник сохранён", "success");
@@ -10602,36 +10607,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
           {/* Body diary result */}
           {activeModule === "body" && bodyScreen === "diary_result" && bodyDiaryResult && (
-            <section style={s.card} className="app-card">
-              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, color: "#2f2925" }}>
-                Итог дня
-              </div>
-              {bodyDiaryResult.ai_day_summary && (
-                <div style={{ fontSize: 15, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#2f2925", marginBottom: 16 }}>
-                  {bodyDiaryResult.ai_day_summary}
-                </div>
-              )}
+            <section className="diary-saved day-result">
+              <span className="overview-kicker">Дневник здоровья · Запись сохранена</span>
+              <h1 className="diary-date">Итог дня</h1>
+              <p>{bodyDiaryResult.ai_day_summary || "День записан. Разбор пока недоступен. Запись можно открыть в кабинете."}</p>
               {bodyDiaryResult.ai_focus_tomorrow && (
-                <div style={{ padding: 14, borderRadius: 14, background: "#f0f5f1", border: "1px solid #c4d0c6", marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 4 }}>Фокус на завтра</div>
-                  <div style={{ fontSize: 14, lineHeight: 1.6, color: "#5f574f" }}>
-                    {bodyDiaryResult.ai_focus_tomorrow}
-                  </div>
-                </div>
+                <aside className="day-focus">
+                  <h2>Фокус на завтра</h2>
+                  <p>{bodyDiaryResult.ai_focus_tomorrow}</p>
+                </aside>
               )}
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button onClick={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }} style={{
-                  padding: "12px 20px", borderRadius: 20, background: "#7D9A89",
-                  color: "#fff", fontWeight: 700, border: 0, cursor: "pointer", flex: 1, minWidth: 160,
-                }}>
-                  Записать ещё день
-                </button>
-                <button onClick={() => { clearToast(); setBodyScreen("cabinet"); }} style={{
-                  padding: "12px 20px", borderRadius: 20, background: "#ede7dc",
-                  color: "#2f2925", fontWeight: 600, border: "1px solid #d8cec1", cursor: "pointer",
-                }}>
-                  В кабинет
-                </button>
+              <div className="day-actions">
+                <button onClick={() => { clearToast(); setBodyScreen("cabinet"); }}>В кабинет</button>
+                <button onClick={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }}>Записать ещё день</button>
               </div>
             </section>
           )}
