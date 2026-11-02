@@ -9830,8 +9830,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   );
 
   const healthLanding = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "landing" && phase === "input";
+  const healthIntake = isDedicatedSubdomain && activeModule === "body" && bodyScreen === "intake";
   return (
-    <div style={s.page} className={healthLanding ? "app-page health-landing" : "app-page"}>
+    <div style={s.page} className={healthIntake ? "app-page health-landing health-intake" : healthLanding ? "app-page health-landing" : "app-page"}>
       <style>{`
   * {
     box-sizing: border-box;
@@ -9967,7 +9968,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 </div>
               )}
             </a>
-          ) : healthLanding ? (
+          ) : (healthLanding || healthIntake) ? (
             <img className="health-wordmark" src="/health-design/brand.webp" alt="Земляничные поляны. Здоровье & Стройность" />
           ) : (
             <div
@@ -9988,7 +9989,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            {((activeModule === "support" && supportScreen === "landing") || (activeModule === "body" && bodyScreen === "landing")) && (
+            {((activeModule === "support" && supportScreen === "landing") || (activeModule === "body" && bodyScreen === "landing") || healthIntake) && (
               <button
                 style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
                 onClick={() => setAboutProjectOpen(true)}
@@ -10123,7 +10124,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           const fullWidthMax = isSupportCabinet ? 1180 : (bodyMaxWidth || 1120);
           return (
         <main style={isFullWidth ? { maxWidth: fullWidthMax, margin: "0 auto", padding: "0 16px", width: "100%", boxSizing: "border-box" } : s.grid} className={isFullWidth ? "" : "app-grid"}>
-          {!isFullWidth && (
+          {healthIntake && (
+            <section className="health-intake-intro">
+              <h1 style={s.h1} className="app-hero-title">Начнём с вас</h1>
+              <p style={s.p} className="app-hero-text">Расскажите о своих целях и привычках. Это поможет подготовить первый план.</p>
+            </section>
+          )}
+          {!isFullWidth && !healthIntake && (
           <section>
             <h1 style={s.h1} className="app-hero-title">
               {activeModule === "body" ? "Разберёмся с питанием, движением и режимом" : "Найдём точку опоры"}

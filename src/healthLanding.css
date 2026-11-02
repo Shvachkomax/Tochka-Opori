@@ -21,3 +21,12 @@
  .health-landing .health-code { margin-top:12px!important; }
  .health-landing .health-code input { width:0!important; }
 }
+
+.health-intake [data-body-intake] { margin:0!important; width:100%; max-width:none!important; min-width:0; box-sizing:border-box; padding:clamp(18px,2.7vw,40px)!important; background:#fffef9!important; border:1px solid #e0dfd1!important; border-radius:20px; box-shadow:0 7px 24px #3843290c; color:#18332a; }
+.health-intake [data-body-intake] h2 { font:500 clamp(29px,3vw,46px)/1.12 Georgia,serif!important; color:#132e23!important; }
+.health-intake [data-body-intake] :is(input:not([type=checkbox]),select,textarea) { background-color:#fff!important; min-height:44px; max-width:100%; box-sizing:border-box; }
+.health-intake [data-body-intake] button[type=submit]:not(:disabled) { background:#204634!important; color:#fff!important; }
+.health-intake .intake-progress-label { font-size:.88rem; margin:1rem 0 .45rem; color:#405c4b; }
+.health-intake .health-intake-intro { align-self:start; }
+@media(min-width:801px) { .health-intake .health-intake-intro { position:sticky; top:20px; } }
+@media(max-width:800px) { .health-intake .app-grid > .health-intake-intro::after { display:none; } }

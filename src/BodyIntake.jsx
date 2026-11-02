@@ -357,8 +357,10 @@ export default function BodyIntake({ onComplete }) {
     const hasError = !!errors[key];
     return (
       <div style={s.field} ref={fieldRefs[key]} tabIndex={-1}>
-        <label style={s.label}>{FIELD_LABELS[key]}</label>
+        <label htmlFor={`health-field-${key}`} style={s.label}>{FIELD_LABELS[key]}</label>
         <input
+          id={`health-field-${key}`}
+          aria-invalid={hasError}
           ref={fieldRefs[key]}
           className="body-intake-input"
           style={{ ...s.input, borderColor: hasError ? "#b5473f" : undefined }}
@@ -376,8 +378,10 @@ export default function BodyIntake({ onComplete }) {
     const hasError = !!errors[key];
     return (
       <div style={s.field} ref={fieldRefs[key]} tabIndex={-1}>
-        <label style={s.label}>{FIELD_LABELS[key]}</label>
+        <label htmlFor={`health-field-${key}`} style={s.label}>{FIELD_LABELS[key]}</label>
         <select
+          id={`health-field-${key}`}
+          aria-invalid={hasError}
           ref={fieldRefs[key]}
           style={{ ...s.select, color: fields[key] ? "#2f2925" : "#8d8378", borderColor: hasError ? "#b5473f" : undefined }}
           value={fields[key]}
@@ -579,9 +583,10 @@ export default function BodyIntake({ onComplete }) {
         }
       `}</style>
       <h2 style={s.heading}>Давайте познакомимся</h2>
-      <p style={s.subheading}>Несколько вопросов, чтобы понять вашу ситуацию. Мы не собираем ФИО и не храним личные данные.</p>
+      <p style={s.subheading}>Несколько вопросов, чтобы понять вашу ситуацию. Можно указать псевдоним.</p>
 
-      <div style={s.progressBar}>
+      <div className="intake-progress-label">Заполнение анкеты</div>
+      <div role="progressbar" aria-label="Заполнение анкеты" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} style={s.progressBar}>
         <div style={{ ...s.progressFill, width: `${progress * 100}%` }} />
       </div>
 
