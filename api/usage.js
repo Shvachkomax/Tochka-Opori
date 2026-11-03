@@ -1,9 +1,9 @@
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { getSupabase } from "../lib/supabase.js";
-import { validateSessionAccess } from "../lib/security/access-token.js";
-import { resolveUsageOwnerFromSession } from "../lib/security/usage-session-owner.js";
-import { hasBodySessionReference, isAnMedSupportOnlyDeployment, isPilotSessionMatch, rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { accessTokenMatchesHash } from "../lib/security/access-token.js";
+import { resolveUsageOwner } from "../lib/security/usage-session-owner.js";
+import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
@@ -34,63 +34,38 @@ export default async function handler(req, res) {
   }
 }
 
-async function resolveOwnerId(sessionId, module, accessToken) {
+async function resolveOwner(sessionId, module, accessToken) {
+  if (!sessionId || !accessToken || !["support", "body"].includes(module)) return null;
   const supabase = getSupabase();
-
-  if (module === "support") {
-    const { data } = await supabase
-      .from("sessions")
-      .select("session_id, anonymous_owner_id, legacy_access, json_data")
-      .eq("session_id", sessionId)
-      .maybeSingle();
-    return resolveUsageOwnerFromSession(data, accessToken, validateSessionAccess);
-  }
-
-  if (module === "body") {
-    const { data } = await supabase
-      .from("body_clients")
-      .select("anonymous_owner_id")
-      .eq("session_id", sessionId)
-      .maybeSingle();
-    if (!data) return null;
-    return data.anonymous_owner_id;
-  }
-
-  return null;
+  return resolveUsageOwner({
+    sessionId,
+    module,
+    accessToken,
+    findSession: async (id, requestedModule) => {
+      const { data, error } = await supabase
+        .from("sessions")
+        .select("session_id, module, anonymous_owner_id, access_token_hash, legacy_access, json_data")
+        .eq("session_id", id)
+        .eq("module", requestedModule)
+        .maybeSingle();
+      return error ? null : data;
+    },
+    findBodyClient: async (id) => {
+      const { data, error } = await supabase
+        .from("body_clients")
+        .select("session_id, anonymous_owner_id")
+        .eq("session_id", id)
+        .maybeSingle();
+      return error ? null : data;
+    },
+    validateAccess: (_id, token, session) => accessTokenMatchesHash(token, session.access_token_hash),
+  });
 }
 
-async function resolveSessionByCode(publicCode, accessToken) {
-  const supabase = getSupabase();
-  const normalized = publicCode.trim().toUpperCase();
-  const isSupportCode = /^ТОЧКА-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(normalized);
-  const isHealthCode = /^HEALTH-[A-Z0-9]{4}-[A-Z0-9]{3}$/.test(normalized);
-  if (!isSupportCode && !isHealthCode) return null;
-
-  const { data } = await supabase
-    .from("sessions")
-    .select("session_id, anonymous_owner_id, legacy_access, json_data")
-    .eq("public_code", normalized)
-    .maybeSingle();
-
-  if (data) {
-    if (!isPilotSessionMatch(data.json_data)) return null;
-    const ownerId = await resolveUsageOwnerFromSession(data, accessToken, validateSessionAccess);
-    return ownerId ? { sessionId: data.session_id, ownerId, module: isSupportCode ? "support" : "body" } : null;
-  }
-
-  // For body codes not in sessions table (legacy), try body_clients
-  if (isHealthCode) {
-    const { data: bc } = await supabase
-      .from("body_clients")
-      .select("anonymous_owner_id")
-      .eq("session_id", normalized)
-      .maybeSingle();
-    if (bc && bc.anonymous_owner_id) {
-      return { sessionId: normalized, ownerId: bc.anonymous_owner_id, module: "body" };
-    }
-  }
-
-  return null;
+function denyUsageAccess(res) {
+  // The same response is used for a missing session, invalid token, module
+  // mismatch, stale public code, and a token belonging to another owner.
+  return res.status(401).json({ ok: false, error: "Не удалось открыть данные баланса." });
 }
 
 async function handleGetUsageBalance(req, res) {
@@ -105,29 +80,15 @@ async function handleGetUsageBalance(req, res) {
     return res.status(400).json({ ok: false, error: "Invalid module" });
   }
 
-  let ownerId = null;
-  let effectiveSessionId = sessionId;
-  let resolvedModule = module;
-
-  if (publicCode) {
-    const resolved = await resolveSessionByCode(publicCode, access_token);
-    if (!resolved) {
-      return res.status(404).json({ ok: false, error: "Code not found" });
-    }
-    ownerId = resolved.ownerId;
-    effectiveSessionId = resolved.sessionId;
-    resolvedModule = resolved.module;
-  } else if (sessionId) {
-    ownerId = await resolveOwnerId(sessionId, module, access_token);
-  }
-
-  if (!ownerId) {
-    return res.json({ ok: true, visible: false });
-  }
+  const resolvedOwner = await resolveOwner(sessionId, module, access_token);
+  if (!resolvedOwner) return denyUsageAccess(res);
 
   const { getWallet, getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
-  const ownerType = resolvedModule === "support" ? "anonymous_case" : "anonymous_profile";
-  const wallet = await getWallet({ ownerType, ownerId, module: resolvedModule });
+  const wallet = await getWallet({
+    ownerType: resolvedOwner.ownerType,
+    ownerId: resolvedOwner.ownerId,
+    module: resolvedOwner.module,
+  });
 
   if (!wallet) {
     return res.json({ ok: true, visible: false });
@@ -149,33 +110,17 @@ async function handleGetRecentUsage(req, res) {
     return res.status(400).json({ ok: false, error: "Invalid module" });
   }
 
-  let ownerId = null;
-  let resolvedModule = module;
-
-  if (publicCode) {
-    const resolved = await resolveSessionByCode(publicCode, access_token);
-    if (!resolved) {
-      return res.status(404).json({ ok: false, error: "Code not found" });
-    }
-    ownerId = resolved.ownerId;
-    resolvedModule = resolved.module;
-  } else if (sessionId) {
-    ownerId = await resolveOwnerId(sessionId, module, access_token);
-  }
-
-  if (!ownerId) {
-    return res.json({ ok: true, entries: [] });
-  }
+  const resolvedOwner = await resolveOwner(sessionId, module, access_token);
+  if (!resolvedOwner) return denyUsageAccess(res);
 
   const supabase = getSupabase();
-  const ownerType = resolvedModule === "support" ? "anonymous_case" : "anonymous_profile";
 
   const { data: wallet } = await supabase
     .from("usage_wallets")
     .select("id")
-    .eq("owner_type", ownerType)
-    .eq("owner_id", ownerId)
-    .eq("module", resolvedModule)
+    .eq("owner_type", resolvedOwner.ownerType)
+    .eq("owner_id", resolvedOwner.ownerId)
+    .eq("module", resolvedOwner.module)
     .maybeSingle();
 
   if (!wallet) {

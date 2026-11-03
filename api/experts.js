@@ -3,6 +3,7 @@ import { getSupabase } from "../lib/supabase.js";
 import { getPrivacySafeMode } from "../lib/sanitize.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { hasBodySessionReference, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { canAccessPatientOrganization, canViewExpandedPatientData } from "../lib/specialist/access-policy.js";
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
@@ -82,7 +83,7 @@ async function authorizeExpertById(expertId) {
   if (!expertId) return null;
   const { data } = await getSupabase()
     .from("experts")
-    .select("id, name, role, specialty, city, organization")
+    .select("id, name, role, specialty, city, organization, allowed_modules")
     .eq("id", expertId)
     .eq("is_active", true)
     .maybeSingle();
@@ -765,7 +766,10 @@ async function handleDisableDoctorInviteLink(req, res) {
 
 async function handleListMyPatients(req, res) {
   const { expert_id, expert_code, organization_id: reqOrgId, module: reqModule } = req.body || {};
-  const module = reqModule === "body" ? "body" : "support";
+  const module = reqModule === undefined || reqModule === null ? "support" : reqModule;
+  if (!["support", "body"].includes(module)) {
+    return res.status(400).json({ ok: false, error: "Некорректный модуль" });
+  }
   const isAdmin = authorizeAdmin(req);
 
   const supabase = getSupabase();
@@ -777,7 +781,7 @@ async function handleListMyPatients(req, res) {
     const trimmed = expert_code.trim().toUpperCase();
     const { data } = await supabase
       .from("experts")
-      .select("id, name")
+      .select("id, name, allowed_modules")
       .eq("access_code", trimmed)
       .eq("is_active", true)
       .maybeSingle();
@@ -787,13 +791,28 @@ async function handleListMyPatients(req, res) {
   if (!expert && !isAdmin) {
     return res.status(403).json({ ok: false, error: "Специалист не найден" });
   }
+  if (!isAdmin && !(expert.allowed_modules || ["support"]).includes(module)) {
+    return res.status(403).json({ ok: false, error: "Нет доступа к указанному модулю" });
+  }
 
   // Build the patient list
   // Patients accessible via: patient_assignments (primary) OR patient_access
   const expertId = expert?.id;
   const memberships = expertId ? await getExpertMemberships(expertId) : [];
   const orgIds = memberships.map((m) => m.organization_id);
+  const hasRequestedOrg = Object.prototype.hasOwnProperty.call(req.body || {}, "organization_id");
+  const requestedOrgId = reqOrgId || null;
+  if (!isAdmin && hasRequestedOrg && requestedOrgId && !orgIds.includes(requestedOrgId)) {
+    return res.status(403).json({ ok: false, error: "Нет доступа к указанной организации" });
+  }
   const orgId = reqOrgId || orgIds[0] || null;
+  const inOrganizationScope = (row) => canAccessPatientOrganization({
+    isAdmin,
+    organizationId: row?.organization_id ?? null,
+    requestedOrganizationId: requestedOrgId,
+    hasRequestedOrganization: hasRequestedOrg,
+    activeOrganizationIds: orgIds,
+  });
 
   let query = supabase
     .from("patient_assignments")
@@ -847,21 +866,24 @@ async function handleListMyPatients(req, res) {
 
     // Merge: accessed patients that might overlap with assigned
     // Use composite key: public_code for support, owner_type+owner_id for body
+    const scopedAssigned = (assigned || []).filter(inOrganizationScope);
+    const scopedAccessed = (accessed || []).filter(inOrganizationScope);
     const seenKeys = new Set();
     const patients = [];
 
-    for (const p of assigned || []) {
+    for (const p of scopedAssigned) {
       const key = p.public_code || `${p.owner_type}:${p.owner_id}`;
       seenKeys.add(key);
-      patients.push(p);
+      patients.push({ ...p, relationship: "primary", access_role: "owner" });
     }
-    for (const a of accessed || []) {
+    for (const a of scopedAccessed) {
       const key = a.public_code || `${a.owner_type}:${a.owner_id}`;
       if (!seenKeys.has(key)) {
         const pa = a.patient_assignments;
         if (pa) {
           patients.push({
             ...pa,
+            relationship: "shared",
             access_role: a.access_role,
             _access_via: "patient_access",
           });
@@ -872,14 +894,15 @@ async function handleListMyPatients(req, res) {
           const pKey = p.public_code || `${p.owner_type}:${p.owner_id}`;
           return pKey === key;
         });
-        if (existing) {
+        if (existing && existing.relationship !== "primary") {
+          existing.relationship = "shared";
           existing.access_role = a.access_role;
         }
       }
     }
 
     // Enrich with session info
-    const enriched = await enrichPatientsWithSessionData(supabase, patients);
+    const enriched = await enrichPatientsWithSessionData(supabase, patients, { isAdmin });
     return res.status(200).json({ ok: true, patients: enriched });
   } else if (orgId && isAdmin) {
     query = query.eq("organization_id", orgId);
@@ -892,22 +915,31 @@ async function handleListMyPatients(req, res) {
     return res.status(500).json({ ok: false, error: "Ошибка загрузки пациентов" });
   }
 
-  const enriched = await enrichPatientsWithSessionData(supabase, patientsData || []);
+  const enriched = await enrichPatientsWithSessionData(supabase, (patientsData || []).filter(inOrganizationScope), { isAdmin });
   return res.status(200).json({ ok: true, patients: enriched });
 }
 
-async function enrichPatientsWithSessionData(supabase, patients) {
+async function enrichPatientsWithSessionData(supabase, patients, { isAdmin = false } = {}) {
   if (patients.length === 0) return [];
 
-  const codes = patients.map((p) => p.public_code);
-  const { data: sessions } = await supabase
-    .from("sessions")
-    .select("public_code, risk_level, json_data, created_at")
-    .in("public_code", codes)
-    .order("created_at", { ascending: false });
+  const canViewDetails = (patient) => isAdmin || canViewExpandedPatientData({
+    relationship: patient.relationship || (patient.primary_expert_id ? "primary" : "shared"),
+    accessRole: patient.access_role,
+  });
+  const detailPatients = patients.filter(canViewDetails);
+  const codes = detailPatients.map((p) => p.public_code).filter(Boolean);
+  let sessions = [];
+  if (codes.length > 0) {
+    const { data } = await supabase
+      .from("sessions")
+      .select("public_code, risk_level, json_data, created_at")
+      .in("public_code", codes)
+      .order("created_at", { ascending: false });
+    sessions = data || [];
+  }
 
   const sessionMap = {};
-  for (const s of sessions || []) {
+  for (const s of sessions) {
     if (!sessionMap[s.public_code]) {
       sessionMap[s.public_code] = [];
     }
@@ -915,14 +947,26 @@ async function enrichPatientsWithSessionData(supabase, patients) {
   }
 
   return patients.map((p) => {
+    const mayViewDetails = canViewDetails(p);
     const patientSessions = sessionMap[p.public_code] || [];
     const lastSession = patientSessions[0] || null;
     return {
-      ...p,
-      session_count: patientSessions.length,
-      last_session_at: lastSession?.created_at || null,
-      last_risk_level: lastSession?.risk_level || null,
-      last_care_recommendation: lastSession?.json_data?.care_recommendation || null,
+      id: p.id,
+      public_code: p.public_code || null,
+      patient_label: p.patient_label || null,
+      module: p.module || "support",
+      status: p.status || null,
+      relationship: p.relationship || (p.primary_expert_id ? "primary" : "shared"),
+      access_role: p.access_role || null,
+      organization: p.organization ? { name: p.organization.name || null } : null,
+      primary_expert: p.primary_expert ? { name: p.primary_expert.name || null } : null,
+      limited_access: !mayViewDetails,
+      session_count: mayViewDetails ? patientSessions.length : null,
+      last_session_at: mayViewDetails ? lastSession?.created_at || null : null,
+      ...(mayViewDetails ? {
+        last_risk_level: lastSession?.risk_level || null,
+        last_care_recommendation: lastSession?.json_data?.care_recommendation || null,
+      } : {}),
     };
   });
 }
