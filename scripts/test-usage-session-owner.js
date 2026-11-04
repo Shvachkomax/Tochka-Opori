@@ -25,7 +25,9 @@ assert.equal(await resolveUsageOwnerFromSession(session, "valid-token", validate
 assert.equal(validations, 2);
 
 const legacy = { ...session, legacy_access: true, json_data: {} };
-assert.equal(await resolveUsageOwnerFromSession(legacy, null, validateAccess), "owner-pneumo-1");
+const validationsBeforeLegacy = validations;
+assert.equal(await resolveUsageOwnerFromSession(legacy, "valid-token", validateAccess), null, "legacy usage history requires a new token-authenticated session");
+assert.equal(validations, validationsBeforeLegacy, "legacy sessions are rejected before token validation");
 
 if (originalPilot === undefined) delete process.env.PILOT_ID;
 else process.env.PILOT_ID = originalPilot;

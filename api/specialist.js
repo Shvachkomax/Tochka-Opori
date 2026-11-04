@@ -14,6 +14,7 @@ import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
 import { buildSpecialistClientList } from "../lib/specialist-client-list.js";
 import { normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
 import { buildSpecialistRequestContext } from "../lib/specialist/request-context.js";
+import { canViewExpandedPatientData } from "../lib/specialist/access-policy.js";
 import {
   SAFE_MEDICATION_PERMISSION_KEYS,
   getMedicationOrderForOwner,
@@ -250,6 +251,12 @@ function requireSupportMedicationContext({ expert, memberships, organizationId, 
   return context.ok ? { ok: true } : { ...context, status: 403 };
 }
 
+function denyExpandedPatientData(res, resolved) {
+  if (canViewExpandedPatientData(resolved)) return false;
+  res.status(403).json({ ok: false, error: "Уровень доступа не разрешает просмотр подробных данных пациента." });
+  return true;
+}
+
 async function resolveSupportMedicationClient({ expert, memberships, clientRef, organizationId }) {
   const context = requireSupportMedicationContext({ expert, memberships, organizationId, module: "support" });
   if (!context.ok) return context;
@@ -261,6 +268,9 @@ async function resolveSupportMedicationClient({ expert, memberships, clientRef, 
     module: "support",
   });
   if (!resolved.ok) return resolved;
+  if (!canViewExpandedPatientData(resolved)) {
+    return { ok: false, status: 403, error: "Уровень доступа не разрешает просмотр подробных данных пациента." };
+  }
   if (!resolved.publicCode) return { ok: false, status: 403, error: "Владелец клиента не определён." };
 
   const { data: session, error } = await getSupabase()
@@ -1038,6 +1048,7 @@ async function handleGetClientOverview(req, res) {
   if (!resolved.ok) {
     return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
   }
+  if (denyExpandedPatientData(res, resolved)) return;
 
   const { publicCode, relationship, accessRole } = resolved;
   const supabase = getSupabase();
@@ -1150,6 +1161,7 @@ async function handleGetClientProfessionalAnalysis(req, res) {
   if (!resolved.ok) {
     return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
   }
+  if (denyExpandedPatientData(res, resolved)) return;
 
   const { publicCode } = resolved;
   const supabase = getSupabase();
@@ -1275,6 +1287,7 @@ async function handleGetBodyClientOverview(req, res) {
   if (!resolved.ok) {
     return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
   }
+  if (denyExpandedPatientData(res, resolved)) return;
 
   const { ownerType, ownerId, relationship, accessRole } = resolved;
   if (!ownerId) {
@@ -1350,7 +1363,7 @@ async function handleGetBodyClientOverview(req, res) {
   // ── Batch 6: service requests (owner_id direct) ───────
     const { data: srRows } = await supabase
       .from("service_requests")
-      .select("id, request_type, service_code, service_topic, price_credits, meeting_format, title, status, created_at, due_at, scheduled_at")
+      .select("id, request_type, service_code, service_topic, meeting_format, title, status, created_at, due_at, scheduled_at")
       .eq("owner_id", ownerId)
       .eq("owner_type", "anonymous_profile")
       .eq("module", "body")
@@ -1445,7 +1458,6 @@ async function handleGetBodyClientOverview(req, res) {
       request_type: sr.request_type,
       service_code: sr.service_code || null,
       service_topic: sr.service_topic || null,
-      price_credits: sr.price_credits ?? null,
       meeting_format: sr.meeting_format || null,
       title: sr.title || null,
       status: sr.status,

@@ -288,12 +288,12 @@ async function runTests() {
     assert(r.status === 404, "G: inactive assignment rejected (404)");
   }
 
-  // H. Shared patient_access works read-only
+  // H. A shared viewer can appear in the roster but cannot load expanded
+  // clinical details. Detailed patient data requires an explicit clinical role.
   {
     const r = await invoke({ action: "getBodyClientOverview", client_ref: `access:${testIds.accessShared}`, organization_id: testIds.orgClinic, module: "body" }, tokenB);
-    assert(r.status === 200, "H: shared patient_access works (200)");
-    assert(r.body.client?.relationship === "shared", "H: relationship=shared");
-    assert(r.body.client?.access_role === "viewer", "H: access_role=viewer");
+    assert(r.status === 403, "H: shared viewer cannot load expanded clinical details");
+    assert(r.body?.ok === false, "H: viewer receives a controlled denial response");
   }
 
   // I. Membership alone insufficient (expert B with membership but no assignment/access for owner A via assignment path)
@@ -308,6 +308,7 @@ async function runTests() {
     const r = await invoke({ action: "getBodyClientOverview", client_ref: `assignment:${testIds.assignmentA}`, organization_id: testIds.orgClinic, module: "body" }, tokenA);
     const jsonStr = JSON.stringify(r.body);
     assert(!jsonStr.includes(testIds.ownerA), "J: owner_id absent from response");
+    assert(!jsonStr.includes("price_credits") && !jsonStr.includes("charged_credits") && !jsonStr.includes("reserved_credits"), "J: financial fields absent from general clinical overview");
   }
 
   // K. anonymous_owner_id absent

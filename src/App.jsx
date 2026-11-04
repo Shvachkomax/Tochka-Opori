@@ -414,7 +414,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   const [expertData, setExpertData] = useState(() => {
     try {
       const saved = localStorage.getItem("tochka_expert");
-      return saved ? JSON.parse(saved) : null;
+      const sessionCode = sessionStorage.getItem("tochka_expert_access_code");
+      return saved && sessionCode ? JSON.parse(saved) : null;
     } catch { return null; }
   });
   const [expertModalOpen, setExpertModalOpen] = useState(false);
@@ -750,6 +751,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       });
       const data = await res.json();
       if (data.ok && data.expert) {
+        try { sessionStorage.setItem("tochka_expert_access_code", code); } catch {}
         setExpertData(data.expert);
         localStorage.setItem("tochka_expert", JSON.stringify(data.expert));
         setExpertModalOpen(false);
@@ -767,6 +769,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   function handleExpertLogout() {
     setExpertData(null);
+    try { sessionStorage.removeItem("tochka_expert_access_code"); } catch {}
     localStorage.removeItem("tochka_expert");
     showToast("Режим специалиста выключен");
   }
@@ -801,6 +804,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   function getStoredExpertCode() {
     try {
+      const sessionCode = sessionStorage.getItem("tochka_expert_access_code");
+      if (sessionCode) return sessionCode;
       const expert = localStorage.getItem("tochka_expert");
       return expert ? JSON.parse(expert)?.access_code || "" : "";
     } catch { return ""; }
@@ -3823,6 +3828,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const body = { action: "listTrainingSessions", ...trainingFilter, showTrash: trainingShowTrash };
       if (expertData) {
         body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
       } else {
         body.admin_secret = adminPassword;
       }
@@ -3852,7 +3858,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function saveTrainingSession(row) {
     try {
       const body = { action: "saveTrainingSession", ...row };
-      if (expertData) body.expert_id = expertData.id;
+      if (expertData) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
+      }
       else body.admin_secret = adminPassword;
       const res = await fetch("/api/reviews", {
         method: "POST",
@@ -3886,7 +3895,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function updateTrainingSession(id, updates) {
     try {
       const body = { action: "updateTrainingSession", id, updates };
-      if (expertData) body.expert_id = expertData.id;
+      if (expertData) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
+      }
       else body.admin_secret = adminPassword;
       const res = await fetch("/api/reviews", {
         method: "POST",
@@ -4076,7 +4088,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         review_id: trainingFormReviewId,
         ...trainingFormData,
       };
-      if (expertData) body.expert_id = expertData.id;
+      if (expertData) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
+      }
       else body.admin_secret = adminPassword;
       const res = await fetch("/api/reviews", {
         method: "POST",
@@ -4100,7 +4115,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   async function downloadTrainingCsv() {
     try {
       const body = { action: "exportTrainingCsv", ...trainingFilter, showTrash: trainingShowTrash };
-      if (expertData) body.expert_id = expertData.id;
+      if (expertData) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
+      }
       else body.admin_secret = adminPassword;
       const res = await fetch("/api/reviews", {
         method: "POST",
@@ -4396,7 +4414,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "list", status: st, environment: env, expert_filter: exp, limit: 100, showTrash: trash }),
+        body: JSON.stringify({ action: "list", admin_secret: adminPassword, status: st, environment: env, expert_filter: exp, limit: 100, showTrash: trash }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -4705,9 +4723,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     try {
       const body = { action: "getSessionTimeline", public_code: code };
       if (adminPassword) body.admin_secret = adminPassword;
-      if (expertData?.expert_id) {
-        body.expert_id = expertData.expert_id;
-        if (expertData?.access_code) body.expert_code = expertData.access_code;
+      if (expertData?.id) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
       }
 
       const resp = await fetch("/api/reviews", {
@@ -4751,9 +4769,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       else if (item.session_id) body.session_id = item.session_id;
       else if (item.training_session_id) body.training_session_id = item.training_session_id;
       if (adminPassword) body.admin_secret = adminPassword;
-      if (expertData?.expert_id) {
-        body.expert_id = expertData.expert_id;
-        if (expertData?.access_code) body.expert_code = expertData.access_code;
+      if (expertData?.id) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
       }
 
       const resp = await fetch("/api/reviews", {
@@ -9554,9 +9572,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                             )}
                           </div>
                           <div style={{ textAlign: "right", fontSize: 12, color: t.muted }}>
-                            <div>Сессий: {p.session_count || 0}</div>
-                            {p.last_session_at && (
-                              <div>{new Date(p.last_session_at).toLocaleDateString("ru-RU")}</div>
+                            {p.limited_access ? (
+                              <div>Подробные данные недоступны для вашей роли</div>
+                            ) : (
+                              <>
+                                <div>Сессий: {p.session_count || 0}</div>
+                                {p.last_session_at && (
+                                  <div>{new Date(p.last_session_at).toLocaleDateString("ru-RU")}</div>
+                                )}
+                              </>
                             )}
                           </div>
                         </div>
