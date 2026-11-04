@@ -5,6 +5,7 @@ import { buildSpecialistContextKey, isCurrentSpecialistContext } from "./special
 import { APP_BRAND } from "../../lib/appBrand.js";
 import PartnerProgram from "./PartnerProgram.jsx";
 import ClinicalTimelinePanel from "./ClinicalTimelinePanel.jsx";
+import MyPracticePilot from "./MyPracticePilot.jsx";
 
 // ── Styles ────────────────────────────────────────────────
 
@@ -829,6 +830,11 @@ export default function SpecialistCabinet() {
             Рабочее пространство: {module === "body" ? "Здоровье & Стройность" : supportWorkspaceName}
           </div>
         </div>
+
+        {/* Только синтетический пилот; Preview-флаг по умолчанию выключен. */}
+        {import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && !selectedClient && (
+          <MyPracticePilot />
+        )}
 
         {/* Context selection */}
         <div style={S.card}>

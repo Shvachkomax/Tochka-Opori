@@ -51,7 +51,8 @@
     "test:clinical-knowledge": "node scripts/test-clinical-knowledge.js",
     "test:clinical-medication-rpc-routing": "node scripts/test-clinical-medication-rpc-routing.js",
     "check:database-architecture": "node scripts/check-database-architecture.js",
-    "test:database-architecture": "node scripts/test-database-architecture.js"
+    "test:database-architecture": "node scripts/test-database-architecture.js",
+    "test:my-practice": "node scripts/test-my-practice-pilot.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
