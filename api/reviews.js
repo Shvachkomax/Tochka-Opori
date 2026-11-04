@@ -2343,7 +2343,7 @@ async function handleGetSessionTimeline(req, res) {
     const { data: caseReviews } = await supabase
       .from("case_reviews")
       .select("*")
-      .or(`public_code.eq.${code},session_public_code.eq.${code},json_data->>public_code.eq.${code},json_data->>session_public_code.eq.${code},json_data->>publicCode.eq.${code},json_data->>sessionCode.eq.${code},json_data->>code.eq.${code}`)
+      .or(`public_code.eq.${code},json_data->>public_code.eq.${code},json_data->>session_public_code.eq.${code},json_data->>publicCode.eq.${code},json_data->>sessionCode.eq.${code},json_data->>code.eq.${code}`)
       .order("created_at", { ascending: true });
 
     // 3. Search training_sessions (exclude deleted)
