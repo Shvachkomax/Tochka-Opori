@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:api": "node --env-file=.env.local local-api-server.js",
     "dev:all": "concurrently \"npm run dev:api\" \"npm run dev\"",
-    "build": "vite build",
+    "build": "node scripts/check-database-architecture.js && vite build",
     "preview": "vite preview",
     "e2e:phase11c1": "node scripts/e2e-phase11c1-browser.mjs",
     "e2e:service-requests": "node scripts/e2e-service-requests-browser.mjs",
@@ -49,7 +49,9 @@
     "test:clinical-medication-routing": "node scripts/test-clinical-medication-rpc-routing.js",
     "test:medical-staging-guard": "node scripts/test-medical-staging-api-guard.js",
     "test:clinical-knowledge": "node scripts/test-clinical-knowledge.js",
-    "test:clinical-medication-rpc-routing": "node scripts/test-clinical-medication-rpc-routing.js"
+    "test:clinical-medication-rpc-routing": "node scripts/test-clinical-medication-rpc-routing.js",
+    "check:database-architecture": "node scripts/check-database-architecture.js",
+    "test:database-architecture": "node scripts/test-database-architecture.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
