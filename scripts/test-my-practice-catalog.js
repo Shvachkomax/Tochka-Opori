@@ -43,4 +43,26 @@ for(const invalid of [
  {clinicId:"demo-clinic-b",name:"Проверка",format:"fax",priceRub:500,minutes:30}
 ]) assert.throws(()=>addDraftOffer(base,invalid));
 for(const c of DEMO_CLINICS)assert.equal(c.bookingUrl,null);
-console.log("My Practice catalog drafts: PASS (validation, permissions isolation, archive, restore)");
+
+// Регрессия: редактирование ранее существующей услуги прямо в каталоге,
+// не только новой, с последующим сохранением черновика.
+const seeded = base[0].offers[0];
+const editedSeed = updateDraftOffer(base, {
+  clinicId:"demo-clinic-a",offerId:seeded.id,
+  name:"Первичная консультация — уточнённая",
+  format:"offline",priceRub:"5700",minutes:"50",
+});
+assert.equal(editedSeed[0].offers[0].name,"Первичная консультация — уточнённая");
+assert.equal(editedSeed[0].offers[0].priceRub,5700);
+assert.equal(editedSeed[0].offers[0].minutes,50);
+assert.equal(base[0].offers[0].priceRub,4500,"Исходный каталог не должен изменяться");
+const editedLoaded = restoreDraftCatalog(JSON.stringify(editedSeed));
+assert.equal(editedLoaded[0].offers[0].priceRub,5700);
+assert.equal(filterOffers(editedLoaded,{clinicId:"demo-clinic-a"})[0].name,
+  "Первичная консультация — уточнённая");
+assert.throws(()=>updateDraftOffer(base,{
+  clinicId:"demo-clinic-b",offerId:seeded.id,
+  name:"Чужая услуга",format:"online",priceRub:1000,minutes:45,
+}),/не найдена/);
+
+console.log("My Practice catalog drafts: PASS (validation, original offer editing, permissions isolation, archive, restore)");

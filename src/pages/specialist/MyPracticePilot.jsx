@@ -5,7 +5,7 @@ import {
 } from "../../../lib/my-practice/pilot-data.js";
 import "./MyPracticePilot.css";
 import MyPracticeCatalogEditor from "./MyPracticeCatalogEditor.jsx";
-import {initialDraftCatalog,restoreDraftCatalog,countActiveOffers,DRAFT_STORAGE_KEY} from "../../../lib/my-practice/catalog-draft.js";
+import {initialDraftCatalog,restoreDraftCatalog,countActiveOffers,DRAFT_STORAGE_KEY,updateDraftOffer} from "../../../lib/my-practice/catalog-draft.js";
 
 // Чистый визуальный прототип. Никаких запросов к API, личных или медицинских данных.
 const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -33,24 +33,92 @@ function ClinicCard({ clinic, onServices }) {
   );
 }
 
-function OfferCard({ offer }) {
+function OfferCard({ offer, onSaveEdit }) {
+  const [editing, setEditing] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [fields, setFields] = useState(() => ({
+    name: offer.name, priceRub: String(offer.priceRub),
+    minutes: String(offer.minutes), format: offer.format,
+  }));
   const verified = canPublishBookingLink({
     clinicApproved:offer.verifiedForPublication,
     doctorAuthorized:false,
     bookingUrl:offer.bookingUrl,
   });
+
+  const startEditing = () => {
+    setFields({name:offer.name,priceRub:String(offer.priceRub),minutes:String(offer.minutes),format:offer.format});
+    setEditError("");
+    setEditing(true);
+  };
+  const cancelEditing = () => { setEditing(false); setEditError(""); };
+  const saveEdits = event => {
+    event.preventDefault();
+    try {
+      onSaveEdit({clinicId:offer.clinicId,offerId:offer.id,...fields});
+      setEditing(false);
+      setEditError("");
+    } catch(error) {
+      setEditError(error?.message || "Не удалось изменить услугу.");
+    }
+  };
   return (
     <article className="mp-offer" data-testid={"my-practice-offer-" + offer.id}>
-      <div className="mp-offer-top">
-        <span className="mp-format">{offer.format === "online" ? "Дистанционно*" : "Очно"}</span>
-        <strong>{rubles(offer.priceRub)}</strong>
-      </div>
-      <h4>{offer.name}</h4>
-      <p>{offer.clinicName}</p>
-      <p className="mp-muted">{offer.minutes} мин · {offer.address}</p>
-      {verified
-        ? <a href={offer.bookingUrl} target="_blank" rel="noopener noreferrer">Перейти к записи клиники</a>
-        : <p className="mp-booking-disabled">Запись недоступна: требуется подключение клиники</p>}
+      {!editing ? (
+        <>
+          <div className="mp-offer-top">
+            <span className="mp-format">{offer.format === "online" ? "Дистанционно*" : "Очно"}</span>
+            <strong>{rubles(offer.priceRub)}</strong>
+          </div>
+          <h4>{offer.name}</h4>
+          <p>{offer.clinicName}</p>
+          <p className="mp-muted">{offer.minutes} мин · {offer.address}</p>
+          <button
+            type="button"
+            className="mp-secondary mp-offer-edit"
+            data-testid={"mp-edit-offer-" + offer.id}
+            onClick={startEditing}
+            aria-label={"Редактировать услугу: " + offer.name}
+          >
+            Редактировать
+          </button>
+          {verified
+            ? <a href={offer.bookingUrl} target="_blank" rel="noopener noreferrer">Перейти к записи клиники</a>
+            : <p className="mp-booking-disabled">Запись недоступна: требуется подключение клиники</p>}
+        </>
+      ) : (
+        <form className="mp-inline-editor" data-testid={"mp-inline-form-" + offer.id} onSubmit={saveEdits}>
+          <h4>Редактирование услуги</h4>
+          <p className="mp-muted">{offer.clinicName}</p>
+          <label className="mp-field mp-field-block">Название
+            <input required minLength={3} maxLength={100} value={fields.name}
+              onChange={e => setFields({...fields,name:e.target.value})}
+              data-testid="mp-inline-name"/>
+          </label>
+          <div className="mp-inline-editor-grid">
+            <label className="mp-field">Цена, ₽
+              <input type="number" required min="0" max="200000" step="1" value={fields.priceRub}
+                onChange={e => setFields({...fields,priceRub:e.target.value})}
+                data-testid="mp-inline-price"/>
+            </label>
+            <label className="mp-field">Длительность, мин
+              <input type="number" required min="15" max="240" step="1" value={fields.minutes}
+                onChange={e => setFields({...fields,minutes:e.target.value})}/>
+            </label>
+          </div>
+          <label className="mp-field mp-field-block">Формат приёма
+            <select value={fields.format} onChange={e => setFields({...fields,format:e.target.value})}>
+              <option value="offline">Очно</option><option value="online">Дистанционно*</option>
+            </select>
+          </label>
+          {editError && <p className="mp-editor-error" role="alert">{editError}</p>}
+          <div className="mp-inline-editor-actions">
+            <button type="submit" className="mp-primary">Сохранить изменение</button>
+            <button type="button" className="mp-secondary" onClick={cancelEditing}>Отмена</button>
+          </div>
+          <p className="mp-footnote">После изменения сохраните черновик в браузере.</p>
+        </form>
+      )}
     </article>
   );
 }
@@ -123,6 +191,10 @@ export default function MyPracticePilot() {
     [catalog,clinicFilter,formatFilter]
   );
   const switchToClinic = id => { setClinicFilter(id); setTab("services"); };
+  const saveOfferFromCard = payload => {
+    const next = updateDraftOffer(catalog, payload);
+    changeCatalog(next);
+  };
   return <section className="my-practice-pilot" data-testid="my-practice-pilot" aria-labelledby="my-practice-title">
     <header className="mp-header">
       <div>
@@ -175,8 +247,13 @@ export default function MyPracticePilot() {
           <option value="online">Дистанционно*</option>
         </select></label>
       </div>
-      <div className="mp-two-col">{offers.map(o=><OfferCard key={o.id} offer={o}/>)}</div>
+      <div className="mp-two-col">{offers.map(o=><OfferCard key={o.id} offer={o} onSaveEdit={saveOfferFromCard}/>)}</div>
       {!offers.length && <p className="mp-muted">По этим условиям учебных услуг нет.</p>}
+      <div className="mp-services-save">
+        <span>{dirty ? "Есть изменения, ещё не сохранённые в браузере" : (storageMessage || "Изменения можно сохранить в браузере")}</span>
+        <button type="button" className="mp-primary" onClick={saveDraft}
+          disabled={!dirty} data-testid="mp-save-catalog-services">Сохранить черновик в браузере</button>
+      </div>
       <p className="mp-footnote">* Дистанционные медицинские услуги возможны только при соблюдении закона, правил и лицензии клиники. Это не публичная оферта.</p>
     </div>}
     {tab==="manage" && <div role="tabpanel" id="mp-panel-manage" aria-labelledby="mp-tab-manage">

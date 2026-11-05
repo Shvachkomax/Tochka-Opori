@@ -67,3 +67,16 @@
 .mp-editor-note{background:#f1f7f1;border-radius:9px;color:#4f7055;padding:9px 12px;font-size:11px}
 .mp-editor-footer button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:700px){.mp-editor-layout{grid-template-columns:minmax(0,1fr)}.mp-editor-offer{gap:6px}}
+
+
+/* Редактирование услуги непосредственно в карточке каталога */
+.mp-offer-edit{display:inline-flex;margin:8px 0 4px;align-items:center;justify-content:center}
+.mp-inline-editor h4{margin:0 0 8px;font-size:14px}
+.mp-inline-editor .mp-field{min-width:0}
+.mp-inline-editor .mp-field-block{margin-bottom:12px}
+.mp-inline-editor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.mp-inline-editor-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mp-services-save{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:16px;padding:12px;background:#f7f9f6;border:1px solid #e6ebe3;border-radius:11px}
+.mp-services-save span{font-size:12px;color:#637267}
+.mp-services-save .mp-primary:disabled{opacity:.48;cursor:not-allowed}
+@media(max-width:460px){.mp-inline-editor-grid{grid-template-columns:1fr}.mp-inline-editor-actions button{flex:1}}
