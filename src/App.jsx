@@ -1,743 +1,11913 @@
-YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíÛûß¤èµ©hºÚn¶X§zÍZ[\ÜX[]™PÛÛ™\œØ][Ûˆœ›ÛH‹‹ÒX[]™PÛÛ™\œØ][Û‹šœŞÂš[\Ü[™›Ü›X][Û‘›İÈœ›ÛH‹‹Ò[™›Ü›X][Û‘›İËšœŞÂš[\Ü™XXİÈ\ÙT™Y‹\ÙTİ]K\ÙQY™™XİÛÛ\Û™[Hœ›ÛHœ™XXİÂš[\ÜÈÜ™X]U›ÚXÙT™XÛÜ™[™Ë\Õ\ØX›U›ÚXÙP›ØˆHœ›ÛH‹‹ÛX‹İ›ÚXÙT™XÛÜ™[™ËšœÈÂš[\ÜÈ\[™›ÚXÙU^Hœ›ÛH‹‹Üİ\Ü›ÚXÙKšœÈÂš[\ÜÈ›Ü›X[^™PÛÛ™\œØ][Û’\İÜK›Ü›X[^™TÙ\ÜÚ[Û‘]Z[Ë^˜Xİ\Ù\”™\Ü^˜XİØİÜ”™\Ü^˜Xİ^\™YY˜XÚËZ[ÛÛ™\œØ][Û”Z\œÈHœ›ÛH‹‹‹ÛX‹ØÛÛ™\œØ][Û‹šœÈÂš[\Ü›ÙR[ZÙHœ›ÛH‹‹Ğ›ÙR[ZÙKšœŞÂš[\Ü›ÙQX\Hœ›ÛH‹‹Ğ›ÙQX\KšœŞÂš[\ÜX[ØXš[™]œ›ÛH‹‹ÒX[ØXš[™]šœŞÂš[\Ü›ÙSÛ˜›Ø\™[™Èœ›ÛH‹‹Ğ›ÙSÛ˜›Ø\™[™ËšœŞÂš[\Ü›ÙQ^UšY]Èœ›ÛH‹‹Ğ›ÙQ^UšY]ËšœŞÂš[\Ü›ÙRX[ÛÛ^œ›ÛH‹‹Ğ›ÙRX[ÛÛ^šœŞÂš[\Ü›ÙTÙ\šXÙT™\]Y\İÈœ›ÛH‹‹Ğ›ÙTÙ\šXÙT™\]Y\İËšœŞÂš[\ÜYYXØ][ÛØ\™œ›ÛH‹‹ÓYYXØ][ÛØ\™šœŞÂš[\Ü]Y[YYXØ][Û“Ü™\œÈœ›ÛH‹‹Ô]Y[YYXØ][Û“Ü™\œËšœŞÂš[\ÜÈ™]ÚÚ]ÛY[ÚÙ[‹Ù]ÛY[ÚÙ[ˆHœ›ÛH‹‹ÛX‹ØÛY[ÚÙ[‹šœÈÂš[\ÜÈØ]™P›ÙTÙ\ÜÚ[Û‹Ø]™P›ÙQ\Ü^T™\İ[Ø]™Tİ\ÜÙ\ÜÚ[Û‹Ù]›ÙTÙ\ÜÚ[Û‹Ù]İ\ÜÙ\ÜÚ[Û‹ÛX\›ÙTÙ\ÜÚ[Û‹ÛX\”İ\ÜÙ\ÜÚ[Û‹Ú]XØÙ\ÜÕÚÙ[‹Ú]Ù\ÜÚ[ÛXØÙ\ÜÈHœ›ÛH‹‹ÛX‹ÜÙ\ÜÚ[ÛXØÙ\ÜËšœÈÂš[\ÜÛ[šXØ[Ûİ[˜Ú[YZ[ˆœ›ÛH‹‹ÜYÙ\ËØYZ[‹ĞÛ[šXØ[Ûİ[˜Ú[YZ[‹šœŞÂš[\Ü^\[š]TYÙHœ›ÛH‹‹ÜYÙ\ËÙ^\Ñ^\[š]TYÙKšœŞÂš[\Ü^\ØXš[™]œ›ÛH‹‹ÜYÙ\ËÙ^\Ñ^\ØXš[™]šœŞÂš[\ÜÜXÚX[\İØXš[™]œ›ÛH‹‹ÜYÙ\ËÜÜXÚX[\İÔÜXÚX[\İØXš[™]šœŞÂš[\ÜÈTĞ”S‘Hœ›ÛH‹‹ÛX‹Ø\œ˜[™šœÈÂ‚˜Û\ÜÈYZ[‘\œ›Ü›İ[™\H^[™ÈÛÛ\Û™[ÂˆÛÛœİXİÜŠ›ÜÊHÂˆİ\\Š›ÜÊNÂˆ\Ëœİ]HHÈ\œ›Üˆ[\œ›Ü’[™›Îˆ[NÂˆBˆİ]XÈÙ]\š]™Yİ]Qœ›ÛQ\œ›ÜŠ\œ›ÜŠHÂˆ™]\›ˆÈ\œ›ÜˆNÂˆBˆÛÛ\Û™[YØ]Ú
-\œ›Ü‹\œ›Ü’[™›ÊHÂˆ\ËœÙ]İ]JÈ\œ›Ü’[™›ÈJNÂˆÛÛœÛÛK™\œ›ÜŠYZ[‘\œ›Ü›İ[™\HØ]YÚˆ‹\œ›Ü‹\œ›Ü’[™›ÊNÂˆBˆ™[™\Š
-HÂˆYˆ
-\Ëœİ]K™\œ›ÜŠHÂˆ™]\›ˆ
-ˆ]ˆİ[O^ŞÈY[™Îˆ›Û˜[Z[Nˆ›[Û›ÜÜXÙH‹Z[’ZYÚˆŒLš‹˜XÚÙÜ›İ[™ˆˆÌLMÈ‹ÛÛÜˆˆÙ™XØXØHˆ_O‚ˆˆİ[O^ŞÈÛÛÜˆˆÙ˜ØMXMH‹X\™Ú[›İÛNˆMˆ_O´'´b4.4,t.´,4,ˆ4,4-4/4.4/Kt/ô,4/t-t.ô.Ú‚ˆ]ˆİ[O^ŞÈ˜XÚÙÜ›İ[™ˆœ™Ø˜JŒÎKŒJH‹Y[™ÎˆM‹›Ü™\”˜Y]\ÎˆL‹X\™Ú[›İÛNˆM‹›Ü™\ˆŒ\ÛÛY™Ø˜JŒÎKŒÊHˆ_O‚ˆİ›Û™Èİ[O^ŞÈÛÛÜˆˆÙ˜ØMXMHˆ_Oİ\Ëœİ]K™\œ›ÜË›Y\ÜØYÙH´'t-t.4-ô,´-t`t`´/t,4cÈ4/´b4.4,t.´,ŸOÜİ›Û™Ï‚ˆÙ]‚ˆ™Hİ[O^ŞÈ›ÛÚ^™NˆL‹ÛÛÜˆˆÎMLØ‹Ú]TÜXÙNˆœ™K]Ü˜\‹X^ZYÚˆİ™\™›İÎˆ˜]]È‹˜XÚÙÜ›İ[™ˆœ™Ø˜JŒÊH‹Y[™ÎˆM‹›Ü™\”˜Y]\Îˆ_O‚ˆİ\Ëœİ]K™\œ›ÜËœİXÚÈˆŸBˆÜ™O‚ˆÙ]‚ˆ
-NÂˆBˆ™]\›ˆ\Ëœ›ÜË˜Ú[™[ÂˆBŸB‚™^ÜY˜][[˜İ[Ûˆ\
+import HealthLiveConversation from "./HealthLiveConversation.jsx";
+import InformationFlow from "./InformationFlow.jsx";
+import React, { useRef, useState, useEffect, Component } from "react";
+import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
+import { appendVoiceText } from "./supportVoice.js";
+import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback, buildConversationPairs } from "../lib/conversation.js";
+import BodyIntake from "./BodyIntake.jsx";
+import BodyDiary from "./BodyDiary.jsx";
+import HealthCabinet from "./HealthCabinet.jsx";
+import BodyOnboarding from "./BodyOnboarding.jsx";
+import BodyDayView from "./BodyDayView.jsx";
+import BodyHealthContext from "./BodyHealthContext.jsx";
+import BodyServiceRequests from "./BodyServiceRequests.jsx";
+import MedicationCard from "./MedicationCard.jsx";
+import PatientMedicationOrders from "./PatientMedicationOrders.jsx";
+import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
+import { saveBodySession, saveBodyDisplayResult, saveSupportSession, getBodySession, getSupportSession, clearBodySession, clearSupportSession, withAccessToken, withSessionAccess } from "./lib/sessionAccess.js";
+import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
+import ExpertInvitePage from "./pages/expert/ExpertInvitePage.jsx";
+import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
+import SpecialistCabinet from "./pages/specialist/SpecialistCabinet.jsx";
+import { APP_BRAND } from "./lib/appBrand.js";
 
-HÂˆÛÛœİÛ[ÙKÙ][ÙWHH\ÙTİ]J^ŠNÂˆÛÛœİİ^Ù]^HH\ÙTİ]JˆŠNÂˆÛÛœİÜ]Y\İ[ÛœËÙ]]Y\İ[Ûœ×HH\ÙTİ]J[
-NÂˆÛÛœİØ[œİÙ\œËÙ][œİÙ\œ×HH\ÙTİ]JßJNÂˆÛÛœİØÜš\Ú\Ó[ÙKÙ]Üš\Ú\Ó[ÙWHH\ÙTİ]J˜[ÙJNÂˆÛÛœİØÜš\Ú\Ğ›ØÚËÙ]Üš\Ú\Ğ›ØÚ×HH\ÙTİ]J[
-NÂˆÛÛœİÜ™\İ[Ù]™\İ[HH\ÙTİ]J[
-NÂˆÛÛœİÜ\ÙKÙ]\ÙWHH\ÙTİ]Jš[œ]ŠNÂˆÛÛœİÜİ\ÜØÜ™Y[‹Ù]İ\ÜØÜ™Y[—HH\ÙTİ]J›[™[™ÈŠNÂˆÛÛœİÛØY[™ËÙ]ØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÙ\œ›Ü‹Ù]\œ›Ü—HH\ÙTİ]JˆŠNÂˆÛÛœİØXİ]™UX‹Ù]Xİ]™UX—HH\ÙTİ]J\Ù\ˆŠNÂˆÛÛœİØÜš\Ú\ÓÜ[‹Ù]Üš\Ú\ÓÜ[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØX›İ]›Ú™XİÜ[‹Ù]X›İ]›Ú™XİÜ[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØÜš\Ú\Õ^Ù]Üš\Ú\Õ^HH\ÙTİ]JˆŠNÂˆÛÛœİØÜš\Ú\ĞÛÛXİÙ]Üš\Ú\ĞÛÛXİHH\ÙTİ]JˆŠNÂˆÛÛœİØÜš\Ú\ÔİX›Z][™ËÙ]Üš\Ú\ÔİX›Z][™×HH\ÙTİ]J˜[ÙJNÂ‚ˆÛÛœİYYXT™XÛÜ™\”™YˆH\ÙT™YŠ[
-NÂˆÛÛœİ]Y[ĞÚ[šÜÔ™YˆH\ÙT™YŠ×JNÂˆÛÛœİ[Y\”™YˆH\ÙT™YŠ[
-NÂ‚ˆÛÛœİ]ZXÚĞÚ]ÛÛZ[™\”™YˆH\ÙT™YŠ[
-NÂˆÛÛœİ]ZXÚĞÚ][œ]™YˆH\ÙT™YŠ[
-NÂ‚ˆÛÛœİÜ™XÛÜ™[™ËÙ]™XÛÜ™[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİİ˜[œØÜšXš[™ËÙ]˜[œØÜšXš[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİİ›ÚXÙQ\œ›Ü‹Ù]›ÚXÙQ\œ›Ü—HH\ÙTİ]JˆŠNÂˆÛÛœİÜ™XÛÜ™[™Õ[YKÙ]™XÛÜ™[™Õ[YWHH\ÙTİ]J
-NÂˆÛÛœİİ›ÚXÙSØœÙ\˜][ÛœËÙ]›ÚXÙSØœÙ\˜][Ûœ×HH\ÙTİ]J×JNÂˆÛÛœİ›ÚXÙS\ÙĞÛİ[\”™YˆH\ÙT™YŠ
-NÂˆÛÛœİÙ\ÜÚ[Û”™YˆH\ÙT™YŠ[
-NÂˆÛÛœİİ\Ù\ÜÚ[Û”›ÛZ\ÙT™YˆH\ÙT™YŠ[
-NÂ‚ˆËÈİ\ÜØXš[™]ÜYXÚ]Ë]^[œ]\Ù\ÈHØ[YH˜[œØÜšX™H[™Ú[ˆËÈ]ÙY\È]È™XÛÜ™\ˆİ]HÙ\\˜]Hœ›ÛH[ZÙKÜ]Y\İ[Û‹ØÜš\Ú\È›İÜË‚ˆÛÛœİØXš[™]›ÚXÙT™XÛÜ™\”™YˆH\ÙT™YŠ[
-NÂˆÛÛœİØXš[™]›ÚXÙTİ™X[T™YˆH\ÙT™YŠ[
-NÂˆÛÛœİØXš[™]›ÚXÙPÚ[šÜÔ™YˆH\ÙT™YŠ×JNÂˆÛÛœİØXš[™]›ÚXÙU[Y\”™YˆH\ÙT™YŠ[
-NÂˆÛÛœİØXš[™]›ÚXÙRYÛ›Ü™TİÜ™YˆH\ÙT™YŠ˜[ÙJNÂˆÛÛœİØØXš[™]›ÚXÙT™XÛÜ™[™ËÙ]ØXš[™]›ÚXÙT™XÛÜ™[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØØXš[™]›ÚXÙU˜[œØÜšXš[™ËÙ]ØXš[™]›ÚXÙU˜[œØÜšXš[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØØXš[™]›ÚXÙU\™Ù]Ù]ØXš[™]›ÚXÙU\™Ù]HH\ÙTİ]J[
-NÂˆÛÛœİØØXš[™]›ÚXÙU[YKÙ]ØXš[™]›ÚXÙU[YWHH\ÙTİ]J
-NÂˆÛÛœİØØXš[™]›ÚXÙQ\œ›Ü‹Ù]ØXš[™]›ÚXÙQ\œ›Ü—HH\ÙTİ]JˆŠNÂ‚ˆ\ÙQY™™Xİ
+class AdminErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null, errorInfo: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, errorInfo) {
+    this.setState({ errorInfo });
+    console.error("AdminErrorBoundary caught:", error, errorInfo);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 40, fontFamily: "monospace", minHeight: "100vh", background: "#050817", color: "#fecaca" }}>
+          <h2 style={{ color: "#fca5a5", marginBottom: 16 }}>ĞÑˆĞ¸Ğ±ĞºĞ° Ğ² Ğ°Ğ´Ğ¼Ğ¸Ğ½-Ğ¿Ğ°Ğ½ĞµĞ»Ğ¸</h2>
+          <div style={{ background: "rgba(239,68,68,.1)", padding: 16, borderRadius: 12, marginBottom: 16, border: "1px solid rgba(239,68,68,.3)" }}>
+            <strong style={{ color: "#fca5a5" }}>{this.state.error?.message || "ĞĞµĞ¸Ğ·Ğ²ĞµÑÑ‚Ğ½Ğ°Ñ Ğ¾ÑˆĞ¸Ğ±ĞºĞ°"}</strong>
+          </div>
+          <pre style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "pre-wrap", maxHeight: 400, overflow: "auto", background: "rgba(0,0,0,.3)", padding: 16, borderRadius: 8 }}>
+            {this.state.error?.stack || ""}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
+export default function App() {
+  const [mode, setMode] = useState("text");
+  const [text, setText] = useState("");
+  const [questions, setQuestions] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const [crisisMode, setCrisisMode] = useState(false);
+  const [crisisBlock, setCrisisBlock] = useState(null);
+  const [result, setResult] = useState(null);
+  const [phase, setPhase] = useState("input");
+  const [supportScreen, setSupportScreen] = useState("landing");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("user");
+  const [crisisOpen, setCrisisOpen] = useState(false);
+  const [aboutProjectOpen, setAboutProjectOpen] = useState(false);
+  const [crisisText, setCrisisText] = useState("");
+  const [crisisContact, setCrisisContact] = useState("");
+  const [crisisSubmitting, setCrisisSubmitting] = useState(false);
 
-HOˆ
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const timerRef = useRef(null);
 
-HOˆÂˆØXš[™]›ÚXÙRYÛ›Ü™TİÜ™Y‹˜İ\œ™[HYNÂˆYˆ
-ØXš[™]›ÚXÙU[Y\”™Y‹˜İ\œ™[
-HÛX\’[\˜[
-ØXš[™]›ÚXÙU[Y\”™Y‹˜İ\œ™[
-NÂˆØXš[™]›ÚXÙTİ™X[T™Y‹˜İ\œ™[Ë™Ù]˜XÚÜÊ
-K™›Ü‘XXÚ
+  const quickChatContainerRef = useRef(null);
+  const quickChatInputRef = useRef(null);
 
-˜XÚÊHOˆ˜XÚËœİÜ
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [voiceObservations, setVoiceObservations] = useState([]);
+  const voiceMsgCounterRef = useRef(0);
+  const sessionRef = useRef(null);
+  const startSessionPromiseRef = useRef(null);
 
-JNÂˆYˆ
-ØXš[™]›ÚXÙT™XÛÜ™\”™Y‹˜İ\œ™[Ëœİ]HOOHœ™XÛÜ™[™ÈŠHÂˆØXš[™]›ÚXÙT™XÛÜ™\”™Y‹˜İ\œ™[œİÜ
+  // Support cabinet speech-to-text input uses the same transcribe endpoint,
+  // but keeps its recorder state separate from intake/question/crisis flows.
+  const cabinetVoiceRecorderRef = useRef(null);
+  const cabinetVoiceStreamRef = useRef(null);
+  const cabinetVoiceChunksRef = useRef([]);
+  const cabinetVoiceTimerRef = useRef(null);
+  const cabinetVoiceIgnoreStopRef = useRef(false);
+  const [cabinetVoiceRecording, setCabinetVoiceRecording] = useState(false);
+  const [cabinetVoiceTranscribing, setCabinetVoiceTranscribing] = useState(false);
+  const [cabinetVoiceTarget, setCabinetVoiceTarget] = useState(null);
+  const [cabinetVoiceTime, setCabinetVoiceTime] = useState(0);
+  const [cabinetVoiceError, setCabinetVoiceError] = useState("");
 
-NÂˆBˆK×JNÂ‚ˆÛÛœİÜÙ\ÜÚ[Û”™]šY]ÓÜ[‹Ù]Ù\ÜÚ[Û”™]šY]ÓÜ[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]Y[˜][™ËÙ]]Y[˜][™×HH\ÙTİ]J
-NÂˆÛÛœİÜ]Y[\ÙY[Ù]]Y[\ÙY[HH\ÙTİ]JˆŠNÂˆÛÛœİÜ]Y[[˜ÛX\‹Ù]]Y[[˜ÛX\—HH\ÙTİ]JˆŠNÂˆÛÛœİÙØİÜ‘™YY˜XÚËÙ]ØİÜ‘™YY˜XÚ×HH\ÙTİ]JÂˆÜ›Û™Ô]Y\İ[ÛœÎˆˆ‹ˆZ\ÜÚ[™Ô]Y\İ[ÛœÎˆˆ‹ˆ˜Y]Y\İ[Û•ÛÜ™[™Îˆˆ‹ˆÛÜœ™XİY\Ù\”™\Üˆˆ‹ˆÛÜœ™XİYØİÜ”™\Üˆˆ‹ˆ›İØÛÛ\]Nˆˆ‹ˆÙ[™\˜[ÛÛ[Y[ˆˆ‹ˆJNÂ‚ˆÛÛœİØÛÛ™\œØ][Û’\İÜKÙ]ÛÛ™\œØ][Û’\İÜWHH\ÙTİ]J×JNÂˆÛÛœİÙX[ÙÑ\Ù]X[ÙÑ\HH\ÙTİ]J
-NÂ‚ˆÛÛœİÜÙ\ÜÚ[Û“[Ù[Ü[‹Ù]Ù\ÜÚ[Û“[Ù[Ü[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÛØY[™ÔÙ\ÜÚ[Û‹Ù]ØY[™ÔÙ\ÜÚ[Û—HH\ÙTİ]J˜[ÙJNÂ‚ˆËÈ[›Û[[İ\ÈÛÛ[X][ÛˆÜ™Y[X[\ÜÂˆÛÛœİØÛÛ[X][ÛÛÙKÙ]ÛÛ[X][ÛÛÙWHH\ÙTİ]J[
-NÂˆÛÛœİØÛÛ[X][ÛÛÙR[œ]Ù]ÛÛ[X][ÛÛÙR[œ]HH\ÙTİ]JˆŠNÂˆÛÛœİØÛÛ[X][ÛÛÙQ\œ›Ü‹Ù]ÛÛ[X][ÛÛÙQ\œ›Ü—HH\ÙTİ]JˆŠNÂˆÛÛœİÜ™YÙ[™\˜]YÛÙKÙ]™YÙ[™\˜]YÛÙWHH\ÙTİ]J[
-NÂˆÛÛœİÜÙ\ÜÚ[Û‘]KÙ]Ù\ÜÚ[Û‘]WHH\ÙTİ]J[
-NÂˆÛÛœİÜÙ\ÜÚ[Û’YÙ]Ù\ÜÚ[Û’YHH\ÙTİ]J[
-NÂˆÛÛœİÜX›XĞÛÙKÙ]X›XĞÛÙWHH\ÙTİ]J[
-NÂˆÛÛœİÚ\ĞÛÛ[X][Û‹Ù]\ĞÛÛ[X][Û—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ™]š[İ\Ô]Y[™\ÜÙ]™]š[İ\Ô]Y[™\ÜHH\ÙTİ]JˆŠNÂˆÛÛœİÜ™]š[İ\ÑØİÜ”™\ÜÙ]™]š[İ\ÑØİÜ”™\ÜHH\ÙTİ]JˆŠNÂˆÛÛœİÚÛYU\ÚÜËÙ]ÛYU\ÚÜ×HH\ÙTİ]JˆŠNÂˆÛÛœİÜ™\Ûİ\˜ÙQ˜XİÜœËÙ]™\Ûİ\˜ÙQ˜XİÜœ×HH\ÙTİ]JˆŠNÂˆÛÛœİÙXYÒ[™›ËÙ]XYÒ[™›×HH\ÙTİ]J[
-NÂˆÛÛœİØØ\™T™XÛÛ[Y[™][Û‹Ù]Ø\™T™XÛÛ[Y[™][Û—HH\ÙTİ]J[
-NÂˆÛÛœİÜÚİĞÛÛœİ[™\Ù]ÚİĞÛÛœİ[™\HH\ÙTİ]J˜[ÙJNÂ‚‚ˆËÈİ\ÜØXš[™]U”ˆÛÛœİÜİ\ÜØXš[™]Ù]İ\ÜØXš[™]HH\ÙTİ]J[
-NÂˆÛÛœİÜİ\Ü]™SÜ[‹Ù]İ\Ü]™SÜ[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]Y[[š]][ÛœËÙ]]Y[[š]][Ûœ×HH\ÙTİ]J×JNÂˆÛÛœİÜ]Y[[š]][ÛœÓØY[™ËÙ]]Y[[š]][ÛœÓØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]Y[[š]S[Ù[Ü[‹Ù]]Y[[š]S[Ù[Ü[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]Y[[š]PÜ™X]YÙ]]Y[[š]PÜ™X]YHH\ÙTİ]J[
-NÂˆÛÛœİÛX]Ú™\]Y\İÙ[™[™ËÙ]X]Ú™\]Y\İÙ[™[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØØXš[™]ØY[™ËÙ]ØXš[™]ØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÙ›ÛİÕ\[œİÙ\œËÙ]›ÛİÕ\[œİÙ\œ×HH\ÙTİ]JßJNÂˆÛÛœİÜ™\ÜÛİ\˜ÙKÙ]™\ÜÛİ\˜ÙWHH\ÙTİ]J[
-NÈËÈ™Ù[™\˜]Yˆ˜ØXš[™]‚ˆÛÛœİÚ\İš[š\ÚYÙ\ÜÚ[Û‹Ù]\İš[š\ÚYÙ\ÜÚ[Û—HH\ÙTİ]J˜[ÙJNÂˆËÈİ\ÜØXš[™]^[™Y™X]\™\ÂˆÛÛœİÜİ\ÜšY]Ú[™ÔÙ\ÜÚ[Û‹Ù]İ\ÜšY]Ú[™ÔÙ\ÜÚ[Û—HH\ÙTİ]J[
-NÂˆÛÛœİÜİ\ÜšY]Ú[™ÔÙ\ÜÚ[Û‘]KÙ]İ\ÜšY]Ú[™ÔÙ\ÜÚ[Û‘]WHH\ÙTİ]J[
-NÂˆÛÛœİÜİ\ÜÙ\ÜÚ[Û“ØY[™ËÙ]İ\ÜÙ\ÜÚ[Û“ØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜİ\Ü™]Ô™\]Y\İÜ[‹Ù]İ\Ü™]Ô™\]Y\İÜ[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜİ\Ü™\]Y\İÙ\ÜÚ[Û’YÙ]İ\Ü™\]Y\İÙ\ÜÚ[Û’YHH\ÙTİ]J[
-NÂˆÛÛœİÜİ\Ü™]Ô™\]Y\İÙ]İ\Ü™]Ô™\]Y\İHH\ÙTİ]JÈÙ\šXÙWØÛÙNˆˆ‹™X\ÛÛˆˆ‹Y\ÜØYÙNˆˆ‹™Y™\œ™YÙ]Nˆˆ‹[YWÙœ›ÛNˆˆ‹[YWİÎˆˆ‹ÛÛ[Y[ˆˆˆJNÂˆÛÛœİÜİ\Ü™\]Y\İİX›Z][™ËÙ]İ\Ü™\]Y\İİX›Z][™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØXØÙ\ÜÑ^[™YÙ]XØÙ\ÜÑ^[™YHH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ›Ùš[Q^[™YÙ]›Ùš[Q^[™YHH\ÙTİ]J˜[ÙJNÂˆËÈZ[HÚXÚËZ[ˆİ]BˆÛÛœİØÚXÚÚ[•Ù^KÙ]ÚXÚÚ[•Ù^WHH\ÙTİ]J[
-NÂˆÛÛœİØÚXÚÚ[’\İÜKÙ]ÚXÚÚ[’\İÜWHH\ÙTİ]J×JNÂˆÛÛœİØÚXÚÚ[•Ù[™Z[™ËÙ]ÚXÚÚ[•Ù[™Z[™×HH\ÙTİ]J[
-NÂˆÛÛœİØÚXÚÚ[[Y]KÙ]ÚXÚÚ[[Y]WHH\ÙTİ]J[
-NÂˆÛÛœİØÚXÚÚ[ÛÛ[Y[Ù]ÚXÚÚ[ÛÛ[Y[HH\ÙTİ]JˆŠNÂˆÛÛœİØÚXÚÚ[”Ø]š[™ËÙ]ÚXÚÚ[”Ø]š[™×HH\ÙTİ]J˜[ÙJNÂˆËÈ˜XİXÙ\Èİ]BˆÛÛœİÜİ\Ü˜XİXÙ\ËÙ]İ\Ü˜XİXÙ\×HH\ÙTİ]J×JNÂˆÛÛœİÜ˜XİXÙQ]Z[Ù^KÙ]˜XİXÙQ]Z[Ù^WHH\ÙTİ]J[
-NÂˆËÈ]ZXÚÈÚ]İ]BˆÛÛœİÜ]ZXÚĞÚ]Y\ÜØYÙ\ËÙ]]ZXÚĞÚ]Y\ÜØYÙ\×HH\ÙTİ]J×JNÂˆÛÛœİÜ]ZXÚĞÚ][œ]Ù]]ZXÚĞÚ][œ]HH\ÙTİ]JˆŠNÂˆÛÛœİÜ]ZXÚĞÚ]ØY[™ËÙ]]ZXÚĞÚ]ØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]ZXÚĞÚ]^[™YÙ]]ZXÚĞÚ]^[™YHH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]ZXÚĞÚ]ÚİÒ\İÜKÙ]]ZXÚĞÚ]ÚİÒ\İÜWHH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]ZXÚĞÚ]ØÜ›ÛY\Ù]]ZXÚĞÚ]ØÜ›ÛY\HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]ZXÚĞÚ]\Ó™]Ô™\ÜÛœÙKÙ]]ZXÚĞÚ]\Ó™]Ô™\ÜÛœÙWHH\ÙTİ]J˜[ÙJNÂˆËÈ›ÛİË]\[œİÙ\™YÜXÜÈ›ÜˆRHY\ˆÛÛœİÙ›Ûİİ\[œİÙ\™YÜXÜËÙ]›Ûİİ\[œİÙ\™YÜXÜ×HH\ÙTİ]J[
-NÂˆËÈ\Ü^H˜[YBˆÛÛœİÜİ\Ü\Ü^S˜[YKÙ]İ\Ü\Ü^S˜[YWHH\ÙTİ]J[
-NÂˆÛÛœİÙ\Ü^S˜[YR[œ]Ù]\Ü^S˜[YR[œ]HH\ÙTİ]JˆŠNÂ‚ˆÛÛœİØXİ]™S[Ù[KÙ]Xİ]™S[Ù[WHH\ÙTİ]J
+  useEffect(() => () => {
+    cabinetVoiceIgnoreStopRef.current = true;
+    if (cabinetVoiceTimerRef.current) clearInterval(cabinetVoiceTimerRef.current);
+    cabinetVoiceStreamRef.current?.getTracks().forEach((track) => track.stop());
+    if (cabinetVoiceRecorderRef.current?.state === "recording") {
+      cabinetVoiceRecorderRef.current.stop();
+    }
+  }, []);
 
-HOˆÂˆYˆ
-PTĞ”S‘š\Ôİ\Ü[İ	‰ˆ\[ÙˆÚ[™İÈOOH[™Yš[™YŠHÂˆÛÛœİÜİHÚ[™İË›ØØ][Û‹šÜİ˜[YNÂˆYˆ
-ÜİOOHšX[ØÚØK[ÜÜšK›Û›[™HˆÜİœİ\ÕÚ]
-šX[ˆŠJH™]\›ˆ˜›ÙHÂˆÛÛœİ\˜[\ÈH™]ÈT“ÙX\˜Ú\˜[\ÊÚ[™İË›ØØ][Û‹œÙX\˜Ú
-NÂˆYˆ
-\˜[\Ë™Ù]
-›[Ù[HŠHOOH˜›ÙHŠH™]\›ˆ˜›ÙHÂˆBˆ™]\›ˆœİ\ÜÂˆJNÂˆÛÛœİİ\ØYÙP˜[[˜ÙKÙ]\ØYÙP˜[[˜ÙWHH\ÙTİ]J[
-NÂ‚ˆËÈ›ÙH[ZÙHİ]BˆÛÛœİØ›ÙR[ZÙTİYÙKÙ]›ÙR[ZÙTİYÙWHH\ÙTİ]JšYHŠNÈËÈYHš[[™È[˜[^š[™È™\İ[ˆÛÛœİØ›ÙR[ZÙT™\İ[Ù]›ÙR[ZÙT™\İ[HH\ÙTİ]J[
-NÂˆÛÛœİØ›ÙR[ZÙTİ\Ù]›ÙR[ZÙTİ\HH\ÙTİ]J
-NÈËÈ\İ[[X\KOXÛÙK\[‹ÏXİB‚ˆËÈ›ÙHØÜ™Y[ˆİ]HXXÚ[™BˆÛÛœİØ›ÙTØÜ™Y[‹Ù]›ÙTØÜ™Y[—HH\ÙTİ]J›[™[™ÈŠNÈËÈ[™[™È[ZÙH™\İ[ØXš[™]X\WÙY]X\WÜ™\İ[ˆÛÛœİØ›ÙPØXš[™]]KÙ]›ÙPØXš[™]]WHH\ÙTİ]J[
-NÂˆÛÛœİØ›ÙPØXš[™]ØY[™ËÙ]›ÙPØXš[™]ØY[™×HH\ÙTİ]J˜[ÙJNÂ‚ˆËÈİ\ÜÛÛÚ]İ]BˆÛÛœİÜİ\Ü[‹Ù]İ\Ü[—HH\ÙTİ]J[
-NÂˆÛÛœİÜÚİÔÙ[\ÜÙ\ÜÛY[Ù]ÚİÔÙ[\ÜÙ\ÜÛY[HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØØ[“X[˜YÙUÚ]İ]ÜXÚX[\İÙ]Ø[“X[˜YÙUÚ]İ]ÜXÚX[\İHH\ÙTİ]J[
-NÂˆÛÛœİÜÚİÔİ\ÜÛÛÚ]Ù]ÚİÔİ\ÜÛÛÚ]HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜÚİÔÜXÚX[\İ[[Ù]ÚİÔÜXÚX[\İ[[HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜÜXÚX[\İ[[Û™KÙ]ÜXÚX[\İ[[Û™WHH\ÙTİ]J˜[ÙJNÂ‚ˆÛÛœİPÕPÑTÈHÂˆÈYˆ˜œ™X][™È‹]Nˆ´%4bôat,4/t.4-H8 $Íˆ4/4.4/t`ô`ˆ4/ô`4.4`´`4-t,´/´,ô-H‹š[NˆŒKXœ™X][™Ë›Y‹\ØÜš\[Ûˆ´'4-t-4.ô-t/t/t/´-H4-4bôat,4/t.4-H4`H4,t/´.ô-t-H4-4.ô.4/t/tbô/4,´bô-4/´at/´/4aô`´/´,tbÈ4/t-t/4/t/´,ô/ˆ4`t/t.4-ô.4`´c4`´-t.ô-t`t/t/´-H4/t,4/ô`4cô-´-t/t.4-Kˆ‹\˜][ÛˆŒø $ÍH4/4.4/t`ô`ˆ‹Ø]YÛÜNˆ˜œ™X][™ÈˆKˆÈYˆ™Ü›İ[™[™È‹]Nˆ´%ô,4-ô-t/4.ô-t/t.4-Hx $Í8 $Ìø $Ì¸ $ÌH‹š[NˆŒ‹YÜ›İ[™[™Ë›Y‹\ØÜš\[Ûˆ´(´-tat/t.4.´,4-ô,4-ô-t/4.ô-t/t.4cÈ4aô-t`4-t-È4/´`4,ô,4/tbÈ4aô`ô,´`t`´,ˆ4-4.ôcÈ4,´/´-ô,´`4,4bt-t/t.4cÈ4,ˆ4/t,4`t`´/´côbt.4.H4/4/´/4-t/t`‹ˆ‹\˜][ÛˆH4/4.4/t`ô`ˆ‹Ø]YÛÜNˆ™Ü›İ[™[™ÈˆKˆÈYˆš˜]×Ü™[^][Ûˆ‹]Nˆ´'4cô,ô.´/´-H4`4,4`t`t.ô,4,t.ô-t/t.4-H4.ô.4a´,4.4aô-t.ôc´`t`´.‹š[NˆŒËZ˜]Ë\™[^][Û‹›Y‹\ØÜš\[Ûˆ´(t/tcô`´.4-H4/t,4/ô`4cô-´-t/t.4cÈ4`H4.ô.4a´,4aô-t.ôc´`t`´.4.4b4-t.ˆ‹\˜][ÛˆŒø $ÍH4/4.4/t`ô`ˆ‹Ø]YÛÜNˆ™Ü›İ[™[™ÈˆKˆÈYˆœÛY\Ü™\‹]Nˆ´'ô`4,4.´`´.4.´,4/ô-t`4-t-4`t/t/´/‹š[NˆŒ\ÛY\\™\›Y‹\ØÜš\[Ûˆ´'4cô,ô.´,4cÈ4/ô/´-4,ô/´`´/´,´.´,4.´/ˆ4`t/t`È4/ô`4.4`´`4-t,´/´,ô-H4.4.ô.4,t-t`t`t/´/t/t.4a´-Kˆ‹\˜][ÛˆŒL8 $ÌMH4/4.4/t`ô`ˆ‹Ø]YÛÜNˆœÛY\ˆKˆÈYˆ›™XÚ×ÜÚİ[\œ×Üİ™]Ú‹]Nˆ´'4cô,ô.´,4cÈ4`4,4`t`´cô-´.´,4b4-t.4.4/ô.ô-taÈ‹š[NˆŒK[™XÚË\Úİ[\œË\İ™]Ú›Y‹\ØÜš\[Ûˆ´(t/tcô`´.4-H4/4bôb4-taô/t/´,ô/ˆ4/t,4/ô`4cô-´-t/t.4cÈ4,ˆ4,´-t`4at/t-t.H4aô,4`t`´.4`´-t.ô,ˆ‹\˜][ÛˆH4/4.4/t`ô`ˆ‹Ø]YÛÜNˆ˜Xİ]š]HˆKˆÈYˆ™X\H‹]Nˆ´%4/t-t,´/t.4.ˆ4`t/´`t`´/´cô/t.4cÈ4/t,È4-4/tcÈ‹š[NˆŒ‹YX\K›Y‹\ØÜš\[Ûˆ´&´`4,4`´.´.4-H4-t-´-t-4/t-t,´/tbô-H4-ô,4/ô.4`t.4-4.ôcÈ4/´`´`t.ô-t-´.4,´,4/t.4cÈ4.4-ô/4-t/t-t/t.4.Kˆ‹\˜][ÛˆH4/4.4/t`ô`ˆ4,ˆ4-4-t/tc‹Ø]YÛÜNˆš›İ\›˜[[™ÈˆKˆÈYˆŒÜ[ˆ‹]Nˆ´'ô.ô,4/H4aô,4`t,4,t-t-È4`ôat`ô-4b4-t/t.4cÈ‹š[NˆŒËL\[‹›Y‹\ØÜš\[Ûˆ´'ô/´b4,4,ô/´,´bô.H4/ô.ô,4/H4/t,4,t.ô.4-´,4.tb4.4-H4`t`ô`´.´.ˆ‹\˜][Ûˆ¸ %‹Ø]YÛÜNˆœ›İ][™HˆKˆÈYˆœÚÜİØ[È‹]Nˆ´&´/´`4/´`´.´,4cÈ4/ô`4/´,ô`ô.ô.´,‹š[Nˆ[\ØÜš\[Ûˆ´'ô`4/´,ô`ô.ô.´,4/t,4`t,´-t-´-t/4,´/´-ô-4`ôat-H4-4.ôcÈ4`t/4-t/tbÈ4/´,t`t`´,4/t/´,´.´.4.4.ôdt,ô.´/´.H4a4.4-ô.4aô-t`t.´/´.H4,4.´`´.4,´/t/´`t`´.ˆ‹\˜][ÛˆŒMx $ÌÌ4/4.4/t`ô`ˆ‹Ø]YÛÜNˆ˜Xİ]š]HˆKˆNÂ‚ˆ[˜İ[ÛˆİÛ›ØY˜XİXÙQš[Jš[JHÂˆÛÛœİ[˜ÚÜˆHØİ[Y[˜Ü™X]Q[[Y[
-˜HŠNÂˆ[˜ÚÜ‹š™YˆHÜİ\Ü\˜XİXÙ\ËÉÙš[_XÂˆ[˜ÚÜ‹™İÛ›ØYHš[NÂˆ[˜ÚÜ‹˜ÛXÚÊ
-NÂˆB‚ˆ[˜İ[ÛˆİÛ›ØY›ÙR[ZÙR”ÓÓŠ
-HÂˆYˆ
-X›ÙR[ZÙT™\İ[
-H™]\›ÂˆÛÛœİ]HHÂˆ[Y\İ[\ˆ™]È]J
-KÒTÓÔİš[™Ê
-KˆÙ\ÜÚ[Û—ÚYˆ›ÙR[ZÙT™\İ[œÙ\ÜÚ[Û—ÚY[ˆ[ZÙNˆ›ÙR[ZÙT™\İ[š[ZÙWØ[œİÙ\œÈ[ˆ›ZNˆ›ÙR[ZÙT™\İ[˜›ZKˆØ\™WÜ™XÛÛ[Y[™][Ûˆ›ÙR[ZÙT™\İ[˜Ø\™WÜ™XÛÛ[Y[™][Û‹ˆšYÙÙ\™YÜ™YÙ›YÜÎˆ›ÙR[ZÙT™\İ[šYÙÙ\™YÜ™YÙ›YÜÈ×Kˆ™YÙ›Y×ØØ\™WÛ]™[ˆ›ÙR[ZÙT™\İ[œ™YÙ›Y×ØØ\™WÛ]™[[ˆ\Ù\—Ü™\Üˆ›ÙR[ZÙT™\İ[\Ù\—Ü™\Üˆ›ÙWÜ[ˆ›ÙR[ZÙT™\İ[˜›ÙWÜ[‹ˆ\ÙYÙ˜[˜XÚÎˆ›ÙR[ZÙT™\İ[\ÙYÙ˜[˜XÚÈ˜[ÙKˆ[Ù[İ\ÙYˆ›ÙR[ZÙT™\İ[›[Ù[İ\ÙY[ˆNÂˆÛÛœİ›ØˆH™]È›ØŠÒ”ÓÓ‹œİš[™ÚYJ]K[ŠWKÈ\Nˆ˜\XØ][Û‹ÚœÛÛˆˆJNÂˆÛÛœİ\›HT“˜Ü™X]SØš™XİT“
-›ØŠNÂˆÛÛœİHHØİ[Y[˜Ü™X]Q[[Y[
-˜HŠNÂˆKš™YˆH\›ÂˆK™İÛ›ØYH›ÙKZ[ZÙKIÛ™]È]J
-KÒTÓÔİš[™Ê
-KœÛXÙJL
-_KšœÛÛ˜ÂˆK˜ÛXÚÊ
-NÂˆT“œ™]›ÚÙSØš™XİT“
-\›
-NÂˆB‚ˆ\Ş[˜È[˜İ[ÛˆİÛ›ØY™\ÜŠ
-HÂˆÛÛœİÈY˜][ˆœÔˆHH]ØZ][\Ü
-šœÜˆŠNÂˆÛÛœİØÈH™]ÈœÔŠ
-NÂˆÛÛœİ\Ù\ˆH\Ù\”\¸ %ÂˆÛÛœİØİÜˆHØİÜ”\¸ %Âˆ]HHŒÂˆØËœÙ]›ÛÚ^™JM
-NÂˆØË^
-´'´`´aôdt`ˆ4-4.ôcÈ4,´,4`H‹ŒJNÂˆH
-ÏHÂˆØËœÙ]›ÛÚ^™JL
-NÂˆÛÛœİ\Ù\“[™\ÈHØËœÜ]^ÔÚ^™J\Ù\‹œ™\XÙJÏOOUTÑT—Ô‘TÔ•OOKÙËˆŠKš[J
-KMÌ
-NÂˆ\Ù\“[™\Ë™›Ü‘XXÚ
+  const [sessionReviewOpen, setSessionReviewOpen] = useState(false);
+  const [patientRating, setPatientRating] = useState(0);
+  const [patientUseful, setPatientUseful] = useState("");
+  const [patientUnclear, setPatientUnclear] = useState("");
+  const [doctorFeedback, setDoctorFeedback] = useState({
+    wrongQuestions: "",
+    missingQuestions: "",
+    badQuestionWording: "",
+    correctedUserReport: "",
+    correctedDoctorReport: "",
+    protocolUpdate: "",
+    generalComment: "",
+  });
 
-[™JHOˆÂˆYˆ
-HˆÍJHÈØË˜YYÙJ
-NÈHHŒÈBˆØË^
-[™KŒJNÂˆH
-ÏHNÂˆJNÂˆH
-ÏHLÂˆØËœÙ]›ÛÚ^™JM
-NÂˆØË^
-´'´`´aôdt`ˆ4-4.ôcÈ4`t/ô-ta´.4,4.ô.4`t`´,‹ŒJNÂˆH
-ÏHÂˆØËœÙ]›ÛÚ^™JL
-NÂˆÛÛœİØİÜ“[™\ÈHØËœÜ]^ÔÚ^™JØİÜ‹œ™\XÙJÏOOQĞÕÔ—Ô‘TÔ•OOKÙËˆŠKš[J
-KMÌ
-NÂˆØİÜ“[™\Ë™›Ü‘XXÚ
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [dialogDepth, setDialogDepth] = useState(0);
 
-[™JHOˆÂˆYˆ
-HˆÍJHÈØË˜YYÙJ
-NÈHHŒÈBˆØË^
-[™KŒJNÂˆH
-ÏHNÂˆJNÂˆØËœØ]™JİÚ]IÜX›XĞÛÙHØÚØK[ÜÜšHŸKœ˜
-NÂˆB‚ˆ[˜İ[ÛˆİÛ›ØY™\ÜĞÖ
+  const [sessionModalOpen, setSessionModalOpen] = useState(false);
+  const [loadingSession, setLoadingSession] = useState(false);
 
-HÂˆÛÛœİ\Ù\ˆH\Ù\”\¸ %ÂˆÛÛœİØİÜˆHØİÜ”\¸ %ÂˆÛÛœİ[HQĞÕTH[‚[XYY]HÚ\œÙ]H]‹N]O´'´`´aôdt`ˆ4(´/´aô.´,4'´/ô/´`4,İ]OÚXY‚›ÙHİ[OH™›ÛY˜[Z[N‰ÔÙ\šY‰ËÙ[Ü™ÚXKÙ\šYÛX^]ÚYÌÛX\™Ú[]]ÎÛ[™KZZYÚŒKÈ‚O´'´`´aôdt`ˆ4-4.ôcÈ4,´,4`OÚO‚‰İ\Ù\‹œ™\XÙJÏOOUTÑT—Ô‘TÔ•OOKÙËˆŠKš[J
-KœÜ]
-—ˆŠK›X\
-Oˆ‰ÛOÜ˜
-Kš›Ú[Š—ˆŠ_Bˆİ[OH›X\™Ú[ŒÌ‚O´'´`´aôdt`ˆ4-4.ôcÈ4`t/ô-ta´.4,4.ô.4`t`´,ÚO‚‰ÙØİÜ‹œ™\XÙJÏOOQĞÕÔ—Ô‘TÔ•OOKÙËˆŠKš[J
-KœÜ]
-—ˆŠK›X\
-Oˆ‰ÛOÜ˜
-Kš›Ú[Š—ˆŠ_BØ›ÙOÚ[˜ÂˆÛÛœİ›ØˆH™]È›ØŠÚ[KÈ\Nˆ˜\XØ][Û‹Û\İÛÜ™ˆJNÂˆÛÛœİ\›HT“˜Ü™X]SØš™XİT“
-›ØŠNÂˆÛÛœİHHØİ[Y[˜Ü™X]Q[[Y[
-˜HŠNÂˆKš™YˆH\›ÂˆK™İÛ›ØYHİÚ]IÜX›XĞÛÙHØÚØK[ÜÜšHŸK™ØØÂˆK˜ÛXÚÊ
-NÂˆT“œ™]›ÚÙSØš™XİT“
-\›
-NÂˆB‚ˆ[˜İ[ÛˆY˜XİXÙUÔ[Š˜XİXÙRY
-HÂˆÛÛœİ˜XİXÙHHPÕPÑTË™š[™
-OˆšYOOH˜XİXÙRY
-NÂˆYˆ
-\˜XİXÙJH™]\›ÂˆÛÛœİİ\œ™[Hİ\Ü[ËœÙ[XİYÜ˜XİXÙ\È×NÂˆYˆ
-İ\œ™[œÛÛYJOˆšYOOH˜XİXÙRY
-JH™]\›ÂˆÛÛœİ\]YHË‹‹˜İ\œ™[ÈYˆ˜XİXÙKšY]Nˆ˜XİXÙK]KÙ[XİYØ]ˆ™]È]J
-KÒTÓÔİš[™Ê
-KİÛ›ØYYˆ˜[ÙHWNÂˆÛÛœİ™]Ô[ˆHÈ‹‹Šİ\Ü[ˆßJKÙ[XİYÜ˜XİXÙ\Îˆ\]YNÂˆÙ]İ\Ü[Š™]Ô[ŠNÂˆØ]™Tİ\Ü[Š™]Ô[ŠNÂˆØ]™Tİ\Ü˜XİXÙJ˜XİXÙRY
-NÂˆÚİÕØ\İ
-´%4/´,t,4,´.ô-t/t/ˆ4,ˆ4/ô.ô,4/Kˆ4'ô`4.4`t.ô-t-4`ôc´bt-t/4`4,4-ô,ô/´,´/´`4-H4/4bÈ4`t/ô`4/´`t.4/4`ô-4,4.ô/´`tc4.ô.4/ô/´/ô`4/´,t/´,´,4`´cˆŠNÂˆB‚ˆ[˜İ[ÛˆØ]™Tİ\Ü[Š[ŠHÂˆÛÛœİÜH[ˆİ\Ü[ÂˆYˆ
-\Ü
-H™]\›ÂˆYˆ
-X›XĞÛÙJHÂˆÛÛœİ\]P›ÙHHÚ]XØÙ\ÜÕÚÙ[ŠÂˆXİ[Ûˆ\]Tİ\Ü[ˆ‹X›X×ØÛÙNˆX›XĞÛÙKÙ\ÜÚ[Û—ÚYˆÙ\ÜÚ[Û’Yİ\ÜÜ[ˆÜˆKÙ\ÜÚ[Û’Y
-NÂˆ™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJ\]P›ÙJKˆJK˜Ø]Ú
+  // Anonymous Continuation Credential Pass
+  const [continuationCode, setContinuationCode] = useState(null);
+  const [continuationCodeInput, setContinuationCodeInput] = useState("");
+  const [continuationCodeError, setContinuationCodeError] = useState("");
+  const [regeneratedCode, setRegeneratedCode] = useState(null);
+  const [sessionData, setSessionData] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
+  const [publicCode, setPublicCode] = useState(null);
+  const [isContinuation, setIsContinuation] = useState(false);
+  const [previousPatientReport, setPreviousPatientReport] = useState("");
+  const [previousDoctorReport, setPreviousDoctorReport] = useState("");
+  const [homeTasks, setHomeTasks] = useState("");
+  const [resourceFactors, setResourceFactors] = useState("");
+  const [debugInfo, setDebugInfo] = useState(null);
+  const [careRecommendation, setCareRecommendation] = useState(null);
+  const [showConsultPrep, setShowConsultPrep] = useState(false);
 
 
-HOˆßJNÂˆBˆØØ[İÜ˜YÙKœÙ]][JØÚØWÜİ\ÜÜ[ˆ‹”ÓÓ‹œİš[™ÚYJÜ
-JNÂˆB‚ˆÛÛœİİØ\İÙ]Ø\İHH\ÙTİ]JÈY\ÜØYÙNˆˆ‹\Nˆˆ‹Ù^NˆJNÂˆÛÛœİØ\İ[Y\”™YˆH\ÙT™YŠ[
-NÂ‚ˆËÈ]]ËY\ÛZ\ÜÈØ\İY\ˆÈÙXÛÛ™Âˆ\ÙQY™™Xİ
+  // Support Cabinet MVP
+  const [supportCabinet, setSupportCabinet] = useState(null);
+  const [supportLiveOpen, setSupportLiveOpen] = useState(false);
+  const [patientInvitations, setPatientInvitations] = useState([]);
+  const [patientInvitationsLoading, setPatientInvitationsLoading] = useState(false);
+  const [patientInviteModalOpen, setPatientInviteModalOpen] = useState(false);
+  const [patientInviteCreated, setPatientInviteCreated] = useState(null);
+  const [matchRequestSending, setMatchRequestSending] = useState(false);
+  const [cabinetLoading, setCabinetLoading] = useState(false);
+  const [followUpAnswers, setFollowUpAnswers] = useState({});
+  const [reportSource, setReportSource] = useState(null); // "generated" | "cabinet"
+  const [justFinishedSession, setJustFinishedSession] = useState(false);
+  // Support Cabinet expanded features
+  const [supportViewingSession, setSupportViewingSession] = useState(null);
+  const [supportViewingSessionData, setSupportViewingSessionData] = useState(null);
+  const [supportSessionLoading, setSupportSessionLoading] = useState(false);
+  const [supportNewRequestOpen, setSupportNewRequestOpen] = useState(false);
+  const [supportRequestSessionId, setSupportRequestSessionId] = useState(null);
+  const [supportNewRequest, setSupportNewRequest] = useState({ service_code: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
+  const [supportRequestSubmitting, setSupportRequestSubmitting] = useState(false);
+  const [accessExpanded, setAccessExpanded] = useState(false);
+  const [profileExpanded, setProfileExpanded] = useState(false);
+  // Daily check-in state
+  const [checkinToday, setCheckinToday] = useState(null);
+  const [checkinHistory, setCheckinHistory] = useState([]);
+  const [checkinWellbeing, setCheckinWellbeing] = useState(null);
+  const [checkinAnxiety, setCheckinAnxiety] = useState(null);
+  const [checkinComment, setCheckinComment] = useState("");
+  const [checkinSaving, setCheckinSaving] = useState(false);
+  // Practices state
+  const [supportPractices, setSupportPractices] = useState([]);
+  const [practiceDetailKey, setPracticeDetailKey] = useState(null);
+  // Quick chat state
+  const [quickChatMessages, setQuickChatMessages] = useState([]);
+  const [quickChatInput, setQuickChatInput] = useState("");
+  const [quickChatLoading, setQuickChatLoading] = useState(false);
+  const [quickChatExpanded, setQuickChatExpanded] = useState(false);
+  const [quickChatShowHistory, setQuickChatShowHistory] = useState(false);
+  const [quickChatScrolledUp, setQuickChatScrolledUp] = useState(false);
+  const [quickChatHasNewResponse, setQuickChatHasNewResponse] = useState(false);
+  // Follow-up answered topics for AI dedup
+  const [followupAnsweredTopics, setFollowupAnsweredTopics] = useState(null);
+  // Display name
+  const [supportDisplayName, setSupportDisplayName] = useState(null);
+  const [displayNameInput, setDisplayNameInput] = useState("");
+
+  const [activeModule, setActiveModule] = useState(() => {
+    if (!APP_BRAND.isSupportPilot && typeof window !== "undefined") {
+      const host = window.location.hostname;
+      if (host === "health.tochka-opori.online" || host.startsWith("health.")) return "body";
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("module") === "body") return "body";
+    }
+    return "support";
+  });
+  const [usageBalance, setUsageBalance] = useState(null);
+
+  // Body intake state
+  const [bodyIntakeStage, setBodyIntakeStage] = useState("idle"); // idle | filling | analyzing | result
+  const [bodyIntakeResult, setBodyIntakeResult] = useState(null);
+  const [bodyIntakeStep, setBodyIntakeStep] = useState(0); // 0=summary, 1=code, 2=plan, 3=cta
+
+  // Body screen state machine
+  const [bodyScreen, setBodyScreen] = useState("landing"); // landing | intake | result | cabinet | diary_edit | diary_result
+  const [bodyCabinetData, setBodyCabinetData] = useState(null);
+  const [bodyCabinetLoading, setBodyCabinetLoading] = useState(false);
+
+  // Support Toolkit state
+  const [supportPlan, setSupportPlan] = useState(null);
+  const [showSelfAssessment, setShowSelfAssessment] = useState(false);
+  const [canManageWithoutSpecialist, setCanManageWithoutSpecialist] = useState(null);
+  const [showSupportToolkit, setShowSupportToolkit] = useState(false);
+  const [showSpecialistIntent, setShowSpecialistIntent] = useState(false);
+  const [specialistIntentDone, setSpecialistIntentDone] = useState(false);
+
+  const PRACTICES = [
+    { id: "breathing", title: "Ğ”Ñ‹Ñ…Ğ°Ğ½Ğ¸Ğµ 4â€“6 Ğ¼Ğ¸Ğ½ÑƒÑ‚ Ğ¿Ñ€Ğ¸ Ñ‚Ñ€ĞµĞ²Ğ¾Ğ³Ğµ", file: "01-breathing.md", description: "ĞœĞµĞ´Ğ»ĞµĞ½Ğ½Ğ¾Ğµ Ğ´Ñ‹Ñ…Ğ°Ğ½Ğ¸Ğµ Ñ Ğ±Ğ¾Ğ»ĞµĞµ Ğ´Ğ»Ğ¸Ğ½Ğ½Ñ‹Ğ¼ Ğ²Ñ‹Ğ´Ğ¾Ñ…Ğ¾Ğ¼, Ñ‡Ñ‚Ğ¾Ğ±Ñ‹ Ğ½ĞµĞ¼Ğ½Ğ¾Ğ³Ğ¾ ÑĞ½Ğ¸Ğ·Ğ¸Ñ‚ÑŒ Ñ‚ĞµĞ»ĞµÑĞ½Ğ¾Ğµ Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ğµ.", duration: "3â€“5 Ğ¼Ğ¸Ğ½ÑƒÑ‚", category: "breathing" },
+    { id: "grounding", title: "Ğ—Ğ°Ğ·ĞµĞ¼Ğ»ĞµĞ½Ğ¸Ğµ 5â€“4â€“3â€“2â€“1", file: "02-grounding.md", description: "Ğ¢ĞµÑ…Ğ½Ğ¸ĞºĞ° Ğ·Ğ°Ğ·ĞµĞ¼Ğ»ĞµĞ½Ğ¸Ñ Ñ‡ĞµÑ€ĞµĞ· Ğ¾Ñ€Ğ³Ğ°Ğ½Ñ‹ Ñ‡ÑƒĞ²ÑÑ‚Ğ² Ğ´Ğ»Ñ Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ñ Ğ² Ğ½Ğ°ÑÑ‚Ğ¾ÑÑ‰Ğ¸Ğ¹ Ğ¼Ğ¾Ğ¼ĞµĞ½Ñ‚.", duration: "5 Ğ¼Ğ¸Ğ½ÑƒÑ‚", category: "grounding" },
+    { id: "jaw_relaxation", title: "ĞœÑĞ³ĞºĞ¾Ğµ Ñ€Ğ°ÑÑĞ»Ğ°Ğ±Ğ»ĞµĞ½Ğ¸Ğµ Ğ»Ğ¸Ñ†Ğ° Ğ¸ Ñ‡ĞµĞ»ÑÑÑ‚Ğ¸", file: "03-jaw-relaxation.md", description: "Ğ¡Ğ½ÑÑ‚Ğ¸Ğµ Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ñ Ñ Ğ»Ğ¸Ñ†Ğ°, Ñ‡ĞµĞ»ÑÑÑ‚Ğ¸ Ğ¸ ÑˆĞµĞ¸.", duration: "3â€“5 Ğ¼Ğ¸Ğ½ÑƒÑ‚", category: "grounding" },
+    { id: "sleep_prep", title: "ĞŸÑ€Ğ°ĞºÑ‚Ğ¸ĞºĞ° Ğ¿ĞµÑ€ĞµĞ´ ÑĞ½Ğ¾Ğ¼", file: "04-sleep-prep.md", description: "ĞœÑĞ³ĞºĞ°Ñ Ğ¿Ğ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²ĞºĞ° ĞºĞ¾ ÑĞ½Ñƒ Ğ¿Ñ€Ğ¸ Ñ‚Ñ€ĞµĞ²Ğ¾Ğ³Ğµ Ğ¸Ğ»Ğ¸ Ğ±ĞµÑÑĞ¾Ğ½Ğ½Ğ¸Ñ†Ğµ.", duration: "10â€“15 Ğ¼Ğ¸Ğ½ÑƒÑ‚", category: "sleep" },
+    { id: "neck_shoulders_stretch", title: "ĞœÑĞ³ĞºĞ°Ñ Ñ€Ğ°ÑÑ‚ÑĞ¶ĞºĞ° ÑˆĞµĞ¸ Ğ¸ Ğ¿Ğ»ĞµÑ‡", file: "05-neck-shoulders-stretch.md", description: "Ğ¡Ğ½ÑÑ‚Ğ¸Ğµ Ğ¼Ñ‹ÑˆĞµÑ‡Ğ½Ğ¾Ğ³Ğ¾ Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ñ Ğ² Ğ²ĞµÑ€Ñ…Ğ½ĞµĞ¹ Ñ‡Ğ°ÑÑ‚Ğ¸ Ñ‚ĞµĞ»Ğ°.", duration: "5 Ğ¼Ğ¸Ğ½ÑƒÑ‚", category: "activity" },
+    { id: "diary", title: "Ğ”Ğ½ĞµĞ²Ğ½Ğ¸Ğº ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ñ Ğ½Ğ° 3 Ğ´Ğ½Ñ", file: "06-diary.md", description: "ĞšÑ€Ğ°Ñ‚ĞºĞ¸Ğµ ĞµĞ¶ĞµĞ´Ğ½ĞµĞ²Ğ½Ñ‹Ğµ Ğ·Ğ°Ğ¿Ğ¸ÑĞ¸ Ğ´Ğ»Ñ Ğ¾Ñ‚ÑĞ»ĞµĞ¶Ğ¸Ğ²Ğ°Ğ½Ğ¸Ñ Ğ¸Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ğ¹.", duration: "5 Ğ¼Ğ¸Ğ½ÑƒÑ‚ Ğ² Ğ´ĞµĞ½ÑŒ", category: "journaling" },
+    { id: "24h_plan", title: "ĞŸĞ»Ğ°Ğ½ 24 Ñ‡Ğ°ÑĞ° Ğ±ĞµĞ· ÑƒÑ…ÑƒĞ´ÑˆĞµĞ½Ğ¸Ñ", file: "07-24h-plan.md", description: "ĞŸĞ¾ÑˆĞ°Ğ³Ğ¾Ğ²Ñ‹Ğ¹ Ğ¿Ğ»Ğ°Ğ½ Ğ½Ğ° Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞ¸Ğµ ÑÑƒÑ‚ĞºĞ¸.", duration: "â€”", category: "routine" },
+    { id: "short_walk", title: "ĞšĞ¾Ñ€Ğ¾Ñ‚ĞºĞ°Ñ Ğ¿Ñ€Ğ¾Ğ³ÑƒĞ»ĞºĞ°", file: null, description: "ĞŸÑ€Ğ¾Ğ³ÑƒĞ»ĞºĞ° Ğ½Ğ° ÑĞ²ĞµĞ¶ĞµĞ¼ Ğ²Ğ¾Ğ·Ğ´ÑƒÑ…Ğµ Ğ´Ğ»Ñ ÑĞ¼ĞµĞ½Ñ‹ Ğ¾Ğ±ÑÑ‚Ğ°Ğ½Ğ¾Ğ²ĞºĞ¸ Ğ¸ Ğ»Ñ‘Ğ³ĞºĞ¾Ğ¹ Ñ„Ğ¸Ğ·Ğ¸Ñ‡ĞµÑĞºĞ¾Ğ¹ Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½Ğ¾ÑÑ‚Ğ¸.", duration: "15â€“30 Ğ¼Ğ¸Ğ½ÑƒÑ‚", category: "activity" },
+  ];
+
+  function downloadPracticeFile(file) {
+    const anchor = document.createElement("a");
+    anchor.href = `/support-practices/${file}`;
+    anchor.download = file;
+    anchor.click();
+  }
+
+  function downloadBodyIntakeJSON() {
+    if (!bodyIntakeResult) return;
+    const data = {
+      timestamp: new Date().toISOString(),
+      session_id: bodyIntakeResult.session_id || null,
+      intake: bodyIntakeResult.intake_answers || null,
+      bmi: bodyIntakeResult.bmi,
+      care_recommendation: bodyIntakeResult.care_recommendation,
+      triggered_red_flags: bodyIntakeResult.triggered_red_flags || [],
+      red_flag_care_level: bodyIntakeResult.red_flag_care_level || null,
+      user_report: bodyIntakeResult.user_report,
+      body_plan: bodyIntakeResult.body_plan,
+      used_fallback: bodyIntakeResult.used_fallback || false,
+      model_used: bodyIntakeResult.model_used || null,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `body-intake-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function downloadReportPDF() {
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+    const user = userPart || "â€”";
+    const doctor = doctorPart || "â€”";
+    let y = 20;
+    doc.setFontSize(14);
+    doc.text("ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ Ğ²Ğ°Ñ", 20, y);
+    y += 8;
+    doc.setFontSize(10);
+    const userLines = doc.splitTextToSize(user.replace(/===USER_REPORT===/g, "").trim(), 170);
+    userLines.forEach((line) => {
+      if (y > 275) { doc.addPage(); y = 20; }
+      doc.text(line, 20, y);
+      y += 5;
+    });
+    y += 10;
+    doc.setFontSize(14);
+    doc.text("ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°", 20, y);
+    y += 8;
+    doc.setFontSize(10);
+    const doctorLines = doc.splitTextToSize(doctor.replace(/===DOCTOR_REPORT===/g, "").trim(), 170);
+    doctorLines.forEach((line) => {
+      if (y > 275) { doc.addPage(); y = 20; }
+      doc.text(line, 20, y);
+      y += 5;
+    });
+    doc.save(`otchet-${publicCode || "tochka-opori"}.pdf`);
+  }
+
+  function downloadReportDOCX() {
+    const user = userPart || "â€”";
+    const doctor = doctorPart || "â€”";
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ¢Ğ¾Ñ‡ĞºĞ° ĞĞ¿Ğ¾Ñ€Ğ°</title></head>
+<body style="font-family:'PT Serif',Georgia,serif;max-width:700px;margin:40px auto;line-height:1.7">
+<h1>ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ Ğ²Ğ°Ñ</h1>
+${user.replace(/===USER_REPORT===/g, "").trim().split("\n").map(l => `<p>${l}</p>`).join("\n")}
+<hr style="margin:30px 0">
+<h1>ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°</h1>
+${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l}</p>`).join("\n")}
+</body></html>`;
+    const blob = new Blob([html], { type: "application/msword" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `otchet-${publicCode || "tochka-opori"}.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function addPracticeToPlan(practiceId) {
+    const practice = PRACTICES.find(p => p.id === practiceId);
+    if (!practice) return;
+    const current = supportPlan?.selected_practices || [];
+    if (current.some(p => p.id === practiceId)) return;
+    const updated = [...current, { id: practice.id, title: practice.title, selected_at: new Date().toISOString(), downloaded: false }];
+    const newPlan = { ...(supportPlan || {}), selected_practices: updated };
+    setSupportPlan(newPlan);
+    saveSupportPlan(newPlan);
+    saveSupportPractice(practiceId);
+    showToast("Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ»ĞµĞ½Ğ¾ Ğ² Ğ¿Ğ»Ğ°Ğ½. ĞŸÑ€Ğ¸ ÑĞ»ĞµĞ´ÑƒÑÑ‰ĞµĞ¼ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğµ Ğ¼Ñ‹ ÑĞ¿Ñ€Ğ¾ÑĞ¸Ğ¼, ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ»Ğ¸ Ğ¿Ğ¾Ğ¿Ñ€Ğ¾Ğ±Ğ¾Ğ²Ğ°Ñ‚ÑŒ.");
+  }
+
+  function saveSupportPlan(plan) {
+    const sp = plan || supportPlan;
+    if (!sp) return;
+    if (publicCode) {
+      const updateBody = withAccessToken({
+        action: "updateSupportPlan", public_code: publicCode, session_id: sessionId, support_plan: sp,
+      }, sessionId);
+      fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateBody),
+      }).catch(() => {});
+    }
+    localStorage.setItem("tochka_support_plan", JSON.stringify(sp));
+  }
+
+  const [toast, setToast] = useState({ message: "", type: "", key: 0 });
+  const toastTimerRef = useRef(null);
+
+  // Auto-dismiss toast after 3 seconds
+  useEffect(() => {
+    if (toast.message) {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => {
+        setToast({ message: "", type: "", key: 0 });
+      }, 3000);
+    }
+    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
+  }, [toast.key]);
+
+  function clearToast() {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message: "", type: "", key: 0 });
+  }
+
+  // Navigate to body cabinet from any workspace screen
+  function goToBodyCabinet() {
+    if (activeModule !== "body") return;
+    if (bodyScreen === "cabinet") return; // Already there
+    // Confirm if in diary_edit with unsaved changes
+    if (bodyScreen === "diary_edit") {
+      if (!window.confirm("Ğ’ĞµÑ€Ğ½ÑƒÑ‚ÑŒÑÑ Ğ² ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚? ĞĞµÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½Ğ½Ñ‹Ğµ Ğ¸Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ñ Ğ¼Ğ¾Ğ³ÑƒÑ‚ Ğ¿Ğ¾Ñ‚ĞµÑ€ÑÑ‚ÑŒÑÑ.")) return;
+    }
+    clearToast();
+    setBodyDiaryDayData(null);
+    setBodyScreen("cabinet");
+  }
+
+  // Support navigation: go to landing (no logout)
+  function goToSupportLanding() {
+    setSupportScreen("landing");
+    setPhase("input");
+    setSupportNewRequestOpen(false);
+    setSupportViewingSession(null);
+    setSupportViewingSessionData(null);
+  }
+
+  // Support navigation: go to cabinet
+  function goToSupportCabinet() {
+    setSupportScreen("cabinet");
+    setPhase("cabinet");
+    setSupportNewRequestOpen(false);
+    setSupportViewingSession(null);
+    setSupportViewingSessionData(null);
+  }
+
+  // Admin panel state
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminAuthed, setAdminAuthed] = useState(false);
+  const [adminReviews, setAdminReviews] = useState([]);
+  const [adminTotal, setAdminTotal] = useState(0);
+  const [adminFilter, setAdminFilter] = useState("all");
+  const [adminEnv, setAdminEnv] = useState("all");
+  const [adminExpertFilter, setAdminExpertFilter] = useState("all");
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminActionLoading, setAdminActionLoading] = useState(null);
+  const [editingReview, setEditingReview] = useState(null);
+  const [correctionForm, setCorrectionForm] = useState({
+    wrong_questions: "", missing_questions: "", bad_question_wording: "",
+    corrected_user_report: "", corrected_doctor_report: "",
+    protocol_update: "", correction_comment: "",
+    voice_accuracy: "", voice_usefulness: "", voice_influenced: "",
+    voice_confirmed: [], voice_comment: "",
+  });
+
+  // Expert state
+  const [expertData, setExpertData] = useState(() => {
+    try {
+      const saved = localStorage.getItem("tochka_expert");
+      const sessionCode = sessionStorage.getItem("tochka_expert_access_code");
+      return saved && sessionCode ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+  const [expertModalOpen, setExpertModalOpen] = useState(false);
+  const [expertCodeInput, setExpertCodeInput] = useState("");
+  const [expertLoggingIn, setExpertLoggingIn] = useState(false);
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [registerForm, setRegisterForm] = useState({
+    name: "", email: "", telegram: "", role: "psychologist", specialty: "", city: "", organization: "",
+  });
+  const [registerSending, setRegisterSending] = useState(false);
+  const [registrationResult, setRegistrationResult] = useState(null); // { access_code, expert }
+
+  // Organization state
+  const [organizations, setOrganizations] = useState([]);
+  const [orgFormOpen, setOrgFormOpen] = useState(false);
+  const [orgForm, setOrgForm] = useState({ name: "", slug: "", type: "private_clinic", city: "", comment: "" });
+
+  const orgTypeLabels = {
+    private_clinic: "Ğ§Ğ°ÑÑ‚Ğ½Ğ°Ñ ĞºĞ»Ğ¸Ğ½Ğ¸ĞºĞ°",
+    state_clinic: "Ğ“Ğ¾ÑÑƒĞ´Ğ°Ñ€ÑÑ‚Ğ²ĞµĞ½Ğ½Ğ°Ñ ĞºĞ»Ğ¸Ğ½Ğ¸ĞºĞ°",
+    research_institution: "ĞĞ°ÑƒÑ‡Ğ½Ğ¾Ğµ ÑƒÑ‡Ñ€ĞµĞ¶Ğ´ĞµĞ½Ğ¸Ğµ",
+    test: "Ğ¢ĞµÑÑ‚",
+  };
+  const [orgFormEditId, setOrgFormEditId] = useState(null);
+  const [orgDetail, setOrgDetail] = useState(null);
+  const [orgExperts, setOrgExperts] = useState([]);
+  const [orgAddExpertOpen, setOrgAddExpertOpen] = useState(false);
+  const [orgAddExpertId, setOrgAddExpertId] = useState("");
+  const [orgAddExpertRole, setOrgAddExpertRole] = useState("doctor");
+
+  // My patients state (expert panel)
+  const [myPatients, setMyPatients] = useState([]);
+  const [myPatientsLoading, setMyPatientsLoading] = useState(false);
+  const [patientModalOpen, setPatientModalOpen] = useState(false);
+  const [patientModalCode, setPatientModalCode] = useState("");
+
+  // Invite link state
+  const [inviteLinks, setInviteLinks] = useState([]);
+  const [inviteLinkModalOpen, setInviteLinkModalOpen] = useState(false);
+  const [inviteLinkLabel, setInviteLinkLabel] = useState("");
+  const [inviteLinkCreated, setInviteLinkCreated] = useState(null);
+
+  // Invite token from URL
+  const [inviteToken, setInviteToken] = useState(() => {
+    try {
+      const m = window.location.pathname.match(/^\/(?:start|invite)\/([a-z0-9]+)/i);
+      return m ? m[1] : (localStorage.getItem("tochka_invite_token") || null);
+    } catch { return null; }
+  });
+  const [inviteInfo, setInviteInfo] = useState(null);
+  const [inviteChecking, setInviteChecking] = useState(false);
+  const [inviteSpecialistAuth, setInviteSpecialistAuth] = useState({ loading: false, authenticated: false, error: null });
+  const [onboardingForm, setOnboardingForm] = useState({ name: "", contact_email: "", contact_phone: "", comment: "" });
+  const [onboardingSubmitting, setOnboardingSubmitting] = useState(false);
+
+  // Validate invite token on mount
+  React.useEffect(() => {
+    if (inviteToken) {
+      localStorage.setItem("tochka_invite_token", inviteToken);
+      setInviteChecking(true);
+      fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "validateInviteToken", token: inviteToken }),
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.valid && d.invite) {
+            setInviteInfo({ valid: true, ...d.invite });
+            if (d.invite.direction === "patient_to_specialist") {
+              setInviteSpecialistAuth({ loading: true, authenticated: false, error: null });
+              fetch("/api/specialist", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "same-origin",
+                body: JSON.stringify({ action: "me" }),
+              })
+                .then(async (response) => ({ response, data: await response.json() }))
+                .then(({ response, data }) => {
+                  if (data.ok) {
+                    setInviteSpecialistAuth({ loading: false, authenticated: true, error: null });
+                  } else if (response.status === 401 || response.status === 403) {
+                    setInviteSpecialistAuth({ loading: false, authenticated: false, error: null });
+                  } else {
+                    setInviteSpecialistAuth({ loading: false, authenticated: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€Ğ¸Ñ‚ÑŒ Ğ²Ñ…Ğ¾Ğ´ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°." });
+                  }
+                })
+                .catch(() => setInviteSpecialistAuth({ loading: false, authenticated: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€Ğ¸Ñ‚ÑŒ Ğ²Ñ…Ğ¾Ğ´ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°." }));
+            }
+          } else {
+            setInviteInfo({ valid: false, error: d.error || "Ğ¡ÑÑ‹Ğ»ĞºĞ° Ğ½ĞµĞ´ĞµĞ¹ÑÑ‚Ğ²Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ğ°" });
+          }
+        })
+        .catch(() => setInviteInfo({ valid: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ĞºĞ¸ ÑÑÑ‹Ğ»ĞºĞ¸" }))
+        .finally(() => setInviteChecking(false));
+    }
+  }, []);
+
+  // Handle ?ref=alena / ?source=alena query params
+  React.useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("ref");
+      const source = params.get("source");
+      if (ref === "alena" || source === "alena") {
+        localStorage.setItem("body_referral_source", "alena_client");
+        localStorage.setItem("body_specialist_id", "alena_zhukova");
+        localStorage.setItem("body_specialist_name", "ĞĞ»ĞµĞ½Ğ° Ğ–ÑƒĞºĞ¾Ğ²Ğ°");
+      }
+    } catch (e) {}
+  }, []);
+
+  // Auto-load body cabinet if session exists on mount
+  React.useEffect(() => {
+    if (activeModule === "body" && bodyScreen === "landing") {
+      const saved = getBodySession();
+      if (saved.sessionId && saved.accessToken) {
+        loadBodyCabinet();
+      }
+    }
+  }, []);
+
+  // Clear body continuation error when screen changes
+  React.useEffect(() => {
+    setBodyContinuationError("");
+  }, [bodyScreen]);
+
+  const [adminReqTab, setAdminReqTab] = useState("reviews");
+  const [adminRequests, setAdminRequests] = useState([]);
+  const [adminReqFilter, setAdminReqFilter] = useState("pending");
+
+  // Admin crisis requests state
+  const [adminCrisisRequests, setAdminCrisisRequests] = useState([]);
+  const [adminCrisisFilter, setAdminCrisisFilter] = useState("new");
+  const [adminCrisisLoading, setAdminCrisisLoading] = useState(false);
+  const [adminCrisisActionLoading, setAdminCrisisActionLoading] = useState(null);
+  const [adminDarkMode, setAdminDarkMode] = useState(true);
+  const [adminReviewShowTrash, setAdminReviewShowTrash] = useState(false);
+  const [deleteConfirmReviewId, setDeleteConfirmReviewId] = useState(null);
+  const [deleteConfirmCode, setDeleteConfirmCode] = useState("");
+  const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
+  const [deleteConfirmType, setDeleteConfirmType] = useState("soft");
+
+  // Admin role (super / support / body)
+  const [adminRole, setAdminRole] = useState(null);
+  // Admin sub-page for SPA navigation (null = derive from URL)
+  const [adminSubPage, setAdminSubPage] = useState(null);
+
+  // Body intake admin state
+  const [bodyIntakeRecords, setBodyIntakeRecords] = useState([]);
+  const [bodyIntakeTotal, setBodyIntakeTotal] = useState(0);
+  const [bodyIntakeLoading, setBodyIntakeLoading] = useState(false);
+  const [bodyIntakeDetail, setBodyIntakeDetail] = useState(null);
+  const [bodyIntakeDetailOpen, setBodyIntakeDetailOpen] = useState(false);
+  const [bodyIntakeShowDeleted, setBodyIntakeShowDeleted] = useState(false);
+  const [bodyIntakeDeleteConfirm, setBodyIntakeDeleteConfirm] = useState(null);
+  const [bodyIntakeSourceFilter, setBodyIntakeSourceFilter] = useState("all");
+
+  const [bodyCodeCopied, setBodyCodeCopied] = useState(false);
+
+  // Body diary state
+  const [bodyDiarySessionId, setBodyDiarySessionId] = useState(null);
+  const [bodyContinuationInput, setBodyContinuationInput] = useState("");
+  const [bodyContinuationError, setBodyContinuationError] = useState("");
+  const [bodyDiaryOpen, setBodyDiaryOpen] = useState(false);
+  const [bodyDiaryResult, setBodyDiaryResult] = useState(null);
+  const [bodyDiaryDayData, setBodyDiaryDayData] = useState(null);
+  const [bodyDiaryHistory, setBodyDiaryHistory] = useState(null);
+  const [bodyDiaryHistoryOpen, setBodyDiaryHistoryOpen] = useState(false);
+  const [bodyDiaryHistoryLoading, setBodyDiaryHistoryLoading] = useState(false);
+  const [bodyDiaryHistoryDetail, setBodyDiaryHistoryDetail] = useState(null);
+  const [bodyDiaryRecords, setBodyDiaryRecords] = useState([]);
+  const [bodyDiaryLoading, setBodyDiaryLoading] = useState(false);
+  const [bodyDiaryDetail, setBodyDiaryDetail] = useState(null);
+  const [bodyDiaryDetailOpen, setBodyDiaryDetailOpen] = useState(false);
+  const [bodyDiarySessionFilter, setBodyDiarySessionFilter] = useState("");
+  const [bodyAdminTab, setBodyAdminTab] = useState("intake"); // intake | diary | trash | reviews
+  const [bodyExpertReviews, setBodyExpertReviews] = useState([]);
+  const [bodyExpertReviewsLoading, setBodyExpertReviewsLoading] = useState(false);
+  const [bodyExpertReviewFormOpen, setBodyExpertReviewFormOpen] = useState(false);
+  const [bodyExpertReviewForm, setBodyExpertReviewForm] = useState(null);
+  const [bodyExpertReviewSaving, setBodyExpertReviewSaving] = useState(false);
+
+  // Admin specialist onboarding/match state
+  const [onboardingRequests, setOnboardingRequests] = useState([]);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [matchRequests, setMatchRequests] = useState([]);
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [matchExpertSelector, setMatchExpertSelector] = useState(null); // request id being assigned
+  const [matchExpertList, setMatchExpertList] = useState([]);
+  const [matchAssigning, setMatchAssigning] = useState(false);
+  const [bodyExportingCases, setBodyExportingCases] = useState(false);
+  // Body client assignment
+  const [bodyAssignments, setBodyAssignments] = useState([]);
+  const [bodyAssignmentsLoading, setBodyAssignmentsLoading] = useState(false);
+  const [bodyExperts, setBodyExperts] = useState([]);
+  const [bodyAssignTarget, setBodyAssignTarget] = useState(null); // body_client_ref being assigned
+  const [bodyAssignExpertId, setBodyAssignExpertId] = useState("");
+  const [bodyAssignOrgId, setBodyAssignOrgId] = useState(null);
+  const [bodyAssignSaving, setBodyAssignSaving] = useState(false);
+  const [bodyAssignIsReassign, setBodyAssignIsReassign] = useState(false);
+  const [bodyAssignExpertOrgs, setBodyAssignExpertOrgs] = useState([]);
+
+  // Restore body intake result from localStorage
+  const [savedBodyResult, setSavedBodyResult] = useState(() => {
+    try {
+      const raw = localStorage.getItem("body_last_result");
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return null;
+  });
+
+  // Training table state
+  const [trainingSessions, setTrainingSessions] = useState([]);
+  const [trainingLoading, setTrainingLoading] = useState(false);
+  const [trainingFilter, setTrainingFilter] = useState({ status: "all", expected_case_type: "all", ai_detected_case_type: "all", session_kind: "all", model_used: "all", public_code: "" });
+  const [trainingEditId, setTrainingEditId] = useState(null);
+  const [trainingEditData, setTrainingEditData] = useState({});
+  const [trainingNewRow, setTrainingNewRow] = useState(null);
+  const [trainingSessionsError, setTrainingSessionsError] = useState(null);
+
+  // Create training from review state
+  const [trainingFormReviewId, setTrainingFormReviewId] = useState(null);
+  const [trainingFormData, setTrainingFormData] = useState({ scenario_played: "", expected_case_type: "", session_kind: "initial", expert_comment: "", public_code: "" });
+  const [trainingFormPublicCodeAuto, setTrainingFormPublicCodeAuto] = useState(false);
+
+  // Trash / soft-delete state
+  const [trainingShowTrash, setTrainingShowTrash] = useState(false);
+  const [trainingSelection, setTrainingSelection] = useState(new Set());
+  const [trainingTrashConfirm, setTrainingTrashConfirm] = useState(null);
+  const [trainingPermanentConfirm, setTrainingPermanentConfirm] = useState(null);
+  const [trainingDeletionReason, setTrainingDeletionReason] = useState("");
+  const [trainingDeletionReasonCustom, setTrainingDeletionReasonCustom] = useState("");
+  const [trainingBulkConfirm, setTrainingBulkConfirm] = useState(null);
+
+  // Expandable review sections state
+  const [expandedSections, setExpandedSections] = useState({});
+  const [modalData, setModalData] = useState(null);
+
+  // Quality insight state
+  const [qualityInsights, setQualityInsights] = useState([]);
+  const [qualityStats, setQualityStats] = useState({ new_approved_count: 0, last_analysis_at: null, recommended_to_analyze: false });
+  const [qualityLoading, setQualityLoading] = useState(false);
+  const [qualityGenerating, setQualityGenerating] = useState(false);
+  const [qualitySelectedReviewIds, setQualitySelectedReviewIds] = useState([]);
+  const [qualityConfirmOpen, setQualityConfirmOpen] = useState(false);
+  const [qualityDetailInsight, setQualityDetailInsight] = useState(null);
+
+  // Session timeline state
+  const [timelineData, setTimelineData] = useState(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineCode, setTimelineCode] = useState(null);
+  const [timelineCache, setTimelineCache] = useState({});
+  const [timelineView, setTimelineView] = useState("list"); // "list" | "detail"
+  const [timelineLargeSection, setTimelineLargeSection] = useState(null);
+  const [sessionDetailsData, setSessionDetailsData] = useState(null);
+  const [sessionDetailsLoading, setSessionDetailsLoading] = useState(false);
+  const [sessionDetailsCache, setSessionDetailsCache] = useState({});
+  const [sessionDetailsError, setSessionDetailsError] = useState(null);
+
+  const QUALITY_STATUS_LABELS = {
+    new: "ĞĞ¾Ğ²Ñ‹Ğ¹",
+    under_review: "Ğ Ğ°ÑÑĞ¼Ğ°Ñ‚Ñ€Ğ¸Ğ²Ğ°ĞµÑ‚ÑÑ",
+    accepted: "ĞŸÑ€Ğ¸Ğ½ÑÑ‚ Ğº Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğµ",
+    partially_accepted: "ĞŸÑ€Ğ¸Ğ½ÑÑ‚ Ñ‡Ğ°ÑÑ‚Ğ¸Ñ‡Ğ½Ğ¾",
+    rejected: "ĞÑ‚ĞºĞ»Ğ¾Ğ½Ñ‘Ğ½",
+    archived: "ĞÑ€Ñ…Ğ¸Ğ²",
+  };
+
+  const QUALITY_SEVERITY_LABELS = {
+    low: "ĞĞ¸Ğ·ĞºĞ¸Ğ¹",
+    medium: "Ğ¡Ñ€ĞµĞ´Ğ½Ğ¸Ğ¹",
+    high: "Ğ’Ñ‹ÑĞ¾ĞºĞ¸Ğ¹",
+    critical: "ĞšÑ€Ğ¸Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹",
+  };
+
+  const SESSION_KIND_LABELS = {
+    initial: "ĞŸĞµÑ€Ğ²Ğ¸Ñ‡Ğ½Ğ°Ñ ÑĞµÑÑĞ¸Ñ",
+    follow_up: "ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ğ°Ñ ÑĞµÑÑĞ¸Ñ",
+    diary_check: "ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° Ğ´Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ°",
+    support_toolkit_check: "ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸Ğº",
+    crisis_check: "Ğ¡Ñ€Ğ¾Ñ‡Ğ½Ğ¾Ğµ Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ",
+    doctor_review: "Ğ’Ñ€Ğ°Ñ‡ĞµĞ±Ğ½Ñ‹Ğ¹ Ñ€Ğ°Ğ·Ğ±Ğ¾Ñ€",
+    other: "Ğ”Ñ€ÑƒĞ³Ğ¾Ğµ",
+  };
+
+  const CASE_TYPE_LABELS = {
+    anxiety: "Ğ¢Ñ€ĞµĞ²Ğ¾Ğ³Ğ°",
+    sleep: "Ğ¡Ğ¾Ğ½",
+    depression_like: "Ğ”ĞµĞ¿Ñ€ĞµÑÑĞ¸Ğ²Ğ½Ñ‹Ğµ Ğ¿Ñ€Ğ¸Ğ·Ğ½Ğ°ĞºĞ¸",
+    grief: "Ğ£Ñ‚Ñ€Ğ°Ñ‚Ğ° / Ğ³Ğ¾Ñ€Ğµ",
+    trauma: "Ğ¢Ñ€Ğ°Ğ²Ğ¼Ğ°Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ Ğ¾Ğ¿Ñ‹Ñ‚",
+    body_tension: "Ğ¢ĞµĞ»ĞµÑĞ½Ğ¾Ğµ Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ğµ",
+    adhd_like: "ĞĞ°Ñ€ÑƒÑˆĞµĞ½Ğ¸Ğµ Ğ²Ğ½Ğ¸Ğ¼Ğ°Ğ½Ğ¸Ñ / Ğ¸ÑĞ¿Ğ¾Ğ»Ğ½Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ñ‹Ğµ Ñ„ÑƒĞ½ĞºÑ†Ğ¸Ğ¸",
+    substance: "ĞŸĞĞ’ / Ğ²ĞµÑ‰ĞµÑÑ‚Ğ²Ğ°",
+    alcohol: "ĞĞ»ĞºĞ¾Ğ³Ğ¾Ğ»ÑŒ",
+    bipolar_red_flags: "Ğ‘Ğ¸Ğ¿Ğ¾Ğ»ÑÑ€Ğ½Ñ‹Ğµ ĞºÑ€Ğ°ÑĞ½Ñ‹Ğµ Ñ„Ğ»Ğ°Ğ³Ğ¸",
+    psychosis_red_flags: "ĞŸÑĞ¸Ñ…Ğ¾Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğµ ĞºÑ€Ğ°ÑĞ½Ñ‹Ğµ Ñ„Ğ»Ğ°Ğ³Ğ¸",
+    acute_psychosis: "ĞÑÑ‚Ñ€Ñ‹Ğ¹ Ğ¿ÑĞ¸Ñ…Ğ¾Ğ·",
+    suicide_risk: "Ğ¡ÑƒĞ¸Ñ†Ğ¸Ğ´Ğ°Ğ»ÑŒĞ½Ñ‹Ğ¹ Ñ€Ğ¸ÑĞº",
+    self_harm_risk: "Ğ Ğ¸ÑĞº ÑĞ°Ğ¼Ğ¾Ğ¿Ğ¾Ğ²Ñ€ĞµĞ¶Ğ´ĞµĞ½Ğ¸Ñ",
+    medication_issue: "Ğ’Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹ Ğ»ĞµĞºĞ°Ñ€ÑÑ‚Ğ²",
+    mixed: "Ğ¡Ğ¼ĞµÑˆĞ°Ğ½Ğ½Ñ‹Ğ¹ ÑĞ»ÑƒÑ‡Ğ°Ğ¹",
+    other: "Ğ”Ñ€ÑƒĞ³Ğ¾Ğµ",
+  };
+
+  const STATUS_LABELS = {
+    new: "ĞĞ¾Ğ²Ñ‹Ğ¹",
+    reviewed: "ĞŸÑ€Ğ¾ÑĞ¼Ğ¾Ñ‚Ñ€ĞµĞ½",
+    needs_prompt_update: "ĞÑƒĞ¶Ğ½Ğ¾ Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ Ğ¿Ñ€Ğ¾Ğ¼Ğ¿Ñ‚",
+    approved_for_learning: "ĞĞ´Ğ¾Ğ±Ñ€ĞµĞ½ Ğ´Ğ»Ñ Ğ¾Ğ±ÑƒÑ‡ĞµĞ½Ğ¸Ñ",
+    rejected: "ĞÑ‚ĞºĞ»Ğ¾Ğ½Ñ‘Ğ½",
+    archived: "ĞÑ€Ñ…Ğ¸Ğ²",
+  };
+
+  const sk = (v) => SESSION_KIND_LABELS[v] || v;
+  const ct = (v) => CASE_TYPE_LABELS[v] || v;
+  const st = (v) => STATUS_LABELS[v] || v;
+
+  function showToast(message, type = "success") {
+    setToast({ message, type, key: Date.now() });
+  }
+
+  async function handleExpertLogin() {
+    const code = expertCodeInput.trim();
+    if (!code) return;
+    setExpertLoggingIn(true);
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "login", access_code: code }),
+      });
+      const data = await res.json();
+      if (data.ok && data.expert) {
+        try { sessionStorage.setItem("tochka_expert_access_code", code); } catch {}
+        setExpertData(data.expert);
+        localStorage.setItem("tochka_expert", JSON.stringify(data.expert));
+        setExpertModalOpen(false);
+        setExpertCodeInput("");
+        showToast(`Ğ ĞµĞ¶Ğ¸Ğ¼ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°: ${data.expert.name}`);
+      } else {
+        showToast(data.error || "ĞšĞ¾Ğ´ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ° Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ñ", "error");
+    } finally {
+      setExpertLoggingIn(false);
+    }
+  }
+
+  function handleExpertLogout() {
+    setExpertData(null);
+    try { sessionStorage.removeItem("tochka_expert_access_code"); } catch {}
+    localStorage.removeItem("tochka_expert");
+    showToast("Ğ ĞµĞ¶Ğ¸Ğ¼ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ° Ğ²Ñ‹ĞºĞ»ÑÑ‡ĞµĞ½");
+  }
+
+  // â”€â”€ My Patients (expert panel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  async function loadMyPatients() {
+    setPatientModalOpen(true);
+    setMyPatientsLoading(true);
+    try {
+      const body = { action: "listMyPatients" };
+      if (expertData) {
+        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
+      }
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setMyPatients(data.patients || []);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ¾Ğ²", "error");
+    } finally {
+      setMyPatientsLoading(false);
+    }
+  }
+
+  function getStoredExpertCode() {
+    try {
+      const sessionCode = sessionStorage.getItem("tochka_expert_access_code");
+      if (sessionCode) return sessionCode;
+      const expert = localStorage.getItem("tochka_expert");
+      return expert ? JSON.parse(expert)?.access_code || "" : "";
+    } catch { return ""; }
+  }
+
+  async function handleAssignPatient() {
+    const code = patientModalCode.trim().toUpperCase();
+    if (!code) return;
+    try {
+      const body = { action: "assignPatientToExpert", public_code: code };
+      if (expertData) {
+        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
+      }
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("ĞŸĞ°Ñ†Ğ¸ĞµĞ½Ñ‚ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½");
+        setPatientModalCode("");
+        loadMyPatients();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  async function handleCreateInviteLink() {
+    try {
+      const body = { action: "createDoctorInviteLink", label: inviteLinkLabel };
+      if (expertData) {
+        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
+      }
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setInviteLinkCreated(data.invite_link);
+        showToast("Ğ¡ÑÑ‹Ğ»ĞºĞ° ÑĞ¾Ğ·Ğ´Ğ°Ğ½Ğ°");
+        setInviteLinkLabel("");
+        loadInviteLinks();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ğ·Ğ´Ğ°Ğ½Ğ¸Ñ ÑÑÑ‹Ğ»ĞºĞ¸", "error");
+    }
+  }
+
+  async function loadInviteLinks() {
+    try {
+      const body = { action: "listDoctorInviteLinks" };
+      if (expertData) {
+        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
+      }
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setInviteLinks(data.invite_links || []);
+      }
+    } catch {}
+  }
+
+  async function handleDisableInviteLink(linkId) {
+    try {
+      const body = { action: "disableDoctorInviteLink", link_id: linkId };
+      if (expertData) {
+        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
+      }
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Ğ¡ÑÑ‹Ğ»ĞºĞ° Ğ¾Ñ‚ĞºĞ»ÑÑ‡ĞµĞ½Ğ°");
+        loadInviteLinks();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+    }
+  }
+
+  // â”€â”€ Admin Organizations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  async function adminLoadOrganizations() {
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listOrganizations", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setOrganizations(data.organizations || []);
+      }
+    } catch {}
+  }
+
+  async function handleCreateOrganization() {
+    if (!orgForm.name.trim()) { showToast("Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ Ğ½Ğ°Ğ·Ğ²Ğ°Ğ½Ğ¸Ğµ", "error"); return; }
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: orgFormEditId ? "updateOrganization" : "createOrganization",
+          admin_secret: adminPassword,
+          id: orgFormEditId,
+          ...orgForm,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(orgFormEditId ? "ĞÑ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ°" : "ĞÑ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ ÑĞ¾Ğ·Ğ´Ğ°Ğ½Ğ°");
+        setOrgFormOpen(false);
+        setOrgFormEditId(null);
+        setOrgForm({ name: "", slug: "", type: "private_clinic", city: "", comment: "" });
+        adminLoadOrganizations();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+    }
+  }
+
+  async function adminLoadOrganizationExperts(orgId) {
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listOrganizationExperts", organization_id: orgId, admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setOrgExperts(data.members || []);
+      }
+    } catch {}
+  }
+
+  async function handleAddExpertToOrg() {
+    if (!orgDetail?.id || !orgAddExpertId) return;
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "addExpertToOrganization",
+          admin_secret: adminPassword,
+          organization_id: orgDetail.id,
+          expert_id: orgAddExpertId,
+          role: orgAddExpertRole,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚ Ğ´Ğ¾Ğ±Ğ°Ğ²Ğ»ĞµĞ½");
+        setOrgAddExpertOpen(false);
+        setOrgAddExpertId("");
+        adminLoadOrganizationExperts(orgDetail.id);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+    }
+  }
+
+  async function handleRemoveExpertFromOrg(expertId) {
+    if (!orgDetail?.id) return;
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "removeExpertFromOrganization",
+          admin_secret: adminPassword,
+          organization_id: orgDetail.id,
+          expert_id: expertId,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚ ÑƒĞ´Ğ°Ğ»Ñ‘Ğ½");
+        adminLoadOrganizationExperts(orgDetail.id);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+    }
+  }
+
+  async function adminListAllExperts() {
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listAllExperts", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      return data.experts || [];
+    } catch { return []; }
+  }
+
+  function resetRegisterForm() {
+    setRegisterForm({ name: "", email: "", telegram: "", role: "psychologist", specialty: "", city: "", organization: "" });
+  }
+
+  async function handleExpertRegister() {
+    const f = registerForm;
+    if (!f.name || f.name.trim().length < 2) {
+      showToast("Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ Ğ¸Ğ¼Ñ (Ğ¼Ğ¸Ğ½Ğ¸Ğ¼ÑƒĞ¼ 2 ÑĞ¸Ğ¼Ğ²Ğ¾Ğ»Ğ°)", "error");
+      return;
+    }
+
+    setRegisterSending(true);
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "register",
+          name: f.name.trim(),
+          role: f.role,
+          specialty: f.specialty ? f.specialty.trim() : "",
+        }),
+      });
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        showToast(`ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ€Ğ²ĞµÑ€Ğ°: ${res.status} ${res.statusText}`, "error");
+        return;
+      }
+      if (!res.ok || !data?.ok) {
+        showToast(`ĞÑˆĞ¸Ğ±ĞºĞ° Ñ€ĞµĞ³Ğ¸ÑÑ‚Ñ€Ğ°Ñ†Ğ¸Ğ¸: ${data?.details || data?.error || res.statusText}`, "error");
+        return;
+      }
+      setRegistrationResult(data);
+      setExpertData(data.expert);
+      localStorage.setItem("tochka_expert", JSON.stringify(data.expert));
+      showToast(`Ğ ĞµĞ¶Ğ¸Ğ¼ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ° Ğ°ĞºÑ‚Ğ¸Ğ²Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½: ${data.expert.name}`);
+    } catch (e) {
+      showToast(`ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ñ: ${e?.message || "Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ, Ğ·Ğ°Ğ¿ÑƒÑ‰ĞµĞ½ Ğ»Ğ¸ ÑĞµÑ€Ğ²ĞµÑ€"}`, "error");
+    } finally {
+      setRegisterSending(false);
+    }
+  }
+
+  async function adminLoadRequests(filterStatus) {
+    const st = filterStatus || adminReqFilter;
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listRequests", status: st, limit: 100 }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAdminRequests(data.requests || []);
+      }
+    } catch {}
+  }
+
+  async function adminUpdateRequestStatus(requestId, status) {
+    try {
+      await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateRequestStatus", request_id: requestId, status, admin_secret: adminPassword }),
+      });
+      showToast("Ğ¡Ñ‚Ğ°Ñ‚ÑƒÑ Ğ·Ğ°ÑĞ²ĞºĞ¸ Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»Ñ‘Ğ½");
+      adminLoadRequests(adminReqFilter);
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  const [recordingQuestionIndex, setRecordingQuestionIndex] = useState(null);
+  const [questionRecordingTime, setQuestionRecordingTime] = useState(0);
+  const [questionTranscribingIndex, setQuestionTranscribingIndex] = useState(null);
+
+  const questionMediaRecorderRef = useRef(null);
+  const questionAudioChunksRef = useRef([]);
+  const questionTimerRef = useRef(null);
+
+  const crisisMediaRecorderRef = useRef(null);
+  const crisisAudioChunksRef = useRef([]);
+  const crisisTimerRef = useRef(null);
+
+  const [crisisRecording, setCrisisRecording] = useState(false);
+  const [crisisRecordingTime, setCrisisRecordingTime] = useState(0);
+  const [crisisTranscribing, setCrisisTranscribing] = useState(false);
+  const [crisisVoiceError, setCrisisVoiceError] = useState("");
+  const [crisisWarning, setCrisisWarning] = useState("");
+  const [crisisConfirmation, setCrisisConfirmation] = useState("");
+  const [crisisShowHighRiskWarning, setCrisisShowHighRiskWarning] = useState(false);
+
+  const crisisKeywords = [
+    "Ñ…Ğ¾Ñ‡Ñƒ ÑƒĞ¼ĞµÑ€ĞµÑ‚ÑŒ",
+    "Ğ¿Ğ¾ĞºĞ¾Ğ½Ñ‡Ğ¸Ñ‚ÑŒ Ñ ÑĞ¾Ğ±Ğ¾Ğ¹",
+    "ÑĞ°Ğ¼Ğ¾ÑƒĞ±Ğ¸Ğ¹",
+    "ÑÑƒĞ¸Ñ†Ğ¸Ğ´",
+    "ÑƒĞ±Ğ¸Ñ‚ÑŒ ÑĞµĞ±Ñ",
+    "Ğ½Ğµ Ñ…Ğ¾Ñ‡Ñƒ Ğ¶Ğ¸Ñ‚ÑŒ",
+    "Ğ¿Ñ€Ğ¸Ñ‡Ğ¸Ğ½Ğ¸Ñ‚ÑŒ ÑĞµĞ±Ğµ Ğ²Ñ€ĞµĞ´",
+    "Ğ¿Ğ¾Ñ€ĞµĞ·Ğ°Ñ‚ÑŒ",
+    "Ñ‚Ğ°Ğ±Ğ»ĞµÑ‚ĞºĞ¸",
+    "Ğ¿Ğ¾Ğ²ĞµÑĞ¸Ñ‚ÑŒÑÑ",
+    "Ğ¿Ñ€Ñ‹Ğ³Ğ½ÑƒÑ‚ÑŒ",
+    "Ğ½Ğ°Ğ²Ñ€ĞµĞ´Ğ¸Ñ‚ÑŒ ĞºĞ¾Ğ¼Ñƒ-Ñ‚Ğ¾",
+    "ÑƒĞ±Ğ¸Ñ‚ÑŒ ĞºĞ¾Ğ³Ğ¾-Ñ‚Ğ¾",
+    "ÑƒĞ³Ñ€Ğ¾Ğ¶Ğ°ÑÑ‚",
+    "Ğ¼ĞµĞ½Ñ ÑƒĞ±ÑŒÑÑ‚",
+    "Ğ³Ğ¾Ğ»Ğ¾ÑĞ° Ğ¿Ñ€Ğ¸ĞºĞ°Ğ·Ñ‹Ğ²Ğ°ÑÑ‚",
+  ];
+
+  const roleMap = {
+    psychiatrist: "ĞŸÑĞ¸Ñ…Ğ¸Ğ°Ñ‚Ñ€",
+    psychologist: "ĞŸÑĞ¸Ñ…Ğ¾Ğ»Ğ¾Ğ³",
+    psychotherapist: "ĞŸÑĞ¸Ñ…Ğ¾Ñ‚ĞµÑ€Ğ°Ğ¿ĞµĞ²Ñ‚",
+    clinical_psychologist: "ĞšĞ»Ğ¸Ğ½Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ Ğ¿ÑĞ¸Ñ…Ğ¾Ğ»Ğ¾Ğ³",
+    neurologist: "ĞĞµĞ²Ñ€Ğ¾Ğ»Ğ¾Ğ³",
+    other: "Ğ”Ñ€ÑƒĞ³Ğ¾Ğµ",
+  };
+
+  function hasCrisisRisk(value) {
+    const lower = (value || "").toLowerCase();
+    return crisisKeywords.some((keyword) => lower.includes(keyword));
+  }
+
+  async function submitCrisisRequest() {
+    setCrisisWarning("");
+    setCrisisConfirmation("");
+
+    if (hasCrisisRisk(crisisText) && !crisisShowHighRiskWarning) {
+      setCrisisShowHighRiskWarning(true);
+      setCrisisWarning("Ğ•ÑĞ»Ğ¸ ĞµÑÑ‚ÑŒ Ñ€Ğ¸ÑĞº Ğ¿Ñ€Ğ¸Ñ‡Ğ¸Ğ½Ğ¸Ñ‚ÑŒ Ğ²Ñ€ĞµĞ´ ÑĞµĞ±Ğµ Ğ¸Ğ»Ğ¸ Ğ´Ñ€ÑƒĞ³Ğ¾Ğ¼Ñƒ Ñ‡ĞµĞ»Ğ¾Ğ²ĞµĞºÑƒ â€” Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112 Ğ¸Ğ»Ğ¸ 103 Ğ¸ Ğ½Ğµ Ğ¾ÑÑ‚Ğ°Ğ²Ğ°Ğ¹Ñ‚ĞµÑÑŒ Ğ¾Ğ´Ğ½Ğ¸.");
+      return;
+    }
+
+    if (!crisisContact.trim() && !crisisText.trim()) {
+      setCrisisWarning("ĞĞ¿Ğ¸ÑˆĞ¸Ñ‚Ğµ ÑĞ¸Ñ‚ÑƒĞ°Ñ†Ğ¸Ñ Ğ¸Ğ»Ğ¸ ÑƒĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚ Ğ´Ğ»Ñ ÑĞ²ÑĞ·Ğ¸. Ğ•ÑĞ»Ğ¸ Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ Ğ¿Ñ€ÑĞ¼Ğ¾ ÑĞµĞ¹Ñ‡Ğ°Ñ â€” Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112 Ğ¸Ğ»Ğ¸ 103.");
+      return;
+    }
+
+    setCrisisSubmitting(true);
+    try {
+      const res = await fetch("/api/crisis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save",
+          crisis_text: crisisText,
+          contact: crisisContact,
+          public_code: publicCode || null,
+          session_id: sessionId || null,
+          high_risk_detected: hasCrisisRisk(crisisText),
+          risk_markers: hasCrisisRisk(crisisText) ? crisisKeywords.filter(k => (crisisText || "").toLowerCase().includes(k)) : null,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setCrisisConfirmation("ĞĞ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¾. Ğ•ÑĞ»Ğ¸ ĞµÑÑ‚ÑŒ Ğ½ĞµĞ¿Ğ¾ÑÑ€ĞµĞ´ÑÑ‚Ğ²ĞµĞ½Ğ½Ğ°Ñ ÑƒĞ³Ñ€Ğ¾Ğ·Ğ° Ğ¶Ğ¸Ğ·Ğ½Ğ¸ Ğ¸Ğ»Ğ¸ Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚Ğ¸ â€” Ğ½Ğµ Ğ¶Ğ´Ğ¸Ñ‚Ğµ Ğ¾Ñ‚Ğ²ĞµÑ‚Ğ° ÑĞµÑ€Ğ²Ğ¸ÑĞ°, Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112 Ğ¸Ğ»Ğ¸ 103.");
+      } else {
+        setCrisisWarning(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ. Ğ•ÑĞ»Ğ¸ Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ Ğ¿Ñ€ÑĞ¼Ğ¾ ÑĞµĞ¹Ñ‡Ğ°Ñ â€” Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112 Ğ¸Ğ»Ğ¸ 103.");
+      }
+    } catch (e) {
+      console.error("submit crisis error", e);
+      setCrisisWarning("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ. Ğ•ÑĞ»Ğ¸ Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ Ğ¿Ñ€ÑĞ¼Ğ¾ ÑĞµĞ¹Ñ‡Ğ°Ñ â€” Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112 Ğ¸Ğ»Ğ¸ 103.");
+    } finally {
+      setCrisisSubmitting(false);
+    }
+  }
+
+  function continueFromCrisis() {
+    setCrisisConfirmation("");
+    setCrisisWarning("");
+
+    if (crisisTimerRef.current) {
+      clearInterval(crisisTimerRef.current);
+    }
+    if (crisisMediaRecorderRef.current && crisisRecording) {
+      crisisMediaRecorderRef.current.stop();
+    }
+    if (crisisText.trim()) {
+      setText(crisisText);
+      setMode("text");
+    }
+    setCrisisOpen(false);
+    setCrisisText("");
+    setCrisisContact("");
+    setCrisisRecording(false);
+    setCrisisRecordingTime(0);
+    setCrisisTranscribing(false);
+    setCrisisVoiceError("");
+    setCrisisWarning("");
+    setCrisisShowHighRiskWarning(false);
+  }
+
+  function handleCrisisClose() {
+    if (crisisTimerRef.current) {
+      clearInterval(crisisTimerRef.current);
+    }
+    if (crisisMediaRecorderRef.current && crisisRecording) {
+      crisisMediaRecorderRef.current.stop();
+    }
+    setCrisisOpen(false);
+    setCrisisSubmitting(false);
+    setCrisisText("");
+    setCrisisContact("");
+    setCrisisRecording(false);
+    setCrisisRecordingTime(0);
+    setCrisisTranscribing(false);
+    setCrisisVoiceError("");
+    setCrisisWarning("");
+    setCrisisConfirmation("");
+    setCrisisShowHighRiskWarning(false);
+  }
+
+  // Support Cabinet MVP helpers
+  async function loadSupportCabinet(enteredCode) {
+    const saved = getSupportSession();
+    const accessToken = saved.accessToken;
+
+    setCabinetLoading(true);
+    setContinuationCodeError("");
+    setError("");
+    try {
+      let cabinetData;
+      let effectiveSessionId;
+      let effectiveAccessToken;
+
+      if (accessToken && saved.sessionId && !(APP_BRAND.isSupportPilot && enteredCode)) {
+        // Same device: use stored access token.
+        const body = { action: "getCabinet", sessionId: saved.sessionId, access_token: accessToken };
+        const cabinetRes = await fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        cabinetData = await cabinetRes.json();
+        if (!cabinetRes.ok || !cabinetData.ok) {
+          throw new Error(cabinetData.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚");
+        }
+        effectiveSessionId = cabinetData.session_id || saved.sessionId;
+        effectiveAccessToken = accessToken;
+      } else if (enteredCode) {
+        // Cross-device: exchange continuation code for access token, then load cabinet.
+        const exchangeRes = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "exchangeContinuationCredential", module: "support", continuation_code: enteredCode }),
+        });
+        const exchangeData = await exchangeRes.json();
+        if (!exchangeRes.ok || !exchangeData.ok) {
+          throw new Error(exchangeData.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€. ĞŸÑ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ.");
+        }
+        effectiveSessionId = exchangeData.session_id;
+        effectiveAccessToken = exchangeData.access_token;
+        saveSupportSession(effectiveSessionId, effectiveAccessToken);
+        // Now load full cabinet with wallet/specialist/requests
+        const cabinetRes = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "getCabinet", sessionId: effectiveSessionId, access_token: effectiveAccessToken }),
+        });
+        cabinetData = await cabinetRes.json();
+        if (!cabinetRes.ok || !cabinetData.ok) {
+          // Fallback to exchange cabinet data
+          cabinetData = { ...exchangeData.cabinet, ok: true, public_code: exchangeData.public_code, session_id: exchangeData.session_id };
+        }
+      } else {
+        // No stored token and no code: show modal.
+        setSessionModalOpen(true);
+        setCabinetLoading(false);
+        return;
+      }
+
+      setSupportCabinet({
+        sessions: cabinetData.sessions || [],
+        latest_report: cabinetData.latest_report || null,
+        public_code: cabinetData.public_code || "",
+        wallet: cabinetData.wallet || null,
+        specialist: cabinetData.specialist || null,
+        service_requests: cabinetData.service_requests || [],
+        match_requests: APP_BRAND.isSupportPilot ? cabinetData.match_requests || [] : [],
+        unread_message_count: cabinetData.unread_message_count || 0,
+        display_name: cabinetData.display_name || null,
+        medication_cards: cabinetData.medication_cards || [],
+      });
+      setSupportDisplayName(cabinetData.display_name || null);
+      setSessionId(effectiveSessionId);
+      setPublicCode(cabinetData.public_code || enteredCode || saved.sessionId);
+      setPhase("cabinet");
+      setSupportScreen("cabinet");
+      // Optional loads â€” non-blocking
+      loadSupportCheckins().catch(() => {});
+      loadSupportPractices().catch(() => {});
+      loadPatientInvitations().catch(() => {});
+      // Don't auto-load chat â€” show fresh composer
+      setQuickChatMessages([]);
+      setQuickChatInput("");
+      setQuickChatShowHistory(false);
+      return true;
+    } catch (e) {
+      const msg = e.message || "";
+      let userMsg = "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.";
+      if (APP_BRAND.isSupportPilot && msg.includes("ÑÑ‚Ğ°Ñ€Ğ¾Ğ¹ Ğ²ĞµÑ€ÑĞ¸Ğ¸")) {
+        userMsg = msg;
+      } else if (msg.includes("ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ") || msg.includes("continuation") || msg.includes("401") || msg.includes("403")) {
+        userMsg = "ĞŸÑ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ.";
+      } else if (msg.includes("fetch") || msg.includes("NetworkError") || msg.includes("network")) {
+        userMsg = "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ²ÑĞ·Ğ°Ñ‚ÑŒÑÑ Ñ ÑĞµÑ€Ğ²Ğ¸ÑĞ¾Ğ¼. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.";
+      }
+      setContinuationCodeError(userMsg);
+      if (!(APP_BRAND.isSupportPilot && msg.includes("ÑÑ‚Ğ°Ñ€Ğ¾Ğ¹ Ğ²ĞµÑ€ÑĞ¸Ğ¸"))) showToast(userMsg, "error");
+      return false;
+    } finally {
+      setCabinetLoading(false);
+    }
+  }
+
+  async function loadBodyCabinet(enteredCode, options = {}) {
+    const preferCode = options.preferCode === true;
+    const saved = getBodySession();
+    const accessToken = saved.accessToken;
+
+    setBodyCabinetLoading(true);
+    setBodyContinuationError("");
+    setError("");
+    try {
+      let cabinetData;
+      let effectiveSessionId;
+      let effectiveAccessToken;
+
+      // An explicitly user-entered continuation code is never silently
+      // overridden by a previously stored credential pair.
+      if (!(preferCode && enteredCode) && accessToken && saved.sessionId) {
+        const d = new Date();
+        const clientToday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const body = { action: "getBodyCabinet", sessionId: saved.sessionId, accessToken, clientToday };
+        const cabinetRes = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        cabinetData = await cabinetRes.json();
+        if (!cabinetRes.ok || !cabinetData.ok) {
+          throw new Error(cabinetData.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚");
+        }
+        effectiveSessionId = saved.sessionId;
+        effectiveAccessToken = accessToken;
+      } else if (enteredCode) {
+        const exchangeRes = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "exchangeContinuationCredential", module: "body", continuation_code: enteredCode }),
+        });
+        const exchangeData = await exchangeRes.json();
+        if (!exchangeRes.ok || !exchangeData.ok) {
+          throw new Error(exchangeData.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ¿Ñ€Ğ¾Ñ„Ğ¸Ğ»ÑŒ. ĞŸÑ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ.");
+        }
+        effectiveSessionId = exchangeData.session_id;
+        effectiveAccessToken = exchangeData.access_token;
+        saveBodySession(effectiveSessionId, effectiveAccessToken);
+
+        const d2 = new Date();
+        const clientToday2 = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
+        const cabinetRes = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "getBodyCabinet", sessionId: effectiveSessionId, accessToken: effectiveAccessToken, clientToday: clientToday2 }),
+        });
+        cabinetData = await cabinetRes.json();
+        if (!cabinetRes.ok || !cabinetData.ok) {
+          throw new Error(cabinetData.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚");
+        }
+      } else {
+        setBodyCabinetLoading(false);
+        return;
+      }
+
+      setBodyCabinetData(cabinetData);
+      setBodyDiarySessionId(effectiveSessionId);
+
+      // Check if onboarding is needed
+      try {
+        let token;
+        try { token = await getClientToken("body", "session"); } catch {}
+        const hdrs = { "Content-Type": "application/json" };
+        if (token) hdrs["Authorization"] = `Bearer ${token}`;
+        const onbRes = await fetch("/api/session", {
+          method: "POST",
+          headers: hdrs,
+          body: JSON.stringify({ action: "getBodyOnboarding", session_id: effectiveSessionId, access_token: effectiveAccessToken }),
+        });
+        const onbData = await onbRes.json();
+        if (onbData.ok && !onbData.onboarding?.intro_completed) {
+          setBodyScreen("onboarding");
+        } else {
+          setBodyScreen("cabinet");
+        }
+      } catch {
+        setBodyScreen("cabinet");
+      }
+    } catch (e) {
+      setBodyContinuationError(e.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ¿Ñ€Ğ¾Ñ„Ğ¸Ğ»ÑŒ. ĞŸÑ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ.");
+      showToast(e.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ¿Ñ€Ğ¾Ñ„Ğ¸Ğ»ÑŒ.", "error");
+    } finally {
+      setBodyCabinetLoading(false);
+    }
+  }
+
+  async function regenerateSupportContinuationCode() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("ĞÑƒĞ¶ĞµĞ½ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ° Ğº Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ñƒ.", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "regenerateContinuationCredential", module: "support", session_id: saved.sessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ Ğ½Ğ¾Ğ²Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ");
+      }
+      setRegeneratedCode(data.continuation_code);
+      setContinuationCode(null);
+    } catch (e) {
+      showToast(e.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ Ğ½Ğ¾Ğ²Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function regenerateBodyContinuationCode() {
+    const saved = getBodySession();
+    if (!saved.sessionId || !saved.accessToken) {
+      throw new Error("ĞÑƒĞ¶ĞµĞ½ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ° Ğº Ğ¿Ñ€Ğ¾Ñ„Ğ¸Ğ»Ñ.");
+    }
+    const res = await fetch("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "regenerateContinuationCredential", module: "body", session_id: saved.sessionId, access_token: saved.accessToken }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ Ğ½Ğ¾Ğ²Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ");
+    }
+    return data.continuation_code;
+  }
+
+  async function openSupportReport(targetSessionId) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("ĞÑƒĞ¶ĞµĞ½ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ° Ğº Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ñƒ.", "error");
+      return;
+    }
+    const sid = targetSessionId || saved.sessionId;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getReport", sessionId: sid, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚");
+      }
+      const s = data.session;
+      setSessionId(s.sessionId || s.session_id);
+      setPublicCode(s.publicCode || s.public_code);
+      setText(s.patient_input || s.patient_text || "");
+      setConversationHistory(s.conversationHistory || s.conversation_history || []);
+      setDialogDepth(s.dialogDepth || 0);
+      setPreviousPatientReport(s.previousPatientReport || s.user_report || "");
+      setPreviousDoctorReport("");
+      setHomeTasks(s.homeTasks || "");
+      setResourceFactors(s.resourceFactors || "");
+      // Client-safe: only user_report, no doctor_report
+      setResult(s.user_report || "");
+      setReportSource("cabinet");
+      setJustFinishedSession(false);
+      if (supportCabinet?.wallet) {
+        setUsageBalance({ ...supportCabinet.wallet, module: "support" });
+      }
+      setActiveTab("user");
+      setPhase("report");
+      setSupportScreen("report");
+    } catch (e) {
+      showToast(e.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function startSupportFollowUp() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("ĞÑƒĞ¶ĞµĞ½ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ° Ğº Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ñƒ.", "error");
+      return;
+    }
+    const latest = supportCabinet?.sessions?.[0];
+    const latestReport = supportCabinet?.latest_report || {};
+    setSessionId(saved.sessionId);
+    setPublicCode(latest?.publicCode || supportCabinet?.public_code || saved.sessionId);
+    if (APP_BRAND.isSupportPilot && latestReport.crisisBlock?.status === "safety_check_in_progress") {
+      const safetyQuestions = latestReport.crisisBlock.questions || [
+        "Ğ’Ñ‹ ÑĞµĞ¹Ñ‡Ğ°Ñ Ğ² Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚Ğ¸? Ğ•ÑÑ‚ÑŒ Ğ»Ğ¸ Ñ€Ğ¸ÑĞº, Ñ‡Ñ‚Ğ¾ Ğ²Ñ‹ Ğ¿Ñ€Ğ¸Ñ‡Ğ¸Ğ½Ğ¸Ñ‚Ğµ ÑĞµĞ±Ğµ Ğ²Ñ€ĞµĞ´ Ğ² Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞµĞµ Ğ²Ñ€ĞµĞ¼Ñ?",
+        "Ğ•ÑÑ‚ÑŒ Ğ»Ğ¸ Ñƒ Ğ²Ğ°Ñ ÑĞµĞ¹Ñ‡Ğ°Ñ Ğ½Ğ°Ğ¼ĞµÑ€ĞµĞ½Ğ¸Ğµ Ğ¸Ğ»Ğ¸ ĞºĞ¾Ğ½ĞºÑ€ĞµÑ‚Ğ½Ñ‹Ğ¹ Ğ¿Ğ»Ğ°Ğ½ Ğ¿Ñ€Ğ¸Ñ‡Ğ¸Ğ½Ğ¸Ñ‚ÑŒ ÑĞµĞ±Ğµ Ğ²Ñ€ĞµĞ´?",
+        "Ğ’Ñ‹ ÑĞµĞ¹Ñ‡Ğ°Ñ Ğ¾Ğ´Ğ¸Ğ½/Ğ¾Ğ´Ğ½Ğ°? ĞšÑ‚Ğ¾ Ğ¼Ğ¾Ğ¶ĞµÑ‚ Ğ¿Ğ¾Ğ±Ñ‹Ñ‚ÑŒ Ñ€ÑĞ´Ğ¾Ğ¼ Ğ¸Ğ»Ğ¸ Ğ¿Ğ¾Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ¸Ñ‚ÑŒ Ñ Ğ²Ğ°Ğ¼Ğ¸?",
+        "ĞšĞ¾Ğ¼Ñƒ Ğ²Ñ‹ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ¿Ğ¾Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚ÑŒ Ğ¸Ğ»Ğ¸ Ğ½Ğ°Ğ¿Ğ¸ÑĞ°Ñ‚ÑŒ Ğ¿Ñ€ÑĞ¼Ğ¾ ÑĞµĞ¹Ñ‡Ğ°Ñ?",
+      ];
+      setText(latestReport.crisisBlock.initial_message || latest?.summary || "");
+      setIsContinuation(false);
+      setPreviousPatientReport("");
+      setPreviousDoctorReport("");
+      setConversationHistory([{ role: "assistant", questions: safetyQuestions }]);
+      setDialogDepth(1);
+      setAnswers({});
+      setQuestions(safetyQuestions);
+      setResult(null);
+      setCrisisMode(true);
+      setCrisisBlock(latestReport.crisisBlock);
+      setPhase("questions");
+      setSupportScreen("questions");
+      return;
+    }
+    setIsContinuation(true);
+    setPreviousPatientReport(latestReport.user_report || "");
+    setPreviousDoctorReport("");
+    setHomeTasks(latestReport.homeTasks || "");
+    setResourceFactors(latestReport.resourceFactors || "");
+    setSupportPlan(latestReport.supportPlan || null);
+    setConversationHistory([]);
+    setDialogDepth(0);
+    setAnswers({});
+    setQuestions(null);
+    setResult(null);
+    setCrisisMode(false);
+    setCrisisBlock(null);
+    setFollowUpAnswers({});
+    setPhase("followup");
+    setSupportScreen("followup");
+    loadSupportPractices();
+  }
+
+  async function submitFollowUp() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("ĞÑƒĞ¶ĞµĞ½ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ° Ğº Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ñƒ.", "error");
+      return;
+    }
+    const answers = followUpAnswers;
+    const hasStructured = answers.dynamics?.trim() || answers.new_concerns?.trim() || answers.tried?.trim();
+    const hasFreeText = answers.free_text?.trim();
+    if (!hasStructured && !hasFreeText) {
+      showToast("Ğ—Ğ°Ğ¿Ğ¾Ğ»Ğ½Ğ¸Ñ‚Ğµ Ñ…Ğ¾Ñ‚Ñ Ğ±Ñ‹ Ğ¾Ğ´Ğ½Ğ¾ Ğ¿Ğ¾Ğ»Ğµ Ğ¸Ğ»Ğ¸ Ğ½Ğ°Ğ¿Ğ¸ÑˆĞ¸Ñ‚Ğµ ÑĞ²Ğ¾Ğ±Ğ¾Ğ´Ğ½Ñ‹Ğ¹ Ñ‚ĞµĞºÑÑ‚.", "error");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      // Create a new session for the follow-up, linked to the same owner/wallet
+      const createRes = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "createFollowUpSession",
+          previousSessionId: saved.sessionId,
+          access_token: saved.accessToken,
+        }),
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok || !createData.ok) {
+        throw new Error(createData.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ğµ");
+      }
+
+      saveSupportSession(createData.sessionId, createData.access_token);
+      setSessionId(createData.sessionId);
+      setPublicCode(createData.public_code);
+      sessionRef.current = { sessionId: createData.sessionId, accessToken: createData.access_token };
+
+      const followUpParts = [];
+      if (answers.dynamics?.trim()) followUpParts.push(`Ğ¡Ñ‚Ğ°Ğ»Ğ¾ Ğ»ĞµĞ³Ñ‡Ğµ, Ñ‚ÑĞ¶ĞµĞ»ĞµĞµ Ğ¸Ğ»Ğ¸ Ğ¿Ñ€Ğ¸Ğ¼ĞµÑ€Ğ½Ğ¾ Ñ‚Ğ°Ğº Ğ¶Ğµ: ${answers.dynamics}`);
+      if (answers.new_concerns?.trim()) followUpParts.push(`ĞŸĞ¾ÑĞ²Ğ¸Ğ»Ğ¾ÑÑŒ Ğ»Ğ¸ Ñ‡Ñ‚Ğ¾-Ñ‚Ğ¾ Ğ½Ğ¾Ğ²Ğ¾Ğµ, Ñ‡Ñ‚Ğ¾ Ğ¾ÑĞ¾Ğ±ĞµĞ½Ğ½Ğ¾ Ğ±ĞµÑĞ¿Ğ¾ĞºĞ¾Ğ¸Ñ‚: ${answers.new_concerns}`);
+      if (answers.tried?.trim()) followUpParts.push(`Ğ§Ñ‚Ğ¾ Ğ¸Ğ· Ğ¿Ñ€ĞµĞ´Ğ»Ğ¾Ğ¶ĞµĞ½Ğ½Ğ¾Ğ³Ğ¾ Ñ€Ğ°Ğ½ÑŒÑˆĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ğ¾Ğ¿Ñ€Ğ¾Ğ±Ğ¾Ğ²Ğ°Ñ‚ÑŒ: ${answers.tried}`);
+      if (answers.free_text?.trim()) followUpParts.push(`Ğ”Ğ¾Ğ¿Ğ¾Ğ»Ğ½Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ğ¾ Ğ¾Ñ‚ Ğ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ĞµĞ»Ñ:\n${answers.free_text}`);
+
+      // Add practice context for AI
+      if (supportPractices.length > 0) {
+        const practiceContext = supportPractices
+          .filter(p => p.status === "active")
+          .map(p => `- ${p.title} (ÑÑ‚Ğ°Ñ‚ÑƒÑ: ${p.user_status === "helped" ? "Ğ¿Ğ¾Ğ¼Ğ¾Ğ³Ğ»Ğ¾" : p.user_status === "not_helpful" ? "Ğ½Ğµ Ğ¿Ğ¾Ğ´Ğ¾ÑˆĞ»Ğ¾" : p.user_status === "tried" ? "Ğ¿Ñ€Ğ¾Ğ±Ğ¾Ğ²Ğ°Ğ»" : "Ğ½Ğµ Ğ¿Ñ€Ğ¾Ğ±Ğ¾Ğ²Ğ°Ğ»"})`)
+          .join("\n");
+        if (practiceContext) {
+          followUpParts.push(`Ğ Ğ°Ğ½ĞµĞµ Ñ€ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´Ğ¾Ğ²Ğ°Ğ½Ğ½Ñ‹Ğµ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸ĞºĞ¸:\n${practiceContext}`);
+        }
+      }
+
+      const followUpText = followUpParts.join("\n\n");
+
+      // Build structured answered topics for AI dedup
+      const answeredTopics = {};
+      if (answers.dynamics?.trim()) answeredTopics.overall_change = answers.dynamics.trim();
+      if (answers.new_concerns?.trim()) answeredTopics.new_concerns = answers.new_concerns.trim();
+      if (answers.tried?.trim()) answeredTopics.tried_practices = answers.tried.trim();
+      if (answers.free_text?.trim()) answeredTopics.free_text = answers.free_text.trim();
+      // Add practice statuses
+      if (supportPractices.length > 0) {
+        answeredTopics.practice_statuses = supportPractices
+          .filter(p => p.status === "active")
+          .map(p => ({ title: p.title, status: p.user_status }));
+      }
+      setFollowupAnsweredTopics(answeredTopics);
+
+      setText(followUpText);
+      setConversationHistory([]);
+      setDialogDepth(0);
+      setAnswers({});
+      setQuestions(null);
+      setResult(null);
+      setReportSource("generated");
+      setJustFinishedSession(false);
+
+      // Continue via existing analyze flow
+      await submitRound(followUpText);
+    } catch (e) {
+      showToast(e.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ğµ", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Open a specific session from cabinet (session_view)
+  async function openSupportSessionView(targetSessionId) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("ĞÑƒĞ¶ĞµĞ½ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ° Ğº Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ñƒ.", "error");
+      return;
+    }
+    setSupportSessionLoading(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getReport", sessionId: targetSessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ ÑĞµÑÑĞ¸Ñ");
+      }
+      setSupportViewingSession(targetSessionId);
+      setSupportViewingSessionData(data.session);
+      setPhase("session_view");
+      setSupportScreen("session_view");
+    } catch (e) {
+      showToast(e.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ ÑĞµÑÑĞ¸Ñ", "error");
+    } finally {
+      setSupportSessionLoading(false);
+    }
+  }
+
+  // Submit a new support service request
+  function openSupportRequestForSession(targetSessionId = sessionId) {
+    setSupportRequestSessionId(targetSessionId || null);
+    setSupportNewRequestOpen(true);
+  }
+
+  async function submitSupportServiceRequest() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("ĞÑƒĞ¶ĞµĞ½ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°.", "error");
+      return;
+    }
+    if (!supportNewRequest.service_code) {
+      showToast("Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ ÑƒÑĞ»ÑƒĞ³Ñƒ.", "error");
+      return;
+    }
+    if (!supportNewRequest.message || supportNewRequest.message.trim().length < 2) {
+      showToast("Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ.", "error");
+      return;
+    }
+    setSupportRequestSubmitting(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "createSupportServiceRequest",
+          session_id: APP_BRAND.isSupportPilot ? supportRequestSessionId || saved.sessionId : saved.sessionId,
+          access_token: saved.accessToken,
+          service_code: supportNewRequest.service_code,
+          reason: supportNewRequest.reason,
+          message: supportNewRequest.message,
+          preferred_date: supportNewRequest.preferred_date,
+          time_from: supportNewRequest.time_from,
+          time_to: supportNewRequest.time_to,
+          comment: supportNewRequest.comment,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ");
+      }
+      showToast("Ğ—Ğ°Ğ¿Ñ€Ğ¾Ñ Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ñƒ.", "success");
+      setSupportNewRequestOpen(false);
+      setSupportRequestSessionId(null);
+      setSupportNewRequest({ service_code: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
+      // Refresh cabinet to show new request
+      await refreshSupportCabinet();
+    } catch (e) {
+      showToast(e.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ", "error");
+    } finally {
+      setSupportRequestSubmitting(false);
+    }
+  }
+
+  // Cancel a support service request
+  async function cancelSupportServiceRequest(requestId) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "cancelSupportServiceRequest",
+          session_id: saved.sessionId,
+          access_token: saved.accessToken,
+          request_id: requestId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ");
+      }
+      showToast("Ğ—Ğ°Ğ¿Ñ€Ğ¾Ñ Ğ¾Ñ‚Ğ¼ĞµĞ½Ñ‘Ğ½.", "success");
+      await refreshSupportCabinet();
+    } catch (e) {
+      showToast(e.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ", "error");
+    }
+  }
+
+  // Refresh support cabinet data
+  async function refreshSupportCabinet() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getCabinet", sessionId: saved.sessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setSupportCabinet({
+          sessions: data.sessions || [],
+          latest_report: data.latest_report || null,
+          public_code: data.public_code || "",
+          wallet: data.wallet || null,
+          specialist: data.specialist || null,
+          service_requests: data.service_requests || [],
+          match_requests: APP_BRAND.isSupportPilot ? data.match_requests || [] : [],
+          unread_message_count: data.unread_message_count || 0,
+          display_name: data.display_name || null,
+          medication_cards: data.medication_cards || [],
+        });
+        if (data.display_name) setSupportDisplayName(data.display_name);
+      }
+    } catch { /* silent */ }
+  }
+
+  // â”€â”€ Patient Invitations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async function loadPatientInvitations() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    setPatientInvitationsLoading(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listPatientInvitations", session_id: saved.sessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) setPatientInvitations(data.invitations || []);
+    } catch {}
+    setPatientInvitationsLoading(false);
+  }
+
+  async function acceptPatientInvitationById(invitationId) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "acceptPatientInvitationById", session_id: saved.sessionId, access_token: saved.accessToken, invitation_id: invitationId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½");
+        await refreshSupportCabinet();
+        await loadPatientInvitations();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ‚Ğ¸", "error"); }
+  }
+
+  async function declinePatientInvitationById(invitationId) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "declinePatientInvitationById", session_id: saved.sessionId, access_token: saved.accessToken, invitation_id: invitationId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ Ğ¾Ñ‚ĞºĞ»Ğ¾Ğ½ĞµĞ½Ğ¾");
+        await loadPatientInvitations();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ‚Ğ¸", "error"); }
+  }
+
+  async function acceptPublicSpecialistInvitation(token) {
+    let saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      try {
+        await ensureStartSession();
+        saved = getSupportSession();
+      } catch (error) {
+        showToast(error.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ Ğ·Ğ°Ñ‰Ğ¸Ñ‰Ñ‘Ğ½Ğ½ÑƒÑ ÑĞµÑÑĞ¸Ñ", "error");
+        return;
+      }
+    }
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ğ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ñ‰Ğ¸Ñ‰Ñ‘Ğ½Ğ½ÑƒÑ ÑĞµÑÑĞ¸Ñ", "error");
+      return;
+    }
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "acceptSpecialistInvitation", session_id: saved.sessionId, access_token: saved.accessToken, invitation_token: token }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½");
+        localStorage.removeItem("tochka_invite_token");
+        setInviteInfo(null);
+        await loadSupportCabinet();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ‚Ğ¸", "error"); }
+  }
+
+  async function declinePublicSpecialistInvitation(token) {
+    let saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) {
+      try {
+        await ensureStartSession();
+        saved = getSupportSession();
+      } catch (error) {
+        showToast(error.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ Ğ·Ğ°Ñ‰Ğ¸Ñ‰Ñ‘Ğ½Ğ½ÑƒÑ ÑĞµÑÑĞ¸Ñ", "error");
+        return;
+      }
+    }
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "declineSpecialistInvitation", session_id: saved.sessionId, access_token: saved.accessToken, invitation_token: token }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ Ğ¾Ñ‚ĞºĞ»Ğ¾Ğ½ĞµĞ½Ğ¾");
+        localStorage.removeItem("tochka_invite_token");
+        setInviteInfo(null);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ‚Ğ¸", "error"); }
+  }
+
+  async function declineSpecialistInvitation(token) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "declineSpecialistInvitation", session_id: saved.sessionId, access_token: saved.accessToken, invitation_token: token }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ Ğ¾Ñ‚ĞºĞ»Ğ¾Ğ½ĞµĞ½Ğ¾");
+        await loadPatientInvitations();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ‚Ğ¸", "error"); }
+  }
+
+  async function submitPatientSpecialistOnboarding() {
+    if (!onboardingForm.name.trim()) return;
+    setOnboardingSubmitting(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "submitOnboardingRequest", invitation_token: inviteToken, ...onboardingForm, name: onboardingForm.name.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast(data.message || "Ğ—Ğ°ÑĞ²ĞºĞ° Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ°");
+        setInviteInfo({ ...inviteInfo, status: "onboarding_submitted" });
+      } else {
+        showToast(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ·Ğ°ÑĞ²ĞºÑƒ", "error");
+      }
+    } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ‚Ğ¸", "error"); }
+    setOnboardingSubmitting(false);
+  }
+
+  async function respondToPatientInvitationAsSpecialist(action) {
+    try {
+      const res = await fetch("/api/specialist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action, invitation_id: inviteInfo?.invitation_id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast(action === "acceptPatientInvitation" ? "ĞŸĞ°Ñ†Ğ¸ĞµĞ½Ñ‚ Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡Ñ‘Ğ½" : "ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ Ğ¾Ñ‚ĞºĞ»Ğ¾Ğ½ĞµĞ½Ğ¾");
+        localStorage.removeItem("tochka_invite_token");
+        setInviteInfo(null);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ‚Ğ¸", "error"); }
+  }
+
+  async function createPatientInvitation() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "createPatientInvitation", session_id: saved.sessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setPatientInviteCreated(data.invitation);
+        await loadPatientInvitations();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ‚Ğ¸", "error"); }
+  }
+
+  async function createMatchRequest(message) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    setMatchRequestSending(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "createMatchRequest", session_id: saved.sessionId, access_token: saved.accessToken, message }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        showToast("Ğ—Ğ°ÑĞ²ĞºĞ° Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ°. ĞĞ´Ğ¼Ğ¸Ğ½Ğ¸ÑÑ‚Ñ€Ğ°Ñ‚Ğ¾Ñ€ Ğ¿Ğ¾Ğ´Ğ±ĞµÑ€Ñ‘Ñ‚ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°.");
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ‚Ğ¸", "error"); }
+    setMatchRequestSending(false);
+  }
+
+  // Load daily check-ins
+  async function loadSupportCheckins() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getSupportCheckins", session_id: saved.sessionId, access_token: saved.accessToken, days: 90 }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setCheckinToday(data.today);
+        setCheckinHistory(data.history || []);
+        if (data.today) {
+          setCheckinWellbeing(data.today.wellbeing_score);
+          setCheckinAnxiety(data.today.anxiety_score);
+          setCheckinComment(data.today.comment || "");
+        }
+      }
+    } catch { /* silent */ }
+  }
+
+  // Save daily check-in
+  async function saveSupportCheckin() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    if (checkinWellbeing === null || checkinWellbeing === undefined) {
+      showToast("ĞÑ‚Ğ¼ĞµÑ‚ÑŒÑ‚Ğµ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ.", "error");
+      return;
+    }
+    setCheckinSaving(true);
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "saveSupportCheckin",
+          session_id: saved.sessionId,
+          access_token: saved.accessToken,
+          wellbeing_score: checkinWellbeing,
+          anxiety_score: checkinAnxiety,
+          comment: checkinComment,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setCheckinToday(data.checkin);
+        showToast("Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¾.", "success");
+        await loadSupportCheckins();
+      } else {
+        showToast(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ", "error");
+      }
+    } catch {
+      showToast("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ", "error");
+    } finally {
+      setCheckinSaving(false);
+    }
+  }
+
+  // Load support practices
+  async function loadSupportPractices() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getSupportPractices", session_id: saved.sessionId, access_token: saved.accessToken }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setSupportPractices(data.practices || []);
+      }
+    } catch { /* silent */ }
+  }
+
+  // Save a practice (add to owner-level)
+  async function saveSupportPractice(practiceKey) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "saveSupportPractice", session_id: saved.sessionId, access_token: saved.accessToken, practice_key: practiceKey }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        await loadSupportPractices();
+      }
+    } catch { /* silent */ }
+  }
+
+  // Update practice user_status
+  async function updatePracticeStatus(practiceKey, userStatus) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateSupportPracticeStatus", session_id: saved.sessionId, access_token: saved.accessToken, practice_key: practiceKey, user_status: userStatus }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        await loadSupportPractices();
+      }
+    } catch { /* silent */ }
+  }
+
+  // Load support chat messages
+  async function loadSupportChat() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getSupportChat", session_id: saved.sessionId, access_token: saved.accessToken, limit: 20 }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setQuickChatMessages(data.messages || []);
+      }
+    } catch { /* silent */ }
+  }
+
+  function handleQuickChatScroll(e) {
+    const el = e.target;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    setQuickChatScrolledUp(!atBottom);
+  }
+
+  function scrollToQuickChatBottom(smooth = true) {
+    const el = quickChatContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "instant" });
+    setQuickChatScrolledUp(false);
+    setQuickChatHasNewResponse(false);
+  }
+
+  // Send quick chat message
+  async function sendQuickChatMessage(text) {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    const trimmed = (text || quickChatInput).trim();
+    if (!trimmed) return;
+
+    // Optimistic add
+    const tempId = "temp-" + Date.now();
+    setQuickChatMessages(prev => [...prev, { id: tempId, role: "user", message_text: trimmed, created_at: new Date().toISOString() }]);
+    setQuickChatLoading(true);
+    setQuickChatHasNewResponse(false);
+
+    // Scroll to bottom after optimistic add (after React render)
+    requestAnimationFrame(() => { setTimeout(() => scrollToQuickChatBottom(false), 0); });
+
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sendSupportMessage", session_id: saved.sessionId, access_token: saved.accessToken, message: trimmed }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        // Success: clear input and replace temp with real messages
+        setQuickChatInput("");
+        setQuickChatMessages(prev => {
+          const withoutTemp = prev.filter(m => m.id !== tempId);
+          return [...withoutTemp,
+            { id: "user-" + Date.now(), role: "user", message_text: trimmed, created_at: new Date().toISOString() },
+            { id: "ai-" + Date.now(), role: "assistant", message_text: data.response?.answer || "", ai_response: data.response, created_at: new Date().toISOString() },
+          ];
+        });
+        // Auto-scroll to new assistant message (unless user scrolled up)
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (!quickChatScrolledUp) {
+              scrollToQuickChatBottom(true);
+            } else {
+              setQuickChatHasNewResponse(true);
+            }
+          }, 0);
+        });
+      } else {
+        // API returned error â€” show fallback message and restore text
+        setQuickChatMessages(prev => {
+          const withoutTemp = prev.filter(m => m.id !== tempId);
+          return [...withoutTemp,
+            { id: "user-" + Date.now(), role: "user", message_text: trimmed, created_at: new Date().toISOString() },
+            { id: "ai-" + Date.now(), role: "assistant", message_text: "Ğ¡ĞµĞ¹Ñ‡Ğ°Ñ Ğ½Ğµ Ğ¿Ğ¾Ğ»ÑƒÑ‡Ğ¸Ğ»Ğ¾ÑÑŒ ÑÑ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ñ‚Ğ²ĞµÑ‚. Ğ’Ñ‹ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ¿Ğ¾Ğ¿Ñ€Ğ¾Ğ±Ğ¾Ğ²Ğ°Ñ‚ÑŒ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ· Ğ¸Ğ»Ğ¸ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€ Ğ² Ğ¿Ğ¾Ğ´Ñ€Ğ¾Ğ±Ğ½Ğ¾Ğ¼ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğµ.", ai_response: { answer: "Ğ¡ĞµĞ¹Ñ‡Ğ°Ñ Ğ½Ğµ Ğ¿Ğ¾Ğ»ÑƒÑ‡Ğ¸Ğ»Ğ¾ÑÑŒ ÑÑ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ñ‚Ğ²ĞµÑ‚. Ğ’Ñ‹ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ¿Ğ¾Ğ¿Ñ€Ğ¾Ğ±Ğ¾Ğ²Ğ°Ñ‚ÑŒ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ· Ğ¸Ğ»Ğ¸ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€ Ğ² Ğ¿Ğ¾Ğ´Ñ€Ğ¾Ğ±Ğ½Ğ¾Ğ¼ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğµ.", safety_note: null, confidence: "low", suggest_followup: true, intent_type: "error" }, created_at: new Date().toISOString() },
+          ];
+        });
+        setQuickChatInput(trimmed);
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            quickChatInputRef.current?.focus();
+            if (!quickChatScrolledUp) scrollToQuickChatBottom(true);
+          }, 0);
+        });
+      }
+    } catch {
+      // Network error â€” show fallback and restore text
+      setQuickChatMessages(prev => {
+        const withoutTemp = prev.filter(m => m.id !== tempId);
+        return [...withoutTemp,
+          { id: "user-" + Date.now(), role: "user", message_text: trimmed, created_at: new Date().toISOString() },
+          { id: "ai-" + Date.now(), role: "assistant", message_text: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ²ÑĞ·Ğ°Ñ‚ÑŒÑÑ Ñ ÑĞµÑ€Ğ²Ğ¸ÑĞ¾Ğ¼. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ· Ğ¸Ğ»Ğ¸ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚Ğµ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€ Ğ² Ğ¿Ğ¾Ğ´Ñ€Ğ¾Ğ±Ğ½Ğ¾Ğ¼ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğµ.", ai_response: { answer: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ²ÑĞ·Ğ°Ñ‚ÑŒÑÑ Ñ ÑĞµÑ€Ğ²Ğ¸ÑĞ¾Ğ¼. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ· Ğ¸Ğ»Ğ¸ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚Ğµ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€ Ğ² Ğ¿Ğ¾Ğ´Ñ€Ğ¾Ğ±Ğ½Ğ¾Ğ¼ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğµ.", safety_note: null, confidence: "low", suggest_followup: true, intent_type: "error" }, created_at: new Date().toISOString() },
+        ];
+      });
+      setQuickChatInput(trimmed);
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          quickChatInputRef.current?.focus();
+          if (!quickChatScrolledUp) scrollToQuickChatBottom(true);
+        }, 0);
+      });
+    } finally {
+      setQuickChatLoading(false);
+    }
+  }
+
+  // Save patient feedback to case_reviews
+  async function savePatientFeedback() {
+    const saved = getSupportSession();
+    if (!saved.sessionId || !saved.accessToken) return;
+    if (!patientRating && !patientUseful && !patientUnclear) {
+      showToast("Ğ—Ğ°Ğ¿Ğ¾Ğ»Ğ½Ğ¸Ñ‚Ğµ Ñ…Ğ¾Ñ‚Ñ Ğ±Ñ‹ Ğ¾Ğ´Ğ½Ğ¾ Ğ¿Ğ¾Ğ»Ğµ.", "error");
+      return;
+    }
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save",
+          case_id: sessionId,
+          sessionId: saved.sessionId,
+          access_token: saved.accessToken,
+          publicCode: publicCode || "",
+          module: "support",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          patient_feedback: {
+            rating: patientRating,
+            useful: patientUseful,
+            unclear_or_useless: patientUnclear,
+          },
+          doctor_feedback: {},
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Ğ¡Ğ¿Ğ°ÑĞ¸Ğ±Ğ¾ Ğ·Ğ° Ğ¾Ñ‚Ğ·Ñ‹Ğ²!", "success");
+      } else {
+        showToast(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¾Ñ‚Ğ·Ñ‹Ğ²", "error");
+      }
+    } catch {
+      showToast("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¾Ñ‚Ğ·Ñ‹Ğ²", "error");
+    }
+  }
+
+  // Care recommendation â†’ CTA helper
+  function getCareNextStep(careRecommendation) {
+    const level = careRecommendation?.level;
+    if (level === "urgent_help") {
+      return { text: "Ğ­ĞºÑÑ‚Ñ€ĞµĞ½Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ", description: "Ğ•ÑĞ»Ğ¸ ĞµÑÑ‚ÑŒ Ñ€Ğ¸ÑĞº â€” Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112 Ğ¸Ğ»Ğ¸ 103", urgent: true };
+    }
+    if (level === "medical_consultation") {
+      return { text: "Ğ ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´ÑƒĞµÑ‚ÑÑ ĞºĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ñ Ğ²Ñ€Ğ°Ñ‡Ğ°", description: "ĞĞ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ĞµÑÑŒ Ğº ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ñƒ Ğ´Ğ»Ñ Ğ¾Ñ‡Ğ½Ğ¾Ğ¹ Ğ¾Ñ†ĞµĞ½ĞºĞ¸", cta: "Ğ¡Ğ²ÑĞ·Ğ°Ñ‚ÑŒÑÑ ÑĞ¾ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ¼" };
+    }
+    if (level === "professional_contact") {
+      return { text: "Ğ¡Ñ‚Ğ¾Ğ¸Ñ‚ Ğ¾Ğ±ÑÑƒĞ´Ğ¸Ñ‚ÑŒ ÑĞ¾ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ¼", description: "Ğ ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´ÑƒĞµĞ¼ ÑĞ²ÑĞ·Ğ°Ñ‚ÑŒÑÑ ÑĞ¾ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ¼", cta: "Ğ¡Ğ²ÑĞ·Ğ°Ñ‚ÑŒÑÑ ÑĞ¾ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ¼" };
+    }
+    // self_care / self_support / default
+    return { text: "ĞœĞ¾Ğ¶Ğ½Ğ¾ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ Ğ½Ğ°Ğ±Ğ»ÑĞ´ĞµĞ½Ğ¸Ğµ", description: "ĞŸÑ€Ğ¸ Ğ½ĞµĞ¾Ğ±Ñ…Ğ¾Ğ´Ğ¸Ğ¼Ğ¾ÑÑ‚Ğ¸ Ğ²ĞµÑ€Ğ½Ğ¸Ñ‚ĞµÑÑŒ Ğº Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ñƒ", cta: "ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€" };
+  }
+
+  async function ensureStartSession() {
+    if (sessionRef.current) {
+      return sessionRef.current;
+    }
+    if (startSessionPromiseRef.current) {
+      return startSessionPromiseRef.current;
+    }
+    startSessionPromiseRef.current = (async () => {
+      const mod = activeModule || "support";
+      let token;
+      try { token = await getClientToken(mod, "analyze"); } catch (e) {
+        throw new Error("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.");
+      }
+      const r = await fetch("/api/start-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      const d = await r.json();
+      if (!d.ok) {
+        const code = d.code || (r.status === 401 ? "SESSION_START_401" : r.status === 404 ? "SESSION_START_404" : "SESSION_CREATE_FAILED");
+        throw new Error(`ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€ (${code}). ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.`);
+      }
+      const data = { sessionId: d.session_id, accessToken: d.access_token };
+      sessionRef.current = data;
+      setSessionId(data.sessionId);
+      saveSupportSession(data.sessionId, data.accessToken);
+      return data;
+    })();
+    try {
+      return await startSessionPromiseRef.current;
+    } finally {
+      startSessionPromiseRef.current = null;
+    }
+  }
+
+  async function transcribeSupportAudio(audioBlob, currentSession) {
+    if (!isUsableVoiceBlob(audioBlob)) throw new Error("Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ ÑĞ»Ğ¸ÑˆĞºĞ¾Ğ¼ ĞºĞ¾Ñ€Ğ¾Ñ‚ĞºĞ°Ñ Ğ¸Ğ»Ğ¸ Ğ¿ÑƒÑÑ‚Ğ°Ñ. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.");
+    const mod = "support";
+    let token;
+    try { token = await getClientToken(mod, "transcribe"); } catch {}
+    const tHeaders = {
+      "Content-Type": audioBlob.type,
+      "X-Session-Id": currentSession.sessionId,
+      "X-Module": "support",
+      "X-Access-Token": currentSession.accessToken,
+    };
+    if (token) tHeaders.Authorization = `Bearer ${token}`;
+
+    let response = await fetch("/api/transcribe", {
+      method: "POST",
+      headers: tHeaders,
+      body: audioBlob,
+    });
+
+    // Retry once when only the short-lived client token has expired.
+    if (response.status === 401 && token) {
+      try { token = await getClientToken(mod, "transcribe"); } catch {}
+      tHeaders.Authorization = `Bearer ${token}`;
+      response = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: tHeaders,
+        body: audioBlob,
+      });
+    }
+
+    const responseText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      throw new Error("Ğ¡ĞµÑ€Ğ²ĞµÑ€ Ğ²ĞµÑ€Ğ½ÑƒĞ» Ğ¿ÑƒÑÑ‚Ğ¾Ğ¹ Ğ¾Ñ‚Ğ²ĞµÑ‚ (Ğ¿Ğ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿ĞµÑ€ĞµĞ·Ğ°Ğ¿ÑƒÑÑ‚Ğ¸Ñ‚ÑŒ ÑĞµÑ€Ğ²ĞµÑ€)");
+    }
+    if (!response.ok) throw new Error(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ñ€Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ³Ğ¾Ğ»Ğ¾Ñ");
+    return data;
+  }
+
+  function stopSupportCabinetVoice() {
+    if (cabinetVoiceTimerRef.current) {
+      clearInterval(cabinetVoiceTimerRef.current);
+      cabinetVoiceTimerRef.current = null;
+    }
+    if (cabinetVoiceRecorderRef.current?.state === "recording") {
+      cabinetVoiceRecorderRef.current.stop();
+    }
+    setCabinetVoiceRecording(false);
+  }
+
+  async function startSupportCabinetVoice(target) {
+    if (cabinetVoiceRecording || cabinetVoiceTranscribing) return;
+    if (recording || transcribing || recordingQuestionIndex !== null || questionTranscribingIndex !== null || crisisRecording || crisisTranscribing) {
+      setCabinetVoiceError("Ğ¡Ğ½Ğ°Ñ‡Ğ°Ğ»Ğ° Ğ·Ğ°Ğ²ĞµÑ€ÑˆĞ¸Ñ‚Ğµ Ğ´Ñ€ÑƒĞ³ÑƒÑ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ Ğ³Ğ¾Ğ»Ğ¾ÑĞ¾Ğ¼.");
+      setCabinetVoiceTarget(target);
+      return;
+    }
+
+    setCabinetVoiceError("");
+    setCabinetVoiceTarget(target);
+    cabinetVoiceIgnoreStopRef.current = false;
+
+    try {
+      const saved = getSupportSession();
+      if (!saved.sessionId || !saved.accessToken) {
+        throw new Error("Ğ¡ĞµÑÑĞ¸Ñ Ğ¸ÑÑ‚ĞµĞºĞ»Ğ°. Ğ’Ğ¾Ğ¹Ğ´Ğ¸Ñ‚Ğµ ÑĞ½Ğ¾Ğ²Ğ° Ğ¿Ğ¾ ĞºĞ¾Ğ´Ñƒ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ.");
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const voiceCapture = createVoiceRecording(stream);
+      const recorder = voiceCapture.recorder;
+      cabinetVoiceStreamRef.current = stream;
+      cabinetVoiceRecorderRef.current = recorder;
+      cabinetVoiceChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) cabinetVoiceChunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        cabinetVoiceStreamRef.current = null;
+        cabinetVoiceRecorderRef.current = null;
+        if (cabinetVoiceTimerRef.current) {
+          clearInterval(cabinetVoiceTimerRef.current);
+          cabinetVoiceTimerRef.current = null;
+        }
+        if (cabinetVoiceIgnoreStopRef.current) return;
+
+        const audioBlob = await voiceCapture.blobPromise;
+        setCabinetVoiceTranscribing(true);
+        try {
+          const data = await transcribeSupportAudio(audioBlob, saved);
+          const transcript = data.text || "";
+          if (target === "quick_chat") {
+            setQuickChatInput((previous) => appendVoiceText(previous, transcript));
+          } else {
+            setFollowUpAnswers((previous) => ({
+              ...previous,
+              [target]: appendVoiceText(previous[target], transcript),
+            }));
+          }
+        } catch (error) {
+          setCabinetVoiceError(error.message || "ĞÑˆĞ¸Ğ±ĞºĞ° Ñ€Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²ĞºĞ¸");
+        } finally {
+          setCabinetVoiceTranscribing(false);
+          setCabinetVoiceTarget(null);
+          setCabinetVoiceTime(0);
+        }
+      };
+
+      recorder.start();
+      setCabinetVoiceRecording(true);
+      setCabinetVoiceTime(0);
+      cabinetVoiceTimerRef.current = setInterval(() => {
+        setCabinetVoiceTime((previous) => {
+          const next = previous + 1;
+          if (next >= 60) {
+            stopSupportCabinetVoice();
+            return 60;
+          }
+          return next;
+        });
+      }, 1000);
+    } catch (error) {
+      cabinetVoiceStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cabinetVoiceStreamRef.current = null;
+      cabinetVoiceRecorderRef.current = null;
+      setCabinetVoiceRecording(false);
+      setCabinetVoiceError(error.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ğ¾Ğ»ÑƒÑ‡Ğ¸Ñ‚ÑŒ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿ Ğº Ğ¼Ğ¸ĞºÑ€Ğ¾Ñ„Ğ¾Ğ½Ñƒ");
+    }
+  }
+
+  function renderSupportCabinetVoice(target, idleLabel) {
+    const active = cabinetVoiceTarget === target;
+    const anotherBusy = (cabinetVoiceRecording || cabinetVoiceTranscribing) && !active;
+    return (
+      <div style={{ marginTop: 6 }}>
+        <button
+          type="button"
+          style={{ ...s.secondary, fontSize: 12, padding: "7px 12px", opacity: anotherBusy ? 0.5 : 1 }}
+          onClick={() => active && cabinetVoiceRecording ? stopSupportCabinetVoice() : startSupportCabinetVoice(target)}
+          disabled={anotherBusy || (active && cabinetVoiceTranscribing)}
+        >
+          {active && cabinetVoiceTranscribing
+            ? "Ğ Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²Ñ‹Ğ²Ğ°ĞµĞ¼..."
+            : active && cabinetVoiceRecording
+              ? "â–  ĞÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ Ğ¸ Ñ€Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ"
+              : `ğŸ™ ${idleLabel}`}
+        </button>
+        {active && cabinetVoiceRecording && (
+          <div style={{ marginTop: 5, color: cabinetVoiceTime > 45 ? "#B85C4A" : "#7A7268", fontSize: 12 }}>
+            Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ: {cabinetVoiceTime} ÑĞµĞº / 60 ÑĞµĞº
+          </div>
+        )}
+        {active && cabinetVoiceError && <div style={{ marginTop: 5, color: "#991B1B", fontSize: 12 }}>{cabinetVoiceError}</div>}
+      </div>
+    );
+  }
+
+  async function startRecording() {
+    setVoiceError("");
+
+    try {
+      await ensureStartSession();
+      const currentSession = sessionRef.current;
+      if (!currentSession?.sessionId || !currentSession?.accessToken) {
+        setVoiceError("Ğ¡ĞµÑÑĞ¸Ñ Ğ¸ÑÑ‚ĞµĞºĞ»Ğ°. Ğ’Ğ¾Ğ¹Ğ´Ğ¸Ñ‚Ğµ ÑĞ½Ğ¾Ğ²Ğ° Ğ¿Ğ¾ ĞºĞ¾Ğ´Ñƒ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ.");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const voiceCapture = createVoiceRecording(stream);
+      const recorder = voiceCapture.recorder;
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+
+        const audioBlob = await voiceCapture.blobPromise;
+
+        setTranscribing(true);
+
+         try {
+           const data = await transcribeSupportAudio(audioBlob, currentSession);
+
+           const transcript = data.text || "";
+          setText(transcript);
+          if (data.voice_observations) {
+            const msgId = `voice-${Date.now()}-${++voiceMsgCounterRef.current}`;
+            setVoiceObservations((prev) => {
+              if (prev.some((e) => e.messageId === msgId)) return prev;
+              return [...prev, {
+                messageId: msgId,
+                round: 0,
+                createdAt: new Date().toISOString(),
+                transcript,
+                analysis: data.voice_observations,
+              }];
+            });
+          }
+          setMode("text");
+        } catch (error) {
+          setVoiceError(error.message || "ĞÑˆĞ¸Ğ±ĞºĞ° Ñ€Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²ĞºĞ¸");
+        } finally {
+          setTranscribing(false);
+        }
+      };
+
+      recorder.start();
+      setRecording(true);
+      setRecordingTime(0);
+
+      timerRef.current = setInterval(() => {
+        setRecordingTime((prev) => {
+          const next = prev + 1;
+
+          if (next >= 60) {
+            stopRecording();
+            setVoiceError("Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ°Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸ Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ° Ñ‡ĞµÑ€ĞµĞ· 60 ÑĞµĞºÑƒĞ½Ğ´.");
+            return 60;
+          }
+
+          return next;
+        });
+      }, 1000);
+    } catch (error) {
+      setVoiceError("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ğ¾Ğ»ÑƒÑ‡Ğ¸Ñ‚ÑŒ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿ Ğº Ğ¼Ğ¸ĞºÑ€Ğ¾Ñ„Ğ¾Ğ½Ñƒ");
+    }
+  }
+
+  function stopRecording() {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+    }
+  }
+
+  async function startQuestionRecording(index) {
+    setVoiceError("");
+
+    try {
+      await ensureStartSession();
+      const currentSession = sessionRef.current;
+      if (!currentSession?.sessionId || !currentSession?.accessToken) {
+        setVoiceError("Ğ¡ĞµÑÑĞ¸Ñ Ğ¸ÑÑ‚ĞµĞºĞ»Ğ°. Ğ’Ğ¾Ğ¹Ğ´Ğ¸Ñ‚Ğµ ÑĞ½Ğ¾Ğ²Ğ° Ğ¿Ğ¾ ĞºĞ¾Ğ´Ñƒ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ.");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const voiceCapture = createVoiceRecording(stream);
+      const recorder = voiceCapture.recorder;
+      questionMediaRecorderRef.current = recorder;
+      questionAudioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          questionAudioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+
+        if (questionTimerRef.current) {
+          clearInterval(questionTimerRef.current);
+        }
+
+        const audioBlob = await voiceCapture.blobPromise;
+
+        setQuestionTranscribingIndex(index);
+
+         try {
+           const data = await transcribeSupportAudio(audioBlob, currentSession);
+
+           setAnswers((prev) => ({
+            ...prev,
+            [index]: data.text || "",
+          }));
+          if (data.voice_observations) {
+            const msgId = `voice-${Date.now()}-${++voiceMsgCounterRef.current}`;
+            setVoiceObservations((prev) => {
+              if (prev.some((e) => e.messageId === msgId)) return prev;
+              return [...prev, {
+                messageId: msgId,
+                round: dialogDepth,
+                createdAt: new Date().toISOString(),
+                transcript: data.text || "",
+                analysis: data.voice_observations,
+              }];
+            });
+          }
+        } catch (error) {
+          setVoiceError(error.message || "ĞÑˆĞ¸Ğ±ĞºĞ° Ñ€Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²ĞºĞ¸");
+        } finally {
+          setQuestionTranscribingIndex(null);
+          setRecordingQuestionIndex(null);
+          setQuestionRecordingTime(0);
+        }
+      };
+
+      recorder.start();
+      setRecordingQuestionIndex(index);
+      setQuestionRecordingTime(0);
+
+      questionTimerRef.current = setInterval(() => {
+        setQuestionRecordingTime((prev) => {
+          const next = prev + 1;
+
+          if (next >= 60) {
+            stopQuestionRecording();
+            return 60;
+          }
+
+          return next;
+        });
+      }, 1000);
+    } catch (error) {
+      setVoiceError("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ğ¾Ğ»ÑƒÑ‡Ğ¸Ñ‚ÑŒ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿ Ğº Ğ¼Ğ¸ĞºÑ€Ğ¾Ñ„Ğ¾Ğ½Ñƒ");
+    }
+  }
+
+  function stopQuestionRecording() {
+    if (questionTimerRef.current) {
+      clearInterval(questionTimerRef.current);
+    }
+
+    if (questionMediaRecorderRef.current && recordingQuestionIndex !== null) {
+      questionMediaRecorderRef.current.stop();
+    }
+  }
+
+  async function startCrisisRecording() {
+    setCrisisVoiceError("");
+
+    try {
+      await ensureStartSession().catch(() => {});
+      const currentSession = sessionRef.current;
+      if (!currentSession?.sessionId || !currentSession?.accessToken) {
+        setCrisisVoiceError("Ğ¡ĞµÑÑĞ¸Ñ Ğ¸ÑÑ‚ĞµĞºĞ»Ğ°. Ğ’Ğ¾Ğ¹Ğ´Ğ¸Ñ‚Ğµ ÑĞ½Ğ¾Ğ²Ğ° Ğ¿Ğ¾ ĞºĞ¾Ğ´Ñƒ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ.");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const voiceCapture = createVoiceRecording(stream);
+      const recorder = voiceCapture.recorder;
+      crisisMediaRecorderRef.current = recorder;
+      crisisAudioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          crisisAudioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+
+        if (crisisTimerRef.current) {
+          clearInterval(crisisTimerRef.current);
+        }
+
+        const audioBlob = await voiceCapture.blobPromise;
+
+        setCrisisTranscribing(true);
+
+        try {
+          if (!isUsableVoiceBlob(audioBlob)) throw new Error("Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ ÑĞ»Ğ¸ÑˆĞºĞ¾Ğ¼ ĞºĞ¾Ñ€Ğ¾Ñ‚ĞºĞ°Ñ Ğ¸Ğ»Ğ¸ Ğ¿ÑƒÑÑ‚Ğ°Ñ. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.");
+          const mod = "support";
+          let token;
+          try { token = await getClientToken(mod, "transcribe"); } catch {}
+          const tHeaders = {
+            "Content-Type": audioBlob.type,
+            "X-Session-Id": currentSession.sessionId,
+            "X-Module": "support",
+            "X-Access-Token": currentSession.accessToken,
+          };
+          if (token) tHeaders["Authorization"] = `Bearer ${token}`;
+
+          let response = await fetch("/api/transcribe", {
+            method: "POST",
+            headers: tHeaders,
+            body: audioBlob,
+          });
+
+          if (response.status === 401 && token) {
+            try { token = await getClientToken(mod, "transcribe"); } catch {}
+            tHeaders["Authorization"] = `Bearer ${token}`;
+            response = await fetch("/api/transcribe", {
+              method: "POST",
+              headers: tHeaders,
+              body: audioBlob,
+            });
+          }
+
+          const responseText = await response.text();
+          let data;
+          try {
+            data = JSON.parse(responseText);
+          } catch {
+            console.error("Transcribe: non-JSON response", response.status, responseText.slice(0, 200));
+            throw new Error("Ğ¡ĞµÑ€Ğ²ĞµÑ€ Ğ²ĞµÑ€Ğ½ÑƒĞ» Ğ¿ÑƒÑÑ‚Ğ¾Ğ¹ Ğ¾Ñ‚Ğ²ĞµÑ‚ (Ğ¿Ğ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿ĞµÑ€ĞµĞ·Ğ°Ğ¿ÑƒÑÑ‚Ğ¸Ñ‚ÑŒ ÑĞµÑ€Ğ²ĞµÑ€)");
+          }
+
+          if (!response.ok) {
+            throw new Error(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ñ€Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ³Ğ¾Ğ»Ğ¾Ñ");
+          }
+
+          setCrisisText(data.text || "");
+        } catch (error) {
+          setCrisisVoiceError(error.message || "ĞÑˆĞ¸Ğ±ĞºĞ° Ñ€Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²ĞºĞ¸");
+        } finally {
+          setCrisisTranscribing(false);
+          setCrisisRecording(false);
+          setCrisisRecordingTime(0);
+        }
+      };
+
+      recorder.start();
+      setCrisisRecording(true);
+      setCrisisRecordingTime(0);
+
+      crisisTimerRef.current = setInterval(() => {
+        setCrisisRecordingTime((prev) => {
+          const next = prev + 1;
+
+          if (next >= 60) {
+            stopCrisisRecording();
+            return 60;
+          }
+
+          return next;
+        });
+      }, 1000);
+    } catch (error) {
+      setCrisisVoiceError("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ğ¾Ğ»ÑƒÑ‡Ğ¸Ñ‚ÑŒ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿ Ğº Ğ¼Ğ¸ĞºÑ€Ğ¾Ñ„Ğ¾Ğ½Ñƒ");
+    }
+  }
+
+  function stopCrisisRecording() {
+    if (crisisTimerRef.current) {
+      clearInterval(crisisTimerRef.current);
+    }
+
+    if (crisisMediaRecorderRef.current && crisisRecording) {
+      crisisMediaRecorderRef.current.stop();
+    }
+  }
+
+  async function submitRound(overrideText) {
+    const inputText = typeof overrideText === "string" ? overrideText : text;
+    if (dialogDepth === 0 && inputText.trim().length < 10) {
+      setError("ĞĞ°Ğ¿Ğ¸ÑˆĞ¸Ñ‚Ğµ Ñ…Ğ¾Ñ‚Ñ Ğ±Ñ‹ 2â€“3 Ğ¿Ñ€ĞµĞ´Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ñ.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setQuestions(null);
+
+    let analyzeSessionId = sessionId;
+    let analyzeSessionAccess = null;
+
+    // Use the returned session context immediately; React state updates are asynchronous.
+    if (activeModule === "support" && !analyzeSessionId) {
+      try {
+        const sessionData = await ensureStartSession();
+        analyzeSessionId = sessionData.sessionId;
+        analyzeSessionAccess = sessionData;
+        setSessionId(sessionData.sessionId);
+
+        // Save display_name immediately after session creation
+        if (displayNameInput.trim() && !supportDisplayName) {
+          fetch("/api/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "saveSupportProfile", session_id: sessionData.sessionId, access_token: sessionData.accessToken, display_name: displayNameInput.trim() }),
+          }).then(r => r.json()).then(d => { if (d.ok) setSupportDisplayName(d.display_name); }).catch(() => {});
+        }
+      } catch (e) {
+        setError(e.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€.");
+        setLoading(false);
+        return;
+      }
+    } else if (activeModule === "support") {
+      const current = sessionRef.current?.sessionId === analyzeSessionId
+        ? sessionRef.current
+        : getSupportSession();
+      if (current.sessionId === analyzeSessionId) analyzeSessionAccess = current;
+    }
+
+    if (dialogDepth >= 3 && activeModule === "support") {
+      setLoadingMessage("Ğ“Ğ¾Ñ‚Ğ¾Ğ²Ğ¸Ğ¼ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚â€¦");
+      setTimeout(() => {
+        if (loading) setLoadingMessage("ĞŸĞ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²ĞºĞ° Ğ·Ğ°Ğ½Ğ¸Ğ¼Ğ°ĞµÑ‚ Ğ±Ğ¾Ğ»ÑŒÑˆĞµ Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ¸, Ñ‡ĞµĞ¼ Ğ¾Ğ±Ñ‹Ñ‡Ğ½Ğ¾.");
+      }, 40000);
+    } else {
+      setLoadingMessage("");
+    }
+
+    try {
+      const mod = activeModule || "support";
+      const res = await fetchWithClientToken("/api/analyze", mod, "analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withSessionAccess({
+          text: inputText,
+          answers: dialogDepth === 0 ? {} : answers,
+          conversationHistory,
+          depth: dialogDepth,
+          isContinuation,
+          previousPatientReport,
+          previousDoctorReport,
+          homeTasks,
+          resourceFactors,
+          supportPlan,
+          voiceObservations,
+          module: mod,
+          followup_answered_topics: followupAnsweredTopics || undefined,
+          crisis_mode: crisisMode,
+        }, analyzeSessionId ? {
+          sessionId: analyzeSessionId,
+          accessToken: analyzeSessionAccess?.accessToken,
+        } : null)),
+      });
+
+      if (!res.ok) {
+        if (res instanceof Response) {
+          const errText = await res.text();
+          throw new Error(errText ? JSON.parse(errText).error : "ĞÑˆĞ¸Ğ±ĞºĞ°");
+        }
+        throw new Error(res.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ±Ğ¾Ñ€. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.");
+      }
+
+      const data = await res.json();
+
+      if (data.type === "crisis_questions") {
+        setCrisisMode(true);
+        setCrisisBlock(data.crisis || { status: "safety_check_in_progress", emergency_contacts: ["112", "103"] });
+        setQuestions(data.questions || []);
+        setConversationHistory([{ role: "assistant", questions: data.questions || [] }]);
+        setAnswers({});
+        setDialogDepth((d) => d + 1);
+        setPhase("questions");
+        setSupportScreen("questions");
+      } else if (data.type === "questions") {
+        const qs = Array.isArray(data.questions)
+          ? data.questions.filter(Boolean)
+          : [];
+
+        // If questions are empty after dedup (follow-up with sufficient data), skip to report
+        if (qs.length === 0 && followupAnsweredTopics) {
+          setFollowupAnsweredTopics(null);
+          // Submit again with depth incremented to trigger report generation
+          setDialogDepth((d) => d + 1);
+          await submitRound(inputText);
+          return;
+        }
+
+        const newHistory = [
+          ...conversationHistory,
+          ...(dialogDepth > 0
+            ? [{ role: "user", answers }]
+            : []),
+          { role: "assistant", questions: qs },
+        ];
+
+        setConversationHistory(newHistory);
+        setQuestions(qs.length > 0 ? qs : fallbackQ());
+        setAnswers({});
+        setDialogDepth((d) => d + 1);
+        setPhase("questions");
+        setSupportScreen("questions");
+
+        // Persist conversation pairs after each answer round
+        if (dialogDepth > 0 && sessionId) {
+          const pairs = buildConversationPairs(
+            [...conversationHistory, { role: "user", answers }],
+            { questions, answers, patient_input: inputText }
+          );
+            if (pairs.length > 0) {
+            const pairsBody = withAccessToken({ action: "save_conversation_pairs", sessionId, pairs }, sessionId);
+            fetch("/api/session", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(pairsBody),
+            }).catch(() => {});
+          }
+        }
+      } else if (data.type === "processing") {
+        // Backend is still generating the report. Start polling.
+        const sid = sessionId || `session-${Date.now()}`;
+        if (!sessionId) setSessionId(sid);
+        setLoadingMessage("ĞÑ‚Ñ‡Ñ‘Ñ‚ ĞµÑ‰Ñ‘ Ñ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€ÑƒĞµÑ‚ÑÑ. ĞŸĞ¾Ğ´Ğ¾Ğ¶Ğ´Ğ¸Ñ‚Ğµ Ğ½ĞµĞ¼Ğ½Ğ¾Ğ³Ğ¾.");
+        await pollReportStatus(sid, (status) => finalizeReportFromStatus(status, inputText));
+      } else if (data.type === "final") {
+        setResult(data.report || "");
+        if (data.crisis) setCrisisBlock(data.crisis);
+        if (data._debug) setDebugInfo(data._debug);
+        if (data.care_recommendation) setCareRecommendation(data.care_recommendation);
+        setActiveTab("user");
+        setReportSource("generated");
+        setJustFinishedSession(true);
+        setPhase("report");
+        setSupportScreen("report");
+
+        const sid = sessionId || `session-${Date.now()}`;
+        if (!sessionId) setSessionId(sid);
+
+        // Backend now saves the report durably. Use tokens/codes from the response.
+        if (data.public_code) setPublicCode(data.public_code);
+        if (data.access_token) saveSupportSession(sid, data.access_token);
+        if (data.continuation_code) setContinuationCode(data.continuation_code);
+
+        // Persist conversation pairs for all rounds (best-effort).
+        const finalHistory = [
+          ...conversationHistory,
+          ...(dialogDepth > 0 ? [{ role: "user", answers }] : []),
+        ];
+        const finalPairs = buildConversationPairs(finalHistory, { questions, answers, patient_input: inputText });
+        if (finalPairs.length > 0) {
+          const pairsBody = withAccessToken({ action: "save_conversation_pairs", sessionId: sid, pairs: finalPairs }, sid);
+          fetch("/api/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pairsBody),
+          }).catch(() => {});
+        }
+
+        // Save case review (local + Supabase)
+        const review = {
+          case_id: sid, sessionId: sid, publicCode: data.public_code || publicCode || "",
+          access_token: data.access_token || getSupportSession().accessToken || "",
+          module: activeModule,
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+          environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
+          patient_input: inputText, questions, answers,
+          ai_result: data.report || "", conversationHistory, dialogDepth,
+          previousPatientReport: previousPatientReport || "",
+          previousDoctorReport: previousDoctorReport || "",
+          homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
+          patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
+          doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
+          voice_observations: voiceObservations || null,
+          expert_id: expertData?.id || null,
+          expert_name: expertData?.name || null,
+          expert_role: expertData?.role || null,
+          expert_specialty: expertData?.specialty || null,
+        };
+        fetch("/api/reviews", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "save", ...review }),
+        }).catch(() => {});
+      } else {
+        throw new Error("ĞĞµĞ¸Ğ·Ğ²ĞµÑÑ‚Ğ½Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿ Ğ¾Ñ‚Ğ²ĞµÑ‚Ğ°");
+      }
+    } catch (e) {
+      const msg = e.message || "";
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("abort")) {
+        // Connection dropped â€” check backend status before giving up.
+        await attemptReportRecovery(sid || sessionId, inputText, data?.report);
+      } else if (dialogDepth < 3 || activeModule !== "support") {
+        setError("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ±Ğ¾Ñ€. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.");
+      } else {
+        setError("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑÑ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.");
+      }
+    } finally {
+      setLoading(false);
+      setLoadingMessage("");
+    }
+  }
+
+  async function getReportStatus(sessionId) {
+    const res = await fetch("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "getReportStatus", sessionId }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  }
+
+  async function pollReportStatus(sessionId, onReady) {
+    let attempts = 0;
+    const maxAttempts = 60; // ~60 seconds
+    while (attempts < maxAttempts) {
+      const status = await getReportStatus(sessionId);
+      if (!status) {
+        await new Promise((r) => setTimeout(r, 1000));
+        attempts += 1;
+        continue;
+      }
+      if (status.status === "ready" && status.type === "final") {
+        onReady(status);
+        return;
+      }
+      if (status.status === "failed") {
+        setError(status.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑÑ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.");
+        setLoading(false);
+        return;
+      }
+      // processing or not_started
+      await new Promise((r) => setTimeout(r, 1000));
+      attempts += 1;
+    }
+    setError("ĞÑ‚Ñ‡Ñ‘Ñ‚ ĞµÑ‰Ñ‘ Ñ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€ÑƒĞµÑ‚ÑÑ. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ ÑÑ‚Ñ€Ğ°Ğ½Ğ¸Ñ†Ñƒ Ñ‡ĞµÑ€ĞµĞ· Ğ¼Ğ¸Ğ½ÑƒÑ‚Ñƒ.");
+    setLoading(false);
+  }
+
+  async function attemptReportRecovery(sessionId, inputText, fallbackReport) {
+    if (!sessionId) {
+      setError("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑÑ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚. ĞŸÑ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ ÑĞ¾ĞµĞ´Ğ¸Ğ½ĞµĞ½Ğ¸Ğµ Ğ¸ Ğ¿Ğ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.");
+      return;
+    }
+    setLoading(true);
+    setError("Ğ¡Ğ¾ĞµĞ´Ğ¸Ğ½ĞµĞ½Ğ¸Ğµ Ğ¿Ñ€ĞµÑ€Ğ²Ğ°Ğ»Ğ¾ÑÑŒ. ĞŸÑ€Ğ¾Ğ²ĞµÑ€ÑĞµĞ¼, ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ğ»ÑÑ Ğ»Ğ¸ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚â€¦");
+    const status = await getReportStatus(sessionId);
+    if (!status) {
+      setError("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€Ğ¸Ñ‚ÑŒ ÑÑ‚Ğ°Ñ‚ÑƒÑ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚Ğ°. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.");
+      setLoading(false);
+      return;
+    }
+    if (status.status === "ready" && status.type === "final") {
+      finalizeReportFromStatus(status, inputText);
+      return;
+    }
+    if (status.status === "processing" || status.status === "not_started") {
+      setError("");
+      setLoadingMessage("ĞÑ‚Ñ‡Ñ‘Ñ‚ ĞµÑ‰Ñ‘ Ñ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€ÑƒĞµÑ‚ÑÑ. ĞŸĞ¾Ğ´Ğ¾Ğ¶Ğ´Ğ¸Ñ‚Ğµ Ğ½ĞµĞ¼Ğ½Ğ¾Ğ³Ğ¾.");
+      await pollReportStatus(sessionId, (readyStatus) => finalizeReportFromStatus(readyStatus, inputText));
+      return;
+    }
+    setError(status.message || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑÑ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.");
+    setLoading(false);
+  }
+
+  function finalizeReportFromStatus(status, inputText) {
+    setResult(status.report || "");
+    if (status.care_recommendation) setCareRecommendation(status.care_recommendation);
+    setActiveTab("user");
+    setReportSource("generated");
+    setJustFinishedSession(true);
+    setPhase("report");
+    setSupportScreen("report");
+    if (status.public_code) setPublicCode(status.public_code);
+    if (status.access_token) saveSupportSession(status.session_id, status.access_token);
+    if (status.continuation_code) setContinuationCode(status.continuation_code);
+    setSessionId(status.session_id);
+    setLoading(false);
+    // Save review
+    const review = {
+      case_id: status.session_id, sessionId: status.session_id, publicCode: status.public_code || "",
+      access_token: status.access_token || getSupportSession().accessToken || "",
+      module: activeModule,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
+      patient_input: inputText, questions, answers,
+      ai_result: status.report || "", conversationHistory, dialogDepth,
+      previousPatientReport: previousPatientReport || "",
+      previousDoctorReport: previousDoctorReport || "",
+      homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
+      patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
+      doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
+      voice_observations: voiceObservations || null,
+      expert_id: expertData?.id || null,
+      expert_name: expertData?.name || null,
+      expert_role: expertData?.role || null,
+      expert_specialty: expertData?.specialty || null,
+    };
+    fetch("/api/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save", ...review }),
+    }).catch(() => {});
+  }
+
+  const [loadingMessage, setLoadingMessage] = useState("");
+
+  function fallbackQ() {
+    return [
+      "Ğ‘Ñ‹Ğ»Ğ¾ Ğ»Ğ¸ Ğ² Ğ¿Ğ¾ÑĞ»ĞµĞ´Ğ½Ğ¸Ğµ Ğ¼ĞµÑÑÑ†Ñ‹ Ğ²Ğ°Ğ¶Ğ½Ğ¾Ğµ ÑĞ¾Ğ±Ñ‹Ñ‚Ğ¸Ğµ, ĞºĞ¾Ñ‚Ğ¾Ñ€Ğ¾Ğµ Ğ¼Ğ¾Ğ³Ğ»Ğ¾ Ğ¿Ğ¾Ğ²Ğ»Ğ¸ÑÑ‚ÑŒ Ğ½Ğ° Ğ²Ğ°ÑˆĞµ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ?",
+      "ĞĞ°Ñ‡Ğ°Ğ»Ğ¾ÑÑŒ Ğ»Ğ¸ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ Ğ¿Ğ¾ÑĞ»Ğµ ĞºĞ¾Ğ½ĞºÑ€ĞµÑ‚Ğ½Ğ¾Ğ³Ğ¾ ÑĞ¾Ğ±Ñ‹Ñ‚Ğ¸Ñ Ğ¸Ğ»Ğ¸ Ğ¿Ğ¾ÑÑ‚ĞµĞ¿ĞµĞ½Ğ½Ğ¾?",
+      "ĞšĞ°Ğº Ğ´Ğ°Ğ²Ğ½Ğ¾ Ğ²Ñ‹ Ğ·Ğ°Ğ¼ĞµÑ‡Ğ°ĞµÑ‚Ğµ ÑÑ‚Ğ¾ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ?",
+      "ĞĞ°ÑĞºĞ¾Ğ»ÑŒĞºĞ¾ ÑÑ‚Ğ¾ Ğ²Ğ»Ğ¸ÑĞµÑ‚ Ğ½Ğ° ÑĞ¾Ğ½, Ñ€Ğ°Ğ±Ğ¾Ñ‚Ñƒ Ğ¸Ğ»Ğ¸ Ğ¾Ñ‚Ğ½Ğ¾ÑˆĞµĞ½Ğ¸Ñ?",
+      "Ğ‘Ñ‹Ğ²Ğ°Ğ»Ğ¸ Ğ»Ğ¸ Ğ¼Ñ‹ÑĞ»Ğ¸, Ñ‡Ñ‚Ğ¾ Ğ¶Ğ¸Ñ‚ÑŒ Ğ½Ğµ Ñ…Ğ¾Ñ‡ĞµÑ‚ÑÑ Ğ¸Ğ»Ğ¸ Ğ¿Ñ€Ğ¸Ñ‡Ğ¸Ğ½Ğ¸Ñ‚ÑŒ ÑĞµĞ±Ğµ Ğ²Ñ€ĞµĞ´?",
+    ];
+  }
+
+  function generatePublicCode() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const part = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    return `Ğ¢ĞĞ§ĞšĞ-${part()}-${part()}`;
+  }
+
+  function buildCaseReview() {
+    const now = new Date().toISOString();
+    const sid = sessionId || `session-${Date.now()}`;
+    const code = publicCode || generatePublicCode();
+
+    if (!sessionId) setSessionId(sid);
+    if (!publicCode) setPublicCode(code);
+
+    return {
+      case_id: sid,
+      sessionId: sid,
+      publicCode: code,
+      createdAt: now,
+      updatedAt: now,
+      environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
+      patient_input: text,
+      questions,
+      answers,
+      ai_result: result,
+      conversationHistory,
+      dialogDepth,
+      previousPatientReport: previousPatientReport || "",
+      previousDoctorReport: previousDoctorReport || "",
+      homeTasks: homeTasks || "",
+      resourceFactors: resourceFactors || "",
+      expert_id: expertData?.id || null,
+      expert_name: expertData?.name || null,
+      expert_role: expertData?.role || null,
+      expert_specialty: expertData?.specialty || null,
+      patient_feedback: {
+        rating: patientRating,
+        useful: patientUseful,
+        unclear_or_useless: patientUnclear,
+      },
+      doctor_feedback: {
+        wrong_questions: doctorFeedback.wrongQuestions,
+        missing_questions: doctorFeedback.missingQuestions,
+        bad_question_wording: doctorFeedback.badQuestionWording,
+        corrected_user_report: doctorFeedback.correctedUserReport,
+        corrected_doctor_report: doctorFeedback.correctedDoctorReport,
+        protocol_update: doctorFeedback.protocolUpdate,
+        general_comment: doctorFeedback.generalComment,
+      },
+    };
+  }
+
+  function downloadCaseReview(caseReview) {
+    const blob = new Blob([JSON.stringify(caseReview, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${caseReview.case_id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const userPart = result
+    ? result.split("===DOCTOR_REPORT===")[0]
+        .replace("===USER_REPORT===", "")
+        .trim()
+    : "";
+
+  const doctorPart = result
+    ? result.split("===DOCTOR_REPORT===")[1]?.trim() || ""
+    : "";
+
+  function renderUserReport(text) {
+    if (!text) return null;
+    const highlightTitles = [
+      "Ğ§Ñ‚Ğ¾ Ğ¼Ğ¾Ğ¶ĞµÑ‚ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‡ÑŒ ÑĞµĞ³Ğ¾Ğ´Ğ½Ñ",
+      "ĞŸĞ»Ğ°Ğ½ Ğ´Ğ¾ ÑĞ»ĞµĞ´ÑƒÑÑ‰ĞµĞ³Ğ¾ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ°",
+      "Ğ”Ğ¾ ÑĞ»ĞµĞ´ÑƒÑÑ‰ĞµĞ³Ğ¾ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ°",
+    ];
+    const lines = text.split("\n");
+    const sections = [];
+    let current = null;
+    for (const line of lines) {
+      const m = line.match(/^(\d+)\.\s+(.+)/);
+      if (m) {
+        if (current) sections.push(current);
+        current = { num: m[1], title: m[2], lines: [] };
+      } else if (current) {
+        current.lines.push(line);
+      }
+    }
+    if (current) sections.push(current);
+
+    if (!sections.length) {
+      return <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{text}</div>;
+    }
+
+    const isHighlighted = (title) =>
+      highlightTitles.some((h) => title.toLowerCase().includes(h.toLowerCase()) || h.toLowerCase().includes(title.toLowerCase()));
+
+    return sections.map((s, i) => {
+      const hl = isHighlighted(s.title);
+      return (
+        <div
+          key={i}
+          style={{
+            marginBottom: 12,
+            padding: hl ? "14px 18px" : 0,
+            borderRadius: hl ? 14 : 0,
+            background: hl ? "#E2EBE4" : "transparent",
+            border: hl ? "1px solid rgba(125,154,137,.3)" : "none",
+          }}
+        >
+          <div
+            style={{
+              fontWeight: hl ? 700 : 600,
+              fontSize: hl ? 16 : 15,
+              color: hl ? "#2E2A25" : "#2E2A25",
+              marginBottom: s.lines.some((l) => l.trim()) ? 6 : 0,
+            }}
+          >
+            {s.num}. {s.title}
+          </div>
+          {s.lines.some((l) => l.trim()) && (
+            <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7, color: "#7A7268" }}>
+              {s.lines.join("\n").trim()}
+            </div>
+          )}
+        </div>
+      );
+    });
+  }
+
+  function handleBodyIntakeComplete(response) {
+    setBodyIntakeResult(response);
+    setBodyIntakeStage("result");
+    setBodyIntakeStep(0);
+    setBodyScreen("result");
+    const sid = response?.session_id || "";
+    const token = response?.access_token || "";
+    // Credential pair first and atomically: a new session must never be
+    // stored next to a previous session's token. A failed pair write is
+    // fail-closed: the previous pair is cleared and never stays active.
+    const pairSaved = Boolean(sid && token) && saveBodySession(sid, token);
+    if (!pairSaved) clearBodySession();
+    try {
+      if (sid) saveBodyDisplayResult(response);
+      if (response?.continuation_code) {
+        setContinuationCode(response.continuation_code);
+      }
+    } catch (e) {}
+    if (!pairSaved) {
+      showToast("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿ Ğº ÑĞµÑÑĞ¸Ğ¸. Ğ’Ğ¾Ğ¹Ğ´Ğ¸Ñ‚Ğµ ÑĞ½Ğ¾Ğ²Ğ° Ğ¿Ğ¾ ĞºĞ¾Ğ´Ñƒ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ.", "error");
+    }
+  }
+
+  function copyBodyCode() {
+    const code = bodyIntakeResult?.continuation_code || continuationCode;
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      setBodyCodeCopied(true);
+      setTimeout(() => setBodyCodeCopied(false), 2500);
+    }).catch(() => {});
+  }
+
+  async function continueBodyByCode() {
+    const code = bodyContinuationInput.trim();
+    if (!code) return;
+    await loadBodyCabinet(code, { preferCode: true });
+    setBodyContinuationInput("");
+  }
+
+  async function loadBodyDiaryHistory() {
+    setBodyDiaryHistoryLoading(true);
+    const sid = bodyDiarySessionId || bodyIntakeResult?.session_id || localStorage.getItem("body_last_session_id");
+    if (!sid) { setBodyDiaryHistoryLoading(false); return; }
+    try {
+      const listBody = withAccessToken({ action: "listBodyDailyLogs", session_id: sid }, sid);
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(listBody),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setBodyDiaryHistory(data.logs);
+        setBodyDiaryHistoryOpen(true);
+      }
+    } catch (e) {
+      console.error("Failed to load diary history:", e);
+    } finally {
+      setBodyDiaryHistoryLoading(false);
+    }
+  }
+
+  function handleReset() {
+    setPhase("input");
+    setSupportScreen("landing");
+    setQuestions(null);
+    setCrisisMode(false);
+    setCrisisBlock(null);
+    setAnswers({});
+    setResult(null);
+    setText("");
+    setError("");
+    setActiveTab("user");
+    setSessionReviewOpen(false);
+    setPatientRating(0);
+    setPatientUseful("");
+    setPatientUnclear("");
+    setDoctorFeedback({
+      wrongQuestions: "",
+      missingQuestions: "",
+      badQuestionWording: "",
+      correctedUserReport: "",
+      correctedDoctorReport: "",
+      protocolUpdate: "",
+      generalComment: "",
+    });
+    setConversationHistory([]);
+    setDialogDepth(0);
+    setSessionData(null);
+    setSessionId(null);
+    setPublicCode(null);
+    setIsContinuation(false);
+    setPreviousPatientReport("");
+    setPreviousDoctorReport("");
+    setSupportPlan(null);
+    setShowSelfAssessment(false);
+    setCanManageWithoutSpecialist(null);
+    setShowSupportToolkit(false);
+    setShowSpecialistIntent(false);
+    setSpecialistIntentDone(false);
+    setHomeTasks("");
+    setResourceFactors("");
+    setDebugInfo(null);
+    setCareRecommendation(null);
+    setSupportCabinet(null);
+    setCabinetLoading(false);
+    setFollowUpAnswers({});
+    setReportSource(null);
+    setJustFinishedSession(false);
+    setContinuationCode(null);
+    setContinuationCodeInput("");
+    setContinuationCodeError("");
+    setRegeneratedCode(null);
+    setBodyIntakeStage("idle");
+    setBodyIntakeResult(null);
+    setBodyScreen("landing");
+    setBodyCabinetData(null);
+    setBodyDiarySessionId(null);
+    setBodyContinuationInput("");
+    setBodyContinuationError("");
+    try {
+      localStorage.removeItem("body_last_session_id");
+      localStorage.removeItem("body_last_result");
+      localStorage.removeItem("body_last_created_at");
+      clearBodySession();
+    } catch (e) {}
+    setSavedBodyResult(null);
+    setShowConsultPrep(false);
+    setRecording(false);
+    setTranscribing(false);
+    setVoiceError("");
+    setRecordingTime(0);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    setRecordingQuestionIndex(null);
+    setQuestionRecordingTime(0);
+    setQuestionTranscribingIndex(null);
+    if (questionTimerRef.current) {
+      clearInterval(questionTimerRef.current);
+    }
+    setCrisisOpen(false);
+    setCrisisSubmitted(false);
+    setCrisisText("");
+    setCrisisContact("");
+    setCrisisRecording(false);
+    setCrisisRecordingTime(0);
+    setCrisisTranscribing(false);
+    setCrisisVoiceError("");
+    setCrisisWarning("");
+    setCrisisConfirmation("");
+    setToast({ message: "", type: "", key: 0 });
+    if (crisisTimerRef.current) {
+      clearInterval(crisisTimerRef.current);
+    }
+  }
+
+  async function adminLogin() {
+    if (!adminPassword) return;
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify", password: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAdminAuthed(true);
+        setAdminRole(data.role || null);
+        if (adminModuleRoute === "body") {
+          setBodyIntakeShowDeleted(false);
+          adminLoadBodyIntake();
+        } else if (adminModuleRoute === "council") {
+          // ClinicalCouncilAdmin loads its own data on mount
+        } else {
+          adminLoadReviews(adminFilter, adminEnv, adminExpertFilter, adminReviewShowTrash);
+        }
+      } else {
+        setAdminRole(null);
+        showToast("ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ Ğ¿Ğ°Ñ€Ğ¾Ğ»ÑŒ", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  async function adminLoadBodyIntake(maxCount = 50) {
+    setBodyIntakeLoading(true);
+    try {
+      const body = {
+        action: "listBodyIntake",
+        password: adminPassword,
+        limit: maxCount,
+        showDeleted: bodyIntakeShowDeleted,
+      };
+      if (bodyIntakeSourceFilter !== "all") {
+        body.source = bodyIntakeSourceFilter;
+      }
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setBodyIntakeRecords(data.records || []);
+        setBodyIntakeTotal(data.count || 0);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ body intake", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ body intake", "error");
+    } finally {
+      setBodyIntakeLoading(false);
+    }
+  }
+
+  async function adminOpenBodyIntakeDetail(id) {
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getBodyIntakeDetail", password: adminPassword, id }),
+      });
+      const data = await res.json();
+      if (data.ok && data.record) {
+        setBodyIntakeDetail(data.record);
+        setBodyIntakeDetailOpen(true);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ´ĞµÑ‚Ğ°Ğ»ĞµĞ¹", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ´ĞµÑ‚Ğ°Ğ»ĞµĞ¹", "error");
+    }
+  }
+
+  async function adminDeleteBodyIntake(id) {
+    setBodyIntakeDeleteConfirm(null);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "deleteBodyIntake", password: adminPassword, id }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("ĞĞ½ĞºĞµÑ‚Ğ° Ğ¿ĞµÑ€ĞµĞ¼ĞµÑ‰ĞµĞ½Ğ° Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ", "success");
+        adminLoadBodyIntake();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  async function adminRestoreBodyIntake(id) {
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restoreBodyIntake", password: adminPassword, id }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("ĞĞ½ĞºĞµÑ‚Ğ° Ğ²Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ°", "success");
+        adminLoadBodyIntake();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ²Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ²Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  function adminDownloadBodyIntakeJSON(record) {
+    const data = {
+      timestamp: record.created_at || new Date().toISOString(),
+      intake_answers: record.answers || null,
+      bmi: record.bmi,
+      care_recommendation: record.care_recommendation,
+      module: record.module,
+      version: record.version,
+      session_id: record.session_id,
+      body_plan: record.body_plan || null,
+      user_report: record.user_report || null,
+      triggered_red_flags: record.triggered_red_flags || [],
+      red_flag_care_level: record.red_flag_care_level || null,
+      used_fallback: record.used_fallback || false,
+      model_used: record.model_used || null,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `body-intake-${record.id || "unknown"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function adminLoadBodyDailyLogs(maxCount = 50) {
+    setBodyDiaryLoading(true);
+    try {
+      const body = { action: "listBodyDailyLogs", password: adminPassword, limit: maxCount };
+      if (bodyDiarySessionFilter) body.session_id = bodyDiarySessionFilter;
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setBodyDiaryRecords(data.records || []);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ¾Ğ²", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ¾Ğ²", "error");
+    } finally {
+      setBodyDiaryLoading(false);
+    }
+  }
+
+  async function adminLoadBodyExpertReviews() {
+    setBodyExpertReviewsLoading(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listBodyExpertReviews", password: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setBodyExpertReviews(data.records || []);
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ¿Ñ€Ğ°Ğ²Ğ¾Ğº", "error");
+    } finally {
+      setBodyExpertReviewsLoading(false);
+    }
+  }
+
+  // Service requests admin state and functions
+  const [adminServiceRequests, setAdminServiceRequests] = useState([]);
+  const [adminServiceRequestsLoading, setAdminServiceRequestsLoading] = useState(false);
+  const [adminServiceRequestsFilter, setAdminServiceRequestsFilter] = useState("all");
+
+  async function adminLoadBodyServiceRequests() {
+    setAdminServiceRequestsLoading(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listBodyServiceRequests", password: adminPassword, status: adminServiceRequestsFilter }),
+      });
+      const data = await res.json();
+      if (data.ok) setAdminServiceRequests(data.requests || []);
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ¾Ğ²", "error");
+    } finally {
+      setAdminServiceRequestsLoading(false);
+    }
+  }
+
+  async function adminLoadBodyAssignments() {
+    setBodyAssignmentsLoading(true);
+    try {
+      const [clientsRes, expertsRes] = await Promise.all([
+        fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "listUnassignedBodyClients", password: adminPassword }),
+        }),
+        fetch("/api/experts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "listAllExperts", admin_secret: adminPassword }),
+        }),
+      ]);
+      const [clientsData, expertsData] = await Promise.all([clientsRes.json(), expertsRes.json()]);
+      if (clientsData.ok) setBodyAssignments(clientsData.clients || []);
+      if (expertsData.ok) {
+        const experts = (expertsData.experts || []).map((e) => ({
+          ...e,
+          organizations: (e.expert_organization_memberships || [])
+            .filter((m) => m.status === "active")
+            .map((m) => ({ id: m.organization_id, name: m.organizations?.name })),
+        }));
+        setBodyExperts(experts);
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ¿Ñ€Ğ¸Ğ²ÑĞ·Ğ¾Ğº", "error");
+    } finally {
+      setBodyAssignmentsLoading(false);
+    }
+  }
+
+  async function adminAssignBodyClient(bodyClientRef, expertId, orgId, isReassign = false) {
+    setBodyAssignSaving(true);
+    try {
+      const action = isReassign ? "reassignBodyClientExpert" : "assignBodyClientToExpert";
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          password: adminPassword,
+          body_client_ref: bodyClientRef,
+          expert_id: expertId,
+          organization_id: orgId,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.noop ? "Ğ£Ğ¶Ğµ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¾" : (isReassign ? "Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚ Ğ¿ĞµÑ€ĞµĞ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½" : "ĞšĞ»Ğ¸ĞµĞ½Ñ‚ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½"), "success");
+        setBodyAssignTarget(null);
+        setBodyAssignIsReassign(false);
+        adminLoadBodyAssignments();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ñ", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ‚Ğ¸", "error");
+    } finally {
+      setBodyAssignSaving(false);
+    }
+  }
+
+  async function adminUpdateServiceRequest(id, action, extra = {}) {
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateBodyServiceRequest", password: adminPassword, id, update_action: action, ...extra }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("ĞĞ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¾", "success");
+        adminLoadBodyServiceRequests();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  function adminOpenBodyExpertReviewForm(targetType, targetId, sessionId, sourcePayload, aiOutput) {
+    setBodyExpertReviewForm({
+      target_type: targetType,
+      target_id: targetId,
+      session_id: sessionId,
+      reviewer_name: "ĞĞ»ĞµĞ½Ğ° Ğ–ÑƒĞºĞ¾Ğ²Ğ°",
+      reviewer_role: "body_expert",
+      rating_safety: "ok",
+      rating_usefulness: 3,
+      rating_practicality: 3,
+      rating_tone: 3,
+      error_tags: [],
+      what_ai_did_well: "",
+      what_ai_missed: "",
+      corrected_recommendation: "",
+      suggested_questions: "",
+      expert_comment: "",
+      source_payload: sourcePayload || null,
+      ai_output: aiOutput || null,
+    });
+    setBodyExpertReviewFormOpen(true);
+  }
+
+  async function adminSaveBodyExpertReview() {
+    if (!bodyExpertReviewForm) return;
+    setBodyExpertReviewSaving(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "saveBodyExpertReview", password: adminPassword, review: bodyExpertReviewForm }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("ĞŸÑ€Ğ°Ğ²ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ°", "success");
+        setBodyExpertReviewFormOpen(false);
+        adminLoadBodyExpertReviews();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ", "error");
+    } finally {
+      setBodyExpertReviewSaving(false);
+    }
+  }
+
+  async function adminExportBodyExpertCases() {
+    setBodyExportingCases(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "exportBodyExpertCases", password: adminPassword }),
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `body-expert-cases-${new Date().toISOString().split("T")[0]}.jsonl`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ²Ñ‹Ğ³Ñ€ÑƒĞ·ĞºĞ¸", "error");
+    } finally {
+      setBodyExportingCases(false);
+    }
+  }
+
+  async function adminOpenBodyDailyLogDetail(id) {
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getBodyDailyLogDetail", password: adminPassword, id }),
+      });
+      const data = await res.json();
+      if (data.ok && data.record) {
+        setBodyDiaryDetail(data.record);
+        setBodyDiaryDetailOpen(true);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ°", "error");
+    }
+  }
+
+  async function adminDeleteBodyDailyLog(id) {
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "deleteBodyDailyLog", password: adminPassword, id }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ°", "success");
+        adminLoadBodyDailyLogs();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  async function loadTrainingSessions() {
+    setTrainingLoading(true);
+    setTrainingSessionsError(null);
+    setTrainingSelection(new Set());
+    try {
+      const body = { action: "listTrainingSessions", ...trainingFilter, showTrash: trainingShowTrash };
+      if (expertData) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
+      } else {
+        body.admin_secret = adminPassword;
+      }
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions(data.sessions || []);
+        setTrainingSessionsError(null);
+      } else {
+        const err = data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸";
+        setTrainingSessionsError(err);
+        showToast(err, "error");
+      }
+    } catch {
+      const err = "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ñ‚Ğ°Ğ±Ğ»Ğ¸Ñ†Ñ‹ Ñ‚Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²Ğ¾Ğº";
+      setTrainingSessionsError(err);
+      showToast(err, "error");
+    } finally {
+      setTrainingLoading(false);
+    }
+  }
+
+  async function saveTrainingSession(row) {
+    try {
+      const body = { action: "saveTrainingSession", ...row };
+      if (expertData) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
+      }
+      else body.admin_secret = adminPassword;
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¾");
+        if (data.session) {
+          setTrainingSessions((prev) => {
+            const idx = prev.findIndex((s) => s.id === data.session.id);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = data.session;
+              return next;
+            }
+            return [data.session, ...prev];
+          });
+        }
+        return data;
+      }
+      showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      return null;
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ", "error");
+      return null;
+    }
+  }
+
+  async function updateTrainingSession(id, updates) {
+    try {
+      const body = { action: "updateTrainingSession", id, updates };
+      if (expertData) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
+      }
+      else body.admin_secret = adminPassword;
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => {
+          const idx = prev.findIndex((s) => s.id === id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = data.session;
+            return next;
+          }
+          return prev;
+        });
+        showToast("Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¾");
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  async function deleteTrainingSession(id) {
+    if (!confirm("Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ?")) return;
+    try {
+      const body = { action: "deleteTrainingSession", id, admin_secret: adminPassword };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
+        showToast("ĞŸĞµÑ€ĞµĞ¼ĞµÑ‰ĞµĞ½Ğ¾ Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ");
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  async function trashSingleTrainingSession(id) {
+    try {
+      const reason = trainingDeletionReason === "other" ? trainingDeletionReasonCustom || "other" : trainingDeletionReason;
+      const body = { action: "trashTrainingSession", id, admin_secret: adminPassword, expert_name: "admin", deletion_reason: reason };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
+        setTrainingTrashConfirm(null);
+        setTrainingDeletionReason("");
+        setTrainingDeletionReasonCustom("");
+        showToast("ĞŸĞµÑ€ĞµĞ¼ĞµÑ‰ĞµĞ½Ğ¾ Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ");
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¿ĞµÑ€ĞµĞ¼ĞµÑ‰ĞµĞ½Ğ¸Ñ Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ", "error");
+    }
+  }
+
+  async function trashBulkTrainingSessions(ids) {
+    try {
+      const reason = trainingDeletionReason === "other" ? trainingDeletionReasonCustom || "other" : trainingDeletionReason;
+      const body = { action: "trashTrainingSessions", ids, admin_secret: adminPassword, expert_name: "admin", deletion_reason: reason };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
+        setTrainingSelection(new Set());
+        setTrainingBulkConfirm(null);
+        setTrainingDeletionReason("");
+        setTrainingDeletionReasonCustom("");
+        showToast(`ĞŸĞµÑ€ĞµĞ¼ĞµÑ‰ĞµĞ½Ğ¾ Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ: ${data.count || ids.length}`);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¿ĞµÑ€ĞµĞ¼ĞµÑ‰ĞµĞ½Ğ¸Ñ Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ", "error");
+    }
+  }
+
+  async function restoreSingleTrainingSession(id) {
+    try {
+      const body = { action: "restoreTrainingSession", id, admin_secret: adminPassword };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
+        showToast("Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¾");
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ²Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  async function restoreBulkTrainingSessions(ids) {
+    try {
+      const body = { action: "restoreTrainingSessions", ids, admin_secret: adminPassword };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
+        setTrainingSelection(new Set());
+        setTrainingBulkConfirm(null);
+        showToast(`Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¾: ${data.count || ids.length}`);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ²Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  async function permanentDeleteTrainingSession(id) {
+    try {
+      const body = { action: "permanentlyDeleteTrainingSession", id, admin_secret: adminPassword };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
+        setTrainingTrashConfirm(null);
+        showToast("Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ° Ğ±ĞµĞ·Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‚Ğ½Ğ¾");
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ±ĞµĞ·Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‚Ğ½Ğ¾Ğ³Ğ¾ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  async function permanentDeleteBulkTrainingSessions(ids) {
+    try {
+      const body = { action: "permanentlyDeleteTrainingSessions", ids, admin_secret: adminPassword };
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTrainingSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
+        setTrainingSelection(new Set());
+        setTrainingBulkConfirm(null);
+        showToast(`Ğ£Ğ´Ğ°Ğ»ĞµĞ½Ğ¾ Ğ±ĞµĞ·Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‚Ğ½Ğ¾: ${data.count || ids.length}`);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ±ĞµĞ·Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‚Ğ½Ğ¾Ğ³Ğ¾ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ", "error");
+    }
+  }
+
+  async function createTrainingFromReview() {
+    if (!trainingFormReviewId) return;
+    try {
+      const body = {
+        action: "createTrainingFromReview",
+        review_id: trainingFormReviewId,
+        ...trainingFormData,
+      };
+      if (expertData) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
+      }
+      else body.admin_secret = adminPassword;
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Ğ¡Ğ¾Ğ·Ğ´Ğ°Ğ½Ğ¾");
+        setTrainingSessions((prev) => [data.session, ...prev]);
+        setTrainingFormReviewId(null);
+        setTrainingFormData({ scenario_played: "", expected_case_type: "", session_kind: "initial", expert_comment: "", public_code: "" });
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ğ·Ğ´Ğ°Ğ½Ğ¸Ñ", "error");
+    }
+  }
+
+  async function downloadTrainingCsv() {
+    try {
+      const body = { action: "exportTrainingCsv", ...trainingFilter, showTrash: trainingShowTrash };
+      if (expertData) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
+      }
+      else body.admin_secret = adminPassword;
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${trainingShowTrash ? "training-sessions-trash" : "training-sessions"}-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ²Ñ‹Ğ³Ñ€ÑƒĞ·ĞºĞ¸", "error");
+    }
+  }
+
+  // â”€â”€ Admin Onboarding Requests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async function adminLoadOnboardingRequests(status) {
+    setOnboardingLoading(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listOnboardingRequests", status: status || "all", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) setOnboardingRequests(data.requests || []);
+    } catch {}
+    setOnboardingLoading(false);
+  }
+
+  async function adminReviewOnboardingRequest(id, action, expertId) {
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reviewOnboardingRequest", id, review_action: action, expert_id: expertId, admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(action === "approve" ? "Ğ—Ğ°ÑĞ²ĞºĞ° Ğ¾Ğ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ°" : "Ğ—Ğ°ÑĞ²ĞºĞ° Ğ¾Ñ‚ĞºĞ»Ğ¾Ğ½ĞµĞ½Ğ°");
+        adminLoadOnboardingRequests("all");
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ°", "error"); }
+  }
+
+  // â”€â”€ Admin Match Requests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async function adminLoadMatchRequests(status) {
+    setMatchLoading(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listMatchRequests", status: status || "all", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) setMatchRequests(data.requests || []);
+    } catch {}
+    setMatchLoading(false);
+  }
+
+  async function adminAssignMatchRequest(requestId, expertId) {
+    setMatchAssigning(true);
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "assignMatchRequest", id: requestId, expert_id: expertId, admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(`ĞĞ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½: ${expertId}`);
+        setMatchExpertSelector(null);
+        adminLoadMatchRequests("all");
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ°", "error"); }
+    setMatchAssigning(false);
+  }
+
+  async function adminLoadEligibleExperts(module) {
+    try {
+      const res = await fetch("/api/experts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listAllExperts", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const experts = (data.experts || []).filter(e => {
+          if (!e.is_active) return false;
+          const modules = Array.isArray(e.allowed_modules) ? e.allowed_modules : [];
+          return modules.includes(module || "support");
+        });
+        setMatchExpertList(experts);
+      }
+    } catch {}
+  }
+
+  async function loadQualityStats() {
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getQualityAnalysisStats", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setQualityStats({
+          new_approved_count: data.new_approved_count || 0,
+          unanalyzed_review_ids: data.unanalyzed_review_ids || [],
+          last_analysis_at: data.last_analysis_at || null,
+          last_analysis_review_count: data.last_analysis_review_count || 0,
+          recommended_to_analyze: data.recommended_to_analyze || false,
+        });
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ ÑÑ‚Ğ°Ñ‚Ğ¸ÑÑ‚Ğ¸ĞºĞ¸", "error");
+    }
+  }
+
+  async function loadQualityInsights() {
+    setQualityLoading(true);
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "listQualityInsights", admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setQualityInsights(data.insights || []);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ¾Ğ±Ğ·Ğ¾Ñ€Ğ¾Ğ²", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ¾Ğ±Ğ·Ğ¾Ñ€Ğ¾Ğ²", "error");
+    } finally {
+      setQualityLoading(false);
+    }
+  }
+
+  async function generateQualityInsight() {
+    setQualityGenerating(true);
+    setQualityConfirmOpen(false);
+    try {
+      const body = {
+        action: "generateQualityInsight",
+        admin_secret: adminPassword,
+        analysis_type: qualitySelectedReviewIds.length > 0 ? "selected" : "new_approved",
+      };
+      if (qualitySelectedReviewIds.length > 0) {
+        body.review_ids = qualitySelectedReviewIds;
+      }
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "ĞĞ±Ğ·Ğ¾Ñ€ ÑĞ¾Ğ·Ğ´Ğ°Ğ½");
+        setQualitySelectedReviewIds([]);
+        await loadQualityStats();
+        await loadQualityInsights();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ğ·Ğ´Ğ°Ğ½Ğ¸Ñ Ğ¾Ğ±Ğ·Ğ¾Ñ€Ğ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ğ·Ğ´Ğ°Ğ½Ğ¸Ñ Ğ¾Ğ±Ğ·Ğ¾Ñ€Ğ°", "error");
+    } finally {
+      setQualityGenerating(false);
+    }
+  }
+
+  async function loadQualityInsightDetail(insightId) {
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getQualityInsight", admin_secret: adminPassword, insight_id: insightId }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setQualityDetailInsight(data.insight);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ¾Ğ±Ğ·Ğ¾Ñ€Ğ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ¾Ğ±Ğ·Ğ¾Ñ€Ğ°", "error");
+    }
+  }
+
+  async function updateQualityInsightStatus(insightId, status) {
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateQualityInsightStatus", admin_secret: adminPassword, insight_id: insightId, status }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Ğ¡Ñ‚Ğ°Ñ‚ÑƒÑ Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»Ñ‘Ğ½");
+        setQualityInsights((prev) => prev.map((i) => i.id === insightId ? { ...i, status } : i));
+        if (qualityDetailInsight && qualityDetailInsight.id === insightId) {
+          setQualityDetailInsight((prev) => ({ ...prev, status }));
+        }
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ ÑÑ‚Ğ°Ñ‚ÑƒÑĞ°", "error");
+    }
+  }
+
+  function toggleReviewSelection(reviewId) {
+    setQualitySelectedReviewIds((prev) =>
+      prev.includes(reviewId) ? prev.filter((id) => id !== reviewId) : [...prev, reviewId]
+    );
+  }
+
+  function copyOpenCodeTask(insight) {
+    if (!insight || !insight.recommendations || insight.recommendations.length === 0) {
+      showToast("ĞĞµÑ‚ Ğ¿Ñ€Ğ¸Ğ½ÑÑ‚Ñ‹Ñ… Ñ€ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´Ğ°Ñ†Ğ¸Ğ¹ Ğ´Ğ»Ñ ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¸Ñ", "error");
+      return;
+    }
+    const acceptedRels = insight.recommendations;
+    if (acceptedRels.length === 0) {
+      showToast("ĞĞµÑ‚ Ñ€ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´Ğ°Ñ†Ğ¸Ğ¹ Ğ´Ğ»Ñ Ğ·Ğ°Ğ´Ğ°Ğ½Ğ¸Ñ", "error");
+      return;
+    }
+    const lines = [
+      "## Ğ—Ğ°Ğ´Ğ°Ğ½Ğ¸Ğµ Ğ´Ğ»Ñ OpenCode",
+      "",
+      "### ĞĞ°Ğ¹Ğ´ĞµĞ½Ğ½Ñ‹Ğµ Ğ¿Ñ€Ğ¾Ğ±Ğ»ĞµĞ¼Ñ‹",
+    ];
+    for (const rel of acceptedRels) {
+      lines.push(`- **${rel.title}** (Ğ¿Ñ€Ğ¸Ğ¾Ñ€Ğ¸Ñ‚ĞµÑ‚: ${rel.priority || "ÑÑ€ĞµĞ´Ğ½Ğ¸Ğ¹"}, Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´Ğ°ÑÑ‰Ğ¸Ñ… ĞºĞµĞ¹ÑĞ¾Ğ²: ${rel.case_count || "â€”"})`);
+      if (rel.description) lines.push(`  - ĞĞ¿Ğ¸ÑĞ°Ğ½Ğ¸Ğµ: ${rel.description}`);
+      if (rel.suggested_change) lines.push(`  - ĞŸÑ€ĞµĞ´Ğ»Ğ°Ğ³Ğ°ĞµĞ¼Ğ¾Ğµ Ğ¸Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ğµ: ${rel.suggested_change}`);
+      if (rel.target_file) lines.push(`  - Ğ¤Ğ°Ğ¹Ğ»: ${rel.target_file}`);
+      if (rel.risk_of_change) lines.push(`  - Ğ Ğ¸ÑĞº: ${rel.risk_of_change}`);
+      lines.push("");
+    }
+    lines.push("### Ğ ĞµĞ³Ñ€ĞµÑÑĞ¸Ğ¾Ğ½Ğ½Ñ‹Ğµ Ñ‚ĞµÑÑ‚Ñ‹");
+    if (insight.regression_tests && insight.regression_tests.length > 0) {
+      for (const test of insight.regression_tests) {
+        lines.push(`- Ğ¡Ñ†ĞµĞ½Ğ°Ñ€Ğ¸Ğ¹: ${test.scenario || test.scenario || "â€”"}`);
+        if (test.expected_behavior) lines.push(`  - ĞĞ¶Ğ¸Ğ´Ğ°ĞµĞ¼Ğ¾Ğµ Ğ¿Ğ¾Ğ²ĞµĞ´ĞµĞ½Ğ¸Ğµ: ${test.expected_behavior}`);
+      }
+    } else {
+      lines.push("(Ğ½Ğµ ÑƒĞºĞ°Ğ·Ğ°Ğ½Ñ‹)");
+    }
+    lines.push("");
+    lines.push("### Ğ¢Ñ€ĞµĞ±Ğ¾Ğ²Ğ°Ğ½Ğ¸Ñ");
+    lines.push("- ĞŸĞ¾ĞºĞ°Ğ·Ğ°Ñ‚ÑŒ diff Ğ¿ĞµÑ€ĞµĞ´ Ğ»ÑĞ±Ñ‹Ğ¼Ğ¸ Ğ¸Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸ÑĞ¼Ğ¸");
+    lines.push("- ĞĞµ Ğ´ĞµĞ»Ğ°Ñ‚ÑŒ Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ°Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ push Ğ±ĞµĞ· Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ĞºĞ¸");
+    lines.push("- ĞĞµ Ğ¼ĞµĞ½ÑÑ‚ÑŒ production Ğ±ĞµĞ· ÑĞ²Ğ½Ğ¾Ğ³Ğ¾ Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´ĞµĞ½Ğ¸Ñ");
+
+    navigator.clipboard.writeText(lines.join("\n")).then(() => {
+      showToast("Ğ—Ğ°Ğ´Ğ°Ğ½Ğ¸Ğµ ÑĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¾ Ğ² Ğ±ÑƒÑ„ĞµÑ€ Ğ¾Ğ±Ğ¼ĞµĞ½Ğ°");
+    }).catch(() => {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¸Ñ", "error");
+    });
+  }
+
+  function openTrainingForm(review) {
+    const json = getReviewJson(review);
+    let code = review.public_code || json.public_code || json.publicCode || json.session?.public_code || json.sessionCode || json.code || "";
+    setTrainingFormReviewId(review.id);
+    setTrainingFormData({
+      scenario_played: "",
+      expected_case_type: "",
+      session_kind: "initial",
+      expert_comment: "",
+      public_code: code,
+    });
+    setTrainingFormPublicCodeAuto(!!code);
+  }
+
+  async function adminLoadReviews(filterStatus, filterEnv, expertFilter, showTrash) {
+    const st = filterStatus !== undefined ? filterStatus : adminFilter;
+    const env = filterEnv !== undefined ? filterEnv : adminEnv;
+    const exp = expertFilter !== undefined ? expertFilter : adminExpertFilter;
+    const trash = showTrash !== undefined ? showTrash : adminReviewShowTrash;
+    setAdminLoading(true);
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "list", admin_secret: adminPassword, status: st, environment: env, expert_filter: exp, limit: 100, showTrash: trash }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAdminReviews(data.reviews || []);
+        setAdminTotal(data.count || data.reviews?.length || 0);
+      } else {
+        const details = data.details || data.error || null;
+        showToast(details ? `ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸: ${details}` : "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸", "error");
+      }
+    } catch (err) {
+      console.error("adminLoadReviews error", err);
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ ÑĞ¿Ğ¸ÑĞºĞ°", "error");
+    } finally {
+      setAdminLoading(false);
+    }
+  }
+
+  async function adminUpdateStatus(reviewId, status) {
+    setAdminActionLoading(reviewId);
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateStatus", review_id: reviewId, status, admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Ğ¡Ñ‚Ğ°Ñ‚ÑƒÑ Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»Ñ‘Ğ½");
+        adminLoadReviews();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ ÑÑ‚Ğ°Ñ‚ÑƒÑĞ°", "error");
+    } finally {
+      setAdminActionLoading(null);
+    }
+  }
+
+  function safeObject(value) {
+    if (!value) return {};
+    if (typeof value === "object" && !Array.isArray(value)) return value;
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  }
+
+  function getReviewJson(review) {
+    return safeObject(review?.json_data);
+  }
+
+  function getDoctorCorrection(review) {
+    return safeObject(review?.doctor_correction);
+  }
+
+  function getCorrectedJson(review) {
+    return safeObject(review?.corrected_json);
+  }
+
+  function openCorrectionForm(review) {
+    try {
+      const json = getReviewJson(review);
+      const correction = getDoctorCorrection(review);
+      const corrected = getCorrectedJson(review);
+      const voiceReview = json?.voice_analysis_review || review?.voice_analysis_review || {};
+
+      setCorrectionForm({
+        wrong_questions: correction.wrong_questions || json?.doctor_feedback?.wrong_questions || "",
+        missing_questions: correction.missing_questions || json?.doctor_feedback?.missing_questions || "",
+        bad_question_wording: correction.bad_question_wording || json?.doctor_feedback?.bad_question_wording || "",
+        corrected_user_report: corrected.corrected_user_report || correction.corrected_user_report || json?.corrected_user_report || "",
+        corrected_doctor_report: corrected.corrected_doctor_report || correction.corrected_doctor_report || json?.corrected_doctor_report || "",
+        protocol_update: review?.protocol_update || correction.protocol_update || "",
+        correction_comment: review?.correction_comment || correction.correction_comment || "",
+        voice_accuracy: voiceReview.accuracy || "",
+        voice_usefulness: voiceReview.usefulness || "",
+        voice_influenced: voiceReview.influenced_decision || "",
+        voice_confirmed: voiceReview.confirmed_features || [],
+        voice_comment: voiceReview.comment || "",
+      });
+      setEditingReview(review?.id);
+    } catch (error) {
+      console.error("open correction editor failed", error, review);
+    }
+  }
+
+  function closeCorrectionForm() {
+    setEditingReview(null);
+  }
+
+  async function adminSaveCorrection(reviewId, newStatus) {
+    setAdminActionLoading(reviewId);
+    try {
+      const voiceReview = {};
+      if (correctionForm.voice_accuracy) voiceReview.accuracy = correctionForm.voice_accuracy;
+      if (correctionForm.voice_usefulness) voiceReview.usefulness = correctionForm.voice_usefulness;
+      if (correctionForm.voice_influenced) voiceReview.influenced_decision = correctionForm.voice_influenced;
+      if (correctionForm.voice_confirmed?.length) voiceReview.confirmed_features = correctionForm.voice_confirmed;
+      if (correctionForm.voice_comment) voiceReview.comment = correctionForm.voice_comment;
+      if (Object.keys(voiceReview).length > 0) {
+        voiceReview.reviewed_at = new Date().toISOString();
+      }
+
+      const body = {
+        review_id: reviewId,
+        admin_secret: adminPassword,
+        action: "save_correction",
+        doctor_correction: {
+          wrong_questions: correctionForm.wrong_questions,
+          missing_questions: correctionForm.missing_questions,
+          bad_question_wording: correctionForm.bad_question_wording,
+          corrected_user_report: correctionForm.corrected_user_report,
+          corrected_doctor_report: correctionForm.corrected_doctor_report,
+        },
+        protocol_update: correctionForm.protocol_update,
+        correction_comment: correctionForm.correction_comment,
+        voice_analysis_review: Object.keys(voiceReview).length > 0 ? voiceReview : undefined,
+      };
+      if (newStatus) {
+        body.status = newStatus;
+      }
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, action: "saveCorrection" }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¾");
+        setEditingReview(null);
+        adminLoadReviews();
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ Ğ¿Ñ€Ğ°Ğ²Ğ¾Ğº", "error");
+    } finally {
+      setAdminActionLoading(null);
+    }
+  }
+
+  function adminDownloadJson(review) {
+    const blob = new Blob([JSON.stringify(review.json_data || review, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${review.case_id || review.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function adminDownloadJsonl(status) {
+    const st = status || "approved";
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "exportJsonl", admin_secret: adminPassword, status: st }),
+      });
+      const text = await res.text();
+      const blob = new Blob([text], { type: "application/jsonl" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reviews-${st}-${new Date().toISOString().split("T")[0]}.jsonl`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞºÑĞ¿Ğ¾Ñ€Ñ‚Ğ°: " + e.message);
+    }
+  }
+
+  async function adminLoadCrisisRequests(filterStatus) {
+    const st = filterStatus !== undefined ? filterStatus : adminCrisisFilter;
+    setAdminCrisisLoading(true);
+    try {
+      const res = await fetch("/api/crisis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "list", status: st, limit: 100, admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAdminCrisisRequests(data.requests || []);
+      } else {
+        console.error("load crisis requests error", data);
+      }
+    } catch (err) {
+      console.error("adminLoadCrisisRequests error", err);
+    } finally {
+      setAdminCrisisLoading(false);
+    }
+  }
+
+  async function adminUpdateCrisisStatus(requestId, status) {
+    setAdminCrisisActionLoading(requestId);
+    try {
+      const res = await fetch("/api/crisis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateStatus", request_id: requestId, status, admin_secret: adminPassword }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(data.message || "Ğ¡Ñ‚Ğ°Ñ‚ÑƒÑ Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»Ñ‘Ğ½");
+        adminLoadCrisisRequests(adminCrisisFilter);
+      } else {
+        showToast(data.error || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ", "error");
+      }
+    } catch {
+      showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ ÑÑ‚Ğ°Ñ‚ÑƒÑĞ°", "error");
+    } finally {
+      setAdminCrisisActionLoading(null);
+    }
+  }
+
+  function adminDownloadCrisisJson(req) {
+    const blob = new Blob([JSON.stringify(req, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `crisis-${req.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+      function safeText(value, fallback = "â€”") {
+        if (value === null || value === undefined) return fallback;
+        if (typeof value === "string") return value || fallback;
+        if (typeof value === "number" || typeof value === "boolean") return String(value);
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return fallback;
+        }
+      }
+
+      function safeReport(value, label) {
+        if (value && typeof value === "string" && value.trim()) return value;
+        return `${label} Ğ½Ğµ Ğ±Ñ‹Ğ» ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½`;
+      }
+
+  function shortText(value, max = 240) {
+    const text = safeText(value, "");
+    if (!text) return "â€”";
+    return text.length > max ? text.slice(0, max) + "â€¦" : text;
+  }
+
+  function safeDate(value) {
+    if (!value) return "â€”";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "â€”";
+    return d.toLocaleString("ru-RU");
+  }
+
+  function shorten(text, max = 100) {
+    return shortText(text, max);
+  }
+
+   function normalizeReviewDetails(review) {
+    return normalizeSessionDetails(review);
+  }
+
+  function toggleSection(reviewId, section) {
+    const key = `${reviewId}-${section}`;
+    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function isSectionOpen(reviewId, section) {
+    return !!expandedSections[`${reviewId}-${section}`];
+  }
+
+  function openModal(title, content) {
+    setModalData({ title, content });
+  }
+
+  function closeModal() {
+    setModalData(null);
+    setTimelineData(null);
+    setTimelineCode(null);
+    setTimelineView("list");
+    setSessionDetailsData(null);
+    setSessionDetailsError(null);
+    setSessionDetailsLoading(false);
+  }
+
+  async function loadSessionTimeline(code) {
+    if (!code || code === "â€”") return;
+    if (timelineCode === code && timelineData) return; // already loaded
+
+    // Check cache
+    if (timelineCache[code]) {
+      setTimelineData(timelineCache[code]);
+      setTimelineCode(code);
+      return;
+    }
+
+    setTimelineLoading(true);
+    setTimelineCode(code);
+    try {
+      const body = { action: "getSessionTimeline", public_code: code };
+      if (adminPassword) body.admin_secret = adminPassword;
+      if (expertData?.id) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
+      }
+
+      const resp = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const result = await resp.json();
+
+      if (result.ok) {
+        setTimelineData(result);
+        setTimelineCache((prev) => ({ ...prev, [code]: result }));
+      } else {
+        showToast(result.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ»Ğ¸Ğ½Ğ¸Ñ ÑĞµÑÑĞ¸Ğ¹", "error");
+        setTimelineData(null);
+      }
+    } catch (e) {
+      showToast("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ»Ğ¸Ğ½Ğ¸Ñ ÑĞµÑÑĞ¸Ğ¹", "error");
+      setTimelineData(null);
+    } finally {
+      setTimelineLoading(false);
+    }
+  }
+
+  async function loadSessionDetails(item) {
+    const cacheKey = item.case_review_id || item.session_id || item.training_session_id;
+    if (!cacheKey) { showToast("ĞĞµÑ‚ Ğ¸Ğ´ĞµĞ½Ñ‚Ğ¸Ñ„Ğ¸ĞºĞ°Ñ‚Ğ¾Ñ€Ğ° ÑĞµÑÑĞ¸Ğ¸", "error"); return; }
+
+    if (sessionDetailsCache[cacheKey]) {
+      setSessionDetailsData(sessionDetailsCache[cacheKey]);
+      setTimelineView("detail");
+      setSessionDetailsError(null);
+      return;
+    }
+
+    setSessionDetailsLoading(true);
+    setSessionDetailsError(null);
+    try {
+      const body = { action: "getSessionTimelineDetails", public_code: timelineCode };
+      if (item.case_review_id) body.case_review_id = item.case_review_id;
+      else if (item.session_id) body.session_id = item.session_id;
+      else if (item.training_session_id) body.training_session_id = item.training_session_id;
+      if (adminPassword) body.admin_secret = adminPassword;
+      if (expertData?.id) {
+        body.expert_id = expertData.id;
+        body.expert_code = await getStoredExpertCode();
+      }
+
+      const resp = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const result = await resp.json();
+
+      if (result.ok) {
+        setSessionDetailsData(result.session);
+        setSessionDetailsCache((prev) => ({ ...prev, [cacheKey]: result.session }));
+        setTimelineView("detail");
+      } else {
+        setSessionDetailsError(result.error === "access_denied" ? "Ğ£ Ğ²Ğ°Ñ Ğ½ĞµÑ‚ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ° Ğº ÑÑ‚Ğ¾Ğ¹ ÑĞµÑÑĞ¸Ğ¸." : result.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ ÑĞµÑÑĞ¸Ñ. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.");
+        showToast(result.error === "access_denied" ? "Ğ£ Ğ²Ğ°Ñ Ğ½ĞµÑ‚ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ° Ğº ÑÑ‚Ğ¾Ğ¹ ÑĞµÑÑĞ¸Ğ¸." : "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ ÑĞµÑÑĞ¸Ñ.", "error");
+      }
+    } catch (e) {
+      setSessionDetailsError("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ ÑĞµÑÑĞ¸Ñ. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.");
+      showToast("ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ ÑĞµÑÑĞ¸Ñ.", "error");
+    } finally {
+      setSessionDetailsLoading(false);
+    }
+  }
+
+  const SESSION_KIND_LABELS_TIMELINE = {
+    initial: "ĞŸĞµÑ€Ğ²Ğ¸Ñ‡Ğ½Ğ°Ñ ÑĞµÑÑĞ¸Ñ",
+    follow_up: "ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€Ğ½Ğ°Ñ ÑĞµÑÑĞ¸Ñ",
+    diary_check: "ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° Ğ´Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ°",
+    support_toolkit_check: "ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸Ğº",
+    crisis_check: "Ğ¡Ñ€Ğ¾Ñ‡Ğ½Ğ¾Ğµ Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ",
+    doctor_review: "Ğ’Ñ€Ğ°Ñ‡ĞµĞ±Ğ½Ñ‹Ğ¹ Ñ€Ğ°Ğ·Ğ±Ğ¾Ñ€",
+    other: "Ğ”Ñ€ÑƒĞ³Ğ¾Ğµ",
+  };
+
+  const STATUS_LABELS_TIMELINE = {
+    approved: "ĞĞ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ¾",
+    rejected: "ĞÑ‚ĞºĞ»Ğ¾Ğ½ĞµĞ½Ğ¾",
+    pending: "ĞĞ¶Ğ¸Ğ´Ğ°Ğ½Ğ¸Ğµ",
+    needs_review: "ĞÑƒĞ¶Ğ½Ğ° Ğ´Ğ¾Ñ€Ğ°Ğ±Ğ¾Ñ‚ĞºĞ°",
+    local_auto_saved: "Ğ§ĞµÑ€Ğ½Ğ¾Ğ²Ğ¸Ğº",
+    new: "ĞĞ¾Ğ²Ñ‹Ğ¹",
+    reviewed: "ĞŸÑ€Ğ¾ÑĞ¼Ğ¾Ñ‚Ñ€ĞµĞ½",
+    needs_prompt_update: "ĞÑƒĞ¶Ğ½Ğ¾ Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ Ğ¿Ñ€Ğ¾Ğ¼Ğ¿Ñ‚",
+    approved_for_learning: "ĞĞ´Ğ¾Ğ±Ñ€ĞµĞ½ Ğ´Ğ»Ñ Ğ¾Ğ±ÑƒÑ‡ĞµĞ½Ğ¸Ñ",
+    archived: "ĞÑ€Ñ…Ğ¸Ğ²",
+  };
+
+  const isAdminPage = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
+  const isTrainingPage = typeof window !== "undefined" && window.location.pathname === "/admin/training";
+  const adminModuleRoute = adminSubPage || (typeof window !== "undefined"
+    ? window.location.pathname === "/admin/body" ? "body" : window.location.pathname === "/admin/council" ? "council" : "support"
+    : "support");
+  const isDedicatedSubdomain = !APP_BRAND.isSupportPilot && typeof window !== "undefined" && (
+    window.location.hostname === "health.tochka-opori.online" || window.location.hostname.startsWith("health.") ||
+    new URLSearchParams(window.location.search).get("module") === "body"
+  );
+  const isDev = typeof window !== "undefined" && (
+    window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || import.meta.env?.DEV
+  );
+  const showModuleSwitcher = isDev || adminRole === "super";
+
+  // Keep the AnMed pilot's presentation separate from the module selection.
+  useEffect(() => {
+    document.title = APP_BRAND.isSupportPilot
+      ? APP_BRAND.title
+      : isDedicatedSubdomain ? "ĞĞ¿Ğ¾Ñ€Ğ°. Ğ—Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒĞµ & Ğ¡Ñ‚Ñ€Ğ¾Ğ¹Ğ½Ğ¾ÑÑ‚ÑŒ" : APP_BRAND.title;
+  }, [isDedicatedSubdomain]);
+
+  const s = {
+    page: {
+      minHeight: "100vh",
+      background: "#F6F0E7",
+      color: "#2E2A25",
+      fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+      padding: "32px",
+    },
+    wrap: { maxWidth: 1200, margin: "0 auto" },
+    header: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 80,
+    },
+    logo: { fontSize: 28, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif" },
+    sub: { color: "#7A7268", marginTop: 4, fontSize: 14 },
+    crisis: {
+      background: "#B85C4A",
+      color: "white",
+      border: 0,
+      borderRadius: 22,
+      padding: "14px 22px",
+      fontWeight: 700,
+      fontSize: 15,
+      cursor: "pointer",
+    },
+    grid: {
+      display: "grid",
+      gridTemplateColumns: "1.1fr 0.9fr",
+      gap: 56,
+      alignItems: "start",
+    },
+    badge: {
+      display: "inline-block",
+      border: "1px solid rgba(46,42,37,.12)",
+      background: "#FFFDF8",
+      borderRadius: 999,
+      padding: "10px 16px",
+      color: "#7A7268",
+      marginBottom: 28,
+      fontSize: 13,
+    },
+    h1: {
+      fontSize: 68,
+      lineHeight: 1.03,
+      fontWeight: 900,
+      margin: 0,
+      letterSpacing: "-0.05em",
+      fontFamily: "Georgia, \"PT Serif\", serif",
+    },
+    p: {
+      color: "#7A7268",
+      fontSize: 20,
+      lineHeight: 1.7,
+      maxWidth: 680,
+    },
+    row: {
+      display: "flex",
+      gap: 14,
+      marginTop: 32,
+      flexWrap: "wrap",
+    },
+    primary: {
+      border: 0,
+      borderRadius: 22,
+      background: "#7D9A89",
+      color: "white",
+      padding: "16px 24px",
+      fontWeight: 700,
+      fontSize: 16,
+      cursor: "pointer",
+    },
+    secondary: {
+      border: "1px solid rgba(46,42,37,.18)",
+      borderRadius: 22,
+      background: "#FFFDF8",
+      color: "#2E2A25",
+      padding: "16px 24px",
+      fontWeight: 600,
+      fontSize: 15,
+      cursor: "pointer",
+    },
+    card: {
+      border: "1px solid rgba(46,42,37,.1)",
+      background: "#FFFDF8",
+      borderRadius: 36,
+      padding: 28,
+      boxShadow: "0 4px 24px rgba(46,42,37,.06)",
+    },
+    inner: {
+      background: "#FAF6EF",
+      borderRadius: 30,
+      padding: 26,
+      marginTop: 22,
+    },
+    textarea: {
+      width: "100%",
+      minHeight: 180,
+      resize: "vertical",
+      border: "1px solid rgba(46,42,37,.12)",
+      borderRadius: 24,
+      background: "#FAF6EF",
+      color: "#2E2A25",
+      padding: 20,
+      fontSize: 16,
+      outline: "none",
+      boxSizing: "border-box",
+    },
+    wide: {
+      width: "100%",
+      marginTop: 18,
+      border: 0,
+      borderRadius: 24,
+      background: "#7D9A89",
+      color: "white",
+      padding: "18px 22px",
+      fontWeight: 700,
+      fontSize: 16,
+      cursor: "pointer",
+    },
+    error: {
+      marginTop: 16,
+      background: "rgba(184,92,74,.1)",
+      color: "#B85C4A",
+      padding: 16,
+      borderRadius: 18,
+    },
+    result: {
+      marginTop: 24,
+      border: "1px solid rgba(46,42,37,.1)",
+      background: "#FFFDF8",
+      borderRadius: 28,
+      padding: 24,
+    },
+    label: { color: "#7A7268", fontSize: 14, marginTop: 18, marginBottom: 6 },
+    label2: { color: "#7A7268", fontSize: 14, marginTop: 22, marginBottom: 6 },
+    questionCard: {
+      background: "#FAF6EF",
+      borderRadius: 18,
+      padding: 16,
+      marginBottom: 14,
+    },
+    questionText: {
+      fontWeight: 700,
+      marginBottom: 10,
+      lineHeight: 1.5,
+    },
+    tabs: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 18,
+    },
+    tab: {
+      border: "1px solid rgba(46,42,37,.12)",
+      background: "transparent",
+      color: "#7A7268",
+      borderRadius: 14,
+      padding: "10px 16px",
+      cursor: "pointer",
+    },
+    activeTab: {
+      border: "1px solid #7D9A89",
+      background: "#E2EBE4",
+      color: "#2E2A25",
+      borderRadius: 14,
+      padding: "10px 16px",
+      fontWeight: 700,
+      cursor: "pointer",
+    },
+    reportBlock: {
+      background: "#FAF6EF",
+      borderRadius: 20,
+      padding: 20,
+    },
+    expertBox: {
+      marginTop: 24,
+      border: "1px solid rgba(46,42,37,.1)",
+      background: "#FAF6EF",
+      borderRadius: 24,
+      padding: 20,
+    },
+    overlay: {
+      position: "fixed",
+      top: 0, left: 0, right: 0, bottom: 0,
+      background: "rgba(46,42,37,.45)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+      padding: 20,
+    },
+    modal: {
+      background: "#FFFDF8",
+      borderRadius: 28,
+      padding: 28,
+      maxWidth: 560,
+      width: "100%",
+      border: "1px solid rgba(46,42,37,.1)",
+      boxShadow: "0 8px 40px rgba(46,42,37,.12)",
+    },
+    modalTitle: {
+      fontSize: 26,
+      fontWeight: 900,
+      marginBottom: 12,
+    },
+    modalWarning: {
+      background: "rgba(184,92,74,.1)",
+      color: "#B85C4A",
+      padding: 14,
+      borderRadius: 16,
+      fontSize: 15,
+      lineHeight: 1.5,
+      marginBottom: 20,
+    },
+    crisisTextarea: {
+      width: "100%",
+      minHeight: 100,
+      resize: "vertical",
+      border: "1px solid rgba(46,42,37,.12)",
+      borderRadius: 16,
+      background: "#FAF6EF",
+      color: "#2E2A25",
+      padding: 14,
+      fontSize: 15,
+      outline: "none",
+      boxSizing: "border-box",
+      marginBottom: 14,
+    },
+    crisisInput: {
+      width: "100%",
+      border: "1px solid rgba(46,42,37,.12)",
+      borderRadius: 16,
+      background: "#FAF6EF",
+      color: "#2E2A25",
+      padding: "14px 14px",
+      fontSize: 15,
+      outline: "none",
+      boxSizing: "border-box",
+      marginBottom: 20,
+    },
+    crisisActions: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    },
+    crisisWarning: {
+      marginTop: 14,
+      background: "rgba(184,92,74,.08)",
+      border: "1px solid rgba(184,92,74,.2)",
+      color: "#B85C4A",
+      padding: 16,
+      borderRadius: 18,
+      lineHeight: 1.5,
+    },
+    crisisConfirmation: {
+      marginTop: 14,
+      background: "rgba(125,154,137,.12)",
+      border: "1px solid rgba(125,154,137,.3)",
+      color: "#5F7D6C",
+      padding: 16,
+      borderRadius: 18,
+      lineHeight: 1.5,
+    },
+    privacyNote: {
+      marginBottom: 20,
+      background: "rgba(125,154,137,.08)",
+      border: "1px solid rgba(125,154,137,.2)",
+      color: "#5F7D6C",
+      padding: 14,
+      borderRadius: 16,
+      fontSize: 14,
+      lineHeight: 1.5,
+    },
+    toast: {
+      position: "fixed",
+      bottom: 24,
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 2000,
+      padding: "14px 24px",
+      borderRadius: 16,
+      fontWeight: 600,
+      fontSize: 15,
+      boxShadow: "0 4px 20px rgba(46,42,37,.12)",
+      animation: "toastIn 0.3s ease",
+      textAlign: "center",
+      maxWidth: "calc(100vw - 40px)",
+    },
+    toastSuccess: {
+      background: "#E2EBE4",
+      border: "1px solid rgba(125,154,137,.4)",
+      color: "#2E2A25",
+    },
+    toastError: {
+      background: "rgba(184,92,74,.1)",
+      border: "1px solid rgba(184,92,74,.3)",
+      color: "#B85C4A",
+    },
+    answerInput: {
+      width: "100%",
+      minHeight: 80,
+      resize: "vertical",
+      border: "1px solid rgba(46,42,37,.12)",
+      borderRadius: 16,
+      background: "#FAF6EF",
+      color: "#2E2A25",
+      padding: 14,
+      fontSize: 15,
+      outline: "none",
+      boxSizing: "border-box",
+    },
+  };
+
+  if (isAdminPage) {
+    const t = adminDarkMode
+      ? { bg: "#050817", text: "white", cardBg: "rgba(255,255,255,.03)", cardBorder: "rgba(255,255,255,.08)",
+          border: "rgba(255,255,255,.12)", tabBg: "rgba(255,255,255,.06)", tabActive: "white", tabActiveText: "#020617",
+          inputBg: "rgba(2,6,23,.55)", inputBorder: "rgba(255,255,255,.12)", inputText: "white",
+          accent: "#7bc0e8", muted: "#94a3b8", secondary: "#16213e", secondaryBorder: "#2a3a5c",
+          success: "#bbf7d0", error: "#fecaca", highlight: "rgba(59,130,246,.15)",
+          badgeApproved: "#14532d", badgeApprovedText: "#bbf7d0",
+          badgeRejected: "#7f1d1d", badgeRejectedText: "#fecaca",
+          badgePending: "#1e3a5f", badgePendingText: "#93c5fd",
+          danger: "#ef4444", dangerBg: "rgba(239,68,68,.1)",
+          crisisCard: "rgba(255,255,255,.04)", crisisText: "#e2e8f0", crisisMuted: "#64748b",
+          crisisBorder: "rgba(255,255,255,.1)", crisisAccent: "#a5b4fc",
+          cardLabel: "#64748b", cardValue: "#e2e8f0",
+          filterBg: "rgba(255,255,255,.06)", filterText: "white", filterBorder: "rgba(255,255,255,.12)",
+          jsonlBtn: "#16213e", jsonlBtnBorder: "#2a3a5c", jsonlBtnText: "#7bc0e8",
+          badgeInProgress: "rgba(59,130,246,.2)", badgeInProgressText: "#93c5fd",
+          badgeClosed: "rgba(34,197,94,.2)", badgeClosedText: "#bbf7d0",
+          badgeFalseAlarm: "rgba(100,116,139,.2)", badgeFalseAlarmText: "#cbd5e1",
+          badgeNew: "rgba(220,38,38,.2)", badgeNewText: "#fecaca",
+          badgeHighRisk: "rgba(220,38,38,.2)", badgeHighRiskText: "#fecaca",
+          riskMarker: "#fca5a5", riskMarkerBg: "rgba(220,38,38,.15)",
+          crisisActionPrimary: "rgba(59,130,246,.2)", crisisActionPrimaryText: "#93c5fd",
+          crisisActionSuccess: "rgba(34,197,94,.2)", crisisActionSuccessText: "#bbf7d0",
+          crisisActionNeutral: "rgba(100,116,139,.2)", crisisActionNeutralText: "#cbd5e1",
+          crisisActionJsonl: "rgba(255,255,255,.06)", crisisActionJsonlText: "#94a3b8",
+          crisisActionJsonlBorder: "rgba(255,255,255,.12)",
+        }
+      : { bg: "#f3f1ec", text: "#1a1a1a", cardBg: "#ffffff", cardBorder: "#dcd8d0",
+          border: "#d4cec4", tabBg: "#e6e2da", tabActive: "#2e2a25", tabActiveText: "#ffffff",
+          inputBg: "#ffffff", inputBorder: "#d4cec4", inputText: "#1a1a1a",
+          accent: "#2563eb", muted: "#6b7280", secondary: "#e8e4dc", secondaryBorder: "#d4cec4",
+          success: "#166534", error: "#991b1b", highlight: "rgba(37,99,235,.08)",
+          badgeApproved: "#dcfce7", badgeApprovedText: "#166534",
+          badgeRejected: "#fee2e2", badgeRejectedText: "#991b1b",
+          badgePending: "#dbeafe", badgePendingText: "#1e40af",
+          danger: "#dc2626", dangerBg: "rgba(220,38,38,.06)",
+          crisisCard: "#ffffff", crisisText: "#374151", crisisMuted: "#6b7280",
+          crisisBorder: "#dcd8d0", crisisAccent: "#4f46e5",
+          cardLabel: "#6b7280", cardValue: "#1a1a1a",
+          filterBg: "#ffffff", filterText: "#1a1a1a", filterBorder: "#d4cec4",
+          jsonlBtn: "#e8e4dc", jsonlBtnBorder: "#d4cec4", jsonlBtnText: "#2563eb",
+          badgeInProgress: "#dbeafe", badgeInProgressText: "#1e40af",
+          badgeClosed: "#dcfce7", badgeClosedText: "#166534",
+          badgeFalseAlarm: "#f3f4f6", badgeFalseAlarmText: "#6b7280",
+          badgeNew: "#fee2e2", badgeNewText: "#991b1b",
+          badgeHighRisk: "#fee2e2", badgeHighRiskText: "#991b1b",
+          riskMarker: "#fca5a5", riskMarkerBg: "rgba(220,38,38,.08)",
+          crisisActionPrimary: "#dbeafe", crisisActionPrimaryText: "#1e40af",
+          crisisActionSuccess: "#dcfce7", crisisActionSuccessText: "#166534",
+          crisisActionNeutral: "#f3f4f6", crisisActionNeutralText: "#6b7280",
+          crisisActionJsonl: "#f3f4f6", crisisActionJsonlText: "#6b7280",
+          crisisActionJsonlBorder: "#d4cec4",
+        };
+
+    const detailQualityInsightView = (d, t) => {
+      return (
+        <div style={{ marginTop: 16, borderTop: `1px solid ${t.cardBorder}`, paddingTop: 16 }}>
+          {/* Summary */}
+          {d.summary && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.cardLabel, fontSize: 11, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>ĞĞ±Ñ‰Ğ¸Ğ¹ Ğ²Ñ‹Ğ²Ğ¾Ğ´</div>
+              <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6 }}>{d.summary}</div>
+            </div>
+          )}
+
+          {/* Strengths */}
+          {d.strengths && d.strengths.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.success, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Ğ§Ñ‚Ğ¾ Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°ĞµÑ‚ Ñ…Ğ¾Ñ€Ğ¾ÑˆĞ¾</div>
+              {d.strengths.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6, background: t.highlight }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title}</div>
+                  {item.case_count && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>ĞšĞµĞ¹ÑĞ¾Ğ²: {item.case_count}</div>}
+                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Recurring Problems */}
+          {d.recurring_problems && d.recurring_problems.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.error, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€ÑÑÑ‰Ğ¸ĞµÑÑ Ğ¿Ñ€Ğ¾Ğ±Ğ»ĞµĞ¼Ñ‹</div>
+              {d.recurring_problems.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.error}`, borderRadius: 8, marginBottom: 6, background: t.dangerBg }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title}</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                      background: item.severity === "critical" ? t.badgeNew
+                        : item.severity === "high" ? t.badgeHighRisk
+                        : item.severity === "medium" ? t.badgePending
+                        : t.badgeFalseAlarm,
+                      color: item.severity === "critical" ? t.badgeNewText
+                        : item.severity === "high" ? t.badgeHighRiskText
+                        : item.severity === "medium" ? t.badgePendingText
+                        : t.badgeFalseAlarmText,
+                    }}>
+                      {QUALITY_SEVERITY_LABELS[item.severity] || item.severity || "â€”"}
+                    </span>
+                  </div>
+                  {item.case_count && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>ĞšĞµĞ¹ÑĞ¾Ğ²: {item.case_count}</div>}
+                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Safety Findings */}
+          {d.safety_findings && d.safety_findings.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.danger, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Ğ‘ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚ÑŒ</div>
+              {d.safety_findings.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.danger}`, borderRadius: 8, marginBottom: 6, background: t.dangerBg }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title || item}</div>
+                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Missed Domains */}
+          {d.missed_domains && d.missed_domains.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.error, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>ĞŸÑ€Ğ¾Ğ¿ÑƒÑ‰ĞµĞ½Ğ½Ñ‹Ğµ Ğ´Ğ¾Ğ¼ĞµĞ½Ñ‹</div>
+              {d.missed_domains.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title || item}</div>
+                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Language Findings */}
+          {d.language_findings && d.language_findings.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.accent, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Ğ¯Ğ·Ñ‹Ğº Ğ¸ ÑÑ‚Ğ¸Ğ»ÑŒ</div>
+              {d.language_findings.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title || item}</div>
+                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Recommendations */}
+          {d.recommendations && d.recommendations.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.accent, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>ĞŸÑ€ĞµĞ´Ğ»Ğ°Ğ³Ğ°ĞµĞ¼Ñ‹Ğµ Ğ¸Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ñ</div>
+              {d.recommendations.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title}</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                      background: item.priority === "critical" || item.priority === "high" ? t.badgeNew : t.badgePending,
+                      color: item.priority === "critical" || item.priority === "high" ? t.badgeNewText : t.badgePendingText,
+                    }}>
+                      {item.priority || "â€”"}
+                    </span>
+                  </div>
+                  {item.case_count && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>ĞšĞµĞ¹ÑĞ¾Ğ²: {item.case_count}</div>}
+                  {item.reason && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.reason}</div>}
+                  {item.suggested_change && (
+                    <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4, padding: "6px 8px", background: t.highlight, borderRadius: 6 }}>
+                      <span style={{ fontWeight: 600 }}>Ğ˜Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ğµ:</span> {item.suggested_change}
+                    </div>
+                  )}
+                  {item.target_file && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>Ğ¤Ğ°Ğ¹Ğ»: {item.target_file}</div>}
+                  {item.risk_of_change && <div style={{ fontSize: 11, color: t.muted }}>Ğ Ğ¸ÑĞº: {item.risk_of_change}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Risk Assessment */}
+          {d.risk_of_changes && (
+            <div style={{ marginBottom: 16, padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8 }}>
+              <div style={{ color: t.cardLabel, fontSize: 11, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Ğ Ğ¸ÑĞºĞ¸ Ğ¸Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ğ¹</div>
+              <div style={{ fontSize: 13, color: t.crisisText }}>{d.risk_of_changes}</div>
+            </div>
+          )}
+
+          {/* Regression Tests */}
+          {d.regression_tests && d.regression_tests.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: t.muted, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>Ğ ĞµĞ³Ñ€ĞµÑÑĞ¸Ğ¾Ğ½Ğ½Ñ‹Ğµ Ñ‚ĞµÑÑ‚Ñ‹</div>
+              {d.regression_tests.map((item, i) => (
+                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6 }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, color: t.crisisText }}>{item.scenario}</div>
+                  {item.expected_behavior && <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>ĞĞ¶Ğ¸Ğ´Ğ°ĞµÑ‚ÑÑ: {item.expected_behavior}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const renderReviewSections = (review, json, t, data) => {
+      const { patientText, userReport, doctorReport, doctorFeedbackComment, conversationHistory: rounds } = data;
+        const sections = [
+        {
+          key: "patient",
+          label: "Ğ¢ĞµĞºÑÑ‚ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ°",
+          hasData: !!patientText,
+          summary: shortText(patientText, 200),
+          fullContent: patientText,
+          noDataMessage: null,
+        },
+        {
+          key: "dialogue",
+          label: "Ğ”Ğ¸Ğ°Ğ»Ğ¾Ğ³ Ñ ÑĞ¸ÑÑ‚ĞµĞ¼Ğ¾Ğ¹",
+          hasData: rounds.length > 0 || (Array.isArray(json.questions) && json.questions.length > 0),
+          summary: rounds.length > 0
+            ? `Ğ Ğ°ÑƒĞ½Ğ´Ğ¾Ğ²: ${rounds.length}`
+            : Array.isArray(json.questions) ? `Ğ’Ğ¾Ğ¿Ñ€Ğ¾ÑĞ¾Ğ²: ${json.questions.length}` : "",
+          fullContent: null,
+          isDialogue: true,
+          noDataMessage: "Ğ¢ĞµĞºÑÑ‚ Ğ´Ğ¸Ğ°Ğ»Ğ¾Ğ³Ğ° Ğ½Ğµ Ğ±Ñ‹Ğ» ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½",
+        },
+        {
+          key: "userReport",
+          label: "ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ°",
+          hasData: !!userReport,
+          summary: shortText(userReport, 200),
+          fullContent: userReport,
+          noDataMessage: "ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ° Ğ½Ğµ Ğ±Ñ‹Ğ» ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½",
+        },
+        {
+          key: "doctorReport",
+          label: "ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°",
+          hasData: !!doctorReport,
+          summary: shortText(doctorReport, 200),
+          fullContent: doctorReport,
+          noDataMessage: "ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ° Ğ½Ğµ Ğ±Ñ‹Ğ» ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½",
+        },
+        {
+          key: "feedback",
+          label: "ĞÑ‚Ğ·Ñ‹Ğ² ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°",
+          hasData: !!doctorFeedbackComment || Object.keys(data.doctorFeedback || {}).length > 0,
+          summary: doctorFeedbackComment
+            ? shortText(doctorFeedbackComment, 200)
+            : Object.keys(data.doctorFeedback || {}).length > 0 ? "Ğ•ÑÑ‚ÑŒ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğµ Ğ¾Ğ±Ñ€Ğ°Ñ‚Ğ½Ğ¾Ğ¹ ÑĞ²ÑĞ·Ğ¸" : "",
+          fullContent: null,
+          isFeedback: true,
+          feedbackData: data.doctorFeedback,
+          noDataMessage: null,
+        },
+      ];
+
+      return (
+        <div style={{ marginBottom: 12 }}>
+          {sections.map((sec) => {
+            const open = isSectionOpen(review.id, sec.key);
+            const canOpen = sec.hasData || sec.isDialogue;
+            return (
+              <div key={sec.key} style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+                <div
+                  onClick={() => canOpen && toggleSection(review.id, sec.key)}
+                  style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "10px 14px", cursor: canOpen ? "pointer" : "default",
+                    background: open ? t.highlight : "transparent",
+                    userSelect: "none",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: canOpen ? t.crisisText : t.muted }}>
+                      {sec.label}
+                    </span>
+                    {!open && sec.hasData && sec.summary && (
+                      <span style={{ color: t.cardLabel, fontSize: 12, marginLeft: 8, maxWidth: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {sec.summary}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {!canOpen && <span style={{ color: t.muted, fontSize: 11 }}>{sec.noDataMessage || "ĞĞµÑ‚ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½Ğ½Ñ‹Ñ… Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ…"}</span>}
+                    {canOpen && <span style={{ color: t.cardLabel, fontSize: 11, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>â–¾</span>}
+                  </div>
+                </div>
+
+                {open && canOpen && (
+                  <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
+                    {sec.isDialogue ? renderDialogueContent(review, json, t, rounds)
+                      : sec.isFeedback ? renderFeedbackContent(review, json, t, data.doctorFeedback, doctorFeedbackComment)
+                      : renderTextContent(review, sec, t)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    const renderTextContent = (review, sec, t) => {
+      const text = sec.fullContent || "";
+      return (
+        <div>
+          <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 300, overflowY: "auto" }}>
+            {sec.isDialogue ? null : text}
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            {text.length > 250 && (
+              <button onClick={() => openModal(sec.label, text)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ² Ğ±Ğ¾Ğ»ÑŒÑˆĞ¾Ğ¼ Ğ¾ĞºĞ½Ğµ
+              </button>
+            )}
+            {text && (
+              <button onClick={() => { navigator.clipboard.writeText(text); showToast("Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¾"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const renderDialogueContent = (review, json, t, rounds) => {
+      const items = rounds.length > 0 ? rounds : normalizeConversationHistory([], json).rounds;
+
+      const fullText = renderRoundsToText(items);
+
+      return (
+        <div>
+          {items.length === 0 ? (
+            <div style={{ color: t.muted, fontSize: 13 }}>ĞĞµÑ‚ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½Ğ½Ñ‹Ñ… Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ´Ğ¸Ğ°Ğ»Ğ¾Ğ³Ğ°</div>
+          ) : (
+            <div style={{ maxHeight: 400, overflowY: "auto" }}>
+              {items.map((rnd) => (
+                <div key={rnd.round} style={{ marginBottom: 14 }}>
+                  <div style={{
+                    background: t.cardLabel, color: "white", fontSize: 11, fontWeight: 700,
+                    padding: "4px 12px", marginBottom: 8, borderRadius: 4,
+                  }}>
+                    Ğ Ğ°ÑƒĞ½Ğ´ {rnd.round}
+                  </div>
+                  <div style={{
+                    marginBottom: 6, padding: "10px 12px",
+                    background: "transparent",
+                    borderLeft: `3px solid ${t.muted}`,
+                    borderRadius: "0 8px 8px 0",
+                  }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: t.muted, marginBottom: 4 }}>Ğ¢Ğ¾Ñ‡ĞºĞ° Ğ¾Ğ¿Ğ¾Ñ€Ñ‹</div>
+                    <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                      {rnd.question}
+                    </div>
+                  </div>
+                  <div style={{
+                    padding: "10px 12px",
+                    background: t.highlight,
+                    borderLeft: `3px solid ${t.accent}`,
+                    borderRadius: "0 8px 8px 0",
+                  }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, color: t.accent, marginBottom: 4 }}>ĞŸĞ°Ñ†Ğ¸ĞµĞ½Ñ‚</div>
+                    <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                      {rnd.answer}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    function renderRoundsToText(rounds) {
+      return rounds.map((r) => {
+        const lines = [];
+        lines.push(`[Ğ¢Ğ¾Ñ‡ĞºĞ° Ğ¾Ğ¿Ğ¾Ñ€Ñ‹] (Ñ€Ğ°ÑƒĞ½Ğ´ ${r.round})`);
+        lines.push(r.question);
+        lines.push(`[ĞŸĞ°Ñ†Ğ¸ĞµĞ½Ñ‚] (Ñ€Ğ°ÑƒĞ½Ğ´ ${r.round})`);
+        lines.push(r.answer);
+        return lines.join("\n");
+      }).join("\n\n---\n\n");
+    }
+
+    const renderFeedbackContent = (review, json, t, feedback, feedbackComment) => {
+      const df = feedback || {};
+      const items = [];
+      if (df.wrong_questions) items.push({ label: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğµ Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹", value: df.wrong_questions });
+      if (df.missing_questions) items.push({ label: "ĞŸÑ€Ğ¾Ğ¿ÑƒÑ‰ĞµĞ½Ğ½Ñ‹Ğµ Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹", value: df.missing_questions });
+      if (df.bad_question_wording) items.push({ label: "ĞĞµĞºĞ¾Ñ€Ñ€ĞµĞºÑ‚Ğ½Ñ‹Ğµ Ñ„Ğ¾Ñ€Ğ¼ÑƒĞ»Ğ¸Ñ€Ğ¾Ğ²ĞºĞ¸", value: df.bad_question_wording });
+      if (df.corrected_user_report) items.push({ label: "Ğ¡ĞºĞ¾Ñ€Ñ€ĞµĞºÑ‚Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ñ‹Ğ¹ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚ (Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚)", value: df.corrected_user_report });
+      if (df.corrected_doctor_report) items.push({ label: "Ğ¡ĞºĞ¾Ñ€Ñ€ĞµĞºÑ‚Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ñ‹Ğ¹ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚ (ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚)", value: df.corrected_doctor_report });
+      if (df.protocol_update) items.push({ label: "ĞĞ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ¿Ñ€Ğ¾Ñ‚Ğ¾ĞºĞ¾Ğ»Ğ°", value: df.protocol_update });
+      if (df.correction_comment) items.push({ label: "ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹ Ğº Ğ¿Ñ€Ğ°Ğ²ĞºĞµ", value: df.correction_comment });
+      if (df.generalComment) items.push({ label: "ĞĞ±Ñ‰Ğ¸Ğ¹ ĞºĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹", value: df.generalComment });
+      if (review?.correction_comment) items.push({ label: "ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹ Ğ°Ğ´Ğ¼Ğ¸Ğ½Ğ¸ÑÑ‚Ñ€Ğ°Ñ‚Ğ¾Ñ€Ğ°", value: review.correction_comment });
+
+      if (items.length === 0 && !feedbackComment) {
+        return <div style={{ color: t.muted, fontSize: 13 }}>ĞĞµÑ‚ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½Ğ½Ñ‹Ñ… Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ¾Ğ±Ñ€Ğ°Ñ‚Ğ½Ğ¾Ğ¹ ÑĞ²ÑĞ·Ğ¸</div>;
+      }
+
+      const fullText = items.map((i) => `${i.label}:\n${i.value}`).join("\n\n---\n\n");
+
+      return (
+        <div>
+          {feedbackComment && (
+            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6, marginBottom: 8, fontStyle: "italic" }}>{feedbackComment}</div>
+          )}
+          {items.length > 0 && (
+            <div style={{ maxHeight: 400, overflowY: "auto" }}>
+              {items.map((item, i) => (
+                <div key={i} style={{ marginBottom: 10, padding: "8px 10px", border: `1px solid ${t.cardBorder}`, borderRadius: 8 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: t.cardLabel, marginBottom: 4 }}>{item.label}</div>
+                  <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            {items.length > 0 && (
+              <button onClick={() => openModal("ĞÑ‚Ğ·Ñ‹Ğ² ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°", fullText)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ² Ğ±Ğ¾Ğ»ÑŒÑˆĞ¾Ğ¼ Ğ¾ĞºĞ½Ğµ
+              </button>
+            )}
+            {fullText && (
+              <button onClick={() => { navigator.clipboard.writeText(fullText); showToast("Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¾"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    function formatConversationForCopy(rounds) {
+      return renderRoundsToText(rounds || []);
+    }
+
+    function formatAnonymizedSession(sd) {
+      if (!sd) return "";
+      const parts = [];
+      const { rounds } = normalizeConversationHistory(sd.conversation_history || []);
+      parts.push(`ĞŸĞµÑ€Ğ²Ğ¸Ñ‡Ğ½Ğ¾Ğµ Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ:\n${sd.patient_text || "â€”"}`);
+      parts.push(`Ğ”Ğ¸Ğ°Ğ»Ğ¾Ğ³:\n${rounds.length > 0 ? formatConversationForCopy(rounds) : "Ğ¢ĞµĞºÑÑ‚ Ğ´Ğ¸Ğ°Ğ»Ğ¾Ğ³Ğ° Ğ½Ğµ Ğ±Ñ‹Ğ» ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½"}`);
+      parts.push(`ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ°:\n${sd.user_report || "ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ° Ğ½Ğµ Ğ±Ñ‹Ğ» ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½"}`);
+      parts.push(`ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°:\n${sd.doctor_report || "ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ° Ğ½Ğµ Ğ±Ñ‹Ğ» ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½"}`);
+      if (sd.correction_comment) parts.push(`Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ğ°Ñ Ğ¿Ñ€Ğ°Ğ²ĞºĞ°:\n${sd.correction_comment}`);
+      const tr = sd.training;
+      if (tr) {
+        const tlines = [];
+        if (tr.scenario_played) tlines.push(`Ğ¡Ñ†ĞµĞ½Ğ°Ñ€Ğ¸Ğ¹: ${tr.scenario_played}`);
+        if (tr.expected_case_type) tlines.push(`ĞĞ¶Ğ¸Ğ´Ğ°ĞµĞ¼Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿: ${tr.expected_case_type}`);
+        if (tr.ai_detected_case_type) tlines.push(`Ğ Ğ°ÑĞ¿Ğ¾Ğ·Ğ½Ğ°Ğ½Ğ¾: ${tr.ai_detected_case_type}`);
+        if (tr.expert_comment) tlines.push(`ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹: ${tr.expert_comment}`);
+        parts.push(`ĞÑ†ĞµĞ½ĞºĞ° Ñ‚Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²ĞºĞ¸:\n${tlines.join("\n")}`);
+      }
+      return parts.join("\n\n=====\n\n");
+    }
+
+    async function copyToClipboard(text, successMessage) {
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast(successMessage || "Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¾");
+      } catch {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); showToast(successMessage || "Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¾"); } catch {}
+        ta.remove();
+      }
+    }
+
+    const renderSessionTimelineDetail = (sd, t) => {
+      if (!sd) return null;
+
+      const { rounds } = normalizeConversationHistory(sd.conversation_history || []);
+
+      const dialogueText = formatConversationForCopy(rounds);
+
+      const sections = [];
+
+      const addSection = (key, label, content, defaultOpen) => {
+        const open = defaultOpen && !!content;
+        sections.push(
+          <div key={key} style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+            <div
+              onClick={() => {
+                if (!content) return;
+                const k = `tl-${key}`;
+                setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
+              }}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "10px 14px", cursor: content ? "pointer" : "default",
+                background: open ? t.highlight : "transparent",
+                userSelect: "none",
+              }}
+            >
+              <span style={{ fontWeight: 700, fontSize: 13, color: content ? t.crisisText : t.muted }}>
+                {label}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {!content && <span style={{ color: t.muted, fontSize: 11 }}>ĞĞµÑ‚ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½Ğ½Ñ‹Ñ… Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ…</span>}
+                {content && <span style={{ color: t.cardLabel, fontSize: 11, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>â–¾</span>}
+              </div>
+            </div>
+            {open && content && (
+              <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
+                <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 400, overflowY: "auto" }}>
+                  {content}
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  {content.length > 250 && (
+                    <button
+                      onClick={() => setTimelineLargeSection({ title: label, content })}
+                      style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
+                    >
+                      ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ² Ğ±Ğ¾Ğ»ÑŒÑˆĞ¾Ğ¼ Ğ¾ĞºĞ½Ğµ
+                    </button>
+                  )}
+                  <button
+                    onClick={() => copyToClipboard(content, `${label} ÑĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½`)}
+                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
+                  >
+                    Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // 1. Patient text
+      addSection("patient", "ĞŸĞµÑ€Ğ²Ğ¸Ñ‡Ğ½Ğ¾Ğµ Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ", sd.patient_text, true);
+
+      // 2. Dialogue
+      sections.push(
+        <div key="dialogue" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+          <div
+            onClick={() => {
+              if (rounds.length === 0) return;
+              const k = "tl-dialogue";
+              setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
+            }}
+            style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "10px 14px", cursor: rounds.length > 0 ? "pointer" : "default",
+              background: t.highlight,
+              userSelect: "none",
+            }}
+          >
+            <span style={{ fontWeight: 700, fontSize: 13, color: rounds.length > 0 ? t.crisisText : t.muted }}>
+              Ğ”Ğ¸Ğ°Ğ»Ğ¾Ğ³ Ñ ÑĞ¸ÑÑ‚ĞµĞ¼Ğ¾Ğ¹
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {rounds.length === 0 && (
+                <span style={{ color: t.muted, fontSize: 11 }}>ĞĞµÑ‚ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½Ğ½Ñ‹Ñ… Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ…</span>
+              )}
+              {rounds.length > 0 && (
+                <span style={{ color: t.cardLabel, fontSize: 11, transform: "rotate(180deg)", transition: "transform .2s" }}>â–¾</span>
+              )}
+            </div>
+          </div>
+          {rounds.length > 0 && (
+            <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
+              <div style={{ maxHeight: 400, overflowY: "auto" }}>
+                {rounds.map((rnd) => (
+                  <div key={rnd.round} style={{ marginBottom: 14 }}>
+                    <div style={{
+                      background: t.cardLabel, color: "white", fontSize: 11, fontWeight: 700,
+                      padding: "4px 12px", marginBottom: 8, borderRadius: 4,
+                    }}>
+                      Ğ Ğ°ÑƒĞ½Ğ´ {rnd.round}
+                    </div>
+                    <div style={{
+                      marginBottom: 6, padding: "10px 12px",
+                      background: "transparent",
+                      borderLeft: `3px solid ${t.muted}`,
+                      borderRadius: "0 8px 8px 0",
+                    }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: t.muted, marginBottom: 4 }}>Ğ¢Ğ¾Ñ‡ĞºĞ° Ğ¾Ğ¿Ğ¾Ñ€Ñ‹</div>
+                      <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                        {rnd.question}
+                      </div>
+                    </div>
+                    <div style={{
+                      padding: "10px 12px",
+                      background: t.highlight,
+                      borderLeft: `3px solid ${t.accent}`,
+                      borderRadius: "0 8px 8px 0",
+                    }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: t.accent, marginBottom: 4 }}>ĞŸĞ°Ñ†Ğ¸ĞµĞ½Ñ‚</div>
+                      <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                        {rnd.answer}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                {dialogueText && (
+                  <button
+                    onClick={() => setTimelineLargeSection({ title: "Ğ”Ğ¸Ğ°Ğ»Ğ¾Ğ³ Ñ ÑĞ¸ÑÑ‚ĞµĞ¼Ğ¾Ğ¹", content: dialogueText })}
+                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
+                  >
+                    ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ² Ğ±Ğ¾Ğ»ÑŒÑˆĞ¾Ğ¼ Ğ¾ĞºĞ½Ğµ
+                  </button>
+                )}
+                {dialogueText && (
+                  <button
+                    onClick={() => copyToClipboard(dialogueText, "Ğ”Ğ¸Ğ°Ğ»Ğ¾Ğ³ ÑĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½")}
+                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
+                  >
+                    Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ´Ğ¸Ğ°Ğ»Ğ¾Ğ³
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+
+      // 3-10: sections using addSection
+      addSection("user_report", "ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ°", sd.user_report || "ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ° Ğ½Ğµ Ğ±Ñ‹Ğ» ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½", !!sd.user_report);
+      if (sd.doctor_correction?.corrected_user_report) {
+        addSection("corrected_user", "Ğ˜ÑĞ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ½Ğ°Ñ Ğ²ĞµÑ€ÑĞ¸Ñ (Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚)", sd.corrected_user_report, false);
+      }
+
+      addSection("doctor_report", "ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°", sd.doctor_report || "ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ° Ğ½Ğµ Ğ±Ñ‹Ğ» ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½", !!sd.doctor_report);
+      if (sd.doctor_correction?.corrected_doctor_report) {
+        addSection("corrected_doctor", "Ğ˜ÑĞ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ½Ğ°Ñ Ğ²ĞµÑ€ÑĞ¸Ñ (ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚)", sd.corrected_doctor_report, false);
+      }
+
+      const df = sd.doctor_feedback || {};
+      const feedbackItems = [];
+      if (df.wrong_questions) feedbackItems.push({ label: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğµ Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹", value: df.wrong_questions });
+      if (df.missing_questions) feedbackItems.push({ label: "ĞŸÑ€Ğ¾Ğ¿ÑƒÑ‰ĞµĞ½Ğ½Ñ‹Ğµ Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹", value: df.missing_questions });
+      if (df.bad_question_wording) feedbackItems.push({ label: "ĞĞµĞºĞ¾Ñ€Ñ€ĞµĞºÑ‚Ğ½Ñ‹Ğµ Ñ„Ğ¾Ñ€Ğ¼ÑƒĞ»Ğ¸Ñ€Ğ¾Ğ²ĞºĞ¸", value: df.bad_question_wording });
+      if (df.generalComment) feedbackItems.push({ label: "ĞĞ±Ñ‰Ğ¸Ğ¹ ĞºĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹", value: df.generalComment });
+      const feedbackText = feedbackItems.map((i) => `${i.label}:\n${i.value}`).join("\n\n---\n\n");
+      addSection("feedback", "ĞÑ‚Ğ·Ñ‹Ğ² ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°", feedbackText || df.correction_comment || "", false);
+
+      const correctionParts = [];
+      if (sd.correction_comment) correctionParts.push(`ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹ Ğº Ğ¿Ñ€Ğ°Ğ²ĞºĞµ:\n${sd.correction_comment}`);
+      if (sd.protocol_update) correctionParts.push(`ĞĞ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ¿Ñ€Ğ¾Ñ‚Ğ¾ĞºĞ¾Ğ»Ğ°:\n${sd.protocol_update}`);
+      if (sd.doctor_correction?.wrong_questions) correctionParts.push(`ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğµ Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹:\n${sd.doctor_correction.wrong_questions}`);
+      if (sd.doctor_correction?.missing_questions) correctionParts.push(`ĞŸÑ€Ğ¾Ğ¿ÑƒÑ‰ĞµĞ½Ğ½Ñ‹Ğµ Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹:\n${sd.doctor_correction.missing_questions}`);
+      if (sd.doctor_correction?.bad_question_wording) correctionParts.push(`ĞĞµĞºĞ¾Ñ€Ñ€ĞµĞºÑ‚Ğ½Ñ‹Ğµ Ñ„Ğ¾Ñ€Ğ¼ÑƒĞ»Ğ¸Ñ€Ğ¾Ğ²ĞºĞ¸:\n${sd.doctor_correction.bad_question_wording}`);
+      addSection("expert_correction", "Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ğ°Ñ Ğ¿Ñ€Ğ°Ğ²ĞºĞ°", correctionParts.join("\n\n---\n\n"), false);
+
+      const diaryStr = sd.diary
+        ? (typeof sd.diary === "string" ? sd.diary : JSON.stringify(sd.diary, null, 2))
+        : "";
+      addSection("diary", "Ğ”Ğ½ĞµĞ²Ğ½Ğ¸Ğº ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ñ", diaryStr, false);
+
+      const spStr = sd.support_plan
+        ? (typeof sd.support_plan === "string" ? sd.support_plan : JSON.stringify(sd.support_plan, null, 2))
+        : "";
+      addSection("support_plan", "Ğ’Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ñ‹Ğµ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸ĞºĞ¸", spStr, false);
+
+      addSection("continuation", "ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹ Ğ¿Ğ¾ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ", sd.continuation_comment, false);
+
+      const tr = sd.training;
+      if (tr) {
+        const trainingLines = [];
+        if (tr.scenario_played) trainingLines.push(`Ğ¡Ñ†ĞµĞ½Ğ°Ñ€Ğ¸Ğ¹: ${tr.scenario_played}`);
+        if (tr.expected_case_type) trainingLines.push(`ĞĞ¶Ğ¸Ğ´Ğ°ĞµĞ¼Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿ ÑĞ»ÑƒÑ‡Ğ°Ñ: ${tr.expected_case_type}`);
+        if (tr.ai_detected_case_type) trainingLines.push(`Ğ§Ñ‚Ğ¾ Ñ€Ğ°ÑĞ¿Ğ¾Ğ·Ğ½Ğ°Ğ»Ğ° ÑĞ¸ÑÑ‚ĞµĞ¼Ğ°: ${tr.ai_detected_case_type}`);
+        if (tr.ai_detected_secondary_types && tr.ai_detected_secondary_types.length > 0) {
+          trainingLines.push(`Ğ’Ñ‚Ğ¾Ñ€Ğ¸Ñ‡Ğ½Ñ‹Ğµ Ğ¿Ñ€Ğ¸Ğ·Ğ½Ğ°ĞºĞ¸: ${tr.ai_detected_secondary_types.join(", ")}`);
+        }
+        const qualityFields = [
+          ["detection_quality", "Ğ Ğ°ÑĞ¿Ğ¾Ğ·Ğ½Ğ°Ğ²Ğ°Ğ½Ğ¸Ğµ"],
+          ["questions_quality", "Ğ’Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹"],
+          ["report_quality", "ĞÑ‚Ñ‡Ñ‘Ñ‚"],
+          ["safety_quality", "Safety"],
+          ["language_quality", "Ğ¯Ğ·Ñ‹Ğº"],
+          ["support_toolkit_quality", "ĞŸÑ€Ğ°ĞºÑ‚Ğ¸ĞºĞ¸"],
+          ["continuation_quality", "ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ğµ"],
+        ];
+        for (const [key, label] of qualityFields) {
+          if (tr[key] !== null && tr[key] !== undefined) {
+            trainingLines.push(`${label}: ${tr[key]}`);
+          }
+        }
+        const flagFields = [
+          ["repeated_questions", "ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€Ñ‹"],
+          ["missed_risk_flags", "ĞŸÑ€Ğ¾Ğ¿ÑƒÑ‰ĞµĞ½Ñ‹ Ñ€Ğ¸ÑĞºĞ¸"],
+          ["wrong_recommendation", "ĞĞµĞ²ĞµÑ€Ğ½Ğ°Ñ Ñ€ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´Ğ°Ñ†Ğ¸Ñ"],
+          ["remembered_context", "Ğ£Ñ‡Ñ‚Ñ‘Ğ½ ĞºĞ¾Ğ½Ñ‚ĞµĞºÑÑ‚"],
+        ];
+        for (const [key, label] of flagFields) {
+          if (tr[key]) trainingLines.push(`âš ï¸ ${label}`);
+        }
+        if (tr.expert_comment) trainingLines.push(`\nĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹ ÑĞºÑĞ¿ĞµÑ€Ñ‚Ğ°:\n${tr.expert_comment}`);
+        if (tr.missed_domain) trainingLines.push(`ĞŸÑ€Ğ¾Ğ¿ÑƒÑ‰ĞµĞ½Ğ½Ğ°Ñ Ğ¾Ğ±Ğ»Ğ°ÑÑ‚ÑŒ: ${tr.missed_domain}`);
+        if (tr.action_needed) trainingLines.push(`Ğ§Ñ‚Ğ¾ Ğ¸ÑĞ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ: ${tr.action_needed}`);
+        addSection("training", "ĞÑ†ĞµĞ½ĞºĞ° Ñ‚Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²Ğ¾Ñ‡Ğ½Ğ¾Ğ¹ ÑĞµÑÑĞ¸Ğ¸", trainingLines.join("\n"), false);
+      }
+
+      // Voice observations block
+      const vo = sd.voice_observations || sd.json_data?.voice_observations || null;
+      if (vo) {
+        const voList = Array.isArray(vo) ? vo : [vo];
+        const voiceContent = voList.map((v, vi) => {
+          const a = v.analysis || v;
+          if (a.status === "insufficient_audio") {
+            return `Ğ¡Ğ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ ${vi + 1}: ĞšĞ°Ñ‡ĞµÑÑ‚Ğ²Ğ¾ Ğ·Ğ°Ğ¿Ğ¸ÑĞ¸ Ğ½ĞµĞ´Ğ¾ÑÑ‚Ğ°Ñ‚Ğ¾Ñ‡Ğ½Ğ¾ Ğ´Ğ»Ñ Ğ½Ğ°Ğ´Ñ‘Ğ¶Ğ½Ğ¾Ğ³Ğ¾ Ğ¾Ğ¿Ğ¸ÑĞ°Ğ½Ğ¸Ñ Ğ¾ÑĞ¾Ğ±ĞµĞ½Ğ½Ğ¾ÑÑ‚ĞµĞ¹ Ñ€ĞµÑ‡Ğ¸.`;
+          }
+          if (a.status === "error" || a.status === "not_available") {
+            return null;
+          }
+          const lines = [];
+          if (a.summary) lines.push(a.summary);
+          if (a.alternative_explanations?.length) {
+            lines.push(`\nĞ’Ğ¾Ğ·Ğ¼Ğ¾Ğ¶Ğ½Ñ‹Ğµ Ğ°Ğ»ÑŒÑ‚ĞµÑ€Ğ½Ğ°Ñ‚Ğ¸Ğ²Ğ½Ñ‹Ğµ Ğ¾Ğ±ÑŠÑÑĞ½ĞµĞ½Ğ¸Ñ:\n${a.alternative_explanations.map((e) => `- ${e}`).join("\n")}`);
+          }
+          if (a.suggested_followups?.length) {
+            lines.push(`\nĞ§Ñ‚Ğ¾ ÑÑ‚Ğ¾Ğ¸Ñ‚ ÑƒÑ‚Ğ¾Ñ‡Ğ½Ğ¸Ñ‚ÑŒ:\n${a.suggested_followups.map((f) => `- ${f}`).join("\n")}`);
+          }
+          if (a.limitations?.length) {
+            lines.push(`\nĞĞ³Ñ€Ğ°Ğ½Ğ¸Ñ‡ĞµĞ½Ğ¸Ğµ:\n${a.limitations.map((l) => `- ${l}`).join("\n")}`);
+          }
+          return lines.join("\n");
+        }).filter(Boolean).join("\n\n---\n\n");
+
+        const voiceLabel = voList.length > 1
+          ? "Ğ“Ğ¾Ğ»Ğ¾ÑĞ¾Ğ²Ñ‹Ğµ Ğ¿Ñ€Ğ¸Ğ·Ğ½Ğ°ĞºĞ¸"
+          : (voList[0]?.analysis?.status === "insufficient_audio" || voList[0]?.status === "insufficient_audio"
+              ? "Ğ“Ğ¾Ğ»Ğ¾ÑĞ¾Ğ²Ñ‹Ğµ Ğ¿Ñ€Ğ¸Ğ·Ğ½Ğ°ĞºĞ¸ â€” ĞºĞ°Ñ‡ĞµÑÑ‚Ğ²Ğ¾ Ğ·Ğ°Ğ¿Ğ¸ÑĞ¸ Ğ½ĞµĞ´Ğ¾ÑÑ‚Ğ°Ñ‚Ğ¾Ñ‡Ğ½Ğ¾"
+              : "Ğ“Ğ¾Ğ»Ğ¾ÑĞ¾Ğ²Ñ‹Ğµ Ğ¿Ñ€Ğ¸Ğ·Ğ½Ğ°ĞºĞ¸");
+
+        sections.push(
+          <div key="voice" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+            <div
+              onClick={() => {
+                const k = "tl-voice";
+                setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
+              }}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "10px 14px", cursor: "pointer",
+                background: t.highlight,
+                userSelect: "none",
+              }}
+            >
+              <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>
+                {voiceLabel}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: t.muted, fontSize: 10, border: `1px solid ${t.muted}`, borderRadius: 4, padding: "1px 5px" }}>
+                  Ğ­ĞºÑĞ¿ĞµÑ€Ğ¸Ğ¼ĞµĞ½Ñ‚Ğ°Ğ»ÑŒĞ½Ğ¾
+                </span>
+                <span style={{ color: t.cardLabel, fontSize: 11, transform: expandedSections["tl-voice"] ? "rotate(180deg)" : "none", transition: "transform .2s" }}>â–¾</span>
+              </div>
+            </div>
+            {expandedSections["tl-voice"] && voiceContent && (
+              <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
+                <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 400, overflowY: "auto" }}>
+                  {voiceContent}
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button
+                    onClick={() => copyToClipboard(voiceContent, "Ğ“Ğ¾Ğ»Ğ¾ÑĞ¾Ğ²Ñ‹Ğµ Ğ¿Ñ€Ğ¸Ğ·Ğ½Ğ°ĞºĞ¸ ÑĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ñ‹")}
+                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
+                  >
+                    Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // Care recommendation section
+      const storedCareRec = sd.json_data?.care_recommendation || null;
+      if (storedCareRec && storedCareRec.level) {
+        const levelLabel = { self_support: "Ğ¡Ğ°Ğ¼Ğ¾Ğ¿Ğ¾Ğ´Ğ´ĞµÑ€Ğ¶ĞºĞ°", professional_contact: "ĞĞ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ Ğº ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ñƒ", urgent_help: "Ğ¡Ñ€Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ" };
+        const timeLabel = { today: "Ğ¡ĞµĞ³Ğ¾Ğ´Ğ½Ñ", within_days: "Ğ’ Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞ¸Ğµ Ğ´Ğ½Ğ¸", within_weeks: "Ğ’ Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞ¸Ğµ Ğ½ĞµĞ´ĞµĞ»Ğ¸", routine: "ĞŸĞ»Ğ°Ğ½Ğ¾Ğ²Ğ¾" };
+        const levelColor = { self_support: "#5F7D6C", professional_contact: "#7A7268", urgent_help: "#B85C4A" };
+        sections.push(
+          <div key="care-rec" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: t.highlight, userSelect: "none" }}>
+              <span style={{ fontWeight: 700, fontSize: 13, color: levelColor[storedCareRec.level] || t.crisisText }}>
+                ĞœĞ°Ñ€ÑˆÑ€ÑƒÑ‚Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ: {levelLabel[storedCareRec.level] || storedCareRec.level}
+              </span>
+              <div style={{ display: "flex", gap: 6 }}>
+                {storedCareRec.timeframe && <span style={{ color: t.muted, fontSize: 10, border: `1px solid ${t.muted}`, borderRadius: 4, padding: "1px 5px" }}>{timeLabel[storedCareRec.timeframe] || storedCareRec.timeframe}</span>}
+              </div>
+            </div>
+            <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "10px 14px", fontSize: 12, lineHeight: 1.6, color: t.crisisText }}>
+              {storedCareRec.specialist_types?.length > 0 && (
+                <div style={{ marginBottom: 4 }}><b>Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚:</b> {storedCareRec.specialist_types.join(", ")}</div>
+              )}
+              {storedCareRec.reasons?.length > 0 && (
+                <div style={{ marginBottom: 4 }}><b>ĞŸÑ€Ğ¸Ñ‡Ğ¸Ğ½Ñ‹:</b> {storedCareRec.reasons.join(", ")}</div>
+              )}
+              {storedCareRec.interim_support?.length > 0 && (
+                <div style={{ marginBottom: 4 }}><b>Ğ’Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ°Ñ Ğ¾Ğ¿Ğ¾Ñ€Ğ°:</b>
+                  <ul style={{ margin: "2px 0 0", paddingLeft: 16 }}>
+                    {storedCareRec.interim_support.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </div>
+              )}
+              {storedCareRec.urgent_triggers?.length > 0 && (
+                <div><b>Ğ¢Ñ€Ğ¸Ğ³Ğ³ĞµÑ€Ñ‹ ÑÑ€Ğ¾Ñ‡Ğ½Ğ¾Ğ¹ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰Ğ¸:</b> {storedCareRec.urgent_triggers.join(", ")}</div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      // Debug info section (raw model response, quality check, etc.)
+      const debugData = sd.json_data?._debug || null;
+      if (debugData) {
+        const debugLines = [];
+        if (debugData.prompt_version) debugLines.push(`Prompt version: ${debugData.prompt_version}`);
+        if (debugData.quality_check) {
+          debugLines.push(`Quality check: ${debugData.quality_check.pass ? "âœ… Ğ¿Ñ€Ğ¾Ğ¹Ğ´ĞµĞ½Ğ°" : "âŒ Ğ½Ğ°Ñ€ÑƒÑˆĞµĞ½Ğ°"}`);
+          if (debugData.quality_check.violations?.length) {
+            debugLines.push(`ĞĞ°Ñ€ÑƒÑˆĞµĞ½Ğ¸Ñ: ${debugData.quality_check.violations.join("; ")}`);
+          }
+        }
+        if (debugData.repair?.repairAttempted) {
+          debugLines.push(`Repair: ${debugData.repair.repairSucceeded ? "âœ… ÑƒÑĞ¿ĞµÑˆĞ½Ğ¾" : "âŒ Ğ½Ğµ ÑƒĞ´Ğ°Ğ»ÑÑ"}`);
+        }
+        if (debugData.raw_model_response) {
+          debugLines.push(`\n--- RAW MODEL RESPONSE ---\n${debugData.raw_model_response}`);
+        }
+
+        sections.push(
+          <div key="debug" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+            <div
+              onClick={() => {
+                const k = "tl-debug";
+                setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
+              }}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "10px 14px", cursor: "pointer",
+                background: t.highlight,
+                userSelect: "none",
+              }}
+            >
+              <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>
+                ğŸ›  Ğ¢ĞµÑ…Ğ½Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ¸Ğ½Ñ„Ğ¾Ñ€Ğ¼Ğ°Ñ†Ğ¸Ñ (raw model response)
+              </span>
+              <span style={{ color: t.cardLabel, fontSize: 11, transform: expandedSections["tl-debug"] ? "rotate(180deg)" : "none", transition: "transform .2s" }}>â–¾</span>
+            </div>
+            {expandedSections["tl-debug"] && (
+              <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
+                <div style={{ color: t.crisisText, fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 500, overflowY: "auto" }}>
+                  {debugLines.join("\n")}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // Large section overlay (within detail modal)
+      if (timelineLargeSection) {
+        return (
+          <div>
+            <button
+              onClick={() => setTimelineLargeSection(null)}
+              style={{ border: 0, background: "transparent", color: t.accent, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 12 }}
+            >
+              â† ĞĞ°Ğ·Ğ°Ğ´ Ğº ÑĞµÑÑĞ¸Ğ¸
+            </button>
+            <h4 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 700 }}>{timelineLargeSection.title}</h4>
+            <div style={{
+              color: t.crisisText, fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
+              maxHeight: "calc(90vh - 280px)", overflowY: "auto", marginBottom: 12,
+            }}>
+              {timelineLargeSection.content}
+            </div>
+            <button
+              onClick={() => copyToClipboard(timelineLargeSection.content, `${timelineLargeSection.title} ÑĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½`)}
+              style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+            >
+              Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ
+            </button>
+          </div>
+        );
+      }
+
+      return <div>{sections}</div>;
+    };
+
+    function copySessionDetails(sd) {
+      if (!sd) return;
+      const text = formatAnonymizedSession(sd);
+      copyToClipboard(text, "ĞĞ±ĞµĞ·Ğ»Ğ¸Ñ‡ĞµĞ½Ğ½Ğ°Ñ ÑĞµÑÑĞ¸Ñ ÑĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ°");
+    }
+
+    function Section({ title, children }) {
+      return (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: t.text, marginBottom: 8, paddingBottom: 4, borderBottom: `1px solid ${t.border}` }}>
+            {title}
+          </div>
+          {children}
+        </div>
+      );
+    }
+
+    function Field({ label, value, mono }) {
+      if (!value || value === "â€”" || value === "") return null;
+      return (
+        <div style={{ display: "flex", gap: 8, marginBottom: 4, fontSize: 14, lineHeight: 1.6 }}>
+          {label && <span style={{ color: t.muted, minWidth: 130, flexShrink: 0 }}>{label}:</span>}
+          <span style={{ color: t.text, fontFamily: mono ? "monospace" : "inherit", fontWeight: mono ? 600 : 400 }}>{value}</span>
+        </div>
+      );
+    }
+
+    function normalizeCare(v, fallback) {
+      if (v == null) return fallback || "self_care";
+      if (typeof v === "object") return v.level || fallback || "self_care";
+      return v;
+    }
+
+    function careLabel(level) {
+      const n = normalizeCare(level);
+      if (n === "urgent_help") return "Ğ¡Ñ€Ğ¾Ñ‡Ğ½Ğ¾";
+      if (n === "medical_consultation") return "Ğ’Ñ€Ğ°Ñ‡";
+      return "Self-care";
+    }
+
+    return (
+      <AdminErrorBoundary>
+      <div style={{ minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "Inter, system-ui, Arial", padding: 32 }}>
+        <style>{`
+  * { box-sizing: border-box; }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+`}</style>
+
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 40 }}>
+          <div
+            onClick={goToBodyCabinet}
+            role={isDedicatedSubdomain ? "button" : undefined}
+            aria-label={isDedicatedSubdomain ? "Ğ’ĞµÑ€Ğ½ÑƒÑ‚ÑŒÑÑ Ğ² Ğ»Ğ¸Ñ‡Ğ½Ñ‹Ğ¹ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚" : undefined}
+            tabIndex={isDedicatedSubdomain ? 0 : undefined}
+            onKeyDown={isDedicatedSubdomain ? (e) => { if (e.key === "Enter" || e.key === " ") goToBodyCabinet(); } : undefined}
+            style={{ display: "flex", alignItems: "center", gap: 12, cursor: isDedicatedSubdomain ? "pointer" : "default" }}
+            className="app-logo-link"
+          >
+              <img src="/logo-tochka-opory-header.png" alt={adminModuleRoute === "body" ? "ĞĞ¿Ğ¾Ñ€Ğ°. Ğ—Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒĞµ & Ğ¡Ñ‚Ñ€Ğ¾Ğ¹Ğ½Ğ¾ÑÑ‚ÑŒ" : "Ğ¢Ğ¾Ñ‡ĞºĞ° Ğ¾Ğ¿Ğ¾Ñ€Ñ‹"} style={{ height: 44, width: "auto", display: "block" }} />
+              <div>
+                <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2 }}>{adminModuleRoute === "body" ? "ĞĞ¿Ğ¾Ñ€Ğ°. Ğ—Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒĞµ & Ğ¡Ñ‚Ñ€Ğ¾Ğ¹Ğ½Ğ¾ÑÑ‚ÑŒ" : "Ğ¢Ğ¾Ñ‡ĞºĞ° Ğ¾Ğ¿Ğ¾Ñ€Ñ‹"}</div>
+                <div style={{ fontSize: 14, color: t.muted }}>{adminModuleRoute === "body" ? "ĞĞ´Ğ¼Ğ¸Ğ½-Ğ¿Ğ°Ğ½ĞµĞ»ÑŒ / ĞĞ½ĞºĞµÑ‚Ñ‹ Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ" : adminModuleRoute === "council" ? "ĞĞ´Ğ¼Ğ¸Ğ½-Ğ¿Ğ°Ğ½ĞµĞ»ÑŒ / Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ñ‹Ğ¹ ÑĞ¾Ğ²ĞµÑ‚" : isTrainingPage ? "Ğ¢Ğ°Ğ±Ğ»Ğ¸Ñ†Ğ° Ñ‚Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²Ğ¾Ğº" : "ĞĞ´Ğ¼Ğ¸Ğ½-Ğ¿Ğ°Ğ½ĞµĞ»ÑŒ / ĞÑ‚Ğ·Ñ‹Ğ²Ñ‹ Ğ¾ ÑĞµÑÑĞ¸ÑÑ…"}</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                onClick={() => setAdminDarkMode(!adminDarkMode)}
+                style={{
+                  background: t.tabBg, color: t.text, border: `1px solid ${t.border}`,
+                  padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13,
+                }}
+              >
+                {adminDarkMode ? "â˜€ï¸ Ğ¡Ğ²ĞµÑ‚Ğ»Ğ°Ñ" : "ğŸŒ™ Ğ¢Ñ‘Ğ¼Ğ½Ğ°Ñ"}
+              </button>
+              <a href={adminModuleRoute === "body" ? "https://health.tochka-opori.online" : adminModuleRoute === "council" ? "/admin" : "/"} onClick={adminModuleRoute === "council" ? (e) => { e.preventDefault(); setAdminSubPage(null); window.history.pushState({}, "", "/admin"); } : undefined} style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>â† {adminModuleRoute === "council" ? "Ğ’ Ğ¿Ğ°Ğ½ĞµĞ»ÑŒ Ğ°Ğ´Ğ¼Ğ¸Ğ½Ğ¸ÑÑ‚Ñ€Ğ°Ñ‚Ğ¾Ñ€Ğ°" : "ĞĞ° Ğ³Ğ»Ğ°Ğ²Ğ½ÑƒÑ"}</a>
+            </div>
+          </div>
+
+          {!adminAuthed ? (
+            <div style={{ maxWidth: 400, margin: "60px auto" }}>
+              <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20 }}>Ğ’Ñ…Ğ¾Ğ´ Ğ² Ğ°Ğ´Ğ¼Ğ¸Ğ½-Ğ¿Ğ°Ğ½ĞµĞ»ÑŒ</h2>
+              <input
+                type="password"
+                style={{
+                  width: "100%", border: `1px solid ${t.inputBorder}`, borderRadius: 16,
+                  background: t.inputBg, color: t.inputText, padding: "14px", fontSize: 15,
+                  outline: "none", boxSizing: "border-box", marginBottom: 16,
+                }}
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && adminLogin()}
+                placeholder="ĞŸĞ°Ñ€Ğ¾Ğ»ÑŒ Ğ°Ğ´Ğ¼Ğ¸Ğ½Ğ¸ÑÑ‚Ñ€Ğ°Ñ‚Ğ¾Ñ€Ğ°"
+              />
+              <button
+                style={{
+                  width: "100%", border: 0, borderRadius: 24, background: t.accent, color: "#fff",
+                  padding: "18px 22px", fontWeight: 900, fontSize: 16, cursor: "pointer",
+                }}
+                onClick={adminLogin}
+              >
+                Ğ’Ğ¾Ğ¹Ñ‚Ğ¸
+              </button>
+            </div>
+          ) : adminModuleRoute === "body" ? (
+            <>
+              {/* Body intake admin header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                <div><div style={{ fontSize: 22, fontWeight: 700 }}>ĞĞ½ĞºĞµÑ‚Ñ‹ Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ</div><div style={{ fontSize: 13, color: t.muted, marginTop: 2 }}>ĞŸĞµÑ€Ğ²Ğ¸Ñ‡Ğ½Ñ‹Ğµ Ğ°Ğ½ĞºĞµÑ‚Ñ‹ Ğ¸ AI-Ñ€Ğ°Ğ·Ğ±Ğ¾Ñ€Ñ‹ ĞºĞ»Ğ¸ĞµĞ½Ñ‚Ğ¾Ğ²</div></div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <button
+                    onClick={() => adminLoadBodyIntake()}
+                    style={{
+                      background: t.tabBg, color: t.text, border: `1px solid ${t.border}`,
+                      padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13,
+                    }}
+                  >
+                    ĞĞ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ
+                  </button>
+                  <a href="https://health.tochka-opori.online" style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>â† ĞĞ° Ğ³Ğ»Ğ°Ğ²Ğ½ÑƒÑ</a>
+                </div>
+              </div>
+
+              {/* Tabs: ĞĞ½ĞºĞµÑ‚Ñ‹ | Ğ”Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ¸ | ĞšĞ¾Ñ€Ğ·Ğ¸Ğ½Ğ° */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          {["intake", "diary", "trash", "reviews", "requests", "assignments"].map(tab => (
+            <button
+              key={tab}
+              style={{
+                border: 0, borderRadius: 14, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                background: bodyAdminTab === tab ? t.tabActive : t.tabBg,
+                color: bodyAdminTab === tab ? t.tabActiveText : t.text,
+              }}
+              onClick={() => {
+                setBodyAdminTab(tab);
+                setBodyIntakeDetailOpen(false);
+                setBodyDiaryDetailOpen(false);
+                if (tab === "intake") { setBodyIntakeShowDeleted(false); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }
+                else if (tab === "trash") { setBodyIntakeShowDeleted(true); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }
+                else if (tab === "diary") { adminLoadBodyDailyLogs(); }
+                else if (tab === "reviews") { adminLoadBodyExpertReviews(); }
+                else if (tab === "requests") { adminLoadBodyServiceRequests(); }
+                else if (tab === "assignments") { adminLoadBodyAssignments(); }
+              }}
+            >
+              {tab === "intake" ? "ĞĞ½ĞºĞµÑ‚Ñ‹" : tab === "diary" ? "Ğ”Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ¸" : tab === "trash" ? "ĞšĞ¾Ñ€Ğ·Ğ¸Ğ½Ğ°" : tab === "reviews" ? "Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ñ‹Ğµ Ğ¿Ñ€Ğ°Ğ²ĞºĞ¸" : tab === "requests" ? "Ğ—Ğ°Ğ¿Ñ€Ğ¾ÑÑ‹" : "ĞŸÑ€Ğ¸Ğ²ÑĞ·ĞºĞ°"}
+            </button>
+          ))}
+              </div>
+
+              {/* Source filter tabs (only for intake tab) */}
+              {bodyAdminTab === "intake" && (
+                <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+                  {[
+                    { key: "all", label: "Ğ’ÑĞµ" },
+                    { key: "alena_client", label: "ĞšĞ»Ğ¸ĞµĞ½Ñ‚Ñ‹ ĞĞ»ĞµĞ½Ñ‹" },
+                    { key: "self_signup", label: "Ğ¡Ğ°Ğ¼Ğ¾ÑÑ‚Ğ¾ÑÑ‚ĞµĞ»ÑŒĞ½Ñ‹Ğµ" },
+                    { key: "specialist_referral", label: "ĞŸĞ¾ Ğ½Ğ°Ğ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ¸Ñ" },
+                    { key: "test", label: "Ğ¢ĞµÑÑ‚Ğ¾Ğ²Ñ‹Ğµ" },
+                  ].map(f => (
+                    <button
+                      key={f.key}
+                      style={{
+                        border: 0, borderRadius: 10, padding: "5px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                        background: bodyIntakeSourceFilter === f.key ? t.tabActive : t.tabBg,
+                        color: bodyIntakeSourceFilter === f.key ? t.tabActiveText : t.text,
+                      }}
+                      onClick={() => { setBodyIntakeSourceFilter(f.key); adminLoadBodyIntake(); }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Body intake table (intake or trash tab) */}
+              {(bodyAdminTab === "intake" || bodyAdminTab === "trash") && (
+                bodyIntakeLoading ? (
+                  <div style={{ textAlign: "center", padding: 40, color: t.muted }}>Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°...</div>
+                ) : bodyIntakeRecords.length === 0 && !bodyIntakeShowDeleted ? (
+                  <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
+                    <div style={{ fontSize: 18, marginBottom: 8 }}>ĞŸĞ¾ĞºĞ° Ğ½ĞµÑ‚ Ğ°Ğ½ĞºĞµÑ‚ Ğ¼Ğ¾Ğ´ÑƒĞ»Ñ Ğ—Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒĞµ & Ğ¡Ñ‚Ñ€Ğ¾Ğ¹Ğ½Ğ¾ÑÑ‚ÑŒ</div>
+                    <div style={{ fontSize: 14 }}>Ğ—Ğ°Ğ¿Ğ¾Ğ»Ğ½ĞµĞ½Ğ½Ñ‹Ğµ intake-Ğ°Ğ½ĞºĞµÑ‚Ñ‹ Ğ¿Ğ¾ÑĞ²ÑÑ‚ÑÑ Ğ·Ğ´ĞµÑÑŒ.</div>
+                  </div>
+                ) : bodyIntakeRecords.length === 0 && bodyIntakeShowDeleted ? (
+                  <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
+                    <div style={{ fontSize: 18, marginBottom: 8 }}>ĞšĞ¾Ñ€Ğ·Ğ¸Ğ½Ğ° Ğ¿ÑƒÑÑ‚Ğ°</div>
+                    <div style={{ fontSize: 14 }}>Ğ£Ğ´Ğ°Ğ»Ñ‘Ğ½Ğ½Ñ‹Ñ… Ğ°Ğ½ĞºĞµÑ‚ Ğ½ĞµÑ‚.</div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 13, color: t.muted, marginBottom: 12 }}>
+                      Ğ’ÑĞµĞ³Ğ¾ Ğ·Ğ°Ğ¿Ğ¸ÑĞµĞ¹: {bodyIntakeTotal}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {bodyIntakeRecords.map((rec) => {
+                        const answers = rec.answers || {};
+                        const client = rec.client || {};
+                        const careLevel = normalizeCare(rec.care_recommendation);
+                        const sourceLabel = {
+                          alena_client: "ĞĞ»ĞµĞ½Ğ°",
+                          self_signup: "Ğ¡Ğ°Ğ¼Ğ¾ÑÑ‚.",
+                          specialist_referral: "ĞĞ°Ğ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ¸Ğµ",
+                          test: "Ğ¢ĞµÑÑ‚",
+                        }[rec.source] || rec.source || "â€”";
+                        const sourceColor = {
+                          alena_client: "#86a08f",
+                          self_signup: "#8d8378",
+                          specialist_referral: "#b8946e",
+                          test: "#a0a0a0",
+                        }[rec.source] || "#8d8378";
+                        return (
+                        <div
+                          key={rec.id}
+                          style={{
+                            border: `1px solid ${t.cardBorder}`, borderRadius: 16, padding: "16px 20px",
+                            background: t.cardBg, cursor: "pointer",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 13, color: t.muted }}>
+                                {new Date(rec.created_at).toLocaleString("ru-RU")}
+                              </span>
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${sourceColor}22`, color: sourceColor }}>
+                                {sourceLabel}
+                              </span>
+                              {rec.specialist_name && (
+                                <span style={{ fontSize: 12, color: t.muted, fontStyle: "italic" }}>
+                                  â†’ {rec.specialist_name}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+                              {rec.triggered_red_flags?.length > 0 && (
+                                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "rgba(239,68,68,.2)", color: "#fca5a5" }}>
+                                  {rec.triggered_red_flags.length} Ñ„Ğ»Ğ°Ğ³
+                                </span>
+                              )}
+                              {careLevel && (
+                                <span style={{
+                                  fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                                  background: careLevel === "urgent_help" ? "rgba(239,68,68,.2)" :
+                                    careLevel === "medical_consultation" ? "rgba(251,191,36,.2)" : "rgba(34,197,94,.2)",
+                                  color: careLevel === "urgent_help" ? "#fca5a5" :
+                                    careLevel === "medical_consultation" ? "#fde68a" : "#bbf7d0",
+                                }}>
+                                  {careLabel(careLevel)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div style={{ fontSize: 15, fontWeight: 600, color: t.text }}>
+                            {answers.display_name || client.display_name || "Ğ‘ĞµĞ· Ğ¸Ğ¼ĞµĞ½Ğ¸"}
+                          </div>
+                          {answers.goal && (
+                            <div style={{ fontSize: 12, color: t.muted, marginTop: 1, fontStyle: "italic" }}>
+                              Ğ¦ĞµĞ»ÑŒ: {answers.goal}
+                            </div>
+                          )}
+
+                          {rec.session_id && (
+                            <div style={{ fontSize: 12, color: t.muted, marginTop: 4, fontFamily: "monospace" }}>
+                              ĞšĞ¾Ğ´: {rec.session_id}
+                            </div>
+                          )}
+
+                          {(rec.user_report || answers.user_report) && (
+                            <div style={{ fontSize: 13, lineHeight: 1.5, color: t.text, marginTop: 6 }}>
+                              {(rec.user_report || answers.user_report || "").slice(0, 200)}
+                              {(rec.user_report || answers.user_report || "").length > 200 ? "..." : ""}
+                            </div>
+                          )}
+
+                          {rec.deleted_at && (
+                            <div style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>
+                              Ğ£Ğ´Ğ°Ğ»Ñ‘Ğ½: {new Date(rec.deleted_at).toLocaleString("ru-RU")} ({rec.deleted_by})
+                            </div>
+                          )}
+
+                          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); adminOpenBodyIntakeDetail(rec.id); }}
+                              style={{
+                                background: t.accent, color: "#fff", border: 0, borderRadius: 8,
+                                padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ
+                            </button>
+                            {bodyIntakeShowDeleted ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); adminRestoreBodyIntake(rec.id); }}
+                                style={{
+                                  background: "transparent", color: t.accent, border: `1px solid ${t.accent}`, borderRadius: 8,
+                                  padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                                }}
+                              >
+                                Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ
+                              </button>
+                            ) : (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setBodyIntakeDeleteConfirm(rec.id); }}
+                                style={{
+                                  background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 8,
+                                  padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                                }}
+                              >
+                                Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); adminDownloadBodyIntakeJSON(rec); }}
+                              style={{
+                                background: "transparent", color: t.muted, border: `1px solid ${t.border}`, borderRadius: 8,
+                                padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              JSON
+                            </button>
+                          </div>
+                        </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )
+              )}
+
+              {/* Body daily logs table (diary tab) */}
+              {bodyAdminTab === "diary" && (
+                <>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
+                    <input
+                      type="text"
+                      placeholder="Ğ¤Ğ¸Ğ»ÑŒÑ‚Ñ€ Ğ¿Ğ¾ session_id"
+                      value={bodyDiarySessionFilter}
+                      onChange={(e) => setBodyDiarySessionFilter(e.target.value)}
+                      style={{
+                        flex: 1, height: 36, padding: "0 12px", borderRadius: 8,
+                        border: `1px solid ${t.border}`, background: t.inputBg, color: t.inputText,
+                        fontSize: 13, outline: "none", fontFamily: "monospace",
+                      }}
+                    />
+                    <button
+                      onClick={() => adminLoadBodyDailyLogs()}
+                      style={{
+                        height: 36, padding: "0 14px", borderRadius: 8, border: 0,
+                        background: t.tabBg, color: t.text, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                      }}
+                    >
+                      ĞŸĞ¾Ğ¸ÑĞº
+                    </button>
+                    <button
+                      onClick={() => { setBodyDiarySessionFilter(""); adminLoadBodyDailyLogs(); }}
+                      style={{
+                        height: 36, padding: "0 14px", borderRadius: 8, border: `1px solid ${t.border}`,
+                        background: "transparent", color: t.muted, fontWeight: 500, fontSize: 13, cursor: "pointer",
+                      }}
+                    >
+                      Ğ¡Ğ±Ñ€Ğ¾ÑĞ¸Ñ‚ÑŒ
+                    </button>
+                  </div>
+
+                  {bodyDiaryLoading ? (
+                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°...</div>
+                  ) : bodyDiaryRecords.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
+                      <div style={{ fontSize: 18, marginBottom: 8 }}>Ğ”Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ¾Ğ² Ğ¿Ğ¾ĞºĞ° Ğ½ĞµÑ‚</div>
+                      <div style={{ fontSize: 14 }}>Ğ—Ğ°Ğ¿Ğ¸ÑĞ¸ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ° Ğ¿Ğ¾ÑĞ²ÑÑ‚ÑÑ Ğ·Ğ´ĞµÑÑŒ Ğ¿Ğ¾ÑĞ»Ğµ Ñ‚Ğ¾Ğ³Ğ¾, ĞºĞ°Ğº ĞºĞ»Ğ¸ĞµĞ½Ñ‚Ñ‹ Ğ½Ğ°Ñ‡Ğ½ÑƒÑ‚ Ğ¸Ñ… Ğ·Ğ°Ğ¿Ğ¾Ğ»Ğ½ÑÑ‚ÑŒ.</div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {bodyDiaryRecords.map((rec) => (
+                        <div
+                          key={rec.id}
+                          style={{
+                            border: `1px solid ${t.cardBorder}`, borderRadius: 16, padding: "14px 18px",
+                            background: t.cardBg,
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                            <div style={{ fontSize: 13, color: t.muted }}>
+                              {rec.log_date} {rec.created_at ? new Date(rec.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : ""}
+                            </div>
+                            <div style={{ fontSize: 12, color: t.muted, fontFamily: "monospace" }}>
+                              {rec.session_id?.slice(0, 12)}â€¦
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: t.text, marginBottom: 4 }}>
+                            Ğ¨Ğ°Ğ³Ğ¸: {rec.steps ?? "â€”"} | Ğ¢Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²ĞºĞ°: {rec.workout_done ? rec.workout_type || "Ğ´Ğ°" : "Ğ½ĞµÑ‚"} | ĞšĞ°Ğ»Ğ¾Ñ€Ğ¸Ğ¸: {rec.calories ?? "â€”"}
+                          </div>
+                          {rec.overeating_level && (
+                            <div style={{ fontSize: 12, color: t.muted }}>
+                              ĞŸĞµÑ€ĞµĞµĞ´Ğ°Ğ½Ğ¸Ğµ: {rec.overeating_level === "severe" ? "Ğ²Ñ‹Ñ€Ğ°Ğ¶ĞµĞ½Ğ½Ğ¾" : rec.overeating_level === "slight" ? "Ğ½ĞµĞ¼Ğ½Ğ¾Ğ³Ğ¾" : rec.overeating_level}
+                              {rec.sweet_cravings ? ` | Ğ¢ÑĞ³Ğ°: ${rec.sweet_cravings}` : ""}
+                            </div>
+                          )}
+                          {rec.sleep_hours && (
+                            <div style={{ fontSize: 12, color: t.muted }}>
+                              Ğ¡Ğ¾Ğ½: {rec.sleep_hours} Ñ‡ | Ğ­Ğ½ĞµÑ€Ğ³Ğ¸Ñ: {rec.energy_level ?? "â€”"}/10
+                            </div>
+                          )}
+                          {rec.ai_day_summary && (
+                            <div style={{ fontSize: 13, color: t.text, marginTop: 4, lineHeight: 1.5, fontStyle: "italic" }}>
+                              {rec.ai_day_summary.slice(0, 150)}{rec.ai_day_summary.length > 150 ? "..." : ""}
+                            </div>
+                          )}
+                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                            <button
+                              onClick={() => adminOpenBodyDailyLogDetail(rec.id)}
+                              style={{
+                                background: t.accent, color: "#fff", border: 0, borderRadius: 8,
+                                padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ
+                            </button>
+                            <button
+                              onClick={() => adminDeleteBodyDailyLog(rec.id)}
+                              style={{
+                                background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 8,
+                                padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Reviews tab */}
+              {bodyAdminTab === "reviews" && (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>
+                      Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ñ‹Ğµ Ğ¿Ñ€Ğ°Ğ²ĞºĞ¸ ({bodyExpertReviews.length})
+                    </div>
+                    <button
+                      onClick={adminExportBodyExpertCases}
+                      disabled={bodyExportingCases}
+                      style={{
+                        padding: "10px 18px", borderRadius: 12, border: `1px solid ${t.border}`,
+                        background: t.tabBg, color: t.text, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                        opacity: bodyExportingCases ? 0.5 : 1,
+                      }}
+                    >
+                      {bodyExportingCases ? "Ğ’Ñ‹Ğ³Ñ€ÑƒĞ·ĞºĞ°..." : "Ğ¡ĞºĞ°Ñ‡Ğ°Ñ‚ÑŒ ĞºĞµĞ¹ÑÑ‹ (.jsonl)"}
+                    </button>
+                  </div>
+                  {bodyExpertReviewsLoading ? (
+                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°...</div>
+                  ) : bodyExpertReviews.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>
+                      <div style={{ fontSize: 18, marginBottom: 8 }}>Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ñ‹Ñ… Ğ¿Ñ€Ğ°Ğ²Ğ¾Ğº Ğ¿Ğ¾ĞºĞ° Ğ½ĞµÑ‚</div>
+                      <div style={{ fontSize: 13 }}>ĞÑ‚ĞºÑ€Ğ¾Ğ¹Ñ‚Ğµ Ğ°Ğ½ĞºĞµÑ‚Ñƒ Ğ¸Ğ»Ğ¸ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸Ğº Ğ¸ Ğ½Ğ°Ğ¶Ğ¼Ğ¸Ñ‚Ğµ Â«Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ğ°Ñ Ğ¿Ñ€Ğ°Ğ²ĞºĞ°Â»</div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {bodyExpertReviews.map((r, i) => (
+                        <div key={r.id || i} style={{
+                          border: `1px solid ${t.cardBorder}`, borderRadius: 16, padding: "14px 18px",
+                          background: t.cardBg,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                            <div style={{ fontSize: 13, color: t.muted }}>
+                              {new Date(r.created_at).toLocaleString("ru-RU")} Â· {r.reviewer_name}
+                            </div>
+                            <div style={{ fontSize: 12, color: t.muted }}>
+                              {r.target_type === "intake" ? "ĞĞ½ĞºĞµÑ‚Ğ°" : r.target_type === "daily_log" ? "Ğ”Ğ½ĞµĞ²Ğ½Ğ¸Ğº" : "Ğ¢Ğ°Ñ€ĞµĞ»ĞºĞ°"}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 12, color: t.muted, marginBottom: 4 }}>
+                            <span>Ğ‘ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚ÑŒ: {r.rating_safety || "â€”"}</span>
+                            <span>ĞŸĞ¾Ğ»ĞµĞ·Ğ½Ğ¾ÑÑ‚ÑŒ: {r.rating_usefulness ?? "â€”"}/5</span>
+                            <span>ĞŸÑ€Ğ°ĞºÑ‚Ğ¸Ñ‡Ğ½Ğ¾ÑÑ‚ÑŒ: {r.rating_practicality ?? "â€”"}/5</span>
+                            <span>Ğ¢Ğ¾Ğ½: {r.rating_tone ?? "â€”"}/5</span>
+                          </div>
+                          {Array.isArray(r.error_tags) && r.error_tags.length > 0 && (
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 4 }}>
+                              {r.error_tags.map((tag, j) => (
+                                <span key={j} style={{
+                                  fontSize: 11, padding: "2px 8px", borderRadius: 6,
+                                  background: "rgba(239,68,68,.1)", color: "#991b1b",
+                                }}>
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {r.corrected_recommendation && (
+                            <div style={{ fontSize: 13, color: t.text, lineHeight: 1.5, marginTop: 4, fontStyle: "italic" }}>
+                              {r.corrected_recommendation.slice(0, 200)}{r.corrected_recommendation.length > 200 ? "..." : ""}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Expert review form modal */}
+              {bodyExpertReviewFormOpen && bodyExpertReviewForm && (
+                <div style={{
+                  position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 1100,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }} onClick={() => setBodyExpertReviewFormOpen(false)}>
+                  <div style={{
+                    background: "#ffffff", borderRadius: 20, padding: 28, maxWidth: 600, width: "90%",
+                    maxHeight: "85vh", overflowY: "auto",
+                  }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: "#2f2925" }}>
+                        Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ğ°Ñ Ğ¿Ñ€Ğ°Ğ²ĞºĞ°
+                      </div>
+                      <button onClick={() => setBodyExpertReviewFormOpen(false)} style={{ background: "none", border: 0, fontSize: 20, cursor: "pointer", color: "#8d8378" }}>âœ•</button>
+                    </div>
+
+                    <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 16 }}>
+                      {bodyExpertReviewForm.target_type === "intake" ? "ĞĞ½ĞºĞµÑ‚Ğ° Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ" :
+                       bodyExpertReviewForm.target_type === "daily_log" ? "Ğ”Ğ½ĞµĞ²Ğ½Ğ¸Ğº" : "ĞĞ½Ğ°Ğ»Ğ¸Ğ· Ñ‚Ğ°Ñ€ĞµĞ»ĞºĞ¸"}
+                      {" Â· "}
+                      {bodyExpertReviewForm.session_id}
+                    </div>
+
+                    {/* Safety */}
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#2f2925", marginBottom: 6 }}>Ğ‘ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚ÑŒ</label>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {[
+                          { value: "ok", label: "ĞĞº" },
+                          { value: "questionable", label: "Ğ¡Ğ¿Ğ¾Ñ€Ğ½Ğ¾" },
+                          { value: "dangerous", label: "ĞĞ¿Ğ°ÑĞ½Ğ¾" },
+                        ].map(o => (
+                          <button key={o.value} type="button" onClick={() => setBodyExpertReviewForm(prev => ({ ...prev, rating_safety: o.value }))} style={{
+                            padding: "8px 16px", borderRadius: 10, border: bodyExpertReviewForm.rating_safety === o.value ? "2px solid #7D9A89" : "1px solid #d8cec1",
+                            background: bodyExpertReviewForm.rating_safety === o.value ? "#e8f0ea" : "#ffffff",
+                            color: "#2f2925", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                          }}>
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Ratings */}
+                    {["rating_usefulness", "rating_practicality", "rating_tone"].map((key, idx) => (
+                      <div key={key} style={{ marginBottom: 14 }}>
+                        <label style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#2f2925", marginBottom: 4 }}>
+                          {["ĞŸĞ¾Ğ»ĞµĞ·Ğ½Ğ¾ÑÑ‚ÑŒ", "ĞŸÑ€Ğ°ĞºÑ‚Ğ¸Ñ‡Ğ½Ğ¾ÑÑ‚ÑŒ", "Ğ¢Ğ¾Ğ½"][idx]}
+                        </label>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {[1, 2, 3, 4, 5].map(n => (
+                            <button key={n} type="button" onClick={() => setBodyExpertReviewForm(prev => ({ ...prev, [key]: n }))} style={{
+                              width: 36, height: 36, borderRadius: 8,
+                              border: bodyExpertReviewForm[key] === n ? "2px solid #7D9A89" : "1px solid #d8cec1",
+                              background: bodyExpertReviewForm[key] === n ? "#e8f0ea" : "#ffffff",
+                              color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                            }}>
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Error tags */}
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#2f2925", marginBottom: 6 }}>ĞÑˆĞ¸Ğ±ĞºĞ¸</label>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {[
+                          "Ğ½Ğµ Ñ…Ğ²Ğ°Ñ‚Ğ°ĞµÑ‚ Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑĞ¾Ğ²", "ÑĞ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ¾Ğ±Ñ‰Ğ¸Ğ¹ Ğ¿Ğ»Ğ°Ğ½", "Ğ½ĞµĞ²ĞµÑ€Ğ½Ğ°Ñ Ğ¾Ñ†ĞµĞ½ĞºĞ° Ğ¿Ğ¸Ñ‚Ğ°Ğ½Ğ¸Ñ",
+                          "Ğ½ĞµĞ²ĞµÑ€Ğ½Ğ°Ñ Ğ¾Ñ†ĞµĞ½ĞºĞ° Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½Ğ¾ÑÑ‚Ğ¸", "Ğ½ĞµĞ²ĞµÑ€Ğ½Ğ°Ñ Ğ¾Ñ†ĞµĞ½ĞºĞ° ÑĞ½Ğ°", "Ğ½ĞµĞ²ĞµÑ€Ğ½Ğ°Ñ Ğ¾Ñ†ĞµĞ½ĞºĞ° Ñ‚Ğ°Ñ€ĞµĞ»ĞºĞ¸",
+                          "Ğ½ÑƒĞ¶Ğ½Ğ¾ Ğº Ğ²Ñ€Ğ°Ñ‡Ñƒ", "ÑĞ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ¶ĞµÑÑ‚ĞºĞ¾", "ÑĞ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ¼ÑĞ³ĞºĞ¾", "ĞºĞ°Ğ½Ñ†ĞµĞ»ÑÑ€Ğ¸Ñ‚", "Ğ´Ñ€ÑƒĞ³Ğ¾Ğµ",
+                        ].map(tag => {
+                          const checked = bodyExpertReviewForm.error_tags.includes(tag);
+                          return (
+                            <label key={tag} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "#5f574f" }}>
+                              <input type="checkbox" checked={checked} onChange={() => {
+                                setBodyExpertReviewForm(prev => ({
+                                  ...prev,
+                                  error_tags: checked
+                                    ? prev.error_tags.filter(t => t !== tag)
+                                    : [...prev.error_tags, tag],
+                                }));
+                              }} style={{ accentColor: "#86a08f", width: 18, height: 18 }} />
+                              {tag}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Text fields */}
+                    {[
+                      { key: "what_ai_did_well", label: "Ğ§Ñ‚Ğ¾ AI ÑĞ´ĞµĞ»Ğ°Ğ» Ñ…Ğ¾Ñ€Ğ¾ÑˆĞ¾" },
+                      { key: "what_ai_missed", label: "Ğ§Ñ‚Ğ¾ AI ÑƒĞ¿ÑƒÑÑ‚Ğ¸Ğ»" },
+                      { key: "corrected_recommendation", label: "ĞšĞ°Ğº Ğ±Ñ‹ Ğ²Ñ‹ ÑÑ„Ğ¾Ñ€Ğ¼ÑƒĞ»Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ»Ğ¸ Ñ€ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´Ğ°Ñ†Ğ¸Ñ" },
+                      { key: "suggested_questions", label: "ĞšĞ°ĞºĞ¸Ğµ Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹ Ğ½ÑƒĞ¶Ğ½Ğ¾ Ğ´Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ" },
+                      { key: "expert_comment", label: "ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹ ÑĞºÑĞ¿ĞµÑ€Ñ‚Ğ°" },
+                    ].map(f => (
+                      <div key={f.key} style={{ marginBottom: 14 }}>
+                        <label style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#2f2925", marginBottom: 4 }}>{f.label}</label>
+                        <textarea
+                          style={{
+                            width: "100%", minHeight: 60, padding: 10, borderRadius: 10,
+                            border: "1px solid #d8cec1", fontSize: 14, fontFamily: "inherit",
+                            resize: "vertical", outline: "none", boxSizing: "border-box",
+                          }}
+                          value={bodyExpertReviewForm[f.key] || ""}
+                          onChange={e => setBodyExpertReviewForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                        />
+                      </div>
+                    ))}
+
+                    <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                      <button
+                        onClick={adminSaveBodyExpertReview}
+                        disabled={bodyExpertReviewSaving}
+                        style={{
+                          flex: 1, height: 48, borderRadius: 14, border: 0,
+                          background: bodyExpertReviewSaving ? "#c4d0c6" : "#7D9A89",
+                          color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
+                        }}
+                      >
+                        {bodyExpertReviewSaving ? "Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½ÑĞµĞ¼..." : "Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¿Ñ€Ğ°Ğ²ĞºÑƒ"}
+                      </button>
+                      <button
+                        onClick={() => setBodyExpertReviewFormOpen(false)}
+                        style={{
+                          padding: "0 24px", borderRadius: 14, border: "1px solid #d8cec1",
+                          background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                        }}
+                      >
+                        ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Service Requests Tab */}
+              {bodyAdminTab === "requests" && (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>
+                      Ğ—Ğ°Ğ¿Ñ€Ğ¾ÑÑ‹ ĞºĞ»Ğ¸ĞµĞ½Ñ‚Ğ¾Ğ² ({adminServiceRequests.length})
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {["all", "submitted", "accepted", "needs_clarification", "scheduled", "answered", "completed", "cancelled"].map(f => (
+                        <button key={f} onClick={() => { setAdminServiceRequestsFilter(f); }} style={{
+                          padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`,
+                          background: adminServiceRequestsFilter === f ? t.tabActive : t.tabBg,
+                          color: adminServiceRequestsFilter === f ? t.tabActiveText : t.text,
+                          cursor: "pointer", fontSize: 12, fontWeight: 600,
+                        }}>
+                          {f === "all" ? "Ğ’ÑĞµ" : f === "submitted" ? "ĞĞ¾Ğ²Ñ‹Ğµ" : f === "accepted" ? "ĞŸÑ€Ğ¸Ğ½ÑÑ‚Ñ‹Ğµ" : f === "needs_clarification" ? "Ğ£Ñ‚Ğ¾Ñ‡Ğ½ĞµĞ½Ğ¸Ğµ" : f === "scheduled" ? "Ğ—Ğ°Ğ¿Ğ»Ğ°Ğ½Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ñ‹" : f === "answered" ? "ĞÑ‚Ğ²ĞµÑ‡ĞµĞ½Ñ‹" : f === "completed" ? "Ğ—Ğ°Ğ²ĞµÑ€ÑˆĞµĞ½Ñ‹" : "ĞÑ‚Ğ¼ĞµĞ½ĞµĞ½Ñ‹"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button onClick={adminLoadBodyServiceRequests} style={{ marginBottom: 12, padding: "6px 14px", borderRadius: 8, border: `1px solid ${t.border}`, background: t.tabBg, color: t.text, cursor: "pointer", fontSize: 13 }}>
+                    ĞĞ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ
+                  </button>
+                  {adminServiceRequestsLoading ? (
+                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°...</div>
+                  ) : adminServiceRequests.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>ĞĞµÑ‚ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ¾Ğ²</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {adminServiceRequests.map(r => {
+                        // Pricing-shaped rows must never be offered the legacy
+                        // no-charge action, even if their snapshot is malformed.
+                        const canonical = r.service_code != null || r.price_credits != null;
+                        const clarificationStatuses = canonical ? ["accepted"] : [];
+                        const answerStatuses = canonical ? ["accepted", "needs_clarification"] : ["submitted", "accepted"];
+                        const scheduleStatuses = canonical ? ["accepted", "needs_clarification"] : ["submitted", "accepted"];
+                        const completeStatuses = canonical ? ["answered", "scheduled"] : ["submitted", "accepted", "answered", "scheduled"];
+                        const cancelStatuses = ["submitted", "accepted", "needs_clarification", "scheduled"];
+                        return (
+                        <div key={r.id} style={{ padding: "12px 16px", borderRadius: 12, border: `1px solid ${t.border}`, background: t.cardBg }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{r.title || r.request_type}</div>
+                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                              {/* SLA badge */}
+                              {(() => {
+                                const now = new Date();
+                                const due = r.due_at ? new Date(r.due_at) : null;
+                                const activeStatuses = ["submitted", "accepted", "needs_clarification"];
+                                let slaLabel, slaColor;
+                                if (r.status === "scheduled") { slaLabel = "Ğ—Ğ°Ğ¿Ğ»Ğ°Ğ½Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¾"; slaColor = "#6b8fc7"; }
+                                else if (r.status === "answered") { slaLabel = "ĞÑ‚Ğ²ĞµÑ‚ Ğ´Ğ°Ğ½"; slaColor = "#7D9A89"; }
+                                else if (r.status === "completed") { slaLabel = "Ğ—Ğ°Ğ²ĞµÑ€ÑˆĞµĞ½Ğ¾"; slaColor = "#7D9A89"; }
+                                else if (r.status === "cancelled") { slaLabel = "ĞÑ‚Ğ¼ĞµĞ½Ñ‘Ğ½"; slaColor = "#b5473f"; }
+                                else if (activeStatuses.includes(r.status) && due) {
+                                  if (now > due) { slaLabel = "ĞŸÑ€Ğ¾ÑÑ€Ğ¾Ñ‡ĞµĞ½"; slaColor = "#b5473f"; }
+                                  else if ((due - now) < 6 * 60 * 60 * 1000) { slaLabel = "Ğ¡ĞºĞ¾Ñ€Ğ¾ ÑÑ€Ğ¾Ğº"; slaColor = "#e8a857"; }
+                                  else { slaLabel = "Ğ’ ÑÑ€Ğ¾ĞºĞµ"; slaColor = "#7D9A89"; }
+                                }
+                                if (slaLabel) return <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: slaColor + "18", color: slaColor, fontWeight: 600 }}>{slaLabel}</span>;
+                                return null;
+                              })()}
+                              <span style={{ fontSize: 12, fontWeight: 600, color: { submitted: "#e8a857", accepted: "#5f8b7a", answered: "#7D9A89", completed: "#7D9A89", cancelled: "#b5473f", scheduled: "#6b8fc7" }[r.status] || "#8a7e72" }}>
+                                {r.status}
+                              </span>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 8 }}>{r.message?.slice(0, 200)}</div>
+                            <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>
+                             {r.specialist_name} Â· {new Date(r.created_at).toLocaleDateString("ru-RU")}
+                             {r.service_code && ` Â· ${r.service_code}`}
+                             {r.service_topic && ` Â· Ñ‚ĞµĞ¼Ğ°: ${r.service_topic}`}
+                             {r.meeting_format && ` Â· Ñ„Ğ¾Ñ€Ğ¼Ğ°Ñ‚: ${r.meeting_format}`}
+                             {r.price_credits != null ? ` Â· Ğ¡Ñ‚Ğ¾Ğ¸Ğ¼Ğ¾ÑÑ‚ÑŒ: ${r.price_credits.toLocaleString("ru-RU")} ĞºÑ€ĞµĞ´Ğ¸Ñ‚Ğ¾Ğ²` : " Â· Legacy Ğ±ĞµĞ· snapshot-Ñ†ĞµĞ½Ñ‹"}
+                             {` Â· Ğ—Ğ°Ñ€ĞµĞ·ĞµÑ€Ğ²Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¾: ${r.reserved_credits || 0}`}
+                             {` Â· Ğ¡Ğ¿Ğ¸ÑĞ°Ğ½Ğ¾: ${r.charged_credits || 0}`}
+                            {r.due_at && ` Â· ÑÑ€Ğ¾Ğº: ${new Date(r.due_at).toLocaleDateString("ru-RU")}`}
+                          </div>
+                          {/* Contact info for phone/video/offline */}
+                          {r.client_contact && (r.client_contact.phone || r.client_contact.preferred_date) && (
+                            <div style={{ fontSize: 12, color: "#5f574f", marginBottom: 8, padding: "6px 10px", borderRadius: 8, background: "#faf6ef" }}>
+                              {r.client_contact.phone && <span>Ğ¢ĞµĞ»: {r.client_contact.phone} Â· </span>}
+                              {r.client_contact.preferred_date && <span>Ğ”Ğ°Ñ‚Ğ°: {r.client_contact.preferred_date} Â· </span>}
+                              {r.client_contact.preferred_time_from && <span>Ğ¡ {r.client_contact.preferred_time_from} </span>}
+                              {r.client_contact.preferred_time_to && <span>Ğ´Ğ¾ {r.client_contact.preferred_time_to} </span>}
+                              {r.client_contact.preferred_time_text && <span>({r.client_contact.preferred_time_text})</span>}
+                            </div>
+                          )}
+                          {r.specialist_response && (
+                            <div style={{ fontSize: 13, color: "#5f574f", padding: 8, borderRadius: 8, background: "#f0f5f1", marginBottom: 8 }}>
+                              <strong>ĞÑ‚Ğ²ĞµÑ‚:</strong> {r.specialist_response}
+                            </div>
+                          )}
+                          {r.status === "completed" && (
+                            <div style={{ fontSize: 11, color: "#8a7e72", marginBottom: 8 }}>
+                              Ğ¢ĞµÑÑ‚Ğ¾Ğ²Ñ‹Ğ¹ Ñ€ĞµĞ¶Ğ¸Ğ¼: Ñ„Ğ°ĞºÑ‚Ğ¸Ñ‡ĞµÑĞºĞ¾Ğµ ÑĞ¿Ğ¸ÑĞ°Ğ½Ğ¸Ğµ ĞºÑ€ĞµĞ´Ğ¸Ñ‚Ğ¾Ğ² Ğ¿Ğ¾ĞºĞ° Ğ½Ğµ Ğ²Ñ‹Ğ¿Ğ¾Ğ»Ğ½ÑĞµÑ‚ÑÑ
+                            </div>
+                          )}
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            {r.status === "submitted" && (
+                              <button onClick={() => adminUpdateServiceRequest(r.id, "accept")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>ĞŸÑ€Ğ¸Ğ½ÑÑ‚ÑŒ</button>
+                            )}
+                            {clarificationStatuses.includes(r.status) && (
+                              <button onClick={() => {
+                                const resp = window.prompt("Ğ§Ñ‚Ğ¾ Ğ½ÑƒĞ¶Ğ½Ğ¾ ÑƒÑ‚Ğ¾Ñ‡Ğ½Ğ¸Ñ‚ÑŒ Ñƒ ĞºĞ»Ğ¸ĞµĞ½Ñ‚Ğ°?");
+                                if (resp) adminUpdateServiceRequest(r.id, "needs_clarification", { specialist_response: resp });
+                              }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #e8a857", background: "#fff7e8", color: "#6b4b1f", cursor: "pointer", fontSize: 12 }}>Ğ£Ñ‚Ğ¾Ñ‡Ğ½Ğ¸Ñ‚ÑŒ</button>
+                            )}
+                            {answerStatuses.includes(r.status) || scheduleStatuses.includes(r.status) ? (
+                              <>
+                                {answerStatuses.includes(r.status) && <button onClick={() => {
+                                  const resp = window.prompt("ĞÑ‚Ğ²ĞµÑ‚ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°:");
+                                  if (resp) adminUpdateServiceRequest(r.id, "answer", { specialist_response: resp });
+                                }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>ĞÑ‚Ğ²ĞµÑ‚Ğ¸Ñ‚ÑŒ</button>}
+                                {scheduleStatuses.includes(r.status) && <button onClick={() => {
+                                  const dt = window.prompt("Ğ”Ğ°Ñ‚Ğ° Ğ¸ Ğ²Ñ€ĞµĞ¼Ñ (YYYY-MM-DD HH:MM):");
+                                  const comment = window.prompt("ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹ (Ğ½ĞµĞ¾Ğ±ÑĞ·Ğ°Ñ‚ĞµĞ»ÑŒĞ½Ğ¾):");
+                                  if (dt) adminUpdateServiceRequest(r.id, "schedule", { scheduled_at: dt, scheduled_comment: comment });
+                                }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #6b8fc7", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>Ğ—Ğ°Ğ¿Ğ»Ğ°Ğ½Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ</button>}
+                              </>
+                            ) : null}
+                            {completeStatuses.includes(r.status) && (
+                              <>
+                                <button onClick={() => adminUpdateServiceRequest(r.id, "complete")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>Ğ—Ğ°Ğ²ĞµÑ€ÑˆĞ¸Ñ‚ÑŒ</button>
+                                {!canonical && <button onClick={() => adminUpdateServiceRequest(r.id, "complete_no_charge")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d8cec1", background: "#fff", color: "#5f574f", cursor: "pointer", fontSize: 12 }}>Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ±ĞµĞ· ÑĞ¿Ğ¸ÑĞ°Ğ½Ğ¸Ñ</button>}
+                              </>
+                            )}
+                            {cancelStatuses.includes(r.status) && <button onClick={() => adminUpdateServiceRequest(r.id, "cancel")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #b5473f", background: "#fff", color: "#b5473f", cursor: "pointer", fontSize: 12 }}>ĞÑ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ</button>}
+                          </div>
+                        </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Assignments tab */}
+              {bodyAdminTab === "assignments" && (
+                <>
+                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>ĞŸÑ€Ğ¸Ğ²ÑĞ·ĞºĞ° ĞºĞ»Ğ¸ĞµĞ½Ñ‚Ğ¾Ğ² Ğº ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°Ğ¼</div>
+                  {bodyAssignmentsLoading ? (
+                    <div style={{ color: t.muted, fontSize: 13 }}>Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°...</div>
+                  ) : bodyAssignments.length === 0 ? (
+                    <div style={{ color: t.muted, fontSize: 13 }}>ĞĞµÑ‚ Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½Ñ‹Ñ… body-ĞºĞ»Ğ¸ĞµĞ½Ñ‚Ğ¾Ğ²</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {bodyAssignments.map((c) => (
+                        <div key={c.body_client_ref} style={{
+                          background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 12, padding: 14,
+                          display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between",
+                        }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{c.display_name}</div>
+                            <div style={{ fontSize: 12, color: t.muted }}>
+                              {c.legacy_specialist_name ? `Legacy: ${c.legacy_specialist_name}` : "Ğ‘ĞµĞ· legacy-Ğ¼ĞµÑ‚ĞºĞ¸"}
+                              {c.assignment_status.assigned ? (
+                                <span style={{ marginLeft: 8, color: "#7D9A89" }}>
+                                  â†’ {c.assignment_status.expert_name} ({c.assignment_status.organization_name})
+                                </span>
+                              ) : (
+                                <span style={{ marginLeft: 8, color: "#b5473f" }}>ĞĞµ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½</span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setBodyAssignTarget(c.body_client_ref);
+                              setBodyAssignIsReassign(c.assignment_status.assigned);
+                              setBodyAssignExpertId("");
+                              setBodyAssignOrgId(null);
+                              setBodyAssignExpertOrgs([]);
+                            }}
+                            style={{
+                              padding: "6px 14px", borderRadius: 8, border: `1px solid ${t.border}`,
+                              background: t.tabBg, color: t.text, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {c.assignment_status.assigned ? "ĞŸĞµÑ€ĞµĞ½Ğ°Ğ·Ğ½Ğ°Ñ‡Ğ¸Ñ‚ÑŒ" : "ĞĞ°Ğ·Ğ½Ğ°Ñ‡Ğ¸Ñ‚ÑŒ"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Assignment modal */}
+                  {bodyAssignTarget && (
+                    <div style={{
+                      position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
+                      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+                    }} onClick={() => { setBodyAssignTarget(null); setBodyAssignIsReassign(false); }}>
+                      <div style={{
+                        background: t.bg, borderRadius: 20, padding: 32, maxWidth: 440, width: "90%",
+                      }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>
+                          {bodyAssignIsReassign ? "ĞŸĞµÑ€ĞµĞ½Ğ°Ğ·Ğ½Ğ°Ñ‡Ğ¸Ñ‚ÑŒ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°" : "ĞĞ°Ğ·Ğ½Ğ°Ñ‡Ğ¸Ñ‚ÑŒ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°"}
+                        </div>
+
+                        <label style={{ fontSize: 13, color: t.muted, marginBottom: 4, display: "block" }}>Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚</label>
+                        <select
+                          value={bodyAssignExpertId}
+                          onChange={(e) => {
+                            const expertId = e.target.value;
+                            setBodyAssignExpertId(expertId);
+                            setBodyAssignOrgId(null);
+                            // Find selected expert's organization memberships
+                            const expert = bodyExperts.find((ex) => ex.id === expertId);
+                            setBodyAssignExpertOrgs(expert?.organizations || []);
+                          }}
+                          style={{
+                            width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${t.border}`,
+                            background: t.cardBg, color: t.text, fontSize: 14, marginBottom: 16,
+                          }}
+                        >
+                          <option value="">Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°</option>
+                          {bodyExperts.filter((e) => e.is_active).map((e) => (
+                            <option key={e.id} value={e.id}>{e.name} â€” {e.role || "ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚"}</option>
+                          ))}
+                        </select>
+
+                        <label style={{ fontSize: 13, color: t.muted, marginBottom: 4, display: "block" }}>ĞšĞ¾Ğ½Ñ‚ĞµĞºÑÑ‚</label>
+                        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                          <button
+                            onClick={() => setBodyAssignOrgId(null)}
+                            style={{
+                              padding: "8px 14px", borderRadius: 8, border: `1px solid ${!bodyAssignOrgId ? "#7D9A89" : t.border}`,
+                              background: !bodyAssignOrgId ? "#e8f0ea" : t.cardBg, color: t.text, cursor: "pointer", fontSize: 13,
+                            }}
+                          >
+                            Ğ§Ğ°ÑÑ‚Ğ½Ğ°Ñ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸ĞºĞ°
+                          </button>
+                          {bodyAssignExpertOrgs.map((org) => (
+                            <button
+                              key={org.id}
+                              onClick={() => setBodyAssignOrgId(org.id)}
+                              style={{
+                                padding: "8px 14px", borderRadius: 8, border: `1px solid ${bodyAssignOrgId === org.id ? "#7D9A89" : t.border}`,
+                                background: bodyAssignOrgId === org.id ? "#e8f0ea" : t.cardBg, color: t.text, cursor: "pointer", fontSize: 13,
+                              }}
+                            >
+                              {org.name || "ĞÑ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ"}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8 }}>
+                          <button
+                            onClick={() => { setBodyAssignTarget(null); setBodyAssignExpertId(""); setBodyAssignIsReassign(false); }}
+                            style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.cardBg, color: t.text, cursor: "pointer", fontSize: 13 }}
+                          >
+                            ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                          </button>
+                          <button
+                            disabled={!bodyAssignExpertId || bodyAssignSaving}
+                            onClick={() => adminAssignBodyClient(bodyAssignTarget, bodyAssignExpertId, bodyAssignOrgId, bodyAssignIsReassign)}
+                            style={{
+                              padding: "8px 16px", borderRadius: 10, border: 0,
+                              background: bodyAssignExpertId && !bodyAssignSaving ? (bodyAssignIsReassign ? "#B85C4A" : "#7D9A89") : "#c4d0c6",
+                              color: "#fff", fontWeight: 700, fontSize: 13, cursor: bodyAssignExpertId ? "pointer" : "default",
+                            }}
+                          >
+                            {bodyAssignSaving ? "Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ğµ..." : (bodyAssignIsReassign ? "ĞŸĞµÑ€ĞµĞ½Ğ°Ğ·Ğ½Ğ°Ñ‡Ğ¸Ñ‚ÑŒ" : "ĞĞ°Ğ·Ğ½Ğ°Ñ‡Ğ¸Ñ‚ÑŒ")}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Delete confirmation modal */}
+              {bodyIntakeDeleteConfirm && (
+                <div style={{
+                  position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
+                  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+                }} onClick={() => setBodyIntakeDeleteConfirm(null)}>
+                  <div style={{
+                    background: t.bg, borderRadius: 20, padding: 32, maxWidth: 400, width: "90%",
+                  }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ°Ğ½ĞºĞµÑ‚Ñƒ?</div>
+                    <div style={{ fontSize: 14, color: t.muted, marginBottom: 24, lineHeight: 1.5 }}>
+                      ĞĞ½ĞºĞµÑ‚Ğ° Ğ±ÑƒĞ´ĞµÑ‚ Ğ¿ĞµÑ€ĞµĞ¼ĞµÑ‰ĞµĞ½Ğ° Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ. Ğ’Ñ‹ ÑĞ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ²Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ ĞµÑ‘ Ğ¿Ğ¾Ğ·Ğ¶Ğµ.
+                    </div>
+                    <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                      <button
+                        onClick={() => setBodyIntakeDeleteConfirm(null)}
+                        style={{
+                          background: "transparent", color: t.text, border: `1px solid ${t.border}`, borderRadius: 12,
+                          padding: "10px 20px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                        }}
+                      >
+                        ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                      </button>
+                      <button
+                        onClick={() => adminDeleteBodyIntake(bodyIntakeDeleteConfirm)}
+                        style={{
+                          background: "#ef4444", color: "#fff", border: 0, borderRadius: 12,
+                          padding: "10px 20px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                        }}
+                      >
+                        Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Body intake detail modal â€” human-readable */}
+              {bodyIntakeDetailOpen && bodyIntakeDetail && (
+                <div style={{
+                  position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
+                  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+                }} onClick={() => setBodyIntakeDetailOpen(false)}>
+                  <div style={{
+                    background: t.bg, borderRadius: 20, padding: 32, maxWidth: 720, width: "90%",
+                    maxHeight: "85vh", overflowY: "auto",
+                  }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20, alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>ĞĞ½ĞºĞµÑ‚Ğ° Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ</div>
+                        {bodyIntakeDetail.session_id && (
+                          <div style={{ fontSize: 14, color: t.muted, fontFamily: "monospace", fontWeight: 600, marginTop: 2 }}>
+                            {bodyIntakeDetail.session_id}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setBodyIntakeDetailOpen(false)}
+                        style={{ background: "none", border: 0, color: t.muted, cursor: "pointer", fontSize: 20 }}
+                      >
+                        âœ•
+                      </button>
+                    </div>
+
+                    {/* 1. General Info */}
+                    <Section title="ĞĞ±Ñ‰Ğ°Ñ Ğ¸Ğ½Ñ„Ğ¾Ñ€Ğ¼Ğ°Ñ†Ğ¸Ñ">
+                      <Field label="Ğ”Ğ°Ñ‚Ğ°" value={new Date(bodyIntakeDetail.created_at).toLocaleString("ru-RU")} />
+                      <Field label="Ğ˜ÑÑ‚Ğ¾Ñ‡Ğ½Ğ¸Ğº" value={bodyIntakeDetail.source || "â€”"} />
+                      <Field label="Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚" value={bodyIntakeDetail.specialist_name || "â€”"} />
+                      <Field label="ĞšĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ" value={bodyIntakeDetail.session_id || "ĞºĞ¾Ğ´ Ğ½Ğµ ÑĞ¾Ğ·Ğ´Ğ°Ğ½"} mono />
+                      <Field label="Ğ’ĞµÑ€ÑĞ¸Ñ" value={bodyIntakeDetail.version || "â€”"} />
+                      <Field label="ID" value={bodyIntakeDetail.id || "â€”"} mono />
+                    </Section>
+
+                    {/* 2. Client Info */}
+                    {(() => {
+                      const a = bodyIntakeDetail.answers || {};
+                      const c = bodyIntakeDetail.client || {};
+                      return (
+                        <Section title="Ğ˜Ğ½Ñ„Ğ¾Ñ€Ğ¼Ğ°Ñ†Ğ¸Ñ Ğ¾ ĞºĞ»Ğ¸ĞµĞ½Ñ‚Ğµ">
+                          <Field label="Ğ˜Ğ¼Ñ / Ğ¿ÑĞµĞ²Ğ´Ğ¾Ğ½Ğ¸Ğ¼" value={a.display_name || c.display_name || "â€”"} />
+                          <Field label="ĞŸĞ¾Ğ»" value={{ male: "ĞœÑƒĞ¶ÑĞºĞ¾Ğ¹", female: "Ğ–ĞµĞ½ÑĞºĞ¸Ğ¹", prefer_not_to_say: "ĞĞµ Ñ…Ğ¾Ñ‡Ñƒ ÑƒĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ñ‚ÑŒ", other: "ĞĞµ Ñ…Ğ¾Ñ‡Ñƒ ÑƒĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ñ‚ÑŒ", prefer_not: "ĞĞµ Ñ…Ğ¾Ñ‡Ñƒ ÑƒĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ñ‚ÑŒ" }[a.sex] || "ĞĞµ ÑƒĞºĞ°Ğ·Ğ°Ğ½"} />
+                          <Field label="Ğ’Ğ¾Ğ·Ñ€Ğ°ÑÑ‚" value={a.age || "â€”"} />
+                          <Field label="Ğ¦ĞµĞ»ÑŒ" value={a.goal === "custom" ? a.goal_custom : ({
+                            improve_wellbeing: "Ğ£Ğ»ÑƒÑ‡ÑˆĞ¸Ñ‚ÑŒ ÑĞ°Ğ¼Ğ¾Ñ‡ÑƒĞ²ÑÑ‚Ğ²Ğ¸Ğµ",
+                            slimness: "Ğ¡Ñ‚Ñ€Ğ¾Ğ¹Ğ½Ğ¾ÑÑ‚ÑŒ",
+                            custom: a.goal_custom || "Ğ¡Ğ²Ğ¾Ğ¹ Ğ²Ğ°Ñ€Ğ¸Ğ°Ğ½Ñ‚",
+                          })[a.goal] || a.goal || "â€”"} />
+                        </Section>
+                      );
+                    })()}
+
+                    {/* 3. Key Measurements */}
+                    {(() => {
+                      const a = bodyIntakeDetail.answers || {};
+                      const bmi = bodyIntakeDetail.bmi;
+                      return (
+                        <Section title="ĞÑĞ½Ğ¾Ğ²Ğ½Ñ‹Ğµ Ğ¿Ğ¾ĞºĞ°Ğ·Ğ°Ñ‚ĞµĞ»Ğ¸">
+                          {bmi && <Field label="Ğ˜ĞœĞ¢" value={bmi} />}
+                          <Field label="Ğ Ğ¾ÑÑ‚" value={a.height_cm ? `${a.height_cm} ÑĞ¼` : "â€”"} />
+                          <Field label="Ğ’ĞµÑ" value={a.weight_kg ? `${a.weight_kg} ĞºĞ³` : "â€”"} />
+                          {a.waist_cm && <Field label="ĞĞ±ÑŠÑ‘Ğ¼ Ñ‚Ğ°Ğ»Ğ¸Ğ¸" value={`${a.waist_cm} ÑĞ¼`} />}
+                          <Field label="ĞĞºÑ‚Ğ¸Ğ²Ğ½Ğ¾ÑÑ‚ÑŒ Ğ½Ğ° Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğµ" value={{
+                            sedentary: "Ğ¡Ğ¸Ğ´ÑÑ‡Ğ°Ñ",
+                            light: "Ğ›Ñ‘Ğ³ĞºĞ°Ñ",
+                            moderate: "Ğ£Ğ¼ĞµÑ€ĞµĞ½Ğ½Ğ°Ñ",
+                            heavy: "Ğ¢ÑĞ¶Ñ‘Ğ»Ğ°Ñ",
+                          }[a.work_activity_level] || a.work_activity_level || "â€”"} />
+                          <Field label="Ğ¨Ğ°Ğ³Ğ¾Ğ² Ğ² Ğ´ĞµĞ½ÑŒ" value={{
+                            less_3000: "ĞœĞµĞ½ÑŒÑˆĞµ 3000",
+                            "3000_6000": "3000â€“6000",
+                            "6000_10000": "6000â€“10000",
+                            more_10000: "Ğ‘Ğ¾Ğ»ÑŒÑˆĞµ 10000",
+                          }[a.daily_steps_estimate] || a.daily_steps_estimate || "â€”"} />
+                          <Field label="Ğ¡Ğ¾Ğ½" value={{
+                            less_5: "ĞœĞµĞ½ÑŒÑˆĞµ 5 Ñ‡",
+                            "5_6": "5â€“6 Ñ‡",
+                            "6_7": "6â€“7 Ñ‡",
+                            "7_8": "7â€“8 Ñ‡",
+                            more_8: "Ğ‘Ğ¾Ğ»ÑŒÑˆĞµ 8 Ñ‡",
+                          }[a.sleep_hours_estimate] || a.sleep_hours_estimate || "â€”"} />
+                          <Field label="ĞŸĞ¸Ñ‚Ğ°Ğ½Ğ¸Ğµ (Ğ³Ğ»Ğ°Ğ²Ğ½Ğ°Ñ Ğ¿Ñ€Ğ¾Ğ±Ğ»ĞµĞ¼Ğ°)" value={{
+                            overeating: "ĞŸĞµÑ€ĞµĞµĞ´Ğ°Ğ½Ğ¸Ğµ",
+                            unhealthy_food: "ĞĞµĞ·Ğ´Ğ¾Ñ€Ğ¾Ğ²Ñ‹Ğ¹ Ğ²Ñ‹Ğ±Ğ¾Ñ€",
+                            irregular: "ĞĞµÑ€ĞµĞ³ÑƒĞ»ÑÑ€Ğ½Ğ¾Ğµ",
+                            portion_control: "ĞšĞ¾Ğ½Ñ‚Ñ€Ğ¾Ğ»ÑŒ Ğ¿Ğ¾Ñ€Ñ†Ğ¸Ğ¹",
+                            snacking: "Ğ§Ğ°ÑÑ‚Ñ‹Ğµ Ğ¿ĞµÑ€ĞµĞºÑƒÑÑ‹",
+                            other: "Ğ”Ñ€ÑƒĞ³Ğ¾Ğµ",
+                          }[a.nutrition_main_problem] || a.nutrition_main_problem || "â€”"} />
+                          {a.health_limitations && <Field label="ĞĞ³Ñ€Ğ°Ğ½Ğ¸Ñ‡ĞµĞ½Ğ¸Ñ Ğ¿Ğ¾ Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ" value={a.health_limitations} />}
+                        </Section>
+                      );
+                    })()}
+
+                    {/* 3b. Lifestyle & Nutrition */}
+                    {(() => {
+                      const a = bodyIntakeDetail.answers || {};
+                      const trnTypes = Array.isArray(a.training_types) ? a.training_types.join(", ") : a.training_types;
+                      const drinks = Array.isArray(a.daily_drinks) ? a.daily_drinks.join(", ") : a.daily_drinks;
+                      const foodOrg = Array.isArray(a.food_organization) ? a.food_organization.join(", ") : a.food_organization;
+                      return (
+                        <Section title="ĞĞ±Ñ€Ğ°Ğ· Ğ¶Ğ¸Ğ·Ğ½Ğ¸ Ğ¸ Ğ¿Ğ¸Ñ‚Ğ°Ğ½Ğ¸Ğµ">
+                          <Field label="Ğ¢Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²ĞºĞ¸" value={{
+                            none: "ĞĞµÑ‚",
+                            irregular: "ĞĞµÑ€ĞµĞ³ÑƒĞ»ÑÑ€Ğ½Ğ¾",
+                            "1_2_week": "1â€“2 Ñ€Ğ°Ğ·Ğ° Ğ² Ğ½ĞµĞ´ĞµĞ»Ñ",
+                            "3plus_week": "3+ Ñ€Ğ°Ğ·Ğ° Ğ² Ğ½ĞµĞ´ĞµĞ»Ñ",
+                          }[a.training_current] || a.training_current || "â€”"} />
+                          {trnTypes && <Field label="Ğ¢Ğ¸Ğ¿Ñ‹ Ñ‚Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²Ğ¾Ğº" value={trnTypes} />}
+                          <Field label="ĞĞ³Ñ€Ğ°Ğ½Ğ¸Ñ‡ĞµĞ½Ğ¸Ñ Ğ¿Ñ€Ğ¸ Ğ½Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞµ" value={a.training_limitations || "â€”"} />
+                          <Field label="Ğ’Ñ€ĞµĞ¼Ñ Ğ¾Ñ‚Ñ…Ğ¾Ğ´Ğ° ĞºĞ¾ ÑĞ½Ñƒ" value={a.sleep_bedtime || "â€”"} />
+                          <Field label="Ğ’Ñ€ĞµĞ¼Ñ Ğ¿Ğ¾Ğ´ÑŠÑ‘Ğ¼Ğ°" value={a.sleep_wake_time || "â€”"} />
+                          <Field label="Ğ Ğ°Ğ·Ğ½Ğ¸Ñ†Ğ° Ğ±ÑƒĞ´Ğ½Ğ¸/Ğ²Ñ‹Ñ…Ğ¾Ğ´Ğ½Ñ‹Ğµ" value={{
+                            no: "ĞĞµÑ‚",
+                            slight: "ĞĞµĞ±Ğ¾Ğ»ÑŒÑˆĞ°Ñ",
+                            yes: "Ğ¡Ğ¸Ğ»ÑŒĞ½Ğ°Ñ",
+                          }[a.sleep_schedule_shift] || a.sleep_schedule_shift || "â€”"} />
+                          <Field label="ĞĞ°Ğ¿Ğ¸Ñ‚ĞºĞ¸" value={drinks || "â€”"} />
+                          <Field label="Ğ’Ğ¾Ğ´Ñ‹ Ğ² Ğ´ĞµĞ½ÑŒ (Ğ¾Ñ†ĞµĞ½ĞºĞ°)" value={a.water_l_estimate ? `${a.water_l_estimate} Ğ»` : "â€”"} />
+                          <Field label="ĞŸÑ€Ğ¸Ñ‘Ğ¼Ğ¾Ğ² Ğ¿Ğ¸Ñ‰Ğ¸ Ğ² Ğ´ĞµĞ½ÑŒ" value={{
+                            "1": "1",
+                            "2": "2",
+                            "3": "3",
+                            "4plus": "4+",
+                            irregular: "ĞĞµÑ€ĞµĞ³ÑƒĞ»ÑÑ€Ğ½Ğ¾",
+                          }[a.meals_per_day] || a.meals_per_day || "â€”"} />
+                          <Field label="ĞÑ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ Ğ¿Ğ¸Ñ‚Ğ°Ğ½Ğ¸Ñ" value={foodOrg || "â€”"} />
+                        </Section>
+                      );
+                    })()}
+
+                    {/* 4. Red Flags */}
+                    {(() => {
+                      const redFlags = bodyIntakeDetail.triggered_red_flags;
+                      const redLabels = {
+                        chest_pain: "Ğ‘Ğ¾Ğ»ÑŒ Ğ² Ğ³Ñ€ÑƒĞ´Ğ¸",
+                        severe_dizziness: "Ğ¡Ğ¸Ğ»ÑŒĞ½Ğ¾Ğµ Ğ³Ğ¾Ğ»Ğ¾Ğ²Ğ¾ĞºÑ€ÑƒĞ¶ĞµĞ½Ğ¸Ğµ",
+                        unexplained_weight_loss: "ĞĞµĞ¾Ğ±ÑŠÑÑĞ½Ğ¸Ğ¼Ğ°Ñ Ğ¿Ğ¾Ñ‚ĞµÑ€Ñ Ğ²ĞµÑĞ°",
+                        blood_in_stool: "ĞšÑ€Ğ¾Ğ²ÑŒ Ğ² ÑÑ‚ÑƒĞ»Ğµ",
+                        fainting: "ĞĞ±Ğ¼Ğ¾Ñ€Ğ¾ĞºĞ¸",
+                        none: "ĞĞ¸Ñ‡ĞµĞ³Ğ¾",
+                      };
+                      const activeFlags = Array.isArray(redFlags) ? redFlags.filter(f => f !== "none") : [];
+                      return (
+                        <Section title="ĞšÑ€Ğ°ÑĞ½Ñ‹Ğµ Ñ„Ğ»Ğ°Ğ³Ğ¸">
+                          {activeFlags.length > 0 ? (
+                            <ul style={{ margin: "4px 0 0 0", paddingLeft: 18, color: t.text, fontSize: 14, lineHeight: 1.7 }}>
+                              {activeFlags.map(f => (
+                                <li key={f}>{redLabels[f] || f}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <Field label="" value="ĞĞµ Ğ¾Ñ‚Ğ¼ĞµÑ‡ĞµĞ½Ğ¾" />
+                          )}
+                          {bodyIntakeDetail.red_flag_care_level && (
+                            <Field label="Ğ£Ñ€Ğ¾Ğ²ĞµĞ½ÑŒ Ñ€Ğ¸ÑĞºĞ°" value={{
+                              urgent_help: "Ğ¡Ñ€Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ",
+                              medical_consultation: "ĞšĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ñ Ğ²Ñ€Ğ°Ñ‡Ğ°",
+                            }[bodyIntakeDetail.red_flag_care_level] || bodyIntakeDetail.red_flag_care_level} />
+                          )}
+                        </Section>
+                      );
+                    })()}
+
+                    {/* 4b. Health Context */}
+                    {bodyIntakeDetail.health_context && (() => {
+                      const hc = bodyIntakeDetail.health_context;
+                      return (
+                        <Section title="Ğ—Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒĞµ, Ğ°Ğ½Ğ°Ğ»Ğ¸Ğ·Ñ‹ Ğ¸ Ğ¿Ñ€ĞµĞ¿Ğ°Ñ€Ğ°Ñ‚Ñ‹">
+                          {hc.health_conditions?.length > 0 && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>Ğ¡Ğ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ñ</div>
+                              {hc.health_conditions.map((c, i) => (
+                                <div key={i} style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>â€¢ {c.name}{c.comment ? ` (${c.comment})` : ""}</div>
+                              ))}
+                            </div>
+                          )}
+                          {hc.medications?.length > 0 && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>Ğ›ĞµĞºĞ°Ñ€ÑÑ‚Ğ²Ğ°</div>
+                              {hc.medications.map((m, i) => (
+                                <div key={i} style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>â€¢ {m.name}{m.dosage ? ` ${m.dosage}` : ""}{m.prescribed_by ? ` (${m.prescribed_by})` : ""}</div>
+                              ))}
+                            </div>
+                          )}
+                          {hc.supplements?.length > 0 && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>Ğ‘ĞĞ”Ñ‹ Ğ¸ Ğ²Ğ¸Ñ‚Ğ°Ğ¼Ğ¸Ğ½Ñ‹</div>
+                              {hc.supplements.map((s, i) => (
+                                <div key={i} style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>â€¢ {s.name}{s.dosage ? ` ${s.dosage}` : ""}{s.recommended_by ? ` (${s.recommended_by})` : ""}</div>
+                              ))}
+                            </div>
+                          )}
+                          {hc.lab_notes?.has_recent_labs && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>ĞĞ½Ğ°Ğ»Ğ¸Ğ·Ñ‹</div>
+                              {hc.lab_notes.items?.length > 0 && (
+                                <div style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>ĞœĞ°Ñ€ĞºĞµÑ€Ñ‹: {hc.lab_notes.items.join(", ")}</div>
+                              )}
+                              {hc.lab_notes.comment && (
+                                <div style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>{hc.lab_notes.comment}</div>
+                              )}
+                            </div>
+                          )}
+                          {hc.documents_note && (
+                            <Field label="Ğ’Ñ‹Ğ¿Ğ¸ÑĞºĞ¸" value={hc.documents_note} />
+                          )}
+                          <Field label="Ğ¡Ğ¾Ğ³Ğ»Ğ°ÑĞ¸Ğµ" value={hc.consent_acknowledged ? "Ğ”Ğ°" : "ĞĞµÑ‚"} />
+                        </Section>
+                      );
+                    })()}
+
+                    {/* 5. Care Recommendation */}
+                    {(() => {
+                      const care = bodyIntakeDetail.care_recommendation;
+                      const careLevel = normalizeCare(care);
+                      const careBg = careLevel === "urgent_help" ? "rgba(239,68,68,.1)" :
+                        careLevel === "medical_consultation" ? "rgba(251,191,36,.1)" : "rgba(34,197,94,.1)";
+                      const careColor = careLevel === "urgent_help" ? "#991b1b" :
+                        careLevel === "medical_consultation" ? "#92400e" : "#166534";
+                      const careLabelText = careLevel === "urgent_help" ? "Ğ¡Ñ€Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ" :
+                        careLevel === "medical_consultation" ? "ĞšĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ñ Ğ²Ñ€Ğ°Ñ‡Ğ°" : "Self-care";
+                      const data = bodyIntakeDetail;
+                      return (
+                        <Section title="AI-Ñ€Ğ°Ğ·Ğ±Ğ¾Ñ€">
+                          {data.user_report && (
+                            <div style={{ marginBottom: 16 }}>
+                              <div style={{ fontWeight: 600, fontSize: 13, color: t.muted, marginBottom: 6, letterSpacing: "0.03em" }}>ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ Ğ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ĞµĞ»Ñ</div>
+                              <div style={{ fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}` }}>
+                                {data.user_report}
+                              </div>
+                            </div>
+                          )}
+                          {care && (
+                            <div style={{ padding: 14, borderRadius: 12, background: careBg, border: `1px solid ${t.cardBorder}` }}>
+                              <div style={{ fontWeight: 700, fontSize: 14, color: careColor, marginBottom: 4 }}>Ğ£Ñ€Ğ¾Ğ²ĞµĞ½ÑŒ: {careLabelText}</div>
+                              {typeof care === "object" && care.reasons?.length > 0 && (
+                                <div style={{ fontSize: 13, color: t.text, marginTop: 6 }}>
+                                  <strong>ĞŸÑ€Ğ¸Ñ‡Ğ¸Ğ½Ñ‹:</strong> {care.reasons.join(", ")}
+                                </div>
+                              )}
+                              {typeof care === "object" && care.specialist_types?.length > 0 && (
+                                <div style={{ fontSize: 13, color: t.text, marginTop: 4 }}>
+                                  <strong>Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚:</strong> {{
+                                    emergency_service: "Ğ¡ĞºĞ¾Ñ€Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ",
+                                    general_physician: "Ğ¢ĞµÑ€Ğ°Ğ¿ĞµĞ²Ñ‚",
+                                    nutritionist: "Ğ”Ğ¸ĞµÑ‚Ğ¾Ğ»Ğ¾Ğ³",
+                                    endocrinologist: "Ğ­Ğ½Ğ´Ğ¾ĞºÑ€Ğ¸Ğ½Ğ¾Ğ»Ğ¾Ğ³",
+                                    gastroenterologist: "Ğ“Ğ°ÑÑ‚Ñ€Ğ¾ÑĞ½Ñ‚ĞµÑ€Ğ¾Ğ»Ğ¾Ğ³",
+                                    psychologist: "ĞŸÑĞ¸Ñ…Ğ¾Ğ»Ğ¾Ğ³",
+                                    psychotherapist: "ĞŸÑĞ¸Ñ…Ğ¾Ñ‚ĞµÑ€Ğ°Ğ¿ĞµĞ²Ñ‚",
+                                  }[care.specialist_types[0]] || care.specialist_types.join(", ")}
+                                </div>
+                              )}
+                              {typeof care === "object" && care.interim_support?.length > 0 && (
+                                <div style={{ marginTop: 8 }}>
+                                  {care.interim_support.map((s, i) => (
+                                    <div key={i} style={{ fontSize: 13, color: t.text, paddingLeft: 12, marginTop: 2 }}>
+                                      â€¢ {s}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {data.used_fallback && (
+                            <div style={{ marginTop: 8, fontSize: 12, color: t.muted, fontStyle: "italic" }}>
+                              Ğ˜ÑĞ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ğ½ fallback (Ğ¼Ğ¾Ğ´ĞµĞ»ÑŒ Ğ½Ğµ Ğ´Ğ°Ğ»Ğ° ÑÑ‚Ñ€ÑƒĞºÑ‚ÑƒÑ€Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ğ¾Ğ³Ğ¾ Ğ¾Ñ‚Ğ²ĞµÑ‚Ğ°)
+                            </div>
+                          )}
+                        </Section>
+                      );
+                    })()}
+
+                    {/* 6. Body Plan */}
+                    {(() => {
+                      const plan = bodyIntakeDetail.body_plan || bodyIntakeDetail.answers?.body_plan;
+                      if (!plan) return null;
+                      const days = plan.days || [];
+                      return (
+                        <Section title="ĞŸĞ»Ğ°Ğ½ Ğ½Ğ° 7 Ğ´Ğ½ĞµĞ¹">
+                          {plan.focus && (
+                            <div style={{ fontSize: 14, color: t.muted, fontStyle: "italic", marginBottom: 12 }}>
+                              Ğ¤Ğ¾ĞºÑƒÑ: {plan.focus}
+                            </div>
+                          )}
+                          {days.map(d => (
+                            <div key={d.day} style={{
+                              border: `1px solid ${t.cardBorder}`,
+                              borderRadius: 12, padding: "12px 16px", marginBottom: 8,
+                              background: t.cardBg,
+                            }}>
+                              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4, color: t.text }}>
+                                Ğ”ĞµĞ½ÑŒ {d.day}: {d.title}
+                              </div>
+                              {d.actions?.map((a, i) => (
+                                <div key={i} style={{ color: t.muted, fontSize: 13, paddingLeft: 12, marginTop: 2 }}>
+                                  â€¢ {a}
+                                </div>
+                              ))}
+                              {d.note && (
+                                <div style={{ color: t.muted, fontSize: 12, fontStyle: "italic", marginTop: 4 }}>
+                                  {d.note}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </Section>
+                      );
+                    })()}
+
+                    {/* Deleted info */}
+                    {bodyIntakeDetail.deleted_at && (
+                      <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.2)", fontSize: 13, color: "#991b1b" }}>
+                        Ğ£Ğ´Ğ°Ğ»Ñ‘Ğ½: {new Date(bodyIntakeDetail.deleted_at).toLocaleString("ru-RU")} ({bodyIntakeDetail.deleted_by})
+                      </div>
+                    )}
+
+                    {/* Raw JSON in details (technical) */}
+                    <details style={{ marginBottom: 20 }}>
+                      <summary style={{ cursor: "pointer", fontSize: 13, color: t.muted, fontWeight: 600, padding: 8, borderRadius: 8, background: t.cardBg }}>
+                        Ğ¢ĞµÑ…Ğ½Ğ¸Ñ‡ĞµÑĞºĞ¸Ğµ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğµ
+                      </summary>
+                      <pre style={{ fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}`, maxHeight: 300, overflowY: "auto", margin: 0 }}>
+                        {JSON.stringify(bodyIntakeDetail.answers || {}, null, 2)}
+                      </pre>
+                    </details>
+
+                    {/* Actions */}
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                      <button
+                        onClick={() => adminDownloadBodyIntakeJSON(bodyIntakeDetail)}
+                        style={{
+                          background: t.accent, color: "#fff", border: 0, borderRadius: 12,
+                          padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", flex: 1, minWidth: 140,
+                        }}
+                      >
+                        Ğ¡ĞºĞ°Ñ‡Ğ°Ñ‚ÑŒ JSON
+                      </button>
+                      <button
+                        onClick={() => {
+                          const a = bodyIntakeDetail.answers || {};
+                          adminOpenBodyExpertReviewForm("intake", bodyIntakeDetail.id, bodyIntakeDetail.session_id, a, {
+                            user_report: bodyIntakeDetail.user_report,
+                            body_plan: bodyIntakeDetail.body_plan,
+                            care_recommendation: bodyIntakeDetail.care_recommendation,
+                            bmi: bodyIntakeDetail.bmi,
+                            triggered_red_flags: bodyIntakeDetail.triggered_red_flags,
+                          });
+                        }}
+                        style={{
+                          background: "#e8f0ea", color: "#2f2925", border: "1px solid #c4d0c6", borderRadius: 12,
+                          padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", minWidth: 140,
+                        }}
+                      >
+                        âœï¸ Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ğ°Ñ Ğ¿Ñ€Ğ°Ğ²ĞºĞ°
+                      </button>
+                      {bodyIntakeDetail.deleted_at ? (
+                        <button
+                          onClick={() => { adminRestoreBodyIntake(bodyIntakeDetail.id); setBodyIntakeDetailOpen(false); }}
+                          style={{
+                            background: "transparent", color: t.accent, border: `1px solid ${t.accent}`, borderRadius: 12,
+                            padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                          }}
+                        >
+                          Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => { setBodyIntakeDetailOpen(false); setBodyIntakeDeleteConfirm(bodyIntakeDetail.id); }}
+                          style={{
+                            background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 12,
+                            padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                          }}
+                        >
+                          Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Body diary detail modal */}
+              {bodyDiaryDetailOpen && bodyDiaryDetail && (
+                <div style={{
+                  position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
+                  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+                }} onClick={() => setBodyDiaryDetailOpen(false)}>
+                  <div style={{
+                    background: t.bg, borderRadius: 20, padding: 32, maxWidth: 640, width: "90%",
+                    maxHeight: "85vh", overflowY: "auto",
+                  }} onClick={(e) => e.stopPropagation()}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20, alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ°</div>
+                        <div style={{ fontSize: 14, color: t.muted, fontFamily: "monospace", fontWeight: 600, marginTop: 2 }}>
+                          {bodyDiaryDetail.session_id} Â· {bodyDiaryDetail.log_date}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setBodyDiaryDetailOpen(false)}
+                        style={{ background: "none", border: 0, color: t.muted, cursor: "pointer", fontSize: 20 }}
+                      >
+                        âœ•
+                      </button>
+                    </div>
+
+                    {/* Activity */}
+                    <Section title="ĞĞºÑ‚Ğ¸Ğ²Ğ½Ğ¾ÑÑ‚ÑŒ">
+                      <Field label="Ğ¨Ğ°Ğ³Ğ¸" value={bodyDiaryDetail.steps ?? "â€”"} />
+                      <Field label="Ğ¢Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²ĞºĞ°" value={bodyDiaryDetail.workout_done ? (bodyDiaryDetail.workout_type || "Ğ”Ğ°") : "ĞĞµÑ‚"} />
+                      <Field label="Ğ˜Ğ½Ñ‚ĞµĞ½ÑĞ¸Ğ²Ğ½Ğ¾ÑÑ‚ÑŒ" value={bodyDiaryDetail.workout_intensity || "â€”"} />
+                      <Field label="ĞœĞ¸Ğ½ÑƒÑ‚ Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½Ğ¾ÑÑ‚Ğ¸" value={bodyDiaryDetail.activity_minutes ?? "â€”"} />
+                    </Section>
+
+                    {/* Nutrition */}
+                    <Section title="ĞŸĞ¸Ñ‚Ğ°Ğ½Ğ¸Ğµ">
+                      <Field label="ĞŸÑ€Ğ¸Ñ‘Ğ¼Ğ¾Ğ² Ğ¿Ğ¸Ñ‰Ğ¸" value={bodyDiaryDetail.meals_count ?? "â€”"} />
+                      <Field label="ĞšĞ°Ğ»Ğ¾Ñ€Ğ¸Ğ¸ (Ğ¾Ñ†ĞµĞ½ĞºĞ°)" value={bodyDiaryDetail.calories ? `${bodyDiaryDetail.calories} ĞºĞºĞ°Ğ»` : "â€”"} />
+                      <Field label="ĞŸĞµÑ€ĞµĞµĞ´Ğ°Ğ½Ğ¸Ğµ" value={{
+                        none: "ĞĞµÑ‚",
+                        slight: "ĞĞµĞ¼Ğ½Ğ¾Ğ³Ğ¾",
+                        moderate: "Ğ£Ğ¼ĞµÑ€ĞµĞ½Ğ½Ğ¾",
+                        severe: "Ğ’Ñ‹Ñ€Ğ°Ğ¶ĞµĞ½Ğ½Ğ¾",
+                      }[bodyDiaryDetail.overeating_level] || bodyDiaryDetail.overeating_level || "â€”"} />
+                      <Field label="Ğ¢ÑĞ³Ğ° Ğº ÑĞ»Ğ°Ğ´ĞºĞ¾Ğ¼Ñƒ" value={bodyDiaryDetail.sweet_cravings || "â€”"} />
+                      {bodyDiaryDetail.nutrition_comment && (
+                        <Field label="Ğ—Ğ°Ğ¼ĞµÑ‚ĞºĞ¸ Ğ¾ Ğ¿Ğ¸Ñ‚Ğ°Ğ½Ğ¸Ğ¸" value={bodyDiaryDetail.nutrition_comment} />
+                      )}
+                    </Section>
+
+                    {/* Sleep & Health */}
+                    <Section title="Ğ¡Ğ¾Ğ½ Ğ¸ ÑĞ°Ğ¼Ğ¾Ñ‡ÑƒĞ²ÑÑ‚Ğ²Ğ¸Ğµ">
+                      <Field label="Ğ§Ğ°ÑĞ¾Ğ² ÑĞ½Ğ°" value={bodyDiaryDetail.sleep_hours ? `${bodyDiaryDetail.sleep_hours} Ñ‡` : "â€”"} />
+                      <Field label="ĞšĞ°Ñ‡ĞµÑÑ‚Ğ²Ğ¾ ÑĞ½Ğ°" value={{
+                        terrible: "Ğ£Ğ¶Ğ°ÑĞ½Ğ¾Ğµ",
+                        poor: "ĞŸĞ»Ğ¾Ñ…Ğ¾Ğµ",
+                        average: "Ğ¡Ñ€ĞµĞ´Ğ½ĞµĞµ",
+                        good: "Ğ¥Ğ¾Ñ€Ğ¾ÑˆĞµĞµ",
+                        excellent: "ĞÑ‚Ğ»Ğ¸Ñ‡Ğ½Ğ¾Ğµ",
+                      }[bodyDiaryDetail.sleep_quality] || bodyDiaryDetail.sleep_quality || "â€”"} />
+                      <Field label="Ğ£Ñ€Ğ¾Ğ²ĞµĞ½ÑŒ ÑĞ½ĞµÑ€Ğ³Ğ¸Ğ¸" value={bodyDiaryDetail.energy_level ? `${bodyDiaryDetail.energy_level}/10` : "â€”"} />
+                      <Field label="ĞĞ°ÑÑ‚Ñ€Ğ¾ĞµĞ½Ğ¸Ğµ" value={bodyDiaryDetail.mood_level ? `${bodyDiaryDetail.mood_level}/10` : "â€”"} />
+                      {bodyDiaryDetail.health_notes && (
+                        <Field label="Ğ—Ğ°Ğ¼ĞµÑ‚ĞºĞ¸ Ğ¾ ÑĞ°Ğ¼Ğ¾Ñ‡ÑƒĞ²ÑÑ‚Ğ²Ğ¸Ğ¸" value={bodyDiaryDetail.health_notes} />
+                      )}
+                    </Section>
+
+                    {/* Water */}
+                    {bodyDiaryDetail.water_l != null && (
+                      <Section title="Ğ’Ğ¾Ğ´Ğ°">
+                        <Field label="Ğ’Ğ¾Ğ´Ñ‹, Ğ»Ğ¸Ñ‚Ñ€Ñ‹" value={`${bodyDiaryDetail.water_l} Ğ»`} />
+                      </Section>
+                    )}
+
+                    {/* AI Summary */}
+                    {bodyDiaryDetail.ai_day_summary && (
+                      <Section title="AI-Ğ¸Ñ‚Ğ¾Ğ³ Ğ´Ğ½Ñ">
+                        <div style={{
+                          fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap",
+                          background: t.cardBg, padding: 14, borderRadius: 12,
+                          border: `1px solid ${t.cardBorder}`,
+                        }}>
+                          {bodyDiaryDetail.ai_day_summary}
+                        </div>
+                      </Section>
+                    )}
+
+                    {/* Voice transcript */}
+                    {bodyDiaryDetail.voice_transcript && (
+                      <Section title="Ğ“Ğ¾Ğ»Ğ¾ÑĞ¾Ğ²Ğ¾Ğ¹ Ğ²Ğ²Ğ¾Ğ´ (Ñ€Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²ĞºĞ°)">
+                        <div style={{
+                          fontSize: 13, lineHeight: 1.5, fontStyle: "italic", color: t.muted,
+                          background: t.cardBg, padding: 14, borderRadius: 12,
+                          border: `1px solid ${t.cardBorder}`,
+                        }}>
+                          {bodyDiaryDetail.voice_transcript}
+                        </div>
+                      </Section>
+                    )}
+
+                    {/* Plate photos */}
+                    {bodyDiaryDetail.plate_photos?.length > 0 && (
+                      <Section title="Ğ¤Ğ¾Ñ‚Ğ¾ Ñ‚Ğ°Ñ€ĞµĞ»Ğ¾Ğº">
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                          {bodyDiaryDetail.plate_photos.map((photo, i) => (
+                            <img
+                              key={i}
+                              src={photo}
+                              alt={`Ğ¤Ğ¾Ñ‚Ğ¾ Ñ‚Ğ°Ñ€ĞµĞ»ĞºĞ¸ ${i + 1}`}
+                              style={{
+                                width: 120, height: 120, borderRadius: 12,
+                                objectFit: "cover", border: `1px solid ${t.cardBorder}`,
+                              }}
+                            />
+                          ))}
+                        </div>
+                        {bodyDiaryDetail.plate_analysis?.length > 0 && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            {bodyDiaryDetail.plate_analysis.map((a, i) => (
+                              <div key={i} style={{ fontSize: 13, lineHeight: 1.5, padding: 12, borderRadius: 10, background: t.cardBg, border: `1px solid ${t.cardBorder}` }}>
+                                <div style={{ fontWeight: 700, color: t.text, marginBottom: 6 }}>{a.photo_name || `Ğ¤Ğ¾Ñ‚Ğ¾ ${i + 1}`}</div>
+                                {a.error ? (
+                                  <div style={{ color: "#b5473f" }}>{a.error}</div>
+                                ) : (
+                                  <>
+                                    {a.balance_summary && <div style={{ color: t.text, marginBottom: 4 }}>{a.balance_summary}</div>}
+                                    {a.what_is_missing && (
+                                      <div style={{ color: t.muted, marginBottom: 4 }}>
+                                        Ğ§ĞµĞ³Ğ¾ Ğ½Ğµ Ñ…Ğ²Ğ°Ñ‚Ğ°ĞµÑ‚: {Array.isArray(a.what_is_missing) ? a.what_is_missing.join(", ") : a.what_is_missing}
+                                      </div>
+                                    )}
+                                    {a.gentle_suggestion && <div style={{ color: "#7D9A89", fontStyle: "italic", marginBottom: 4 }}>{a.gentle_suggestion}</div>}
+                                    {a.confidence && typeof a.confidence === "number" && (
+                                      <div style={{ color: t.muted, fontSize: 11 }}>Ğ¢Ğ¾Ñ‡Ğ½Ğ¾ÑÑ‚ÑŒ: {Math.round(a.confidence * 100)}%</div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                            <div style={{ fontSize: 11, color: t.muted }}>ĞŸÑ€Ğ¸Ğ¼ĞµÑ€Ğ½Ğ°Ñ Ğ¾Ñ†ĞµĞ½ĞºĞ° Ğ¿Ğ¾ Ñ„Ğ¾Ñ‚Ğ¾, Ğ½Ğµ Ñ‚Ğ¾Ñ‡Ğ½Ñ‹Ğ¹ Ñ€Ğ°ÑÑ‡Ñ‘Ñ‚ ĞºĞ°Ğ»Ğ¾Ñ€Ğ¸Ğ¹</div>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => {
+                            adminOpenBodyExpertReviewForm("plate_analysis", bodyDiaryDetail.id, bodyDiaryDetail.session_id, {
+                              plate_photos: bodyDiaryDetail.plate_photos,
+                            }, bodyDiaryDetail.plate_analysis);
+                          }}
+                          style={{
+                            marginTop: 10,
+                            background: "#f5f0e8", color: "#2f2925", border: "1px solid #d8cec1", borderRadius: 10,
+                            padding: "8px 16px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                          }}
+                        >
+                          âœï¸ Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ğ°Ñ Ğ¿Ñ€Ğ°Ğ²ĞºĞ° Ğ¿Ğ¾ Ñ‚Ğ°Ñ€ĞµĞ»ĞºĞµ
+                        </button>
+                      </Section>
+                    )}
+
+                    {/* Raw JSON (technical) */}
+                    <details style={{ marginBottom: 16 }}>
+                      <summary style={{ cursor: "pointer", fontSize: 13, color: t.muted, fontWeight: 600, padding: 8, borderRadius: 8, background: t.cardBg }}>
+                        Ğ¢ĞµÑ…Ğ½Ğ¸Ñ‡ĞµÑĞºĞ¸Ğµ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğµ
+                      </summary>
+                      <pre style={{ fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}`, maxHeight: 300, overflowY: "auto", margin: 0 }}>
+                        {JSON.stringify(bodyDiaryDetail, null, 2)}
+                      </pre>
+                    </details>
+
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button
+                        onClick={() => {
+                          adminOpenBodyExpertReviewForm("daily_log", bodyDiaryDetail.id, bodyDiaryDetail.session_id, {
+                            log_date: bodyDiaryDetail.log_date,
+                            steps: bodyDiaryDetail.steps,
+                            workout_done: bodyDiaryDetail.workout_done,
+                            water_l: bodyDiaryDetail.water_l,
+                            sleep_hours: bodyDiaryDetail.sleep_hours,
+                            energy_level: bodyDiaryDetail.energy_level,
+                            mood_level: bodyDiaryDetail.mood_level,
+                            plate_photos: bodyDiaryDetail.plate_photos,
+                          }, {
+                            ai_day_summary: bodyDiaryDetail.ai_day_summary,
+                            ai_focus_tomorrow: bodyDiaryDetail.ai_focus_tomorrow,
+                            plate_analysis: bodyDiaryDetail.plate_analysis,
+                          });
+                        }}
+                        style={{
+                          background: "#e8f0ea", color: "#2f2925", border: "1px solid #c4d0c6", borderRadius: 12,
+                          padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer", flex: 1,
+                        }}
+                      >
+                        âœï¸ Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ğ°Ñ Ğ¿Ñ€Ğ°Ğ²ĞºĞ°
+                      </button>
+                      <button
+                        onClick={() => { adminDeleteBodyDailyLog(bodyDiaryDetail.id); setBodyDiaryDetailOpen(false); }}
+                        style={{
+                          background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 12,
+                          padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                        }}
+                      >
+                        Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : adminModuleRoute === "council" ? (
+            <ClinicalCouncilAdmin adminPassword={adminPassword} theme={t} />
+          ) : (
+            <>
+              {/* Tabs */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "reviews" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "reviews" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => setAdminReqTab("reviews")}
+                >
+                  ĞÑ‚Ğ·Ñ‹Ğ²Ñ‹ Ğ¾ ÑĞµÑÑĞ¸ÑÑ…
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "crisis" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "crisis" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setAdminReqTab("crisis"); adminLoadCrisisRequests(adminCrisisFilter); }}
+                >
+                  Ğ¡Ñ€Ğ¾Ñ‡Ğ½Ñ‹Ğµ Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ñ
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "requests" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "requests" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setAdminReqTab("requests"); adminLoadRequests(adminReqFilter); }}
+                >
+                  Ğ—Ğ°ÑĞ²ĞºĞ¸ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ²
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "training" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "training" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setAdminReqTab("training"); loadTrainingSessions(); }}
+                >
+                  Ğ¢Ğ°Ğ±Ğ»Ğ¸Ñ†Ğ° Ñ‚Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²Ğ¾Ğº
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "quality" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "quality" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setAdminReqTab("quality"); loadQualityStats(); loadQualityInsights(); }}
+                >
+                  ĞĞ±Ğ·Ğ¾Ñ€Ñ‹ ĞºĞ°Ñ‡ĞµÑÑ‚Ğ²Ğ°
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "organizations" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "organizations" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setAdminReqTab("organizations"); adminLoadOrganizations(); }}
+                >
+                  ĞÑ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ†Ğ¸Ğ¸
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "onboarding" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "onboarding" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setAdminReqTab("onboarding"); adminLoadOnboardingRequests("all"); }}
+                >
+                  Ğ—Ğ°ÑĞ²ĞºĞ¸ Ğ½Ğ° Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ğµ
+                </button>
+                <button
+                  style={{
+                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                    background: adminReqTab === "match" ? t.tabActive : t.tabBg,
+                    color: adminReqTab === "match" ? t.tabActiveText : t.text,
+                  }}
+                  onClick={() => { setAdminReqTab("match"); adminLoadMatchRequests("all"); }}
+                >
+                  ĞŸĞ¾Ğ´Ğ±Ğ¾Ñ€ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°
+                </button>
+                {adminRole === "super" && (
+                  <button
+                    style={{
+                      border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                      background: t.tabBg, color: t.text,
+                    }}
+                    onClick={() => { setAdminSubPage("council"); window.history.pushState({}, "", "/admin/council"); }}
+                  >
+                    Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ñ‹Ğ¹ ÑĞ¾Ğ²ĞµÑ‚ â†’
+                  </button>
+                )}
+              </div>
+
+              {adminReqTab === "crisis" ? (
+                <>
+                  <div style={{ color: t.muted, fontSize: 13, lineHeight: 1.5, marginBottom: 16, padding: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.cardBg }}>
+                    Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ğµ ÑÑ€Ğ¾Ñ‡Ğ½Ñ‹Ñ… Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğ¹ Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ¾Ñ‚ĞºĞ»ÑÑ‡ĞµĞ½Ğ¾ Ğ² privacy-safe Ñ€ĞµĞ¶Ğ¸Ğ¼Ğµ. ĞĞ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ñ Ğ½Ğµ ÑĞ¾Ñ…Ñ€Ğ°Ğ½ÑÑÑ‚ÑÑ Ğ² Ğ±Ğ°Ğ·Ñƒ Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ….
+                  </div>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
+                    <select
+                      value={adminCrisisFilter}
+                      onChange={(e) => { const v = e.target.value; setAdminCrisisFilter(v); adminLoadCrisisRequests(v); }}
+                      style={{
+                        border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
+                        color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                      }}
+                    >
+                      <option value="new">ĞĞ¾Ğ²Ñ‹Ğµ</option>
+                      <option value="in_progress">Ğ’ Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğµ</option>
+                      <option value="closed">Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚Ñ‹Ğµ</option>
+                      <option value="false_alarm">Ğ¢ĞµÑÑ‚Ğ¾Ğ²Ñ‹Ğµ</option>
+                      <option value="all">Ğ’ÑĞµ</option>
+                    </select>
+                    <button
+                      style={{
+                        border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
+                        color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                      }}
+                      onClick={() => adminLoadCrisisRequests(adminCrisisFilter)}
+                    >
+                      {adminCrisisLoading ? "Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°..." : `ĞĞ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ (${adminCrisisRequests.length})`}
+                    </button>
+                  </div>
+
+                  {adminCrisisLoading ? (
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°...</div>
+                  ) : adminCrisisRequests.length === 0 ? (
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>ĞĞµÑ‚ Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğ¹</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      {adminCrisisRequests.map((req) => (
+                        <div key={req.id} style={{
+                          border: `1px solid ${t.crisisBorder}`, borderRadius: 20,
+                          background: t.crisisCard, padding: 20,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                              <span style={{ color: t.crisisMuted, fontSize: 12 }}>
+                                {new Date(req.created_at).toLocaleString("ru-RU")}
+                              </span>
+                              <span style={{
+                                fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                                background: req.status === "in_progress" ? t.badgeInProgress : req.status === "closed" ? t.badgeClosed : req.status === "false_alarm" ? t.badgeFalseAlarm : t.badgeNew,
+                                color: req.status === "in_progress" ? t.badgeInProgressText : req.status === "closed" ? t.badgeClosedText : req.status === "false_alarm" ? t.badgeFalseAlarmText : t.badgeNewText,
+                              }}>
+                                {req.status === "new" ? "ĞĞ¾Ğ²Ğ¾Ğµ" : req.status === "in_progress" ? "Ğ’ Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğµ" : req.status === "closed" ? "Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚Ğ¾" : req.status === "false_alarm" ? "Ğ¢ĞµÑÑ‚Ğ¾Ğ²Ğ¾Ğµ" : req.status}
+                              </span>
+                              <span style={{ color: t.crisisMuted, fontSize: 12 }}>
+                                {req.environment} / {req.source}
+                              </span>
+                              {req.high_risk_detected && (
+                                <span style={{
+                                  fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                                  background: t.badgeHighRisk, color: t.badgeHighRiskText,
+                                }}>
+                                  Ğ’Ñ‹ÑĞ¾ĞºĞ¸Ğ¹ Ñ€Ğ¸ÑĞº
+                                </span>
+                              )}
+                            </div>
+                            {req.public_code && (
+                              <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisAccent, letterSpacing: 0.5 }}>
+                                {req.public_code}
+                              </span>
+                            )}
+                          </div>
+
+                          {req.crisis_text && (
+                            <div style={{ marginBottom: 8 }}>
+                              <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 2 }}>Ğ¡Ğ¸Ñ‚ÑƒĞ°Ñ†Ğ¸Ñ</div>
+                              <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5 }}>{req.crisis_text}</div>
+                            </div>
+                          )}
+
+                          {req.contact && (
+                            <div style={{ marginBottom: 8 }}>
+                              <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 2 }}>ĞšĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚</div>
+                              <div style={{ color: t.crisisText, fontSize: 13 }}>{req.contact}</div>
+                            </div>
+                          )}
+
+                          {req.risk_markers && Array.isArray(req.risk_markers) && req.risk_markers.length > 0 && (
+                            <div style={{ marginBottom: 8 }}>
+                              <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 2 }}>ĞœĞ°Ñ€ĞºĞµÑ€Ñ‹ Ñ€Ğ¸ÑĞºĞ°</div>
+                              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                {req.risk_markers.map((m, i) => (
+                                  <span key={i} style={{
+                                    fontSize: 11, padding: "2px 6px", borderRadius: 4,
+                                    background: t.riskMarkerBg, color: t.riskMarker,
+                                  }}>{m}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {req.admin_comment && (
+                            <div style={{ marginBottom: 8, color: t.crisisMuted, fontSize: 13, fontStyle: "italic" }}>
+                              ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹: {req.admin_comment}
+                            </div>
+                          )}
+
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                            {req.status === "new" && (
+                              <button
+                                disabled={adminCrisisActionLoading === req.id}
+                                style={{
+                                  border: 0, borderRadius: 12, background: t.crisisActionPrimary, color: t.crisisActionPrimaryText,
+                                  padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                                  opacity: adminCrisisActionLoading === req.id ? 0.5 : 1,
+                                }}
+                                onClick={() => adminUpdateCrisisStatus(req.id, "in_progress")}
+                              >
+                                Ğ’Ğ·ÑÑ‚ÑŒ Ğ² Ñ€Ğ°Ğ±Ğ¾Ñ‚Ñƒ
+                              </button>
+                            )}
+                            {req.status === "in_progress" && (
+                              <button
+                                disabled={adminCrisisActionLoading === req.id}
+                                style={{
+                                  border: 0, borderRadius: 12, background: t.crisisActionSuccess, color: t.crisisActionSuccessText,
+                                  padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                                  opacity: adminCrisisActionLoading === req.id ? 0.5 : 1,
+                                }}
+                                onClick={() => adminUpdateCrisisStatus(req.id, "closed")}
+                              >
+                                Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚ÑŒ
+                              </button>
+                            )}
+                            <button
+                              disabled={adminCrisisActionLoading === req.id}
+                              style={{
+                                border: 0, borderRadius: 12, background: t.crisisActionNeutral, color: t.crisisActionNeutralText,
+                                padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                                opacity: adminCrisisActionLoading === req.id ? 0.5 : 1,
+                              }}
+                              onClick={() => adminUpdateCrisisStatus(req.id, "false_alarm")}
+                            >
+                              Ğ›Ğ¾Ğ¶Ğ½Ğ°Ñ/Ñ‚ĞµÑÑ‚Ğ¾Ğ²Ğ°Ñ
+                            </button>
+                            <button
+                              style={{
+                                border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                                color: t.crisisActionJsonlText, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                              onClick={() => adminDownloadCrisisJson(req)}
+                            >
+                              Ğ¡ĞºĞ°Ñ‡Ğ°Ñ‚ÑŒ JSON
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : adminReqTab === "requests" ? (
+                <>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
+                    <select
+                      value={adminReqFilter}
+                      onChange={(e) => { const v = e.target.value; setAdminReqFilter(v); adminLoadRequests(v); }}
+                      style={{
+                        border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
+                        color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                      }}
+                    >
+                      <option value="pending">ĞĞ¶Ğ¸Ğ´Ğ°ÑÑ‚</option>
+                      <option value="approved">ĞĞ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ½Ñ‹Ğµ</option>
+                      <option value="rejected">ĞÑ‚ĞºĞ»Ğ¾Ğ½Ñ‘Ğ½Ğ½Ñ‹Ğµ</option>
+                      <option value="all">Ğ’ÑĞµ</option>
+                    </select>
+                    <button
+                      style={{
+                        border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
+                        color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                      }}
+                      onClick={() => adminLoadRequests(adminReqFilter)}
+                    >
+                      ĞĞ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ ({adminRequests.length})
+                    </button>
+                  </div>
+
+                  {adminRequests.length === 0 ? (
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>ĞĞµÑ‚ Ğ·Ğ°ÑĞ²Ğ¾Ğº</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      {adminRequests.map((req) => (
+                        <div key={req.id} style={{
+                          border: `1px solid ${t.crisisBorder}`, borderRadius: 20,
+                          background: t.crisisCard, padding: 20,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                              <span style={{ color: t.crisisMuted, fontSize: 12 }}>
+                                {new Date(req.created_at).toLocaleString("ru-RU")}
+                              </span>
+                              <span style={{
+                                fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                                background: req.status === "approved" ? t.badgeClosed : req.status === "rejected" ? t.badgeNew : t.badgePending,
+                                color: req.status === "approved" ? t.badgeClosedText : req.status === "rejected" ? t.badgeNewText : t.badgePendingText,
+                              }}>
+                                {req.status}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ marginBottom: 8 }}>
+                            <span style={{ fontWeight: 700, color: t.crisisText }}>{req.name}</span>
+                            <span style={{ color: t.crisisMuted, marginLeft: 8 }}>{req.role}</span>
+                          </div>
+                          <div style={{ color: t.cardLabel, fontSize: 13, marginBottom: 8 }}>
+                            {req.email && <span>Email: {req.email}  </span>}
+                            {req.telegram && <span>Telegram: {req.telegram}  </span>}
+                            {req.specialty && <span>Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ: {req.specialty}  </span>}
+                            {req.city && <span>Ğ“Ğ¾Ñ€Ğ¾Ğ´: {req.city}  </span>}
+                            {req.organization && <span>ĞÑ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ: {req.organization}</span>}
+                          </div>
+                          {req.comment && (
+                            <div style={{ color: t.crisisMuted, fontSize: 13, fontStyle: "italic", marginBottom: 8 }}>
+                              "{req.comment}"
+                            </div>
+                          )}
+
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            {req.status !== "approved" && (
+                              <button style={{ border: 0, borderRadius: 12, background: t.badgeClosed, color: t.badgeClosedText, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                                onClick={() => adminUpdateRequestStatus(req.id, "approved")}>
+                                ĞĞ´Ğ¾Ğ±Ñ€Ğ¸Ñ‚ÑŒ
+                              </button>
+                            )}
+                            {req.status !== "rejected" && (
+                              <button style={{ border: 0, borderRadius: 12, background: t.badgeNew, color: t.badgeNewText, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
+                                onClick={() => adminUpdateRequestStatus(req.id, "rejected")}>
+                                ĞÑ‚ĞºĞ»Ğ¾Ğ½Ğ¸Ñ‚ÑŒ
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/*
+                    TODO: "Ğ¡Ğ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ° Ğ¸ ÑĞ³ĞµĞ½ĞµÑ€Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ ĞºĞ¾Ğ´"
+                    Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ ĞºĞ½Ğ¾Ğ¿ĞºÑƒ Ñ€ÑĞ´Ğ¾Ğ¼ Ñ Ğ¾Ğ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ½Ñ‹Ğ¼Ğ¸ Ğ·Ğ°ÑĞ²ĞºĞ°Ğ¼Ğ¸ Ğ´Ğ»Ñ ÑĞ¾Ğ·Ğ´Ğ°Ğ½Ğ¸Ñ Ğ·Ğ°Ğ¿Ğ¸ÑĞ¸ Ğ² experts
+                    Ğ¸ Ğ³ĞµĞ½ĞµÑ€Ğ°Ñ†Ğ¸Ğ¸ access_code. Ğ—Ğ°Ğ¿Ğ¾Ğ»Ğ½ÑÑ‚ÑŒ Ğ²Ñ€ÑƒÑ‡Ğ½ÑƒÑ.
+                  */}
+                </>
+              ) : adminReqTab === "training" ? (
+                <>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
+                  {/* Active / Trash toggle */}
+                  <button onClick={() => { setTrainingShowTrash(false); setTrainingSelection(new Set()); loadTrainingSessions(); }} style={{ border: 0, borderRadius: 12, padding: "10px 16px", fontWeight: 700, fontSize: 14, cursor: "pointer", background: !trainingShowTrash ? t.tabActive : t.tabBg, color: !trainingShowTrash ? t.tabActiveText : t.text }}>ĞĞºÑ‚Ğ¸Ğ²Ğ½Ñ‹Ğµ Ğ·Ğ°Ğ¿Ğ¸ÑĞ¸</button>
+                  <button onClick={() => { setTrainingShowTrash(true); setTrainingSelection(new Set()); loadTrainingSessions(); }} style={{ border: 0, borderRadius: 12, padding: "10px 16px", fontWeight: 700, fontSize: 14, cursor: "pointer", background: trainingShowTrash ? t.tabActive : t.tabBg, color: trainingShowTrash ? t.tabActiveText : t.text }}>ĞšĞ¾Ñ€Ğ·Ğ¸Ğ½Ğ°</button>
+
+                  <select value={trainingFilter.status} onChange={(e) => setTrainingFilter((f) => ({ ...f, status: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
+                    <option value="all">Ğ’ÑĞµ ÑÑ‚Ğ°Ñ‚ÑƒÑÑ‹</option>
+                    {["new","reviewed","needs_prompt_update","approved_for_learning","rejected","archived"].map((o) => <option key={o} value={o}>{st(o)}</option>)}
+                  </select>
+                  <select value={trainingFilter.expected_case_type} onChange={(e) => setTrainingFilter((f) => ({ ...f, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
+                    <option value="all">Ğ’ÑĞµ Ñ‚Ğ¸Ğ¿Ñ‹ ÑĞ»ÑƒÑ‡Ğ°ĞµĞ²</option>
+                    {["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}
+                  </select>
+                  <select value={trainingFilter.session_kind} onChange={(e) => setTrainingFilter((f) => ({ ...f, session_kind: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
+                    <option value="all">Ğ’ÑĞµ Ñ‚Ğ¸Ğ¿Ñ‹ ÑĞµÑÑĞ¸Ğ¹</option>
+                    {["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}
+                  </select>
+                  <input value={trainingFilter.public_code} onChange={(e) => setTrainingFilter((f) => ({ ...f, public_code: e.target.value }))} placeholder="ĞšĞ¾Ğ´ Ğ¢ĞĞ§ĞšĞ-XXXX-XXXX" style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, outline: "none", width: 200 }} />
+                  <button onClick={() => loadTrainingSessions()} style={{ border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg, color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                    {trainingLoading ? "Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°..." : `ĞĞ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ (${trainingSessions.length})`}
+                  </button>
+                  <button onClick={downloadTrainingCsv} style={{ border: `1px solid ${t.jsonlBtnBorder}`, borderRadius: 12, background: t.jsonlBtn, color: t.jsonlBtnText, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                    Ğ¡ĞºĞ°Ñ‡Ğ°Ñ‚ÑŒ CSV
+                  </button>
+                </div>
+
+                {/* Bulk action bar */}
+                {trainingSelection.size > 0 && (
+                  <div style={{ marginBottom: 16, padding: "12px 16px", border: `1px solid ${t.accent}`, borderRadius: 12, background: t.highlight, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    <span style={{ color: t.text, fontWeight: 700, fontSize: 14 }}>Ğ’Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ¾: {trainingSelection.size}</span>
+                    {trainingShowTrash ? (
+                      <>
+                        <button onClick={() => setTrainingBulkConfirm("restore")} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ñ‹Ğµ</button>
+                        <button onClick={() => setTrainingBulkConfirm("permanentDelete")} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ñ‹Ğµ Ğ½Ğ°Ğ²ÑĞµĞ³Ğ´Ğ°</button>
+                      </>
+                    ) : (
+                      <button onClick={() => { setTrainingDeletionReason("bulk"); setTrainingBulkConfirm("trash"); }} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ñ‹Ğµ</button>
+                    )}
+                    <button onClick={() => setTrainingSelection(new Set())} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Ğ¡Ğ½ÑÑ‚ÑŒ Ğ²Ñ‹Ğ´ĞµĞ»ĞµĞ½Ğ¸Ğµ</button>
+                  </div>
+                )}
+
+                {/* Bulk confirm modal */}
+                {trainingBulkConfirm && (
+                  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+                    <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20, padding: 24, maxWidth: 500, width: "90%" }}>
+                      {trainingBulkConfirm === "trash" && (
+                        <>
+                          <div style={{ fontWeight: 800, fontSize: 18, color: t.crisisText, marginBottom: 12 }}>ĞŸĞµÑ€ĞµĞ¼ĞµÑÑ‚Ğ¸Ñ‚ÑŒ Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ {trainingSelection.size} Ğ·Ğ°Ğ¿Ğ¸ÑĞµĞ¹?</div>
+                          <div style={{ color: t.muted, fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>Ğ˜ÑÑ…Ğ¾Ğ´Ğ½Ñ‹Ğµ ÑĞµÑÑĞ¸Ğ¸ Ğ¸ ÑĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ñ‹Ğµ Ñ€ĞµĞ²ÑŒÑ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ñ‹ Ğ½Ğµ Ğ±ÑƒĞ´ÑƒÑ‚.</div>
+                          <div style={{ marginBottom: 16 }}>
+                            <select value={trainingDeletionReason} onChange={(e) => setTrainingDeletionReason(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 14, width: "100%", outline: "none" }}>
+                              <option value="bulk">ĞœĞ°ÑÑĞ¾Ğ²Ğ¾Ğµ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ğµ</option>
+                              <option value="aborted">ĞĞ±Ğ¾Ñ€Ğ²Ğ°Ğ½Ğ½Ğ°Ñ ÑĞµÑÑĞ¸Ñ</option>
+                              <option value="duplicate">Ğ”ÑƒĞ±Ğ»Ğ¸ĞºĞ°Ñ‚</option>
+                              <option value="technical_test">Ğ¢ĞµÑ…Ğ½Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ Ñ‚ĞµÑÑ‚</option>
+                              <option value="erroneous">ĞÑˆĞ¸Ğ±Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ</option>
+                              <option value="insufficient_data">ĞĞµĞ´Ğ¾ÑÑ‚Ğ°Ñ‚Ğ¾Ñ‡Ğ½Ğ¾ Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ…</option>
+                            </select>
+                          </div>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <button onClick={() => { setTrainingBulkConfirm(null); setTrainingDeletionReason("") }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>ĞÑ‚Ğ¼ĞµĞ½Ğ°</button>
+                            <button onClick={() => trashBulkTrainingSessions([...trainingSelection])} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>ĞŸĞµÑ€ĞµĞ¼ĞµÑÑ‚Ğ¸Ñ‚ÑŒ Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ</button>
+                          </div>
+                        </>
+                      )}
+                      {trainingBulkConfirm === "restore" && (
+                        <>
+                          <div style={{ fontWeight: 800, fontSize: 18, color: t.crisisText, marginBottom: 12 }}>Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ {trainingSelection.size} Ğ·Ğ°Ğ¿Ğ¸ÑĞµĞ¹?</div>
+                          <div style={{ color: t.muted, fontSize: 14, marginBottom: 16 }}>Ğ—Ğ°Ğ¿Ğ¸ÑĞ¸ Ğ²ĞµÑ€Ğ½ÑƒÑ‚ÑÑ Ğ² Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½ÑƒÑ Ñ‚Ğ°Ğ±Ğ»Ğ¸Ñ†Ñƒ.</div>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <button onClick={() => setTrainingBulkConfirm(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>ĞÑ‚Ğ¼ĞµĞ½Ğ°</button>
+                            <button onClick={() => restoreBulkTrainingSessions([...trainingSelection])} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ</button>
+                          </div>
+                        </>
+                      )}
+                      {trainingBulkConfirm === "permanentDelete" && (
+                        <>
+                          <div style={{ fontWeight: 800, fontSize: 18, color: t.error, marginBottom: 12 }}>Ğ‘ĞµĞ·Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‚Ğ½Ğ¾ ÑƒĞ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ {trainingSelection.size} Ğ·Ğ°Ğ¿Ğ¸ÑĞµĞ¹?</div>
+                          <div style={{ color: t.muted, fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>
+                            Ğ—Ğ°Ğ¿Ğ¸ÑĞ¸ Ğ±ÑƒĞ´ÑƒÑ‚ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ñ‹ Ğ±ĞµĞ· Ğ²Ğ¾Ğ·Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ÑÑ‚Ğ¸ Ğ²Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ.
+                            <br />Ğ˜ÑÑ…Ğ¾Ğ´Ğ½Ñ‹Ğµ ÑĞµÑÑĞ¸Ğ¸ Ğ¸ case review Ğ¾ÑÑ‚Ğ°Ğ½ÑƒÑ‚ÑÑ Ğ² Ğ±Ğ°Ğ·Ğµ.
+                          </div>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <button onClick={() => setTrainingBulkConfirm(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>ĞÑ‚Ğ¼ĞµĞ½Ğ°</button>
+                            <button onClick={() => permanentDeleteBulkTrainingSessions([...trainingSelection])} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ½Ğ°Ğ²ÑĞµĞ³Ğ´Ğ°</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Single trash confirm */}
+                {trainingTrashConfirm && (
+                  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+                    <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20, padding: 24, maxWidth: 500, width: "90%" }}>
+                      <div style={{ fontWeight: 800, fontSize: 18, color: t.crisisText, marginBottom: 8 }}>Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ñ‚Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²Ğ¾Ñ‡Ğ½ÑƒÑ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ?</div>
+                      <div style={{ color: t.text, fontSize: 14, marginBottom: 8 }}>
+                        <div>ĞšĞ¾Ğ´: {trainingTrashConfirm.public_code || "â€”"}</div>
+                        <div>Ğ¡Ñ†ĞµĞ½Ğ°Ñ€Ğ¸Ğ¹: {trainingTrashConfirm.scenario_played || "â€”"}</div>
+                        <div>Ğ¢Ğ¸Ğ¿ ÑĞµÑÑĞ¸Ğ¸: {sk(trainingTrashConfirm.session_kind) || "â€”"}</div>
+                      </div>
+                      <div style={{ color: t.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ Ğ¿ĞµÑ€ĞµĞ¼ĞµÑÑ‚Ğ¸Ñ‚ÑÑ Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ. Ğ˜ÑÑ…Ğ¾Ğ´Ğ½Ğ°Ñ ÑĞµÑÑĞ¸Ñ Ğ¸ ÑĞºÑĞ¿ĞµÑ€Ñ‚Ğ½Ğ¾Ğµ Ñ€ĞµĞ²ÑŒÑ Ğ¾ÑÑ‚Ğ°Ğ½ÑƒÑ‚ÑÑ Ğ² Ğ±Ğ°Ğ·Ğµ.</div>
+                      <div style={{ marginBottom: 16 }}>
+                        <select value={trainingDeletionReason} onChange={(e) => setTrainingDeletionReason(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 14, width: "100%", outline: "none" }}>
+                          <option value="">Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ Ğ¿Ñ€Ğ¸Ñ‡Ğ¸Ğ½Ñƒ</option>
+                          <option value="aborted">ĞĞ±Ğ¾Ñ€Ğ²Ğ°Ğ½Ğ½Ğ°Ñ ÑĞµÑÑĞ¸Ñ</option>
+                          <option value="duplicate">Ğ”ÑƒĞ±Ğ»Ğ¸ĞºĞ°Ñ‚</option>
+                          <option value="technical_test">Ğ¢ĞµÑ…Ğ½Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ Ñ‚ĞµÑÑ‚</option>
+                          <option value="erroneous">ĞÑˆĞ¸Ğ±Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ</option>
+                          <option value="insufficient_data">ĞĞµĞ´Ğ¾ÑÑ‚Ğ°Ñ‚Ğ¾Ñ‡Ğ½Ğ¾ Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ…</option>
+                          <option value="other">Ğ”Ñ€ÑƒĞ³Ğ¾Ğµ</option>
+                        </select>
+                        {trainingDeletionReason === "other" && (
+                          <input placeholder="ĞĞ¿Ğ¸ÑˆĞ¸Ñ‚Ğµ Ğ¿Ñ€Ğ¸Ñ‡Ğ¸Ğ½Ñƒ" value={trainingDeletionReasonCustom || ""} onChange={(e) => setTrainingDeletionReasonCustom(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 14, width: "100%", outline: "none", marginTop: 8 }} />
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button onClick={() => { setTrainingTrashConfirm(null); setTrainingDeletionReason(""); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>ĞÑ‚Ğ¼ĞµĞ½Ğ°</button>
+                        <button onClick={() => trashSingleTrainingSession(trainingTrashConfirm.id)} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>ĞŸĞµÑ€ĞµĞ¼ĞµÑÑ‚Ğ¸Ñ‚ÑŒ Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Permanent delete confirm */}
+                {trainingPermanentConfirm && (
+                  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+                    <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20, padding: 24, maxWidth: 500, width: "90%" }}>
+                      <div style={{ fontWeight: 800, fontSize: 18, color: t.error, marginBottom: 12 }}>Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ Ğ±ĞµĞ· Ğ²Ğ¾Ğ·Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ÑÑ‚Ğ¸ Ğ²Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ?</div>
+                      <div style={{ color: t.muted, fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>
+                        Ğ‘ÑƒĞ´ĞµÑ‚ Ğ¾ĞºĞ¾Ğ½Ñ‡Ğ°Ñ‚ĞµĞ»ÑŒĞ½Ğ¾ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ° Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ Ñ‚Ğ°Ğ±Ğ»Ğ¸Ñ†Ñ‹ Ñ‚Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²Ğ¾Ğº.
+                        <br />Ğ˜ÑÑ…Ğ¾Ğ´Ğ½Ğ°Ñ ÑĞµÑÑĞ¸Ñ Ğ¸ case review Ğ¾ÑÑ‚Ğ°Ğ½ÑƒÑ‚ÑÑ Ğ² Ğ±Ğ°Ğ·Ğµ.
+                      </div>
+                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button onClick={() => { setTrainingPermanentConfirm(null) }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>ĞÑ‚Ğ¼ĞµĞ½Ğ°</button>
+                        <button onClick={() => { permanentDeleteTrainingSession(trainingPermanentConfirm.id); setTrainingPermanentConfirm(null); }} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ½Ğ°Ğ²ÑĞµĞ³Ğ´Ğ°</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!trainingShowTrash && trainingNewRow && (
+                  <div style={{ border: `1px solid ${t.accent}`, borderRadius: 16, background: t.cardBg, padding: 16, marginBottom: 16 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: t.text }}>ĞĞ¾Ğ²Ğ°Ñ ÑÑ‚Ñ€Ğ¾ĞºĞ°</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                      <input placeholder="ĞšĞ¾Ğ´ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ°" value={trainingNewRow.public_code || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, public_code: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
+                      <select value={trainingNewRow.session_kind || "initial"} onChange={(e) => setTrainingNewRow((r) => ({ ...r, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
+                        {["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                      <input placeholder="Ğ§Ñ‚Ğ¾ Ğ¸Ğ³Ñ€Ğ°ĞµĞ¼ Ğ² ÑÑ‚Ğ¾Ğ¹ ÑĞµÑÑĞ¸Ğ¸?" value={trainingNewRow.scenario_played || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
+                      <select value={trainingNewRow.expected_case_type || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
+                        <option value="">ĞĞ¶Ğ¸Ğ´Ğ°ĞµĞ¼Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿ ÑĞ»ÑƒÑ‡Ğ°Ñ</option>
+                        {["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={async () => { const r = await saveTrainingSession(trainingNewRow); if (r) setTrainingNewRow(null); }} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ</button>
+                      <button onClick={() => setTrainingNewRow(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>ĞÑ‚Ğ¼ĞµĞ½Ğ°</button>
+                    </div>
+                  </div>
+                )}
+
+                {!trainingShowTrash && !trainingNewRow && (
+                  <button onClick={() => setTrainingNewRow({ session_kind: "initial", status: "new" })} style={{ border: `1px dashed ${t.accent}`, borderRadius: 12, background: "transparent", color: t.accent, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer", marginBottom: 16 }}>
+                    + Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ ÑÑ‚Ñ€Ğ¾ĞºÑƒ
+                  </button>
+                )}
+
+                {trainingSessionsError && (
+                  <div style={{ color: t.error || "#e74c3c", textAlign: "center", padding: "12px 16px", marginBottom: 12, background: t.dangerBg || "rgba(231,76,60,0.08)", borderRadius: 12, border: `1px solid ${t.badgeNewText || "#e74c3c"}`, fontWeight: 600, fontSize: 14, lineHeight: 1.4 }}>
+                    {trainingSessionsError}
+                  </div>
+                )}
+
+                {trainingLoading ? (
+                  <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°...</div>
+                ) : trainingSessions.length === 0 ? (
+                  <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>ĞĞµÑ‚ Ğ·Ğ°Ğ¿Ğ¸ÑĞµĞ¹</div>
+                ) : (
+                  <div style={{ overflowX: "auto", fontSize: 12 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1400 }}>
+                      <thead>
+                        <tr style={{ background: t.tabBg }}>
+                          <th style={{ padding: "8px 6px", borderBottom: `1px solid ${t.border}`, width: 36 }}>
+                            <input type="checkbox" checked={trainingSessions.length > 0 && trainingSelection.size === trainingSessions.length} onChange={(e) => { if (e.target.checked) { setTrainingSelection(new Set(trainingSessions.map((s) => s.id))); } else { setTrainingSelection(new Set()); } }} />
+                          </th>
+                          {trainingShowTrash
+                            ? ["Ğ”Ğ°Ñ‚Ğ° ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ","Ğ£Ğ´Ğ°Ğ»Ğ¸Ğ»","ĞŸÑ€Ğ¸Ñ‡Ğ¸Ğ½Ğ°","Ğ”Ğ°Ñ‚Ğ° ÑĞ¾Ğ·Ğ´Ğ°Ğ½Ğ¸Ñ","ĞšĞ¾Ğ´ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ°","ĞĞ¾Ğ¼ĞµÑ€ ÑĞµÑÑĞ¸Ğ¸","Ğ¢Ğ¸Ğ¿ ÑĞµÑÑĞ¸Ğ¸","Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚","Ğ¡Ñ†ĞµĞ½Ğ°Ñ€Ğ¸Ğ¹","ĞĞ¶Ğ¸Ğ´Ğ°ĞµĞ¼Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿ ÑĞ»ÑƒÑ‡Ğ°Ñ","ĞœĞ¾Ğ´ĞµĞ»ÑŒ","Ğ¡Ñ‚Ğ°Ñ‚ÑƒÑ","ĞšÑ€Ğ°Ñ‚ĞºĞ¸Ğ¹ Ğ²Ñ‹Ğ²Ğ¾Ğ´"].map((h) => (
+                              <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontWeight: 700, color: t.muted, borderBottom: `1px solid ${t.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                            ))
+                            : ["Ğ”Ğ°Ñ‚Ğ°","ĞšĞ¾Ğ´ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ°","ĞĞ¾Ğ¼ĞµÑ€ ÑĞµÑÑĞ¸Ğ¸","Ğ¢Ğ¸Ğ¿ ÑĞµÑÑĞ¸Ğ¸","Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚","Ğ¡Ñ†ĞµĞ½Ğ°Ñ€Ğ¸Ğ¹","ĞĞ¶Ğ¸Ğ´Ğ°ĞµĞ¼Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿ ÑĞ»ÑƒÑ‡Ğ°Ñ","Ğ§Ñ‚Ğ¾ Ñ€Ğ°ÑĞ¿Ğ¾Ğ·Ğ½Ğ°Ğ»Ğ° ÑĞ¸ÑÑ‚ĞµĞ¼Ğ°","ĞšĞ°Ñ‡ĞµÑÑ‚Ğ²Ğ¾ Ñ€Ğ°ÑĞ¿Ğ¾Ğ·Ğ½Ğ°Ğ²Ğ°Ğ½Ğ¸Ñ","ĞœĞ¾Ğ´ĞµĞ»ÑŒ","Fallback","Ğ’Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹","ĞÑ‚Ñ‡Ñ‘Ñ‚","Safety","Ğ¯Ğ·Ñ‹Ğº","ĞŸÑ€Ğ°ĞºÑ‚Ğ¸ĞºĞ¸","ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ğµ","ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€Ñ‹","Ğ Ğ¸ÑĞºĞ¸","Ğ ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´Ğ°Ñ†Ğ¸Ñ","ĞšĞ¾Ğ½Ñ‚ĞµĞºÑÑ‚","Ğ¡Ñ‚Ğ°Ñ‚ÑƒÑ","ĞšÑ€Ğ°Ñ‚ĞºĞ¸Ğ¹ Ğ²Ñ‹Ğ²Ğ¾Ğ´","ĞŸÑ€Ğ¾Ğ±Ğ»ĞµĞ¼Ğ°","ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹","Ğ”ĞµĞ¹ÑÑ‚Ğ²Ğ¸Ğµ","ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶."].map((h) => (
+                              <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontWeight: 700, color: t.muted, borderBottom: `1px solid ${t.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                            ))
+                          }
+                          <th style={{ padding: "8px 6px", borderBottom: `1px solid ${t.border}`, width: 100 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trainingSessions.map((s) => {
+                          const isEditing = trainingEditId === s.id;
+                          const ed = isEditing ? trainingEditData : {};
+                          const isSelected = trainingSelection.has(s.id);
+                          return (
+                            <tr key={s.id} style={{ borderBottom: `1px solid ${t.cardBorder}`, background: isSelected ? t.highlight : "transparent" }}>
+                              <td style={{ padding: "6px" }}>
+                                <input type="checkbox" checked={isSelected} onChange={() => { const next = new Set(trainingSelection); if (isSelected) next.delete(s.id); else next.add(s.id); setTrainingSelection(next); }} />
+                              </td>
+                              {trainingShowTrash ? (
+                                <>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.json_data?._deleted?.at ? new Date(s.json_data._deleted.at).toLocaleDateString("ru-RU") : ""}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.json_data?._deleted?.by_expert_name || "â€”"}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, maxWidth: 120 }}>{s.json_data?._deleted?.reason || "â€”"}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.created_at ? new Date(s.created_at).toLocaleDateString("ru-RU") : ""}</td>
+                                  <td style={{ padding: "6px", fontWeight: 700, color: t.accent, fontSize: 12, whiteSpace: "nowrap" }}>{s.public_code || "â€”"}</td>
+                                  <td style={{ padding: "6px", color: t.text }}>{s.session_sequence ?? ""}</td>
+                                  <td style={{ padding: "6px", color: t.text }}>{sk(s.session_kind) || ""}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.expert_name || s.expert_role || "â€”"}</td>
+                                  <td style={{ padding: "6px", color: t.text }}>{s.scenario_played || ""}</td>
+                                  <td style={{ padding: "6px", color: t.text }}>{ct(s.expected_case_type) || ""}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.model_used || "â€”"}</td>
+                                  <td style={{ padding: "6px" }}>
+                                    <span style={{
+                                      fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
+                                      background: s.status === "approved_for_learning" ? t.badgeClosed : s.status === "rejected" ? t.badgeNew : s.status === "reviewed" ? t.badgeInProgress : t.badgePending,
+                                      color: s.status === "approved_for_learning" ? t.badgeClosedText : s.status === "rejected" ? t.badgeNewText : s.status === "reviewed" ? t.badgeInProgressText : t.badgePendingText,
+                                    }}>{st(s.status) || "ĞĞ¾Ğ²Ñ‹Ğ¹"}</span>
+                                  </td>
+                                  <td style={{ padding: "6px", maxWidth: 120, color: t.text, fontSize: 11 }}>{s.short_summary || ""}</td>
+                                  <td style={{ padding: "6px", whiteSpace: "nowrap" }}>
+                                    <button onClick={() => restoreSingleTrainingSession(s.id)} style={{ border: 0, borderRadius: 6, background: t.accent, color: "#fff", padding: "4px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", marginRight: 4 }}>Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ</button>
+                                    <button onClick={() => setTrainingPermanentConfirm(s)} style={{ border: 0, borderRadius: 6, background: t.error, color: "#fff", padding: "4px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ½Ğ°Ğ²ÑĞµĞ³Ğ´Ğ°</button>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.created_at ? new Date(s.created_at).toLocaleDateString("ru-RU") : ""}</td>
+                                  <td style={{ padding: "6px", fontWeight: 700, color: t.accent, fontSize: 12, whiteSpace: "nowrap" }}>{s.public_code || "â€”"}</td>
+                                  <td style={{ padding: "6px", color: t.text }}>{s.session_sequence ?? ""}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <select value={ed.session_kind || s.session_kind || "initial"} onChange={(e) => setTrainingEditData((d) => ({ ...d, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}</select>
+                                    : <span style={{ color: t.text }}>{sk(s.session_kind) || ""}</span>}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.expert_name || (s.expert_role ? s.expert_role : "") || "â€”"}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input value={ed.scenario_played ?? s.scenario_played ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
+                                    : <span style={{ color: t.text }}>{s.scenario_played || ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <select value={ed.expected_case_type ?? s.expected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}><option value="">â€”</option>{["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}</select>
+                                    : <span style={{ color: t.text }}>{ct(s.expected_case_type) || ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input value={ed.ai_detected_case_type ?? s.ai_detected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, ai_detected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 80 }} />
+                                    : <span style={{ color: t.text }}>{s.ai_detected_case_type || ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.detection_quality ?? s.detection_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, detection_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.detection_quality >= 4 ? t.success : s.detection_quality <= 2 ? t.error : t.text }}>{s.detection_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.model_used || "â€”"}</td>
+                                  <td style={{ padding: "6px", color: s.fallback_used ? t.error : t.muted, fontSize: 11 }}>{s.fallback_used ? "Ğ”Ğ°" : "â€”"}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.questions_quality ?? s.questions_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, questions_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.questions_quality >= 4 ? t.success : s.questions_quality <= 2 ? t.error : t.text }}>{s.questions_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.report_quality ?? s.report_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, report_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.report_quality >= 4 ? t.success : s.report_quality <= 2 ? t.error : t.text }}>{s.report_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.safety_quality ?? s.safety_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, safety_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.safety_quality >= 4 ? t.success : s.safety_quality <= 2 ? t.error : t.text }}>{s.safety_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.language_quality ?? s.language_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, language_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.language_quality >= 4 ? t.success : s.language_quality <= 2 ? t.error : t.text }}>{s.language_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.support_toolkit_quality ?? s.support_toolkit_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, support_toolkit_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.support_toolkit_quality >= 4 ? t.success : s.support_toolkit_quality <= 2 ? t.error : t.text }}>{s.support_toolkit_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <input type="number" min="1" max="5" value={ed.continuation_quality ?? s.continuation_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, continuation_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
+                                    : <span style={{ color: s.continuation_quality >= 4 ? t.success : s.continuation_quality <= 2 ? t.error : t.text }}>{s.continuation_quality ?? ""}</span>}</td>
+                                  <td style={{ padding: "6px", color: s.repeated_questions ? t.error : t.muted, fontSize: 11 }}>{s.repeated_questions ? "Ğ”Ğ°" : "â€”"}</td>
+                                  <td style={{ padding: "6px", color: s.missed_risk_flags ? t.error : t.muted, fontSize: 11 }}>{s.missed_risk_flags ? "Ğ”Ğ°" : "â€”"}</td>
+                                  <td style={{ padding: "6px", color: s.wrong_recommendation ? t.error : t.muted, fontSize: 11 }}>{s.wrong_recommendation ? "Ğ”Ğ°" : "â€”"}</td>
+                                  <td style={{ padding: "6px", color: s.remembered_context ? t.success : t.muted, fontSize: 11 }}>{s.remembered_context ? "Ğ”Ğ°" : "â€”"}</td>
+                                  <td style={{ padding: "6px" }}>{isEditing
+                                    ? <select value={ed.status ?? s.status ?? "new"} onChange={(e) => setTrainingEditData((d) => ({ ...d, status: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["new","reviewed","needs_prompt_update","approved_for_learning","rejected","archived"].map((o) => <option key={o} value={o}>{st(o)}</option>)}</select>
+                                    : <span style={{
+                                        fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
+                                        background: s.status === "approved_for_learning" ? t.badgeClosed : s.status === "rejected" ? t.badgeNew : s.status === "reviewed" ? t.badgeInProgress : t.badgePending,
+                                        color: s.status === "approved_for_learning" ? t.badgeClosedText : s.status === "rejected" ? t.badgeNewText : s.status === "reviewed" ? t.badgeInProgressText : t.badgePendingText,
+                                      }}>{st(s.status) || "ĞĞ¾Ğ²Ñ‹Ğ¹"}</span>}</td>
+                                  <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
+                                    ? <input value={ed.short_summary ?? s.short_summary ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, short_summary: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
+                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.short_summary || ""}</span>}</td>
+                                  <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
+                                    ? <input value={ed.main_problem ?? s.main_problem ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, main_problem: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
+                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.main_problem || ""}</span>}</td>
+                                  <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
+                                    ? <input value={ed.expert_comment ?? s.expert_comment ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, expert_comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
+                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.expert_comment || ""}</span>}</td>
+                                  <td style={{ padding: "6px", maxWidth: 100 }}>{isEditing
+                                    ? <input value={ed.action_needed ?? s.action_needed ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, action_needed: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
+                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.action_needed || ""}</span>}</td>
+                                  <td style={{ padding: "6px", maxWidth: 100 }}>{isEditing
+                                    ? <input value={ed.continuation_comment ?? s.continuation_comment ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, continuation_comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
+                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.continuation_comment || ""}</span>}</td>
+                                  <td style={{ padding: "6px", whiteSpace: "nowrap" }}>
+                                    {isEditing ? (
+                                      <>
+                                        <button onClick={async () => { await updateTrainingSession(s.id, trainingEditData); setTrainingEditId(null); setTrainingEditData({}); }} style={{ border: 0, borderRadius: 6, background: t.accent, color: "#fff", padding: "4px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", marginRight: 4 }}>Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ</button>
+                                        <button onClick={() => { setTrainingEditId(null); setTrainingEditData({}); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: t.tabBg, color: t.text, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>ĞÑ‚Ğ¼ĞµĞ½Ğ°</button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button onClick={() => { setTrainingEditId(s.id); setTrainingEditData({}); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: "transparent", color: t.accent, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer", marginRight: 4 }}>âœ</button>
+                                        <button onClick={() => { setTrainingTrashConfirm(s); setTrainingDeletionReason(""); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: "transparent", color: t.muted, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>ğŸ—‘</button>
+                                      </>
+                                    )}
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                </>
+              ) : adminReqTab === "quality" ? (
+                <>
+
+                {/* Quality insight stats counter */}
+                <div style={{ marginBottom: 24, padding: 20, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.cardBg }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+                    <div>
+                      <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 8px 0" }}>ĞĞ±Ğ·Ğ¾Ñ€Ñ‹ ĞºĞ°Ñ‡ĞµÑÑ‚Ğ²Ğ°</h2>
+                      <div style={{ color: t.muted, fontSize: 14, lineHeight: 1.6 }}>
+                        Ğ¡Ğ¸ÑÑ‚ĞµĞ¼Ğ° Ñ€ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´ÑƒĞµÑ‚ Ñ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ğ±Ğ·Ğ¾Ñ€ Ğ¿Ğ¾ÑĞ»Ğµ ĞºĞ°Ğ¶Ğ´Ñ‹Ñ… 10 Ğ½Ğ¾Ğ²Ñ‹Ñ… Ğ¾Ğ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ½Ñ‹Ñ… ĞºĞµĞ¹ÑĞ¾Ğ².
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 36, fontWeight: 900, color: qualityStats.recommended_to_analyze ? t.danger : t.accent }}>
+                        {qualityStats.new_approved_count}
+                      </div>
+                      <div style={{ color: t.muted, fontSize: 13 }}>Ğ½Ğ¾Ğ²Ñ‹Ñ… Ğ¾Ğ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ½Ñ‹Ñ… ĞºĞµĞ¹ÑĞ¾Ğ²</div>
+                    </div>
+                  </div>
+
+                  {qualityStats.last_analysis_at && (
+                    <div style={{ color: t.muted, fontSize: 13, marginTop: 8 }}>
+                      ĞŸĞ¾ÑĞ»ĞµĞ´Ğ½Ğ¸Ğ¹ Ğ¾Ğ±Ğ·Ğ¾Ñ€: {new Date(qualityStats.last_analysis_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                      {qualityStats.last_analysis_review_count > 0 ? ` (${qualityStats.last_analysis_review_count} ĞºĞµĞ¹ÑĞ¾Ğ²)` : ""}
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                    <button
+                      onClick={() => {
+                        if (qualityStats.new_approved_count === 0 && qualitySelectedReviewIds.length === 0) {
+                          showToast("ĞĞµÑ‚ ĞºĞµĞ¹ÑĞ¾Ğ² Ğ´Ğ»Ñ Ğ°Ğ½Ğ°Ğ»Ğ¸Ğ·Ğ°", "error");
+                          return;
+                        }
+                        setQualityConfirmOpen(true);
+                      }}
+                      disabled={qualityGenerating}
+                      style={{
+                        border: 0, borderRadius: 14, padding: "12px 24px", fontWeight: 700, fontSize: 15, cursor: qualityGenerating ? "not-allowed" : "pointer",
+                        background: qualityStats.recommended_to_analyze ? t.danger : t.accent,
+                        color: qualityStats.recommended_to_analyze ? "#fff" : "#fff",
+                        opacity: qualityGenerating ? 0.6 : 1,
+                      }}
+                    >
+                      {qualityGenerating ? "ĞĞ½Ğ°Ğ»Ğ¸Ğ·Ğ¸Ñ€ÑƒĞµĞ¼..." : qualitySelectedReviewIds.length > 0
+                        ? `Ğ¡Ñ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ğ±Ğ·Ğ¾Ñ€ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ñ‹Ñ… (${qualitySelectedReviewIds.length})`
+                        : "Ğ¡Ñ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ğ±Ğ·Ğ¾Ñ€ Ğ½Ğ¾Ğ²Ñ‹Ñ… ĞºĞµĞ¹ÑĞ¾Ğ²"}
+                    </button>
+                    <button
+                      onClick={() => { loadQualityStats(); loadQualityInsights(); }}
+                      style={{
+                        border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
+                        color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                      }}
+                    >
+                      ĞĞ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ
+                    </button>
+                  </div>
+
+                  {qualityStats.new_approved_count > 0 && qualityStats.new_approved_count < 5 && (
+                    <div style={{ color: t.muted, fontSize: 13, marginTop: 8, padding: "8px 12px", border: `1px solid ${t.border}`, borderRadius: 8, background: t.highlight }}>
+                      ĞšĞµĞ¹ÑĞ¾Ğ² Ğ¿Ğ¾ĞºĞ° Ğ¼Ğ°Ğ»Ğ¾. Ğ’Ñ‹Ğ²Ğ¾Ğ´Ñ‹ Ğ¼Ğ¾Ğ³ÑƒÑ‚ Ğ±Ñ‹Ñ‚ÑŒ Ğ¿Ñ€ĞµĞ´Ğ²Ğ°Ñ€Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ñ‹Ğ¼Ğ¸.
+                    </div>
+                  )}
+
+                  {qualityStats.recommended_to_analyze && (
+                    <div style={{ color: t.danger, fontSize: 15, fontWeight: 700, marginTop: 8, padding: "8px 12px", border: `1px solid ${t.danger}`, borderRadius: 8, background: t.dangerBg }}>
+                      ĞŸĞ¾Ñ€Ğ° ÑÑ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ½Ğ¾Ğ²Ñ‹Ğ¹ Ğ¾Ğ±Ğ·Ğ¾Ñ€
+                    </div>
+                  )}
+                </div>
+
+                {/* Quality insights list */}
+                {qualityLoading ? (
+                  <div style={{ color: t.muted, textAlign: "center", padding: 40 }}>Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°...</div>
+                ) : qualityInsights.length === 0 ? (
+                  <div style={{ color: t.muted, textAlign: "center", padding: 40 }}>ĞĞµÑ‚ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½Ğ½Ñ‹Ñ… Ğ¾Ğ±Ğ·Ğ¾Ñ€Ğ¾Ğ²</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {qualityInsights.map((insight) => {
+                      const isDetailView = qualityDetailInsight && qualityDetailInsight.id === insight.id;
+                      const d = isDetailView ? qualityDetailInsight : insight;
+                      return (
+                        <div key={insight.id} style={{
+                          border: `1px solid ${t.cardBorder}`, borderRadius: 20,
+                          background: t.crisisCard, padding: 20,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                              <span style={{ fontWeight: 700, fontSize: 16 }}>ĞĞ±Ğ·Ğ¾Ñ€ ĞºĞ°Ñ‡ĞµÑÑ‚Ğ²Ğ°</span>
+                              <span style={{ color: t.crisisMuted, fontSize: 13 }}>
+                                Ğ¾Ñ‚ {new Date(insight.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                              </span>
+                              <span style={{
+                                fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                                background: insight.status === "accepted" || insight.status === "partially_accepted" ? t.badgeClosed
+                                  : insight.status === "rejected" ? t.badgeNew
+                                  : insight.status === "under_review" ? t.badgeInProgress
+                                  : insight.status === "archived" ? t.badgeFalseAlarm
+                                  : t.badgePending,
+                                color: insight.status === "accepted" || insight.status === "partially_accepted" ? t.badgeClosedText
+                                  : insight.status === "rejected" ? t.badgeNewText
+                                  : insight.status === "under_review" ? t.badgeInProgressText
+                                  : insight.status === "archived" ? t.badgeFalseAlarmText
+                                  : t.badgePendingText,
+                              }}>
+                                {QUALITY_STATUS_LABELS[insight.status] || insight.status}
+                              </span>
+                            </div>
+                            <div style={{ color: t.crisisMuted, fontSize: 13 }}>
+                              {insight.review_count} ĞºĞµĞ¹ÑĞ¾Ğ²
+                              {insight.model_used ? ` Â· ${insight.model_used}` : ""}
+                              {insight.fallback_used ? " Â· fallback" : ""}
+                            </div>
+                          </div>
+
+                          {!isDetailView && insight.summary && (
+                            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
+                              {insight.summary.slice(0, 300)}{insight.summary.length > 300 ? "..." : ""}
+                            </div>
+                          )}
+
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button
+                              onClick={async () => {
+                                if (isDetailView) {
+                                  setQualityDetailInsight(null);
+                                } else {
+                                  await loadQualityInsightDetail(insight.id);
+                                }
+                              }}
+                              style={{
+                                border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg,
+                                color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              {isDetailView ? "Ğ¡Ğ²ĞµÑ€Ğ½ÑƒÑ‚ÑŒ" : "ĞŸĞ¾Ğ´Ñ€Ğ¾Ğ±Ğ½ĞµĞµ"}
+                            </button>
+                            <select
+                              value={insight.status}
+                              onChange={(e) => updateQualityInsightStatus(insight.id, e.target.value)}
+                              style={{
+                                border: `1px solid ${t.inputBorder}`, borderRadius: 8, background: t.inputBg,
+                                color: t.inputText, padding: "6px 12px", fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              {["new","under_review","accepted","partially_accepted","rejected","archived"].map((s) => (
+                                <option key={s} value={s}>{QUALITY_STATUS_LABELS[s]}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => copyOpenCodeTask(insight)}
+                              style={{
+                                border: `1px solid ${t.jsonlBtnBorder}`, borderRadius: 8, background: t.jsonlBtn,
+                                color: t.jsonlBtnText, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                              }}
+                            >
+                              Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ·Ğ°Ğ´Ğ°Ğ½Ğ¸Ğµ Ğ´Ğ»Ñ OpenCode
+                            </button>
+                          </div>
+
+                          {isDetailView && d && detailQualityInsightView(d, t)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Confirm dialog */}
+                {qualityConfirmOpen && (
+                  <div style={{
+                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                    background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center",
+                    justifyContent: "center", zIndex: 1000,
+                  }} onClick={() => setQualityConfirmOpen(false)}>
+                    <div style={{
+                      background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
+                      padding: 24, maxWidth: 500, width: "90%",
+                    }} onClick={(e) => e.stopPropagation()}>
+                      <h3 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 700 }}>Ğ¡Ñ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ğ±Ğ·Ğ¾Ñ€</h3>
+                      <p style={{ color: t.crisisText, fontSize: 14, lineHeight: 1.6, margin: "0 0 16px" }}>
+                        {qualitySelectedReviewIds.length > 0
+                          ? `Ğ’ Ğ°Ğ½Ğ°Ğ»Ğ¸Ğ· Ğ²Ğ¾Ğ¹Ğ´ÑƒÑ‚ ${qualitySelectedReviewIds.length} Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ñ‹Ñ… ĞºĞµĞ¹ÑĞ¾Ğ².`
+                          : `Ğ’ Ğ°Ğ½Ğ°Ğ»Ğ¸Ğ· Ğ²Ğ¾Ğ¹Ğ´ÑƒÑ‚ ${qualityStats.new_approved_count} Ğ½Ğ¾Ğ²Ñ‹Ñ… Ğ¾Ğ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ½Ñ‹Ñ… ĞºĞµĞ¹ÑĞ¾Ğ².`
+                        }
+                        {qualityStats.new_approved_count > 30 && qualitySelectedReviewIds.length === 0 && (
+                          <><br />Ğ’ ÑÑ‚Ğ¾Ñ‚ Ğ¾Ğ±Ğ·Ğ¾Ñ€ Ğ²Ğ¾Ğ¹Ğ´ÑƒÑ‚ 30 Ğ¸Ğ· {qualityStats.new_approved_count} Ğ½Ğ¾Ğ²Ñ‹Ñ… Ğ¾Ğ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ½Ñ‹Ñ… ĞºĞµĞ¹ÑĞ¾Ğ². ĞŸĞ¾ÑĞ»Ğµ Ğ°Ğ½Ğ°Ğ»Ğ¸Ğ·Ğ° Ğ¾ÑÑ‚Ğ°Ğ½ĞµÑ‚ÑÑ ĞµÑ‰Ñ‘ {qualityStats.new_approved_count - 30}.</>
+                        )}
+                        <br /><br />
+                        Ğ­Ñ‚Ğ¾ Ğ½Ğµ Ğ¸Ğ·Ğ¼ĞµĞ½Ğ¸Ñ‚ Ğ¿Ñ€Ğ¾Ğ¼Ğ¿Ñ‚Ñ‹ Ğ¸Ğ»Ğ¸ production Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ°Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸.
+                      </p>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          onClick={generateQualityInsight}
+                          disabled={qualityGenerating}
+                          style={{
+                            flex: 1, border: 0, borderRadius: 12, background: t.accent, color: "#fff",
+                            padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: qualityGenerating ? "not-allowed" : "pointer",
+                            opacity: qualityGenerating ? 0.6 : 1,
+                          }}
+                        >
+                          {qualityGenerating ? "ĞĞ½Ğ°Ğ»Ğ¸Ğ·Ğ¸Ñ€ÑƒĞµĞ¼..." : "ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ"}
+                        </button>
+                        <button
+                          onClick={() => setQualityConfirmOpen(false)}
+                          style={{
+                            flex: 1, border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
+                            color: t.text, padding: "12px 20px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                          }}
+                        >
+                          ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                </>
+              ) : adminReqTab === "organizations" ? (
+                <>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 20px 0" }}>ĞÑ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ†Ğ¸Ğ¸</h2>
+
+                  <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+                    <button onClick={() => { setOrgFormEditId(null); setOrgForm({ name: "", slug: "", type: "clinic", city: "", comment: "" }); setOrgFormOpen(true); }} style={{ border: 0, borderRadius: 14, padding: "12px 24px", fontWeight: 700, fontSize: 14, cursor: "pointer", background: t.accent, color: "#fff" }}>
+                      + Ğ¡Ğ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ Ğ¾Ñ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ
+                    </button>
+                  </div>
+
+                  {/* Organization cards */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {organizations.map((org) => (
+                      <div key={org.id} style={{ border: `1px solid ${t.cardBorder}`, borderRadius: 20, background: t.cardBg, padding: 20 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 16 }}>{org.name}</div>
+                            <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>
+                              {(orgTypeLabels[org.type] || org.type)} Â· {org.status}
+                              {org.city ? ` Â· ${org.city}` : ""}
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={() => { setOrgForm({ name: org.name, slug: org.slug || "", type: org.type, city: org.city || "", comment: org.comment || "" }); setOrgFormEditId(org.id); setOrgFormOpen(true); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+                              Ğ ĞµĞ´Ğ°ĞºÑ‚Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ
+                            </button>
+                            <button onClick={async () => { setOrgDetail(org); adminLoadOrganizationExperts(org.id); }} style={{ border: `1px solid ${t.accent}`, borderRadius: 10, background: t.highlight, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+                              ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ ({org.expert_count} ÑĞ¿ĞµÑ†., {org.patient_count} Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ¾Ğ²)
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {organizations.length === 0 && (
+                      <div style={{ color: t.muted, textAlign: "center", padding: 60, fontSize: 14 }}>
+                        ĞĞµÑ‚ Ğ¾Ñ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ†Ğ¸Ğ¹
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Organization detail */}
+                  {orgDetail && (
+                    <div style={{ marginTop: 32, border: `1px solid ${t.accent}`, borderRadius: 20, background: t.highlight, padding: 24 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>{orgDetail.name}</h3>
+                          <div style={{ color: t.muted, fontSize: 13 }}>{orgDetail.type} Â· {orgDetail.status} Â· {orgDetail.city || "Ğ³Ğ¾Ñ€Ğ¾Ğ´ Ğ½Ğµ ÑƒĞºĞ°Ğ·Ğ°Ğ½"}</div>
+                        </div>
+                        <button onClick={() => setOrgDetail(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+                          Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚ÑŒ
+                        </button>
+                      </div>
+
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ñ‹ Ğ¾Ñ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ†Ğ¸Ğ¸</div>
+                        {orgExperts.length === 0 ? (
+                          <div style={{ color: t.muted, fontSize: 13 }}>ĞĞµÑ‚ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ²</div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {orgExperts.map((m) => (
+                              <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", border: `1px solid ${t.cardBorder}`, borderRadius: 12, background: t.cardBg, flexWrap: "wrap", gap: 8 }}>
+                                <div>
+                                  <span style={{ fontWeight: 600, fontSize: 14 }}>{m.experts?.name || "â€”"}</span>
+                                  <span style={{ color: t.muted, fontSize: 12, marginLeft: 8 }}>{m.role} Â· {m.experts?.specialty || ""}</span>
+                                </div>
+                                <div style={{ display: "flex", gap: 6 }}>
+                                  <span style={{ fontSize: 11, color: t.muted }}>{m.experts?.access_code || ""}</span>
+                                  <button onClick={() => handleRemoveExpertFromOrg(m.expert_id)} style={{ border: `1px solid ${t.badgeNewText}`, borderRadius: 8, background: t.dangerBg, color: t.badgeNewText, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
+                                    Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <button onClick={async () => { const experts = await adminListAllExperts(); setOrgAddExpertOpen(true); }} style={{ border: `1px dashed ${t.accent}`, borderRadius: 10, background: "transparent", color: t.accent, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer", marginTop: 12 }}>
+                          + Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°
+                        </button>
+                      </div>
+
+                      {/* Add expert modal */}
+                      {orgAddExpertOpen && (
+                        <div style={{ marginTop: 12, padding: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.cardBg }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°</div>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                            <input placeholder="ID ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°" value={orgAddExpertId} onChange={(e) => setOrgAddExpertId(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", width: 200 }} />
+                            <select value={orgAddExpertRole} onChange={(e) => setOrgAddExpertRole(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
+                              {["owner","admin","supervisor","doctor","assistant","observer"].map((r) => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                            <button onClick={handleAddExpertToOrg} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ</button>
+                            <button onClick={() => setOrgAddExpertOpen(false)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>ĞÑ‚Ğ¼ĞµĞ½Ğ°</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Create/Edit organization form */}
+                  {orgFormOpen && (
+                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+                      <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20, padding: 24, maxWidth: 500, width: "90%" }}>
+                        <h3 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 800 }}>{orgFormEditId ? "Ğ ĞµĞ´Ğ°ĞºÑ‚Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ñ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ" : "Ğ¡Ğ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ Ğ¾Ñ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ"}</h3>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                          <input placeholder="ĞĞ°Ğ·Ğ²Ğ°Ğ½Ğ¸Ğµ *" value={orgForm.name} onChange={(e) => setOrgForm((f) => ({ ...f, name: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <label style={{ fontSize: 13, fontWeight: 600, color: t.text }}>Slug / Ñ‚ĞµÑ…Ğ½Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ Ğ°Ğ´Ñ€ĞµÑ</label>
+                            <input placeholder="slug-organization" value={orgForm.slug} onChange={(e) => setOrgForm((f) => ({ ...f, slug: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
+                            <div style={{ fontSize: 12, color: t.muted, lineHeight: 1.4 }}>
+                              ĞšĞ¾Ñ€Ğ¾Ñ‚ĞºĞ¸Ğ¹ ÑƒĞ½Ğ¸ĞºĞ°Ğ»ÑŒĞ½Ñ‹Ğ¹ Ğ¸Ğ´ĞµĞ½Ñ‚Ğ¸Ñ„Ğ¸ĞºĞ°Ñ‚Ğ¾Ñ€ Ğ»Ğ°Ñ‚Ğ¸Ğ½Ğ¸Ñ†ĞµĞ¹, Ğ½Ğ°Ğ¿Ñ€Ğ¸Ğ¼ĞµÑ€ kazan-clinic Ğ¸Ğ»Ğ¸ demo-test. ĞœĞ¾Ğ¶Ğ½Ğ¾ Ğ¾ÑÑ‚Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ¿ÑƒÑÑ‚Ñ‹Ğ¼ â€” ÑĞ¸ÑÑ‚ĞµĞ¼Ğ° ÑĞ¾Ğ·Ğ´Ğ°ÑÑ‚ Ğ°Ğ²Ñ‚Ğ¾Ğ¼Ğ°Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸.
+                            </div>
+                          </div>
+                          <select value={orgForm.type} onChange={(e) => setOrgForm((f) => ({ ...f, type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, cursor: "pointer" }}>
+                            {Object.entries(orgTypeLabels).map(([val, label]) => <option key={val} value={val}>{label}</option>)}
+                          </select>
+                          <input placeholder="Ğ“Ğ¾Ñ€Ğ¾Ğ´" value={orgForm.city} onChange={(e) => setOrgForm((f) => ({ ...f, city: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
+                          <textarea placeholder="ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹" value={orgForm.comment} onChange={(e) => setOrgForm((f) => ({ ...f, comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none", minHeight: 60, resize: "vertical" }} />
+                        </div>
+                        <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
+                          <button onClick={handleCreateOrganization} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                            {orgFormEditId ? "Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ" : "Ğ¡Ğ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ"}
+                          </button>
+                          <button onClick={() => { setOrgFormOpen(false); setOrgFormEditId(null); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                            ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : adminReqTab === "onboarding" ? (
+                <>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 20px 0" }}>Ğ—Ğ°ÑĞ²ĞºĞ¸ Ğ½Ğ° Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ğµ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ²</h2>
+                  <div style={{ display: "flex", gap: 12, marginBottom: 24, alignItems: "center" }}>
+                    <button
+                      onClick={() => adminLoadOnboardingRequests("all")}
+                      style={{ border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg, color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}
+                    >
+                      {onboardingLoading ? "Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°..." : `ĞĞ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ (${onboardingRequests.length})`}
+                    </button>
+                  </div>
+                  {onboardingLoading ? (
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°...</div>
+                  ) : onboardingRequests.length === 0 ? (
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>ĞĞµÑ‚ Ğ·Ğ°ÑĞ²Ğ¾Ğº</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      {onboardingRequests.map((req) => (
+                        <div key={req.id} style={{ border: `1px solid ${t.cardBorder}`, borderRadius: 20, background: t.cardBg, padding: 20 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: 16 }}>{req.name}</div>
+                              <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>
+                                {req.contact_email && <span>{req.contact_email} Â· </span>}
+                                {req.contact_phone && <span>{req.contact_phone} Â· </span>}
+                                ĞœĞ¾Ğ´ÑƒĞ»ÑŒ: {req.module} Â· {req.status}
+                              </div>
+                              <div style={{ color: t.muted, fontSize: 12, marginTop: 2 }}>
+                                {new Date(req.created_at).toLocaleString("ru-RU")}
+                                {req.reviewed_at && ` Â· Ğ Ğ°ÑÑĞ¼Ğ¾Ñ‚Ñ€ĞµĞ½Ğ¾: ${new Date(req.reviewed_at).toLocaleString("ru-RU")}`}
+                              </div>
+                            </div>
+                            <span style={{
+                              fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                              background: req.status === "submitted" ? "#FEF3C7" : req.status === "approved" ? "#E2EBE4" : "#f0e0e0",
+                              color: req.status === "submitted" ? "#92400E" : req.status === "approved" ? "#5F7D6C" : "#8B4A3A",
+                            }}>
+                              {req.status === "submitted" ? "ĞĞ¶Ğ¸Ğ´Ğ°ĞµÑ‚" : req.status === "approved" ? "ĞĞ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ°" : req.status === "rejected" ? "ĞÑ‚ĞºĞ»Ğ¾Ğ½ĞµĞ½Ğ°" : req.status}
+                            </span>
+                          </div>
+                          {req.comment && (
+                            <div style={{ fontSize: 13, color: t.text, marginBottom: 8, padding: 8, background: t.filterBg, borderRadius: 8 }}>
+                              {req.comment}
+                            </div>
+                          )}
+                          {req.status === "submitted" && (
+                            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                              <button
+                                onClick={async () => {
+                                  const experts = await adminListAllExperts();
+                                  const eligible = experts.filter(e => e.is_active && Array.isArray(e.allowed_modules) && e.allowed_modules.includes(req.module));
+                                  if (eligible.length === 0) { showToast("ĞĞµÑ‚ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ñ‹Ñ… ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ²", "error"); return; }
+                                  setMatchExpertList(eligible);
+                                  setMatchExpertSelector(`onboarding-${req.id}`);
+                                }}
+                                style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                              >
+                                ĞĞ´Ğ¾Ğ±Ñ€Ğ¸Ñ‚ÑŒ Ğ¸ Ğ¿Ñ€Ğ¸Ğ²ÑĞ·Ğ°Ñ‚ÑŒ
+                              </button>
+                              <button
+                                onClick={() => adminReviewOnboardingRequest(req.id, "reject")}
+                                style={{ border: `1px solid #ef4444`, borderRadius: 10, background: "transparent", color: "#ef4444", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                              >
+                                ĞÑ‚ĞºĞ»Ğ¾Ğ½Ğ¸Ñ‚ÑŒ
+                              </button>
+                            </div>
+                          )}
+                          {matchExpertSelector === `onboarding-${req.id}` && (
+                            <div style={{ marginTop: 12, padding: 12, border: `1px solid ${t.border}`, borderRadius: 12, background: t.filterBg }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°:</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                {matchExpertList.map((exp) => (
+                                  <button
+                                    key={exp.id}
+                                    onClick={() => adminReviewOnboardingRequest(req.id, "approve", exp.id)}
+                                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.cardBg, color: t.text, padding: "8px 12px", textAlign: "left", cursor: "pointer", fontSize: 13 }}
+                                  >
+                                    {exp.name} ({exp.role})
+                                  </button>
+                                ))}
+                              </div>
+                              <button onClick={() => setMatchExpertSelector(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: "transparent", color: t.muted, padding: "6px 12px", fontSize: 12, cursor: "pointer", marginTop: 8 }}>
+                                ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : adminReqTab === "match" ? (
+                <>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 20px 0" }}>Ğ—Ğ°ÑĞ²ĞºĞ¸ Ğ½Ğ° Ğ¿Ğ¾Ğ´Ğ±Ğ¾Ñ€ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°</h2>
+                  <div style={{ display: "flex", gap: 12, marginBottom: 24, alignItems: "center" }}>
+                    <button
+                      onClick={() => adminLoadMatchRequests("all")}
+                      style={{ border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg, color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}
+                    >
+                      {matchLoading ? "Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°..." : `ĞĞ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ (${matchRequests.length})`}
+                    </button>
+                  </div>
+                  {matchLoading ? (
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°...</div>
+                  ) : matchRequests.length === 0 ? (
+                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>ĞĞµÑ‚ Ğ·Ğ°ÑĞ²Ğ¾Ğº</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      {matchRequests.map((req) => (
+                        <div key={req.id} style={{ border: `1px solid ${t.cardBorder}`, borderRadius: 20, background: t.cardBg, padding: 20 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: 16 }}>ĞŸĞ°Ñ†Ğ¸ĞµĞ½Ñ‚: {req.owner_id?.slice(0, 8)}...</div>
+                              <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>
+                                ĞœĞ¾Ğ´ÑƒĞ»ÑŒ: {req.module} Â· {req.status}
+                              </div>
+                              <div style={{ color: t.muted, fontSize: 12, marginTop: 2 }}>
+                                {new Date(req.created_at).toLocaleString("ru-RU")}
+                                {req.assigned_at && ` Â· ĞĞ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¾: ${new Date(req.assigned_at).toLocaleString("ru-RU")}`}
+                              </div>
+                            </div>
+                            <span style={{
+                              fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                              background: req.status === "submitted" ? "#FEF3C7" : req.status === "assigned" ? "#E2EBE4" : "#f0f0f0",
+                              color: req.status === "submitted" ? "#92400E" : req.status === "assigned" ? "#5F7D6C" : "#666",
+                            }}>
+                              {req.status === "submitted" ? "ĞĞ¶Ğ¸Ğ´Ğ°ĞµÑ‚" : req.status === "assigned" ? "ĞĞ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½" : req.status}
+                            </span>
+                          </div>
+                          {req.message && (
+                            <div style={{ fontSize: 13, color: t.text, marginBottom: 8, padding: 8, background: t.filterBg, borderRadius: 8 }}>
+                              {req.message}
+                            </div>
+                          )}
+                          {req.status === "submitted" && (
+                            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                              <button
+                                onClick={async () => {
+                                  await adminLoadEligibleExperts(req.module);
+                                  setMatchExpertSelector(req.id);
+                                }}
+                                style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                              >
+                                ĞĞ°Ğ·Ğ½Ğ°Ñ‡Ğ¸Ñ‚ÑŒ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°
+                              </button>
+                            </div>
+                          )}
+                          {matchExpertSelector === req.id && (
+                            <div style={{ marginTop: 12, padding: 12, border: `1px solid ${t.border}`, borderRadius: 12, background: t.filterBg }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°:</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                {matchExpertList.map((exp) => (
+                                  <button
+                                    key={exp.id}
+                                    onClick={() => adminAssignMatchRequest(req.id, exp.id)}
+                                    disabled={matchAssigning}
+                                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.cardBg, color: t.text, padding: "8px 12px", textAlign: "left", cursor: "pointer", fontSize: 13 }}
+                                  >
+                                    {exp.name} ({exp.role})
+                                  </button>
+                                ))}
+                              </div>
+                              <button onClick={() => setMatchExpertSelector(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: "transparent", color: t.muted, padding: "6px 12px", fontSize: 12, cursor: "pointer", marginTop: 8 }}>
+                                ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+              <>
+              {/* Reviews filters */}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
+                <select
+                  value={adminFilter}
+                  onChange={(e) => { const v = e.target.value; setAdminFilter(v); adminLoadReviews(v, adminEnv); }}
+                  style={{
+                    border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
+                    color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                  }}
+                >
+                  <option value="all">Ğ’ÑĞµ</option>
+                  <option value="pending">ĞĞ¶Ğ¸Ğ´Ğ°ÑÑ‚</option>
+                  <option value="approved">ĞĞ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ½Ñ‹Ğµ</option>
+                  <option value="rejected">ĞÑ‚ĞºĞ»Ğ¾Ğ½Ñ‘Ğ½Ğ½Ñ‹Ğµ</option>
+                  <option value="needs_review">ĞĞ° Ğ´Ğ¾Ñ€Ğ°Ğ±Ğ¾Ñ‚ĞºÑƒ</option>
+                  <option value="local_auto_saved">Ğ›Ğ¾ĞºĞ°Ğ»ÑŒĞ½Ñ‹Ğµ</option>
+                </select>
+                <select
+                  value={adminEnv}
+                  onChange={(e) => { const v = e.target.value; setAdminEnv(v); adminLoadReviews(adminFilter, v); }}
+                  style={{
+                    border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
+                    color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                  }}
+                >
+                  <option value="all">Ğ’ÑĞµ</option>
+                  <option value="production">Ğ Ğ°Ğ±Ğ¾Ñ‡Ğ¸Ğ¹ ÑĞ°Ğ¹Ñ‚ (Production)</option>
+                  <option value="preview">ĞŸÑ€ĞµĞ´Ğ¿Ñ€Ğ¾ÑĞ¼Ğ¾Ñ‚Ñ€ (Preview)</option>
+                  <option value="development">Ğ Ğ°Ğ·Ñ€Ğ°Ğ±Ğ¾Ñ‚ĞºĞ° (Development)</option>
+                  <option value="local">Ğ›Ğ¾ĞºĞ°Ğ»ÑŒĞ½Ğ¾ (Local)</option>
+                </select>
+                <select
+                  value={adminExpertFilter}
+                  onChange={(e) => { const v = e.target.value; setAdminExpertFilter(v); adminLoadReviews(adminFilter, adminEnv, v); }}
+                  style={{
+                    border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
+                    color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
+                  }}
+                >
+                  <option value="all">Ğ’ÑĞµ Ğ¾Ñ‚Ğ·Ñ‹Ğ²Ñ‹</option>
+                  <option value="with_expert">Ğ¡ ÑĞºÑĞ¿ĞµÑ€Ñ‚Ğ¾Ğ¼</option>
+                  <option value="without_expert">Ğ‘ĞµĞ· ÑĞºÑĞ¿ĞµÑ€Ñ‚Ğ°</option>
+                </select>
+                <button
+                  style={{
+                    border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
+                    color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                  }}
+                  onClick={() => adminLoadReviews()}
+                >
+                  {adminLoading ? "Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°..." : `ĞĞ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ (${adminTotal})`}
+                </button>
+                <button
+                  style={{
+                    border: `1px solid ${adminReviewShowTrash ? t.crisisAccent : t.border}`,
+                    borderRadius: 12,
+                    background: adminReviewShowTrash ? t.crisisAccent : t.tabBg,
+                    color: adminReviewShowTrash ? "#fff" : t.text,
+                    padding: "10px 16px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                  }}
+                  onClick={() => {
+                    const next = !adminReviewShowTrash;
+                    setAdminReviewShowTrash(next);
+                    adminLoadReviews(adminFilter, adminEnv, adminExpertFilter, next);
+                  }}
+                >
+                  {adminReviewShowTrash ? "ğŸ—‘ ĞĞºÑ‚Ğ¸Ğ²Ğ½Ñ‹Ğµ" : "ğŸ—‘ ĞšĞ¾Ñ€Ğ·Ğ¸Ğ½Ğ°"}
+                </button>
+              </div>
+
+              {/* Reviews list */}
+              {adminLoading ? (
+                <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°...</div>
+              ) : adminReviews.length === 0 ? (
+                <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>ĞĞµÑ‚ Ğ·Ğ°Ğ¿Ğ¸ÑĞµĞ¹</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {adminReviews.map((review) => {
+                    try {
+                    const json = getReviewJson(review);
+                    const correction = getDoctorCorrection(review);
+                    const corrected = getCorrectedJson(review);
+                    const norm = normalizeReviewDetails(review);
+
+                    const patientText = safeText(norm.patientText);
+                    const userReport = safeText(norm.userReport);
+                    const doctorReport = safeText(norm.doctorReport);
+                    const doctorFeedbackComment = safeText(norm.doctorFeedback?.generalComment || "");
+                    const rounds = norm.rounds;
+                    const status = safeText(json.status, "legacy");
+                    const source = safeText(json.source, "â€”");
+                    const environment = safeText(json.environment, "â€”");
+                    const publicCode = safeText(json.public_code || json.publicCode, "â€”");
+                    const expertName = safeText(json.expert_name || "");
+                    const expertRole = safeText(json.expert_role || "");
+                    const expertSpecialty = safeText(json.expert_specialty || "");
+                    const city = safeText(json.city || "");
+                    const organization = safeText(json.organization || "");
+
+                    return (
+                      <div
+                        key={review.id}
+                        style={{
+                          border: `1px solid ${t.crisisBorder}`, borderRadius: 20,
+                          background: t.crisisCard, padding: 20,
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                            {status === "approved" && (
+                              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", fontSize: 11, color: t.muted }}>
+                                <input
+                                  type="checkbox"
+                                  checked={qualitySelectedReviewIds.includes(review.id)}
+                                  onChange={() => toggleReviewSelection(review.id)}
+                                  style={{ cursor: "pointer" }}
+                                />
+                                Ğ’ Ğ¾Ğ±Ğ·Ğ¾Ñ€
+                              </label>
+                            )}
+                            <span style={{ color: t.crisisMuted, fontSize: 12 }}>
+                              {safeDate(review.created_at)}
+                            </span>
+                            <span style={{
+                              fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
+                              background: status === "approved" ? t.badgeClosed : status === "rejected" ? t.badgeNew : status === "needs_review" ? t.badgePending : status === "local_auto_saved" ? t.badgeInProgress : t.badgeFalseAlarm,
+                              color: status === "approved" ? t.badgeClosedText : status === "rejected" ? t.badgeNewText : status === "needs_review" ? t.badgePendingText : status === "local_auto_saved" ? t.badgeInProgressText : t.badgeFalseAlarmText,
+                            }}>
+                              {status}
+                            </span>
+                            <span style={{ color: t.cardLabel, fontSize: 12 }}>
+                              {environment} / {source}
+                            </span>
+                          </div>
+                          {publicCode !== "â€”" ? (
+                            <span
+                              onClick={() => loadSessionTimeline(publicCode)}
+                              title="ĞŸĞ¾ĞºĞ°Ğ·Ğ°Ñ‚ÑŒ Ğ²ÑĞµ ÑĞµÑÑĞ¸Ğ¸ Ğ¿Ğ¾ ÑÑ‚Ğ¾Ğ¼Ñƒ ĞºĞ¾Ğ´Ñƒ"
+                              style={{ fontWeight: 700, fontSize: 13, color: t.crisisAccent, letterSpacing: 0.5, cursor: "pointer", textDecoration: "underline dotted", textUnderlineOffset: 3 }}
+                            >
+                              {publicCode}
+                            </span>
+                          ) : (
+                            <span style={{ fontWeight: 700, fontSize: 13, color: t.muted, letterSpacing: 0.5 }}>
+                              ĞšĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ Ğ½Ğµ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½
+                            </span>
+                          )}
+                        </div>
+
+                        {expertName && (
+                          <div style={{ marginBottom: 10, fontSize: 12, color: t.crisisAccent }}>
+                            ğŸ”¬ {expertName}{expertRole ? `, ${expertRole}` : ""}{expertSpecialty ? ` (${expertSpecialty})` : ""}{city ? ` Â· ${city}` : ""}{organization ? ` Â· ${organization}` : ""}
+                          </div>
+                        )}
+
+                        {renderReviewSections(review, json, t, { patientText, userReport, doctorReport, doctorFeedbackComment, conversationHistory: rounds, doctorFeedback: norm.doctorFeedback })}
+
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button
+                            disabled={!review?.id || adminActionLoading === review.id}
+                            style={{
+                              border: 0, borderRadius: 12, background: t.badgeClosed, color: t.badgeClosedText,
+                              padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                              opacity: adminActionLoading === review.id ? 0.5 : 1,
+                            }}
+                            onClick={() => adminUpdateStatus(review.id, "approved")}
+                          >
+                            ĞĞ´Ğ¾Ğ±Ñ€Ğ¸Ñ‚ÑŒ
+                          </button>
+                          <button
+                            disabled={!review?.id || adminActionLoading === review.id}
+                            style={{
+                              border: 0, borderRadius: 12, background: t.badgeNew, color: t.badgeNewText,
+                              padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                              opacity: adminActionLoading === review.id ? 0.5 : 1,
+                            }}
+                            onClick={() => adminUpdateStatus(review.id, "rejected")}
+                          >
+                            ĞÑ‚ĞºĞ»Ğ¾Ğ½Ğ¸Ñ‚ÑŒ
+                          </button>
+                          <button
+                            disabled={!review?.id || adminActionLoading === review.id}
+                            style={{
+                              border: 0, borderRadius: 12, background: t.badgePending, color: t.badgePendingText,
+                              padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                              opacity: adminActionLoading === review.id ? 0.5 : 1,
+                            }}
+                            onClick={() => adminUpdateStatus(review.id, "needs_review")}
+                          >
+                            Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ Ğ´Ğ¾Ñ€Ğ°Ğ±Ğ¾Ñ‚ĞºĞ¸
+                          </button>
+                          <button
+                            disabled={!review?.id}
+                            style={{
+                              border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                              color: t.crisisActionJsonlText, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                            }}
+                            onClick={() => adminDownloadJson(review)}
+                          >
+                            Ğ¡ĞºĞ°Ñ‡Ğ°Ñ‚ÑŒ JSON
+                          </button>
+                          <button
+                            disabled={!review?.id}
+                            style={{
+                              border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                              color: t.crisisAccent, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                            }}
+                            onClick={() => {
+                              setTrainingFormReviewId(review.id);
+                              setTrainingFormData((d) => ({ ...d, public_code: review.public_code || "" }));
+                            }}
+                          >
+                            + Ğ’ Ñ‚Ğ°Ğ±Ğ»Ğ¸Ñ†Ñƒ Ñ‚Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²Ğ¾Ğº
+                          </button>
+                          <button
+                            disabled={!review?.id}
+                            style={{
+                              border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                              color: t.crisisAccent, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                            }}
+                            onClick={() => openCorrectionForm(review)}
+                          >
+                            Ğ ĞµĞ´Ğ°ĞºÑ‚Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ
+                          </button>
+                          {!adminReviewShowTrash ? (
+                            <button
+                              disabled={!review?.id}
+                              title="Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ¸Ğ· Ğ¾Ñ‚Ğ·Ñ‹Ğ²Ğ¾Ğ²"
+                              style={{
+                                border: `1px solid ${t.crisisBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                                color: "#e74c3c", padding: "8px 14px", fontWeight: 600, fontSize: 16, cursor: "pointer",
+                                lineHeight: 1,
+                              }}
+                              onClick={() => {
+                                const j = getReviewJson(review);
+                                const code = j.public_code || j.publicCode || review.public_code || "â€”";
+                                setDeleteConfirmReviewId(review.id);
+                                setDeleteConfirmCode(code);
+                                setDeleteConfirmType("soft");
+                                setDeleteConfirmStep(1);
+                              }}
+                            >
+                              ğŸ—‘
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                disabled={!review?.id}
+                                title="Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ"
+                                style={{
+                                  border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                                  color: t.badgeClosedText, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                                }}
+                                onClick={async () => {
+                                  setAdminActionLoading(review.id);
+                                  try {
+                                    const res = await fetch("/api/reviews", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ action: "restoreReview", review_id: review.id, admin_secret: adminPassword }),
+                                    });
+                                    const d = await res.json();
+                                    showToast(d.message || (d.ok ? "Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¾" : d.error), d.ok ? "success" : "error");
+                                    if (d.ok) adminLoadReviews();
+                                  } catch {
+                                    showToast("ĞÑˆĞ¸Ğ±ĞºĞ° Ğ²Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ", "error");
+                                  } finally {
+                                    setAdminActionLoading(null);
+                                  }
+                                }}
+                              >
+                                â†©ï¸ Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ
+                              </button>
+                              <button
+                                disabled={!review?.id}
+                                title="Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ±ĞµĞ·Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‚Ğ½Ğ¾"
+                                style={{
+                                  border: `1px solid ${t.crisisBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
+                                  color: "#e74c3c", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                                }}
+                                onClick={() => {
+                                  const j = getReviewJson(review);
+                                  const code = j.public_code || j.publicCode || review.public_code || "â€”";
+                                  setDeleteConfirmReviewId(review.id);
+                                  setDeleteConfirmCode(code);
+                                  setDeleteConfirmType("permanent");
+                                  setDeleteConfirmStep(1);
+                                }}
+                              >
+                                ğŸ—‘ Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ
+                              </button>
+                              <button
+                                disabled={!review?.id}
+                                title="Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ²ÑÑ Ñ‚ĞµÑÑ‚Ğ¾Ğ²ÑƒÑ ÑĞµÑÑĞ¸Ñ"
+                                style={{
+                                  border: `1px solid #e74c3c`, borderRadius: 12,
+                                  background: "#e74c3c", color: "#fff",
+                                  padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                                }}
+                                onClick={() => {
+                                  const j = getReviewJson(review);
+                                  const code = j.public_code || j.publicCode || review.public_code || "â€”";
+                                  setDeleteConfirmReviewId(review.id);
+                                  setDeleteConfirmCode(code);
+                                  setDeleteConfirmType("full");
+                                  setDeleteConfirmStep(1);
+                                }}
+                              >
+                                â˜  ĞŸĞ¾Ğ»Ğ½Ğ¾ÑÑ‚ÑŒÑ
+                              </button>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Delete confirmation dialog */}
+                        {deleteConfirmReviewId === review.id && deleteConfirmStep >= 1 && (
+                          <div style={{
+                            marginTop: 16, border: `2px solid #e74c3c`, borderRadius: 16,
+                            background: t.cardBorder, padding: 20, position: "relative",
+                          }}>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: "#e74c3c", marginBottom: 12 }}>
+                              {deleteConfirmType === "soft" ? "ğŸ—‘ Ğ£Ğ´Ğ°Ğ»ĞµĞ½Ğ¸Ğµ ĞºĞ°Ñ€Ñ‚Ğ¾Ñ‡ĞºĞ¸" :
+                               deleteConfirmType === "permanent" ? "ğŸ”¥ Ğ‘ĞµĞ·Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‚Ğ½Ğ¾Ğµ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ğµ" :
+                               "â˜  Ğ£Ğ´Ğ°Ğ»ĞµĞ½Ğ¸Ğµ Ğ²ÑĞµĞ¹ Ñ‚ĞµÑÑ‚Ğ¾Ğ²Ğ¾Ğ¹ ÑĞµÑÑĞ¸Ğ¸"}
+                            </div>
+
+                            {deleteConfirmType === "soft" && deleteConfirmStep === 1 && (
+                              <>
+                                <p style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, margin: "0 0 12px" }}>
+                                  ĞšĞ°Ñ€Ñ‚Ğ¾Ñ‡ĞºĞ° Ğ¾Ñ‚Ğ·Ñ‹Ğ²Ğ° <strong>{deleteConfirmCode}</strong> Ğ±ÑƒĞ´ĞµÑ‚ Ğ¿ĞµÑ€ĞµĞ¼ĞµÑ‰ĞµĞ½Ğ° Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ.<br />
+                                  Ğ˜ÑÑ…Ğ¾Ğ´Ğ½Ğ°Ñ ÑĞµÑÑĞ¸Ñ Ğ¸ Ğ´Ğ¸Ğ°Ğ»Ğ¾Ğ³ Ğ¾ÑÑ‚Ğ°Ğ½ÑƒÑ‚ÑÑ Ğ² Ğ±Ğ°Ğ·Ğµ.
+                                </p>
+                                <div style={{ display: "flex", gap: 8 }}>
+                                  <button
+                                    style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                    onClick={async () => {
+                                      setAdminActionLoading(review.id);
+                                      try {
+                                        const res = await fetch("/api/reviews", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ action: "softDeleteReview", review_id: review.id, admin_secret: adminPassword }),
+                                        });
+                                        const d = await res.json();
+                                        showToast(d.message || (d.ok ? "Ğ£Ğ´Ğ°Ğ»ĞµĞ½Ğ¾" : d.error), d.ok ? "success" : "error");
+                                        if (d.ok) { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); adminLoadReviews(); }
+                                      } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ", "error"); }
+                                      finally { setAdminActionLoading(null); }
+                                    }}
+                                  >
+                                    ĞŸĞµÑ€ĞµĞ¼ĞµÑÑ‚Ğ¸Ñ‚ÑŒ Ğ² ĞºĞ¾Ñ€Ğ·Ğ¸Ğ½Ñƒ
+                                  </button>
+                                  <button
+                                    style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                                    onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
+                                  >
+                                    ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                                  </button>
+                                </div>
+                              </>
+                            )}
+
+                            {deleteConfirmType === "permanent" && (
+                              <>
+                                {deleteConfirmStep === 1 ? (
+                                  <>
+                                    <p style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, margin: "0 0 4px" }}>
+                                      Ğ’Ñ‹ ÑƒĞ²ĞµÑ€ĞµĞ½Ñ‹, Ñ‡Ñ‚Ğ¾ Ñ…Ğ¾Ñ‚Ğ¸Ñ‚Ğµ <strong style={{ color: "#e74c3c" }}>Ğ±ĞµĞ·Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‚Ğ½Ğ¾ ÑƒĞ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ</strong> Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ <strong>{deleteConfirmCode}</strong>?
+                                    </p>
+                                    <p style={{ color: t.muted, fontSize: 12, margin: "0 0 12px" }}>
+                                      Ğ‘ÑƒĞ´ĞµÑ‚ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ° Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ ÑÑ‚Ğ° Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ <code>case_review</code>.<br />
+                                      Ğ”ĞµĞ¹ÑÑ‚Ğ²Ğ¸Ğµ Ğ½ĞµĞ»ÑŒĞ·Ñ Ğ¾Ñ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ.
+                                    </p>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                      <button
+                                        style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => setDeleteConfirmStep(2)}
+                                      >
+                                        Ğ”Ğ°, ÑƒĞ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ½Ğ°Ğ²ÑĞµĞ³Ğ´Ğ°
+                                      </button>
+                                      <button
+                                        style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
+                                      >
+                                        ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                                      </button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, margin: "0 0 12px" }}>
+                                      âš ï¸ ĞŸĞ¾ÑĞ»ĞµĞ´Ğ½ĞµĞµ Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´ĞµĞ½Ğ¸Ğµ. Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ <strong>{deleteConfirmCode}</strong> Ğ±ÑƒĞ´ĞµÑ‚ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ° Ğ±ĞµĞ·Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‚Ğ½Ğ¾. Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ½ĞµĞ²Ğ¾Ğ·Ğ¼Ğ¾Ğ¶Ğ½Ğ¾.
+                                    </p>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                      <button
+                                        style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                        onClick={async () => {
+                                          setAdminActionLoading(review.id);
+                                          try {
+                                            const res = await fetch("/api/reviews", {
+                                              method: "POST",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ action: "permanentDeleteReview", review_id: review.id, admin_secret: adminPassword }),
+                                            });
+                                            const d = await res.json();
+                                            showToast(d.message || (d.ok ? "Ğ£Ğ´Ğ°Ğ»ĞµĞ½Ğ¾" : d.error), d.ok ? "success" : "error");
+                                            if (d.ok) { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); adminLoadReviews(); }
+                                          } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ", "error"); }
+                                          finally { setAdminActionLoading(null); }
+                                        }}
+                                      >
+                                        ğŸ”¥ ĞŸĞ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´Ğ°Ñ Ğ±ĞµĞ·Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‚Ğ½Ğ¾Ğµ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ğµ
+                                      </button>
+                                      <button
+                                        style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
+                                      >
+                                        ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </>
+                            )}
+
+                            {deleteConfirmType === "full" && (
+                              <>
+                                {deleteConfirmStep === 1 ? (
+                                  <>
+                                    <p style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, margin: "0 0 4px" }}>
+                                      âš ï¸ Ğ’Ñ‹ ÑĞ¾Ğ±Ğ¸Ñ€Ğ°ĞµÑ‚ĞµÑÑŒ <strong style={{ color: "#e74c3c" }}>Ğ¿Ğ¾Ğ»Ğ½Ğ¾ÑÑ‚ÑŒÑ ÑƒĞ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ñ‚ĞµÑÑ‚Ğ¾Ğ²ÑƒÑ ÑĞµÑÑĞ¸Ñ</strong> <strong>{deleteConfirmCode}</strong>.
+                                    </p>
+                                    <p style={{ color: t.muted, fontSize: 12, margin: "0 0 12px" }}>
+                                      Ğ‘ÑƒĞ´ÑƒÑ‚ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ñ‹: <code>case_review</code>, <code>training_session</code>, <code>session</code>.<br />
+                                      Ğ”Ğ¸Ğ°Ğ»Ğ¾Ğ³ Ğ¸ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚Ñ‹ Ğ²Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ Ğ±ÑƒĞ´ĞµÑ‚ Ğ½ĞµĞ²Ğ¾Ğ·Ğ¼Ğ¾Ğ¶Ğ½Ğ¾.
+                                    </p>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                      <button
+                                        style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => setDeleteConfirmStep(2)}
+                                      >
+                                        Ğ”Ğ°, Ñ Ğ¿Ğ¾Ğ½Ğ¸Ğ¼Ğ°Ñ. Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ²ÑÑ‘.
+                                      </button>
+                                      <button
+                                        style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
+                                      >
+                                        ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                                      </button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p style={{ color: "#e74c3c", fontSize: 13, lineHeight: 1.5, margin: "0 0 12px", fontWeight: 700 }}>
+                                      â˜ ï¸ ĞŸĞ¾ÑĞ»ĞµĞ´Ğ½ĞµĞµ Ğ¿Ñ€ĞµĞ´ÑƒĞ¿Ñ€ĞµĞ¶Ğ´ĞµĞ½Ğ¸Ğµ!<br />
+                                      Ğ¡ĞµÑÑĞ¸Ñ <strong>{deleteConfirmCode}</strong> Ğ±ÑƒĞ´ĞµÑ‚ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ° Ğ¸Ğ· Ğ²ÑĞµÑ… Ñ‚Ğ°Ğ±Ğ»Ğ¸Ñ†.<br />
+                                      Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ½ĞµĞ²Ğ¾Ğ·Ğ¼Ğ¾Ğ¶Ğ½Ğ¾. Ğ­Ñ‚Ğ¾ Ğ´ĞµĞ¹ÑÑ‚Ğ²Ğ¸Ğµ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ´Ğ»Ñ Ğ°Ğ´Ğ¼Ğ¸Ğ½Ğ¸ÑÑ‚Ñ€Ğ°Ñ‚Ğ¾Ñ€Ğ°.
+                                    </p>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                      <button
+                                        style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+                                        onClick={async () => {
+                                          setAdminActionLoading(review.id);
+                                          try {
+                                            const res = await fetch("/api/reviews", {
+                                              method: "POST",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ action: "deleteFullTestSession", review_id: review.id, admin_secret: adminPassword }),
+                                            });
+                                            const d = await res.json();
+                                            if (d.ok) {
+                                              showToast(d.message + ` (case_review: ${d.deleted.case_review}, session: ${d.deleted.session}, training: ${d.deleted.training_sessions})`, "success");
+                                              setDeleteConfirmReviewId(null);
+                                              setDeleteConfirmStep(0);
+                                              adminLoadReviews();
+                                            } else {
+                                              showToast(d.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", "error");
+                                            }
+                                          } catch { showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ñ ÑĞµÑÑĞ¸Ğ¸", "error"); }
+                                          finally { setAdminActionLoading(null); }
+                                        }}
+                                      >
+                                        â˜ ï¸ ĞŸĞ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´Ğ°Ñ Ğ¿Ğ¾Ğ»Ğ½Ğ¾Ğµ ÑƒĞ´Ğ°Ğ»ĞµĞ½Ğ¸Ğµ
+                                      </button>
+                                      <button
+                                        style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                                        onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
+                                      >
+                                        ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {trainingFormReviewId === review.id && (
+                          <div style={{ marginTop: 16, borderTop: `1px solid ${t.cardBorder}`, paddingTop: 16 }}>
+                            <div style={{ color: t.crisisText, fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ² Ñ‚Ğ°Ğ±Ğ»Ğ¸Ñ†Ñƒ Ñ‚Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²Ğ¾Ğº</div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                              <input placeholder="ĞšĞ¾Ğ´ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ°" value={trainingFormData.public_code || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, public_code: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
+                              <select value={trainingFormData.session_kind || "initial"} onChange={(e) => setTrainingFormData((d) => ({ ...d, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
+                                {["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}
+                              </select>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                              <input placeholder="Ğ§Ñ‚Ğ¾ Ğ¸Ğ³Ñ€Ğ°ĞµĞ¼ Ğ² ÑÑ‚Ğ¾Ğ¹ ÑĞµÑÑĞ¸Ğ¸?" value={trainingFormData.scenario_played || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
+                              <select value={trainingFormData.expected_case_type || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
+                                <option value="">ĞĞ¶Ğ¸Ğ´Ğ°ĞµĞ¼Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿ ÑĞ»ÑƒÑ‡Ğ°Ñ</option>
+                                {["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}
+                              </select>
+                            </div>
+                            <textarea value={trainingFormData.expert_comment || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, expert_comment: e.target.value }))} placeholder="ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹ ÑĞºÑĞ¿ĞµÑ€Ñ‚Ğ°" style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", width: "100%", minHeight: 40, marginBottom: 10, resize: "vertical" }} />
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button onClick={createTrainingFromReview} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Ğ¡Ğ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ</button>
+                              <button onClick={() => setTrainingFormReviewId(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>ĞÑ‚Ğ¼ĞµĞ½Ğ°</button>
+                            </div>
+                          </div>
+                        )}
+                        {editingReview === review.id && (
+                          <div style={{ marginTop: 16, borderTop: `1px solid ${t.cardBorder}`, paddingTop: 16 }}>
+                            <div style={{ color: t.crisisText, fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Ğ ĞµĞ´Ğ°ĞºÑ†Ğ¸Ñ Ğ¾Ñ‚Ğ·Ñ‹Ğ²Ğ°</div>
+
+                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="Ğ§Ñ‚Ğ¾ Ğ±Ñ‹Ğ»Ğ¾ Ğ½ĞµĞ²ĞµÑ€Ğ½Ğ¾ Ğ² Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑĞ°Ñ…?" value={correctionForm?.wrong_questions || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, wrong_questions: e.target.value })} />
+                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="ĞšĞ°ĞºĞ¸Ğµ Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹ Ğ½ÑƒĞ¶Ğ½Ğ¾ Ğ±Ñ‹Ğ»Ğ¾ Ğ´Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ?" value={correctionForm?.missing_questions || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, missing_questions: e.target.value })} />
+                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="ĞšĞ°ĞºĞ¸Ğµ Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹ Ğ±Ñ‹Ğ»Ğ¸ Ğ»Ğ¸ÑˆĞ½Ğ¸Ğ¼Ğ¸?" value={correctionForm?.bad_question_wording || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, bad_question_wording: e.target.value })} />
+                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Ğ˜ÑĞ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ½Ğ°Ñ Ğ²ĞµÑ€ÑĞ¸Ñ Ğ¾Ñ‚Ñ‡ĞµÑ‚Ğ° Ğ´Ğ»Ñ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ°" value={correctionForm?.corrected_user_report || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, corrected_user_report: e.target.value })} />
+                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="Ğ˜ÑĞ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ½Ğ°Ñ Ğ²ĞµÑ€ÑĞ¸Ñ Ğ¾Ñ‚Ñ‡ĞµÑ‚Ğ° Ğ´Ğ»Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°" value={correctionForm?.corrected_doctor_report || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, corrected_doctor_report: e.target.value })} />
+                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="ĞŸÑ€ĞµĞ´Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ğµ Ğ´Ğ»Ñ Ğ¸Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ñ Ğ¿Ñ€Ğ¾Ñ‚Ğ¾ĞºĞ¾Ğ»Ğ° / prompts" value={correctionForm?.protocol_update || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, protocol_update: e.target.value })} />
+                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 12 }} placeholder="ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹ Ñ€ĞµĞ´Ğ°ĞºÑ‚Ğ¾Ñ€Ğ°" value={correctionForm?.correction_comment || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, correction_comment: e.target.value })} />
+
+                            <div style={{ borderTop: `1px solid ${t.cardBorder}`, paddingTop: 12, marginBottom: 12 }}>
+                              <div style={{ color: t.crisisText, fontWeight: 700, fontSize: 13, marginBottom: 8 }}>
+                                ĞÑ†ĞµĞ½ĞºĞ° Ğ³Ğ¾Ğ»Ğ¾ÑĞ¾Ğ²Ğ¾Ğ³Ğ¾ Ğ°Ğ½Ğ°Ğ»Ğ¸Ğ·Ğ° <span style={{ color: t.muted, fontWeight: 400, fontSize: 11 }}>Ğ­ĞºÑĞ¿ĞµÑ€Ğ¸Ğ¼ĞµĞ½Ñ‚Ğ°Ğ»ÑŒĞ½Ğ¾</span>
+                              </div>
+
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>Ğ¢Ğ¾Ñ‡Ğ½Ğ¾ÑÑ‚ÑŒ Ğ½Ğ°Ğ±Ğ»ÑĞ´ĞµĞ½Ğ¸Ğ¹</div>
+                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                  {[["correct", "Ğ’ĞµÑ€Ğ½Ğ¾"], ["partially_correct", "Ğ§Ğ°ÑÑ‚Ğ¸Ñ‡Ğ½Ğ¾ Ğ²ĞµÑ€Ğ½Ğ¾"], ["incorrect", "ĞĞµĞ²ĞµÑ€Ğ½Ğ¾"], ["cannot_assess", "ĞĞµĞ²Ğ¾Ğ·Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ğ¾Ñ†ĞµĞ½Ğ¸Ñ‚ÑŒ"]].map(([val, label]) => (
+                                    <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, color: t.crisisText, fontSize: 12, cursor: "pointer" }}>
+                                      <input type="radio" name="voice_accuracy" checked={correctionForm.voice_accuracy === val} onChange={() => setCorrectionForm({ ...correctionForm, voice_accuracy: val })} />
+                                      {label}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>ĞŸĞ¾Ğ»ĞµĞ·Ğ½Ğ¾ÑÑ‚ÑŒ</div>
+                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                  {[["useful", "ĞŸĞ¾Ğ»ĞµĞ·Ğ½Ğ¾"], ["mostly_useful", "Ğ¡ĞºĞ¾Ñ€ĞµĞµ Ğ¿Ğ¾Ğ»ĞµĞ·Ğ½Ğ¾"], ["neutral", "ĞĞµĞ¹Ñ‚Ñ€Ğ°Ğ»ÑŒĞ½Ğ¾"], ["mostly_harmful", "Ğ¡ĞºĞ¾Ñ€ĞµĞµ Ğ¼ĞµÑˆĞ°ĞµÑ‚"], ["harmful", "ĞœĞµÑˆĞ°ĞµÑ‚"]].map(([val, label]) => (
+                                    <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, color: t.crisisText, fontSize: 12, cursor: "pointer" }}>
+                                      <input type="radio" name="voice_usefulness" checked={correctionForm.voice_usefulness === val} onChange={() => setCorrectionForm({ ...correctionForm, voice_usefulness: val })} />
+                                      {label}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>ĞŸĞ¾Ğ²Ğ»Ğ¸ÑĞ»Ğ¾ Ğ½Ğ° Ñ€ĞµÑˆĞµĞ½Ğ¸Ğµ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°</div>
+                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                  {[["yes", "Ğ”Ğ°"], ["no", "ĞĞµÑ‚"], ["partially", "Ğ§Ğ°ÑÑ‚Ğ¸Ñ‡Ğ½Ğ¾"]].map(([val, label]) => (
+                                    <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, color: t.crisisText, fontSize: 12, cursor: "pointer" }}>
+                                      <input type="radio" name="voice_influenced" checked={correctionForm.voice_influenced === val} onChange={() => setCorrectionForm({ ...correctionForm, voice_influenced: val })} />
+                                      {label}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>ĞŸĞ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´Ñ‘Ğ½Ğ½Ñ‹Ğµ Ğ¿Ñ€Ğ¸Ğ·Ğ½Ğ°ĞºĞ¸</div>
+                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                  {[["tempo", "Ğ¢ĞµĞ¼Ğ¿"], ["pauses", "ĞŸĞ°ÑƒĞ·Ñ‹"], ["volume", "Ğ“Ñ€Ğ¾Ğ¼ĞºĞ¾ÑÑ‚ÑŒ"], ["prosody", "Ğ’Ñ‹Ñ€Ğ°Ğ·Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ğ¾ÑÑ‚ÑŒ"], ["tension", "ĞĞ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ğµ"], ["stability", "Ğ˜Ğ·Ğ¼ĞµĞ½Ñ‡Ğ¸Ğ²Ğ¾ÑÑ‚ÑŒ"], ["audio_quality", "ĞšĞ°Ñ‡ĞµÑÑ‚Ğ²Ğ¾ Ğ·Ğ°Ğ¿Ğ¸ÑĞ¸"]].map(([val, label]) => {
+                                    const checked = correctionForm.voice_confirmed?.includes(val);
+                                    return (
+                                      <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, color: t.crisisText, fontSize: 12, cursor: "pointer" }}>
+                                        <input type="checkbox" checked={checked} onChange={() => {
+                                          const current = correctionForm.voice_confirmed || [];
+                                          setCorrectionForm({
+                                            ...correctionForm,
+                                            voice_confirmed: checked ? current.filter((c) => c !== val) : [...current, val],
+                                          });
+                                        }} />
+                                        {label}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              <textarea style={{ ...s.crisisTextarea, minHeight: 50 }} placeholder="ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ° Ğº Ğ°Ğ½Ğ°Ğ»Ğ¸Ğ·Ñƒ Ğ·Ğ²ÑƒÑ‡Ğ°Ğ½Ğ¸Ñ Ñ€ĞµÑ‡Ğ¸" value={correctionForm?.voice_comment || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, voice_comment: e.target.value })} />
+                            </div>
+
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              <button
+                                disabled={!review?.id || adminActionLoading === review.id}
+                                style={{ border: 0, borderRadius: 12, background: t.badgeInProgress, color: t.badgeInProgressText, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: adminActionLoading === review.id ? 0.5 : 1 }}
+                                onClick={() => adminSaveCorrection(review.id, null)}
+                              >
+                                Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¿Ñ€Ğ°Ğ²ĞºĞ¸
+                              </button>
+                              <button
+                                disabled={!review?.id || adminActionLoading === review.id}
+                                style={{ border: 0, borderRadius: 12, background: t.badgeClosed, color: t.badgeClosedText, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: adminActionLoading === review.id ? 0.5 : 1 }}
+                                onClick={() => adminSaveCorrection(review.id, "approved")}
+                              >
+                                ĞĞ´Ğ¾Ğ±Ñ€Ğ¸Ñ‚ÑŒ Ğ¿Ğ¾ÑĞ»Ğµ Ğ¿Ñ€Ğ°Ğ²ĞºĞ¸
+                              </button>
+                              <button
+                                style={{ border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl, color: t.crisisActionJsonlText, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
+                                onClick={closeCorrectionForm}
+                              >
+                                ĞÑ‚Ğ¼ĞµĞ½Ğ°
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                    } catch (error) {
+                      console.error("review card render error", error, review);
+                      return (
+                        <div key={review?.id} style={{ border: `1px solid ${t.badgeNew}`, borderRadius: 20, background: t.dangerBg, padding: 20, color: t.badgeNewText, fontSize: 13 }}>
+                          <div>ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ñ‚Ğ¾Ğ±Ñ€Ğ°Ğ¶ĞµĞ½Ğ¸Ñ review {review?.id}</div>
+                          <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, color: t.muted, marginTop: 6 }}>
+                            {String(error?.message || error)}
+                          </pre>
+                        </div>
+                      );
+                    }
+                  })}
+                </div>
+              )}
+
+              <button
+                onClick={() => adminDownloadJsonl("approved")}
+                style={{
+                  background: t.jsonlBtn, color: t.jsonlBtnText, border: `1px solid ${t.jsonlBtnBorder}`,
+                  padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13,
+                  marginTop: 8,
+                }}
+              >
+                Ğ­ĞºÑĞ¿Ğ¾Ñ€Ñ‚Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ğ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ½Ñ‹Ğµ Ğ² JSONL
+              </button>
+
+              {/* Future /admin/experts page placeholder */}
+              {/*
+                TODO: "ĞŸĞ¾Ğ·Ğ¶Ğµ Ğ´Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ ÑĞ¿Ğ¸ÑĞ¾Ğº Ğ·Ğ°Ñ€ĞµĞ³Ğ¸ÑÑ‚Ñ€Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ñ‹Ñ… ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ², Ğ¾Ñ‚ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ğµ is_active Ğ¸ Ğ¿Ñ€Ğ¾ÑĞ¼Ğ¾Ñ‚Ñ€ Ğ¸Ñ… reviews."
+              */}
+              </>
+            )}
+          </>
+          )}
+        </div>
+
+        {modalData && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center",
+            justifyContent: "center", zIndex: 3000, padding: 20,
+          }} onClick={closeModal}>
+            <div style={{
+              background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
+              padding: 24, maxWidth: 800, width: "100%", maxHeight: "90vh",
+              display: "flex", flexDirection: "column",
+            }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{modalData.title}</h3>
+                <button onClick={closeModal} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>âœ•</button>
+              </div>
+              <div style={{
+                flex: 1, overflowY: "auto", color: t.crisisText, fontSize: 14,
+                lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
+              }}>
+                {modalData.content}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(modalData.content); showToast("Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¾"); }}
+                  style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                >
+                  Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ
+                </button>
+                <button onClick={closeModal} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                  Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚ÑŒ
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Patient modal (expert â€” My Patients) */}
+        {patientModalOpen && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center",
+            justifyContent: "center", zIndex: 3001, padding: 20,
+          }} onClick={() => { setPatientModalOpen(false); }}>
+            <div style={{
+              background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
+              padding: 24, maxWidth: 700, width: "100%", maxHeight: "90vh",
+              display: "flex", flexDirection: "column",
+            }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>ĞœĞ¾Ğ¸ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ñ‹</h3>
+                  {expertData?.membership?.organization_name && (
+                    <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>{expertData.membership.organization_name}</div>
+                  )}
+                </div>
+                <button onClick={() => setPatientModalOpen(false)} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>âœ•</button>
+              </div>
+
+              {/* Assign patient by code */}
+              <div style={{ marginBottom: 16, padding: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.highlight }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ° Ğ¿Ğ¾ ĞºĞ¾Ğ´Ñƒ</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input placeholder="Ğ¢ĞĞ§ĞšĞ-XXXX-XXXX" value={patientModalCode} onChange={(e) => setPatientModalCode(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", flex: 1 }} />
+                  <button onClick={handleAssignPatient} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                    ĞĞ°Ğ·Ğ½Ğ°Ñ‡Ğ¸Ñ‚ÑŒ
+                  </button>
+                </div>
+              </div>
+
+              {/* Create invite link */}
+              <div style={{ marginBottom: 16, padding: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.highlight }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Ğ¡Ğ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ ÑÑÑ‹Ğ»ĞºÑƒ Ğ´Ğ»Ñ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ°</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input placeholder="ĞœĞµÑ‚ĞºĞ° (Ğ½Ğ°Ğ¿Ñ€Ğ¸Ğ¼ĞµÑ€, ĞŸĞ°Ñ†Ğ¸ĞµĞ½Ñ‚ 1)" value={inviteLinkLabel} onChange={(e) => setInviteLinkLabel(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", flex: 1 }} />
+                  <button onClick={handleCreateInviteLink} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                    Ğ¡Ğ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ ÑÑÑ‹Ğ»ĞºÑƒ
+                  </button>
+                </div>
+                {inviteLinkCreated && (
+                  <div style={{ marginTop: 12, padding: 12, border: `1px solid ${t.badgeClosed}`, borderRadius: 10, background: t.cardBg }}>
+                    <div style={{ fontSize: 12, color: t.muted, marginBottom: 4 }}>Ğ¡ÑÑ‹Ğ»ĞºĞ° ÑĞ¾Ğ·Ğ´Ğ°Ğ½Ğ°:</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, wordBreak: "break-all", marginBottom: 8 }}>{inviteLinkCreated.url}</div>
+                    <button onClick={() => { navigator.clipboard.writeText(inviteLinkCreated.url); showToast("Ğ¡ÑÑ‹Ğ»ĞºĞ° ÑĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ°"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>
+                      ĞšĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Patient list */}
+              <div style={{ flex: 1, overflowY: "auto", marginBottom: 16 }}>
+                {myPatientsLoading ? (
+                  <div style={{ color: t.muted, textAlign: "center", padding: 40, fontSize: 14 }}>Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°...</div>
+                ) : myPatients.length === 0 ? (
+                  <div style={{ color: t.muted, textAlign: "center", padding: 40, fontSize: 14 }}>ĞĞµÑ‚ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ½Ñ‹Ñ… Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ¾Ğ²</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {myPatients.map((p) => (
+                      <div key={p.id} style={{ padding: "12px 16px", border: `1px solid ${t.cardBorder}`, borderRadius: 14, background: t.cardBg, cursor: "pointer" }}
+                        onClick={() => loadSessionTimeline(p.public_code)}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 4 }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: t.accent, letterSpacing: 0.5 }}>
+                              {p.public_code}
+                            </div>
+                            {p.patient_label && (
+                              <div style={{ color: t.muted, fontSize: 12, marginTop: 2 }}>{p.patient_label}</div>
+                            )}
+                          </div>
+                          <div style={{ textAlign: "right", fontSize: 12, color: t.muted }}>
+                            {p.limited_access ? (
+                              <div>ĞŸĞ¾Ğ´Ñ€Ğ¾Ğ±Ğ½Ñ‹Ğµ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğµ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ñ‹ Ğ´Ğ»Ñ Ğ²Ğ°ÑˆĞµĞ¹ Ñ€Ğ¾Ğ»Ğ¸</div>
+                            ) : (
+                              <>
+                                <div>Ğ¡ĞµÑÑĞ¸Ğ¹: {p.session_count || 0}</div>
+                                {p.last_session_at && (
+                                  <div>{new Date(p.last_session_at).toLocaleDateString("ru-RU")}</div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {(p.last_risk_level || p.last_care_recommendation) && (
+                          <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                            {p.last_risk_level && (
+                              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: p.last_risk_level === "high" ? t.dangerBg : p.last_risk_level === "medium" ? t.badgePending : t.badgeClosed, color: p.last_risk_level === "high" ? t.badgeNewText : p.last_risk_level === "medium" ? t.badgePendingText : t.badgeClosedText }}>
+                                Ğ Ğ¸ÑĞº: {p.last_risk_level}
+                              </span>
+                            )}
+                            {p.last_care_recommendation?.level && (
+                              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: t.badgeInProgress, color: t.badgeInProgressText }}>
+                                {p.last_care_recommendation.level}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(timelineLoading || timelineData) && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center",
+            justifyContent: "center", zIndex: 3001, padding: 20,
+          }} onClick={() => { closeModal(); }}>
+            <div style={{
+              background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
+              padding: 24, maxWidth: 700, width: "100%", maxHeight: "90vh",
+              display: "flex", flexDirection: "column",
+            }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Ğ›Ğ¸Ğ½Ğ¸Ñ ÑĞµÑÑĞ¸Ğ¹</h3>
+                  {timelineCode && <div style={{ color: t.accent, fontSize: 14, fontWeight: 600, marginTop: 4 }}>{timelineCode}</div>}
+                </div>
+                <button onClick={() => { closeModal(); }} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>âœ•</button>
+              </div>
+
+              <div style={{ flex: 1, overflowY: "auto" }}>
+                {timelineLoading && (
+                  <div style={{ padding: 32, textAlign: "center", color: t.muted, fontSize: 14 }}>
+                    Ğ—Ğ°Ğ³Ñ€ÑƒĞ¶Ğ°ĞµĞ¼ Ğ»Ğ¸Ğ½Ğ¸Ñ ÑĞµÑÑĞ¸Ğ¹â€¦
+                  </div>
+                )}
+
+                {!timelineLoading && timelineData && (
+                  <div>
+                    <div style={{ color: t.cardLabel, fontSize: 13, marginBottom: 16 }}>
+                      ĞĞ°Ğ¹Ğ´ĞµĞ½Ğ¾ Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğ¹: {timelineData.session_count}
+                      {timelineData.single_session_message && (
+                        <span style={{ display: "block", marginTop: 4, fontStyle: "italic" }}>{timelineData.single_session_message}</span>
+                      )}
+                    </div>
+
+                    {timelineData.items && timelineData.items.length > 0 && timelineData.items.map((item, idx) => {
+                      const seq = item.display_sequence || idx + 1;
+                      const kindLabel = SESSION_KIND_LABELS_TIMELINE[item.session_kind] || item.session_kind || "Ğ¡ĞµÑÑĞ¸Ñ";
+                      const dateStr = item.created_at ? new Date(item.created_at).toLocaleString("ru-RU", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "â€”";
+                      const statusLabel = STATUS_LABELS_TIMELINE[item.status] || item.status || "â€”";
+
+                      return (
+                        <div key={`${item.session_id || item.case_review_id || item.training_session_id || idx}-${idx}`} style={{
+                          marginBottom: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 14, padding: 16,
+                          background: t.crisisCard,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                width: 28, height: 28, borderRadius: "50%", background: t.accent, color: "#fff",
+                                fontWeight: 700, fontSize: 13,
+                              }}>{seq}</span>
+                              <span style={{ fontWeight: 700, fontSize: 14 }}>{kindLabel}</span>
+                            </div>
+                            <span style={{
+                              fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 8,
+                              background: item.status === "approved" ? t.badgeClosed : item.status === "rejected" ? t.badgeNew : t.badgePending,
+                              color: item.status === "approved" ? t.badgeClosedText : item.status === "rejected" ? t.badgeNewText : t.badgePendingText,
+                            }}>{statusLabel}</span>
+                          </div>
+
+                          <div style={{ color: t.cardLabel, fontSize: 12, marginBottom: 4 }}>{dateStr}</div>
+
+                          {item.interval_after_previous && (
+                            <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 8, fontStyle: "italic" }}>
+                              {item.interval_after_previous}
+                            </div>
+                          )}
+
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+                            {item.model_used && <span style={{ fontSize: 11, color: t.muted, background: t.tabBg, padding: "2px 8px", borderRadius: 6 }}>{item.model_used}</span>}
+                            {item.fallback_used && <span style={{ fontSize: 11, color: t.muted, background: t.tabBg, padding: "2px 8px", borderRadius: 6 }}>fallback</span>}
+                            {item.expert_name && <span style={{ fontSize: 11, color: t.muted }}>Ğ­ĞºÑĞ¿ĞµÑ€Ñ‚: {item.expert_name}</span>}
+                          </div>
+
+                          {item.patient_text_preview && (
+                            <div style={{ color: t.crisisText, fontSize: 12, lineHeight: 1.5, marginBottom: 8, maxHeight: 60, overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {item.patient_text_preview}
+                            </div>
+                          )}
+
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                            {item.user_report_available && <span style={{ fontSize: 10, color: t.cardLabel }}>ğŸ“‹ ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ°</span>}
+                            {item.doctor_report_available && <span style={{ fontSize: 10, color: t.cardLabel }}>ğŸ“‹ ĞÑ‚Ñ‡Ñ‘Ñ‚ Ğ´Ğ»Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°</span>}
+                            {item.conversation_available && <span style={{ fontSize: 10, color: t.cardLabel }}>ğŸ’¬ Ğ”Ğ¸Ğ°Ğ»Ğ¾Ğ³</span>}
+                            {item.support_plan_available && <span style={{ fontSize: 10, color: t.cardLabel }}>ğŸ“‹ ĞŸÑ€Ğ°ĞºÑ‚Ğ¸ĞºĞ¸</span>}
+                            {item.diary_available && <span style={{ fontSize: 10, color: t.cardLabel }}>ğŸ““ Ğ”Ğ½ĞµĞ²Ğ½Ğ¸Ğº</span>}
+                          </div>
+
+                          {/* Training-specific fields */}
+                          {item.source === "training_session" && (
+                            <div style={{ background: t.tabBg, borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                              {item.scenario_played && <div style={{ fontSize: 11, marginBottom: 2 }}><span style={{ color: t.cardLabel }}>Ğ¡Ñ†ĞµĞ½Ğ°Ñ€Ğ¸Ğ¹:</span> <span style={{ color: t.crisisText }}>{item.scenario_played}</span></div>}
+                              {item.expected_case_type && <div style={{ fontSize: 11, marginBottom: 2 }}><span style={{ color: t.cardLabel }}>ĞĞ¶Ğ¸Ğ´Ğ°ĞµĞ¼Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿:</span> <span style={{ color: t.crisisText }}>{item.expected_case_type}</span></div>}
+                              {item.ai_detected_case_type && <div style={{ fontSize: 11, marginBottom: 2 }}><span style={{ color: t.cardLabel }}>Ğ Ğ°ÑĞ¿Ğ¾Ğ·Ğ½Ğ°Ğ½Ğ¾:</span> <span style={{ color: t.crisisText }}>{item.ai_detected_case_type}</span></div>}
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                                {item.detection_quality && <span style={{ fontSize: 10, color: t.cardLabel }}>Ğ Ğ°ÑĞ¿Ğ¾Ğ·Ğ½Ğ°Ğ²Ğ°Ğ½Ğ¸Ğµ: {item.detection_quality}</span>}
+                                {item.questions_quality && <span style={{ fontSize: 10, color: t.cardLabel }}>Ğ’Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹: {item.questions_quality}</span>}
+                                {item.report_quality && <span style={{ fontSize: 10, color: t.cardLabel }}>ĞÑ‚Ñ‡Ñ‘Ñ‚: {item.report_quality}</span>}
+                                {item.safety_quality && <span style={{ fontSize: 10, color: t.cardLabel }}>Safety: {item.safety_quality}</span>}
+                              </div>
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                                {item.repeated_questions && <span style={{ fontSize: 10, color: t.badgeNewText }}>ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€Ñ‹ Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑĞ¾Ğ²</span>}
+                                {item.missed_risk_flags && <span style={{ fontSize: 10, color: t.badgeNewText }}>ĞŸÑ€Ğ¾Ğ¿ÑƒÑ‰ĞµĞ½Ñ‹ Ñ€Ğ¸ÑĞºĞ¸</span>}
+                                {item.wrong_recommendation && <span style={{ fontSize: 10, color: t.badgeNewText }}>ĞĞµĞ²ĞµÑ€Ğ½Ğ°Ñ Ñ€ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´Ğ°Ñ†Ğ¸Ñ</span>}
+                                {item.remembered_context && <span style={{ fontSize: 10, color: t.badgeClosedText }}>Ğ£Ñ‡Ñ‚Ñ‘Ğ½ ĞºĞ¾Ğ½Ñ‚ĞµĞºÑÑ‚</span>}
+                              </div>
+                              {item.expert_comment && (
+                                <div style={{ fontSize: 11, marginTop: 4, color: t.crisisText, fontStyle: "italic" }}>{item.expert_comment}</div>
+                              )}
+                            </div>
+                          )}
+
+                          <button
+                            onClick={() => loadSessionDetails(item)}
+                            disabled={sessionDetailsLoading}
+                            style={{
+                              border: `1px solid ${t.border}`, borderRadius: 10,
+                              background: t.accent, color: "#fff",
+                              padding: "8px 16px", fontWeight: 600, fontSize: 12,
+                              cursor: sessionDetailsLoading ? "wait" : "pointer",
+                              marginTop: 8,
+                            }}
+                          >
+                            {sessionDetailsLoading ? "Ğ—Ğ°Ğ³Ñ€ÑƒĞ¶Ğ°ĞµĞ¼ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğµ ÑĞµÑÑĞ¸Ğ¸â€¦" : "ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ ÑĞµÑÑĞ¸Ñ"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                <button onClick={() => { closeModal(); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                  Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚ÑŒ
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Session detail view */}
+        {timelineData && timelineView === "detail" && sessionDetailsData && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center",
+            justifyContent: "center", zIndex: 3002, padding: 20,
+          }} onClick={() => { setTimelineView("list"); setSessionDetailsData(null); setSessionDetailsError(null); }}>
+            <div style={{
+              background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
+              padding: 24, maxWidth: 800, width: "100%", maxHeight: "90vh",
+              display: "flex", flexDirection: "column",
+            }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                <div>
+                  <button
+                    onClick={() => { setTimelineView("list"); setSessionDetailsData(null); setSessionDetailsError(null); }}
+                    style={{ border: 0, background: "transparent", color: t.accent, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 8 }}
+                  >
+                    â† ĞĞ°Ğ·Ğ°Ğ´ Ğº Ğ»Ğ¸Ğ½Ğ¸Ğ¸ ÑĞµÑÑĞ¸Ğ¹
+                  </button>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
+                    Ğ¡ĞµÑÑĞ¸Ñ{sessionDetailsData.session_sequence ? ` â„–${sessionDetailsData.session_sequence}` : ""}
+                  </h3>
+                  <div style={{ color: t.accent, fontSize: 14, fontWeight: 600, marginTop: 2 }}>
+                    {SESSION_KIND_LABELS_TIMELINE[sessionDetailsData.session_kind] || sessionDetailsData.session_kind || "Ğ¡ĞµÑÑĞ¸Ñ"}
+                  </div>
+                  {sessionDetailsData.created_at && (
+                    <div style={{ color: t.cardLabel, fontSize: 12, marginTop: 2 }}>
+                      {new Date(sessionDetailsData.created_at).toLocaleString("ru-RU", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => { setTimelineView("list"); setSessionDetailsData(null); setSessionDetailsError(null); }} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>âœ•</button>
+              </div>
+
+              <div style={{ flex: 1, overflowY: "auto" }}>
+                {renderSessionTimelineDetail(sessionDetailsData, t)}
+              </div>
+
+              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                <button onClick={() => copySessionDetails(sessionDetailsData)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                  Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ğ±ĞµĞ·Ğ»Ğ¸Ñ‡ĞµĞ½Ğ½ÑƒÑ ÑĞµÑÑĞ¸Ñ
+                </button>
+                <button onClick={() => { setTimelineView("list"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                  Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚ÑŒ
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {toast.message && (
+          <div
+            key={toast.key}
+            style={{
+              position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+              zIndex: 3010, padding: "14px 24px", borderRadius: 16, fontWeight: 600, fontSize: 15,
+              boxShadow: adminDarkMode ? "0 8px 30px rgba(0,0,0,.5)" : "0 4px 20px rgba(0,0,0,.1)",
+              animation: "toastIn 0.3s ease",
+              textAlign: "center", maxWidth: "calc(100vw - 40px)",
+              ...(toast.type === "error"
+                ? { background: t.dangerBg, border: `1px solid ${t.badgeNewText}`, color: t.badgeNewText }
+                : { background: t.highlight, border: `1px solid ${t.badgeClosedText}`, color: t.badgeClosedText }),
+            }}
+          >
+            {toast.message}
+          </div>
+        )}
+      </div>
+    </AdminErrorBoundary>
+    );
+  }
+
+  // --- Expert Invite page (/expert-invite/<token>) ---
+  if (typeof window !== "undefined" && window.location.pathname.match(/^\/expert-invite\//)) {
+    return <ExpertInvitePage />;
+  }
+
+  // --- Specialist Cabinet page (/specialist) ---
+  if (typeof window !== "undefined" && window.location.pathname.match(/^\/specialist\/?$/)) {
+    return <SpecialistCabinet />;
+  }
+
+  // Keep the legacy expert surface out of the AnMed pilot; its staff entry is /specialist.
+  if (APP_BRAND.isSupportPilot && typeof window !== "undefined" && window.location.pathname.match(/^\/expert\/?$/)) {
+    window.location.replace("/specialist");
+    return null;
+  }
+
+  // --- Expert Cabinet page (/expert) ---
+  if (typeof window !== "undefined" && window.location.pathname.match(/^\/expert\/?$/)) {
+    return <ExpertCabinet />;
+  }
+
+  const isNewLinkingInvite = Boolean(
+    phase !== "cabinet" &&
+    supportScreen === "landing" &&
+    inviteInfo?.valid &&
+    inviteInfo.invite_kind === "patient_specialist" &&
+    ["specialist_to_patient", "patient_to_specialist"].includes(inviteInfo.direction)
+  );
+
+  return (
+    <div style={s.page} className="app-page">
+      <style>{`
+  * {
+    box-sizing: border-box;
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  html, body, #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+    .app-logo {
+      height: 96px;
+      width: auto;
+    }
+    .app-logo-link {
+      transition: opacity 0.15s ease;
+    }
+    .app-logo-link:hover {
+      opacity: 0.85;
+    }
+    @media (max-width: 768px) {
+      .app-logo {
+        height: 72px;
+      }
+    }
+    @media (max-width: 768px) {
+      .app-page {
+      padding: 18px !important;
+    }
+
+    .app-header {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 16px !important;
+      margin-bottom: 36px !important;
+    }
+
+    .app-grid {
+      display: block !important;
+    }
+
+    .app-hero-title {
+      font-size: 38px !important;
+      line-height: 1.08 !important;
+      letter-spacing: -0.03em !important;
+    }
+
+    .app-hero-text {
+      font-size: 17px !important;
+      line-height: 1.55 !important;
+    }
+
+    .app-actions {
+      flex-direction: column !important;
+      width: 100% !important;
+    }
+
+    .app-actions button {
+      width: 100% !important;
+    }
+
+    .app-card {
+      margin-top: 32px !important;
+      padding: 18px !important;
+      border-radius: 24px !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    textarea,
+    input {
+      width: 100% !important;
+      max-width: 100% !important;
+      font-size: 16px !important;
+    }
+
+    button {
+      max-width: 100% !important;
+      white-space: normal !important;
+    }
+
+    .modal {
+      width: calc(100vw - 28px) !important;
+      max-width: calc(100vw - 28px) !important;
+      max-height: calc(100vh - 28px) !important;
+      overflow-y: auto !important;
+      padding: 18px !important;
+    }
+
+    .tabs {
+      flex-direction: column !important;
+    }
+
+    .tabs button {
+      width: 100% !important;
+    }
+
+    .report-block {
+      overflow-wrap: anywhere !important;
+      word-break: break-word !important;
+    }
+  }
+`}</style>
+          <div style={s.wrap}>
+        <header style={{ ...s.header, marginBottom: APP_BRAND.isSupportPilot ? 28 : (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
+          {APP_BRAND.isSupportPilot ? (
+            <a
+              href="/"
+              aria-label={`${APP_BRAND.name} â€” Ğ½Ğ° Ğ³Ğ»Ğ°Ğ²Ğ½ÑƒÑ`}
+              className="app-logo-link"
+              style={{ display: "flex", alignItems: "center", gap: 12, color: "inherit", textDecoration: "none" }}
+            >
+              {APP_BRAND.isPneumo ? (
+                <img src={APP_BRAND.logoHeader} alt={APP_BRAND.name} style={{ height: 72, width: "auto", display: "block", objectFit: "contain", flexShrink: 0 }} />
+              ) : (
+                <div aria-label={APP_BRAND.name} style={{ minWidth: 190 }}>
+                  <div style={{ ...s.logo, color: "#14264A", fontSize: 34, fontWeight: 900, letterSpacing: "-0.04em" }}>
+                    {APP_BRAND.isKgmu ? <span style={{ color: "#176B66", letterSpacing: "-0.025em" }}>ĞšĞ°Ğ·Ğ°Ğ½ÑĞºĞ¸Ğ¹ Ğ“ĞœĞ£</span> : <>ĞĞ½<span style={{ color: "#E63E4B" }}>ĞœĞµĞ´</span></>}
+                  </div>
+                  <div style={s.sub}>{APP_BRAND.subtitle}</div>
+                </div>
+              )}
+              {APP_BRAND.isPneumo && (
+                <div>
+                  <div style={{ ...s.logo, fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>{APP_BRAND.name}</div>
+                  <div style={s.sub}>{APP_BRAND.subtitle}</div>
+                </div>
+              )}
+            </a>
+          ) : (
+            <div
+              style={{ display: "flex", alignItems: "center", gap: 12, cursor: activeModule === "support" && supportScreen !== "landing" ? "pointer" : "default" }}
+              onClick={activeModule === "support" && supportScreen !== "landing" ? goToSupportLanding : undefined}
+              title={activeModule === "support" && supportScreen !== "landing" ? "ĞĞ° Ğ³Ğ»Ğ°Ğ²Ğ½ÑƒÑ" : undefined}
+            >
+              <img
+                src="/logo-tochka-opory-header.png"
+                alt={isDedicatedSubdomain ? "ĞĞ¿Ğ¾Ñ€Ğ°. Ğ—Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒĞµ & Ğ¡Ñ‚Ñ€Ğ¾Ğ¹Ğ½Ğ¾ÑÑ‚ÑŒ" : APP_BRAND.name}
+                className="app-logo"
+                style={{ display: "block", flexShrink: 0, objectFit: "contain", height: 96, width: "auto" }}
+              />
+              <div>
+                <div style={s.logo}>{isDedicatedSubdomain ? "ĞĞ¿Ğ¾Ñ€Ğ°. Ğ—Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒĞµ & Ğ¡Ñ‚Ñ€Ğ¾Ğ¹Ğ½Ğ¾ÑÑ‚ÑŒ" : APP_BRAND.name}</div>
+                {!isDedicatedSubdomain && <div style={s.sub}>{APP_BRAND.subtitle}</div>}
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {((activeModule === "support" && supportScreen === "landing") || (activeModule === "body" && bodyScreen === "landing")) && (
+              <button
+                style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
+                onClick={() => setAboutProjectOpen(true)}
+              >
+                Ğ Ğ¿Ñ€Ğ¾ĞµĞºÑ‚Ğµ
+              </button>
+            )}
+            {!isDedicatedSubdomain && (<>
+            {!(activeModule === "support" && supportScreen !== "landing") && (
+            <button
+              style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
+              onClick={() => { window.location.href = "/specialist"; }}
+            >
+              ĞšĞ°Ğ±Ğ¸Ğ½ĞµÑ‚ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°
+            </button>
+            )}
+            <button
+              style={s.crisis}
+              onClick={() => setCrisisOpen(true)}
+            >
+              Ğ¡Ñ€Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ
+            </button>
+            </>)}
+          </div>
+        </header>
+
+        {APP_BRAND.isSupportPilot && (
+          <div role="note" style={{ margin: "0 0 32px", padding: "12px 16px", borderRadius: 12, background: "#FFF1F1", border: "1px solid #E9B4B8", color: "#7D2530", fontSize: 14, lineHeight: 1.5 }}>
+            {APP_BRAND.pilotNotice}
+          </div>
+        )}
+
+        {/* Invite banners â€” only on landing page, never overlay cabinet */}
+        {phase !== "cabinet" && supportScreen === "landing" && inviteChecking && (
+          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", textAlign: "center", color: "#7A7268", fontSize: 14 }}>
+            ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° ÑÑÑ‹Ğ»ĞºĞ¸...
+          </div>
+        )}
+        {/* NEW patient_specialist invitation â€” Accept/Decline */}
+        {phase !== "cabinet" && supportScreen === "landing" && inviteInfo && inviteInfo.valid && inviteInfo.invite_kind === "patient_specialist" && inviteInfo.direction === "specialist_to_patient" && (
+          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "18px 24px", borderRadius: 16, background: "rgba(46,125,50,0.08)", border: "1px solid rgba(46,125,50,0.2)", textAlign: "center" }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#2e7d32", marginBottom: 6 }}>
+              Ğ’Ğ°Ñ Ğ¿Ñ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞ°ĞµÑ‚ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚ {inviteInfo.expert_name || ""}
+            </div>
+            {inviteInfo.expires_at && (
+              <div style={{ fontSize: 12, color: "#4a7c4c", marginBottom: 12 }}>
+                Ğ¡ÑÑ‹Ğ»ĞºĞ° Ğ´ĞµĞ¹ÑÑ‚Ğ²Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ğ° Ğ´Ğ¾ {new Date(inviteInfo.expires_at).toLocaleDateString("ru-RU")}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button
+                onClick={() => acceptPublicSpecialistInvitation(inviteToken)}
+                style={{ padding: "10px 24px", borderRadius: 12, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+              >
+                ĞŸÑ€Ğ¸Ğ½ÑÑ‚ÑŒ
+              </button>
+              <button
+                onClick={() => declinePublicSpecialistInvitation(inviteToken)}
+                style={{ padding: "10px 24px", borderRadius: 12, border: "1px solid rgba(46,42,37,.15)", background: "transparent", color: "#7A7268", fontWeight: 600, fontSize: 14, cursor: "pointer" }}
+              >
+                ĞÑ‚ĞºĞ»Ğ¾Ğ½Ğ¸Ñ‚ÑŒ
+              </button>
+            </div>
+          </div>
+        )}
+        {/* NEW patient â†’ specialist invitation: authenticated specialist or onboarding */}
+        {phase !== "cabinet" && supportScreen === "landing" && inviteInfo && inviteInfo.valid && inviteInfo.invite_kind === "patient_specialist" && inviteInfo.direction === "patient_to_specialist" && (
+          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "18px 24px", borderRadius: 16, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.12)", textAlign: "center" }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#5F574F", marginBottom: 8 }}>
+              ĞŸĞ°Ñ†Ğ¸ĞµĞ½Ñ‚ Ğ¿Ñ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞ°ĞµÑ‚ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ° Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡Ğ¸Ñ‚ÑŒÑÑ
+            </div>
+            {inviteSpecialistAuth.loading ? (
+              <div style={{ fontSize: 13, color: "#7A7268" }}>ĞŸÑ€Ğ¾Ğ²ĞµÑ€ĞºĞ° Ğ²Ñ…Ğ¾Ğ´Ğ° ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°...</div>
+            ) : inviteSpecialistAuth.error ? (
+              <div style={{ fontSize: 13, color: "#B85C4A" }}>{inviteSpecialistAuth.error}</div>
+            ) : inviteInfo.status === "onboarding_submitted" ? (
+              <div style={{ fontSize: 13, color: "#5F7D6C" }}>Ğ—Ğ°ÑĞ²ĞºĞ° Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ°. ĞĞ´Ğ¼Ğ¸Ğ½Ğ¸ÑÑ‚Ñ€Ğ°Ñ‚Ğ¾Ñ€ Ñ€Ğ°ÑÑĞ¼Ğ¾Ñ‚Ñ€Ğ¸Ñ‚ ĞµÑ‘ Ğ¾Ñ‚Ğ´ĞµĞ»ÑŒĞ½Ğ¾.</div>
+            ) : inviteSpecialistAuth.authenticated ? (
+              <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                <button onClick={() => respondToPatientInvitationAsSpecialist("acceptPatientInvitation")} style={{ padding: "10px 24px", borderRadius: 12, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                  ĞŸÑ€Ğ¸Ğ½ÑÑ‚ÑŒ
+                </button>
+                <button onClick={() => respondToPatientInvitationAsSpecialist("declinePatientInvitation")} style={{ padding: "10px 24px", borderRadius: 12, border: "1px solid rgba(46,42,37,.15)", background: "transparent", color: "#7A7268", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                  ĞÑ‚ĞºĞ»Ğ¾Ğ½Ğ¸Ñ‚ÑŒ
+                </button>
+              </div>
+            ) : (
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
+                  Ğ•ÑĞ»Ğ¸ Ñƒ Ğ²Ğ°Ñ ĞµÑ‰Ñ‘ Ğ½ĞµÑ‚ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚Ğ° ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°, Ğ¾ÑÑ‚Ğ°Ğ²ÑŒÑ‚Ğµ ĞºĞ¾Ğ½Ñ‚Ğ°ĞºÑ‚Ğ½Ñ‹Ğµ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğµ Ğ´Ğ»Ñ Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ñ. ĞšĞ»Ğ¸Ğ½Ğ¸Ñ‡ĞµÑĞºĞ¸Ğµ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğµ Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ° Ğ¿Ğ¾ ÑÑ‚Ğ¾Ğ¹ ÑÑÑ‹Ğ»ĞºĞµ Ğ½Ğµ Ğ¾Ñ‚ĞºÑ€Ñ‹Ğ²Ğ°ÑÑ‚ÑÑ.
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <input style={s.answerInput} placeholder="Ğ˜Ğ¼Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°" value={onboardingForm.name} onChange={(e) => setOnboardingForm({ ...onboardingForm, name: e.target.value })} />
+                  <input style={s.answerInput} type="email" placeholder="Email (Ğ½ĞµĞ¾Ğ±ÑĞ·Ğ°Ñ‚ĞµĞ»ÑŒĞ½Ğ¾)" value={onboardingForm.contact_email} onChange={(e) => setOnboardingForm({ ...onboardingForm, contact_email: e.target.value })} />
+                  <input style={s.answerInput} placeholder="Ğ¢ĞµĞ»ĞµÑ„Ğ¾Ğ½ (Ğ½ĞµĞ¾Ğ±ÑĞ·Ğ°Ñ‚ĞµĞ»ÑŒĞ½Ğ¾)" value={onboardingForm.contact_phone} onChange={(e) => setOnboardingForm({ ...onboardingForm, contact_phone: e.target.value })} />
+                  <textarea style={{ ...s.answerInput, minHeight: 70 }} placeholder="ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹ (Ğ½ĞµĞ¾Ğ±ÑĞ·Ğ°Ñ‚ĞµĞ»ÑŒĞ½Ğ¾)" value={onboardingForm.comment} onChange={(e) => setOnboardingForm({ ...onboardingForm, comment: e.target.value })} />
+                </div>
+                <button onClick={submitPatientSpecialistOnboarding} disabled={onboardingSubmitting || onboardingForm.name.trim().length < 2} style={{ ...s.primary, marginTop: 12, width: "100%" }}>
+                  {onboardingSubmitting ? "ĞÑ‚Ğ¿Ñ€Ğ°Ğ²ĞºĞ°..." : "ĞŸĞ¾Ğ´ĞºĞ»ÑÑ‡Ğ¸Ñ‚ÑŒÑÑ ĞºĞ°Ğº ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {/* LEGACY doctor invite â€” anonymous conversation */}
+        {phase !== "cabinet" && supportScreen === "landing" && inviteInfo && inviteInfo.valid && inviteInfo.invite_kind === "legacy_doctor_invite" && (
+          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: "rgba(46,125,50,0.08)", border: "1px solid rgba(46,125,50,0.2)", textAlign: "center" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#2e7d32", marginBottom: 4 }}>ğŸ”— Ğ’Ñ‹ Ğ¾Ñ‚ĞºÑ€Ñ‹Ğ»Ğ¸ ÑÑÑ‹Ğ»ĞºÑƒ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°</div>
+            <div style={{ fontSize: 13, color: "#4a7c4c", lineHeight: 1.5 }}>
+              Ğ Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€ Ğ¾ÑÑ‚Ğ°Ğ½ĞµÑ‚ÑÑ Ğ°Ğ½Ğ¾Ğ½Ğ¸Ğ¼Ğ½Ñ‹Ğ¼, Ğ½Ğ¾ Ñ€ĞµĞ·ÑƒĞ»ÑŒÑ‚Ğ°Ñ‚ Ğ±ÑƒĞ´ĞµÑ‚ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿ĞµĞ½ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ñƒ, ĞºĞ¾Ñ‚Ğ¾Ñ€Ñ‹Ğ¹ Ğ´Ğ°Ğ» Ğ²Ğ°Ğ¼ ÑÑÑ‹Ğ»ĞºÑƒ.
+            </div>
+          </div>
+        )}
+        {phase !== "cabinet" && supportScreen === "landing" && inviteInfo && !inviteInfo.valid && !inviteChecking && (
+          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: "rgba(255,152,0,0.08)", border: "1px solid rgba(255,152,0,0.2)", textAlign: "center" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#e65100", marginBottom: 4 }}>âš ï¸ {inviteInfo.error || "Ğ¡ÑÑ‹Ğ»ĞºĞ° Ğ½ĞµĞ´ĞµĞ¹ÑÑ‚Ğ²Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ğ°"}</div>
+            <div style={{ fontSize: 13, color: "#bf5f00", lineHeight: 1.5 }}>
+              Ğ’Ñ‹ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ğ¾Ğ±Ñ‹Ñ‡Ğ½Ñ‹Ğ¹ Ğ°Ğ½Ğ¾Ğ½Ğ¸Ğ¼Ğ½Ñ‹Ğ¹ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€.
+            </div>
+          </div>
+        )}
+
+        {(() => {
+          if (isNewLinkingInvite) return null;
+          const isBodyCabinet = activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding", "health_context", "service_requests"].includes(bodyScreen);
+          const isSupportCabinet = activeModule === "support" && supportScreen !== "landing";
+          const bodyMaxWidth = activeModule === "body" && bodyScreen === "cabinet" ? 1120
+            : activeModule === "body" && ["diary_view", "diary_edit", "diary_result", "health_context", "service_requests"].includes(bodyScreen) ? 820
+            : activeModule === "body" && bodyScreen === "onboarding" ? 640
+            : null;
+          const isFullWidth = isBodyCabinet || isSupportCabinet;
+          const fullWidthMax = isSupportCabinet ? 1180 : (bodyMaxWidth || 1120);
+          return (
+        <main style={isFullWidth ? { maxWidth: fullWidthMax, margin: "0 auto", padding: "0 16px", width: "100%", boxSizing: "border-box" } : s.grid} className={isFullWidth ? "" : "app-grid"}>
+          {!isFullWidth && (
+          <section>
+            <h1 style={s.h1} className="app-hero-title">
+              {activeModule === "body" ? "Ğ Ğ°Ğ·Ğ±ĞµÑ€Ñ‘Ğ¼ÑÑ Ñ Ğ¿Ğ¸Ñ‚Ğ°Ğ½Ğ¸ĞµĞ¼, Ğ´Ğ²Ğ¸Ğ¶ĞµĞ½Ğ¸ĞµĞ¼ Ğ¸ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğ¾Ğ¼" : "ĞĞ°Ğ¹Ğ´Ñ‘Ğ¼ Ñ‚Ğ¾Ñ‡ĞºÑƒ Ğ¾Ğ¿Ğ¾Ñ€Ñ‹"}
+            </h1>
+            <p style={s.p} className="app-hero-text">
+              {activeModule === "body"
+                ? "ĞŸĞ¾Ğ´Ğ´ĞµÑ€Ğ¶Ğ¸Ğ¼ Ğ½Ğ° Ğ¿ÑƒÑ‚Ğ¸ Ğº Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²Ğ¾Ğ¼Ñƒ Ğ¸ ÑÑ‚Ñ€Ğ¾Ğ¹Ğ½Ğ¾Ğ¼Ñƒ Ñ‚ĞµĞ»Ñƒ"
+                : "Ğ Ğ°ÑÑĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ, Ñ‡Ñ‚Ğ¾ Ñ Ğ²Ğ°Ğ¼Ğ¸ Ğ¿Ñ€Ğ¾Ğ¸ÑÑ…Ğ¾Ğ´Ğ¸Ñ‚ â€” Ğ³Ğ¾Ğ»Ğ¾ÑĞ¾Ğ¼ Ğ¸Ğ»Ğ¸ Ñ‚ĞµĞºÑÑ‚Ğ¾Ğ¼. Ğ¡ĞµÑ€Ğ²Ğ¸Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ğ¶ĞµÑ‚ Ğ¼ÑĞ³ĞºĞ¾ Ñ€Ğ°Ğ·Ğ¾Ğ±Ñ€Ğ°Ñ‚ÑŒ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ, Ğ·Ğ°Ğ¼ĞµÑ‚Ğ¸Ñ‚ÑŒ Ğ²Ğ°Ğ¶Ğ½Ñ‹Ğµ Ğ¿Ñ€Ğ¸Ğ·Ğ½Ğ°ĞºĞ¸ Ğ¸ Ğ¿Ñ€ĞµĞ´Ğ»Ğ¾Ğ¶Ğ¸Ñ‚ÑŒ Ğ¿Ğ¾Ğ½ÑÑ‚Ğ½Ñ‹Ğ¹ ÑĞ»ĞµĞ´ÑƒÑÑ‰Ğ¸Ğ¹ ÑˆĞ°Ğ³."}
+            </p>
+
+            {phase === "input" && (
+            <div style={{ ...s.row, flexWrap: "wrap", alignItems: "center" }} className="app-actions">
+              {activeModule !== "body" && (
+                <button style={s.primary} onClick={async () => {
+                  try {
+                    await ensureStartSession();
+                  } catch (e) {
+                    setError(e.message);
+                    return;
+                  }
+                  setMode("voice");
+                }}>
+                  Ğ Ğ°ÑÑĞºĞ°Ğ·Ğ°Ñ‚ÑŒ Ğ³Ğ¾Ğ»Ğ¾ÑĞ¾Ğ¼
+                </button>
+              )}
+              {activeModule === "support" && (
+                <button
+                  style={{ ...s.secondary, marginTop: 0 }}
+                  onClick={() => {
+                    const saved = getSupportSession();
+                    if (saved.sessionId && saved.accessToken) {
+                      loadSupportCabinet();
+                    } else {
+                      setSessionModalOpen(true);
+                    }
+                  }}
+                >
+                  {(() => {
+                    const saved = getSupportSession();
+                    return saved.sessionId && saved.accessToken
+                      ? "ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ Ğ¿Ğ¾ÑĞ»ĞµĞ´Ğ½Ğ¸Ğ¹ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€"
+                      : "ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€";
+                  })()}
+                </button>
+              )}
+            </div>
+            )}
+
+            {/* Display name input â€” shown when no saved session */}
+            {activeModule === "support" && phase === "input" && !getSupportSession().sessionId && (
+              <div style={{ marginTop: 16 }}>
+                <label style={{ fontSize: 13, color: "#7A7268", marginBottom: 6, display: "block" }}>ĞšĞ°Ğº Ğº Ğ²Ğ°Ğ¼ Ğ¾Ğ±Ñ€Ğ°Ñ‰Ğ°Ñ‚ÑŒÑÑ?</label>
+                <input
+                  type="text"
+                  style={{ ...s.answerInput, maxWidth: 320 }}
+                  value={displayNameInput}
+                  onChange={(e) => setDisplayNameInput(e.target.value)}
+                  placeholder="Ğ˜Ğ¼Ñ Ğ¸Ğ»Ğ¸ Ğ¿ÑĞµĞ²Ğ´Ğ¾Ğ½Ğ¸Ğ¼ (Ğ½ĞµĞ¾Ğ±ÑĞ·Ğ°Ñ‚ĞµĞ»ÑŒĞ½Ğ¾)"
+                  maxLength={50}
+                />
+              </div>
+            )}
+
+            {activeModule === "body" && bodyScreen === "landing" && (
+              <div style={{ marginTop: 16, padding: 16, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 8 }}>
+                  Ğ£Ğ¶Ğµ ĞµÑÑ‚ÑŒ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ?
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="text"
+                    placeholder="HEALTH-XXXX-XXX-XXXX-XXXX-XXXX"
+                    value={bodyContinuationInput || ""}
+                    onChange={(e) => setBodyContinuationInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => e.key === "Enter" && continueBodyByCode()}
+                    style={{
+                      flex: 1, height: 44, padding: "0 14px", borderRadius: 12,
+                      border: "1px solid #d8cec1", background: "#ffffff",
+                      color: "#2f2925", fontSize: 15, outline: "none",
+                      fontFamily: "monospace", boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    onClick={continueBodyByCode}
+                    disabled={loading || !bodyContinuationInput.trim()}
+                    style={{
+                      height: 44, padding: "0 18px", borderRadius: 12, border: 0,
+                      background: loading ? "#c4d0c6" : "#7D9A89", color: "#ffffff", fontWeight: 700,
+                      fontSize: 14, cursor: loading ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+                    }}
+                  >
+                    {loading ? "ĞÑ‚ĞºÑ€Ñ‹Ñ‚Ğ¸Ğµ..." : "ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ"}
+                  </button>
+                </div>
+                {bodyContinuationError && (
+                  <div style={{ color: "#B85C4A", fontSize: 13, marginTop: 8 }}>{bodyContinuationError}</div>
+                )}
+              </div>
+            )}
+
+            {phase === "input" && showModuleSwitcher && (
+            <div style={{ ...s.row, marginTop: 8, gap: 6 }} className="app-actions">
+              <button
+                style={activeModule === "support" ? s.primary : s.secondary}
+                onClick={() => { setActiveModule("support"); setBodyIntakeStage("idle"); setBodyIntakeResult(null); }}
+              >
+                Ğ¢Ğ¾Ñ‡ĞºĞ° Ğ¾Ğ¿Ğ¾Ñ€Ñ‹
+              </button>
+              <button
+                style={activeModule === "body" ? s.primary : s.secondary}
+                onClick={() => { setActiveModule("body"); setBodyIntakeStage("idle"); setBodyIntakeResult(null); setBodyScreen("landing"); }}
+              >
+                Ğ—Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒĞµ & Ğ¡Ñ‚Ñ€Ğ¾Ğ¹Ğ½Ğ¾ÑÑ‚ÑŒ
+              </button>
+            </div>
+            )}
 
 
-HOˆÂˆYˆ
-Ø\İ›Y\ÜØYÙJHÂˆYˆ
-Ø\İ[Y\”™Y‹˜İ\œ™[
-HÛX\•[Y[İ]
-Ø\İ[Y\”™Y‹˜İ\œ™[
-NÂˆØ\İ[Y\”™Y‹˜İ\œ™[HÙ][Y[İ]
+
+            {phase === "input" && (
+              activeModule === "body" ? (
+                <p style={{ color: "#7A7268", fontSize: 13, marginTop: 24, lineHeight: 1.5 }}>
+                  AI-ĞºĞ¾Ğ¼Ğ¿Ğ°Ğ½ÑŒĞ¾Ğ½ Ğ¿Ğ¾Ğ¼Ğ¾Ğ³Ğ°ĞµÑ‚ Ñ€Ğ°Ğ·Ğ¾Ğ±Ñ€Ğ°Ñ‚ÑŒÑÑ Ñ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğ¾Ğ¼, Ğ¿Ğ¸Ñ‚Ğ°Ğ½Ğ¸ĞµĞ¼, Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½Ğ¾ÑÑ‚ÑŒÑ Ğ¸ ÑĞ°Ğ¼Ğ¾ĞºĞ¾Ğ½Ñ‚Ñ€Ğ¾Ğ»ĞµĞ¼. ĞĞµ Ğ·Ğ°Ğ¼ĞµĞ½ÑĞµÑ‚ Ğ²Ñ€Ğ°Ñ‡Ğ° Ğ¸ Ğ½Ğµ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡Ğ°ĞµÑ‚ Ğ»ĞµÑ‡ĞµĞ½Ğ¸Ğµ.
+                </p>
+              ) : (
+                <>
+                  <p style={{ color: "#7A7268", fontSize: 13, marginTop: 24, lineHeight: 1.5 }}>
+                    Ğ¡ĞµÑ€Ğ²Ğ¸Ñ Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°ĞµÑ‚ Ğ² Ñ‚ĞµÑÑ‚Ğ¾Ğ²Ğ¾Ğ¼ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğµ, Ğ½Ğµ ÑÑ‚Ğ°Ğ²Ğ¸Ñ‚ Ğ´Ğ¸Ğ°Ğ³Ğ½Ğ¾Ğ· Ğ¸ Ğ½Ğµ Ğ·Ğ°Ğ¼ĞµĞ½ÑĞµÑ‚ ĞºĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°. ĞĞµ ÑƒĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ğ¹Ñ‚Ğµ Ğ¿ĞµÑ€ÑĞ¾Ğ½Ğ°Ğ»ÑŒĞ½Ñ‹Ğµ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğµ Ğ² Ñ‚ĞµĞºÑÑ‚Ğµ Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ñ.
+                  </p>
+                  <p style={{ color: "#B85C4A", fontSize: 12, marginTop: 8, lineHeight: 1.4 }}>
+                    Ğ•ÑĞ»Ğ¸ Ğ²Ñ‹ Ñ‡ÑƒĞ²ÑÑ‚Ğ²ÑƒĞµÑ‚Ğµ, Ñ‡Ñ‚Ğ¾ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ¿Ñ€Ğ¸Ñ‡Ğ¸Ğ½Ğ¸Ñ‚ÑŒ Ğ²Ñ€ĞµĞ´ ÑĞµĞ±Ğµ Ğ¸Ğ»Ğ¸ Ğ´Ñ€ÑƒĞ³Ğ¾Ğ¼Ñƒ Ñ‡ĞµĞ»Ğ¾Ğ²ĞµĞºÑƒ, Ğ»Ğ¸Ğ±Ğ¾ Ğ²Ğ°Ğ¼ Ğ½ÑƒĞ¶Ğ½Ğ° ÑÑ€Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ¿ÑĞ¸Ñ…Ğ¸Ğ°Ñ‚Ñ€Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ â€” Ğ½ĞµĞ¼ĞµĞ´Ğ»ĞµĞ½Ğ½Ğ¾ Ğ¾Ğ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ĞµÑÑŒ Ğ¿Ğ¾ Ñ‚ĞµĞ»ĞµÑ„Ğ¾Ğ½Ñƒ 112 (Ğ¸Ğ»Ğ¸ Ğ² ÑĞºÑÑ‚Ñ€ĞµĞ½Ğ½Ñ‹Ğµ ÑĞ»ÑƒĞ¶Ğ±Ñ‹ Ğ²Ğ°ÑˆĞµĞ¹ ÑÑ‚Ñ€Ğ°Ğ½Ñ‹) Ğ»Ğ¸Ğ±Ğ¾ Ğº Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞµĞ¼Ñƒ Ğ¼ĞµĞ´Ğ¸Ñ†Ğ¸Ğ½ÑĞºĞ¾Ğ¼Ñƒ ÑƒÑ‡Ñ€ĞµĞ¶Ğ´ĞµĞ½Ğ¸Ñ.
+                  </p>
+                </>
+              )
+            )}
+          </section>
+          )}
+
+          {/* Body intake form */}
+          {activeModule === "body" && bodyScreen === "intake" && (
+            <BodyIntake onComplete={handleBodyIntakeComplete} />
+          )}
+
+          {/* Body intake result â€” step-by-step flow */}
+          {activeModule === "body" && bodyScreen === "result" && bodyIntakeResult && (
+            <section style={s.card} className="app-card">
+
+              {/* Step 1: Summary */}
+              {bodyIntakeStep === 0 && (
+                <>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16, color: "#2f2925" }}>
+                    Ğ’Ğ°Ñˆ Ğ¿ĞµÑ€Ğ²Ñ‹Ğ¹ Ñ€Ğ°Ğ·Ğ±Ğ¾Ñ€
+                  </div>
+
+                  <div style={{ fontSize: 16, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#2f2925" }}>
+                    {bodyIntakeResult.user_report}
+                  </div>
+
+                  {/* Urgent/medical warning â€” shown on step 1 */}
+                  {bodyIntakeResult?.care_recommendation?.level === "medical_consultation" && (
+                    <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: "rgba(251,191,36,.10)", border: "1px solid rgba(251,191,36,.25)" }}>
+                      <div style={{ fontWeight: 700, color: "#92400e", marginBottom: 6 }}>ĞšĞ¾Ğ³Ğ´Ğ° Ğ»ÑƒÑ‡ÑˆĞµ Ğ¾Ğ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ÑŒÑÑ Ğº Ğ²Ñ€Ğ°Ñ‡Ñƒ</div>
+                      <div style={{ color: "#78350f", fontSize: 14, lineHeight: 1.6 }}>
+                        ĞŸĞ¾ Ğ²Ğ°ÑˆĞ¸Ğ¼ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğ¼ ĞµÑÑ‚ÑŒ Ğ¿Ñ€Ğ¸Ğ·Ğ½Ğ°ĞºĞ¸, ĞºĞ¾Ñ‚Ğ¾Ñ€Ñ‹Ğµ ÑÑ‚Ğ¾Ğ¸Ñ‚ Ğ¾Ğ±ÑÑƒĞ´Ğ¸Ñ‚ÑŒ ÑĞ¾ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ¼. Ğ ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´ÑƒĞµĞ¼ Ğ·Ğ°Ğ¿Ğ¸ÑĞ°Ñ‚ÑŒÑÑ Ğº Ñ‚ĞµÑ€Ğ°Ğ¿ĞµĞ²Ñ‚Ñƒ Ğ² Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞ¸Ğµ Ğ´Ğ½Ğ¸.
+                      </div>
+                    </div>
+                  )}
+                  {bodyIntakeResult?.care_recommendation?.level === "urgent_help" && (
+                    <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.3)" }}>
+                      <div style={{ fontWeight: 700, color: "#991b1b", marginBottom: 6 }}>Ğ’Ğ¾Ğ·Ğ¼Ğ¾Ğ¶Ğ½Ğ¾, Ğ½ÑƒĞ¶Ğ½Ğ° ÑÑ€Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ</div>
+                      <div style={{ color: "#7f1d1d", fontSize: 14, lineHeight: 1.6 }}>
+                        Ğ•ÑĞ»Ğ¸ Ñƒ Ğ²Ğ°Ñ Ğ¸Ğ»Ğ¸ Ñ€ÑĞ´Ğ¾Ğ¼ Ñ Ğ²Ğ°Ğ¼Ğ¸ ĞµÑÑ‚ÑŒ ÑĞ¸Ğ¼Ğ¿Ñ‚Ğ¾Ğ¼Ñ‹, ĞºĞ¾Ñ‚Ğ¾Ñ€Ñ‹Ğµ Ñ‚Ñ€ĞµĞ±ÑƒÑÑ‚ Ğ½ĞµĞ¼ĞµĞ´Ğ»ĞµĞ½Ğ½Ğ¾Ğ¹ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰Ğ¸ â€” Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 103 Ğ¸Ğ»Ğ¸ 112.
+                      </div>
+                    </div>
+                  )}
+
+                  <button onClick={() => setBodyIntakeStep(1)} style={{
+                    marginTop: 24, width: "100%", height: 52, borderRadius: 16, border: 0,
+                    background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
+                  }}>
+                    Ğ”Ğ°Ğ»ÑŒÑˆĞµ
+                  </button>
+                </>
+              )}
+
+              {/* Step 2: Continuation code */}
+              {bodyIntakeStep === 1 && (
+                <>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16, color: "#2f2925" }}>
+                    Ğ’Ğ°Ñˆ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ
+                  </div>
+                  <div style={{ color: "#665c52", fontSize: 14, marginBottom: 16, lineHeight: 1.6 }}>
+                    Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚Ğµ ÑÑ‚Ğ¾Ñ‚ ĞºĞ¾Ğ´. ĞĞ½ Ğ¾Ñ‚ĞºÑ€Ñ‹Ğ²Ğ°ĞµÑ‚ Ğ²Ğ°Ñˆ Ğ¿Ñ€Ğ¾Ñ„Ğ¸Ğ»ÑŒ, Ğ¿Ğ»Ğ°Ğ½ Ğ¸ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸Ğº Ğ½Ğ° Ğ»ÑĞ±Ğ¾Ğ¼ ÑƒÑÑ‚Ñ€Ğ¾Ğ¹ÑÑ‚Ğ²Ğµ.
+                  </div>
+                  {(bodyIntakeResult.continuation_code || continuationCode) ? (
+                    <div style={{
+                      textAlign: "center", padding: 24, borderRadius: 16, background: "#f6f0e7",
+                      border: "1px solid #d8cec1", marginBottom: 20,
+                    }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "0.06em", color: "#2f2925", fontFamily: "monospace", marginBottom: 12, wordBreak: "break-all" }}>
+                        {bodyIntakeResult.continuation_code || continuationCode}
+                      </div>
+                      <button onClick={copyBodyCode} style={{
+                        padding: "10px 24px", borderRadius: 12, border: 0,
+                        background: bodyCodeCopied ? "#4caf50" : "#7D9A89",
+                        color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                      }}>
+                        {bodyCodeCopied ? "ĞšĞ¾Ğ´ ÑĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½" : "Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ ĞºĞ¾Ğ´"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{
+                      textAlign: "center", padding: 24, borderRadius: 16, background: "#f6f0e7",
+                      border: "1px solid #d8cec1", marginBottom: 20, color: "#665c52", fontSize: 14, lineHeight: 1.6,
+                    }}>
+                      ĞšĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ Ğ½Ğµ Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑÑ Ğ½Ğ° ÑƒÑÑ‚Ñ€Ğ¾Ğ¹ÑÑ‚Ğ²Ğµ. Ğ’ Ğ»Ğ¸Ñ‡Ğ½Ğ¾Ğ¼ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚Ğµ Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ Ğ½Ğ¾Ğ²Ñ‹Ğ¹ ĞºĞ¾Ğ´.
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                    <button onClick={() => setBodyIntakeStep(0)} style={{
+                      flex: 1, height: 48, borderRadius: 14, border: "1px solid #d8cec1",
+                      background: "#ede7dc", color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      ĞĞ°Ğ·Ğ°Ğ´
+                    </button>
+                    <button onClick={() => setBodyIntakeStep(2)} style={{
+                      flex: 2, height: 48, borderRadius: 14, border: 0,
+                      background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Step 3: 3-day plan */}
+              {bodyIntakeStep === 2 && bodyIntakeResult.body_plan?.days && (
+                <>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 4, color: "#2f2925" }}>
+                    ĞŸĞ»Ğ°Ğ½ Ğ½Ğ° 3 Ğ´Ğ½Ñ
+                  </div>
+                  <div style={{ color: "#665c52", fontSize: 14, marginBottom: 20, fontStyle: "italic" }}>
+                    {bodyIntakeResult.body_plan.focus}
+                  </div>
+
+                  {bodyIntakeResult.body_plan.days.slice(0, 3).map(d => (
+                    <div key={d.day} style={{
+                      border: "1px solid #d8cec1", borderRadius: 16, padding: "16px 18px",
+                      marginBottom: 10, background: "#faf6ef",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                        <div style={{
+                          width: 32, height: 32, borderRadius: "50%", background: "#5f8b7a",
+                          color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                          fontWeight: 700, fontSize: 14, flexShrink: 0,
+                        }}>
+                          {d.day}
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: 16, color: "#2f2925" }}>
+                          {d.title}
+                        </div>
+                      </div>
+                      {d.actions?.map((a, i) => (
+                        <div key={i} style={{ color: "#5f574f", fontSize: 14, paddingLeft: 14, marginBottom: 3, lineHeight: 1.5 }}>
+                          â€¢ {a}
+                        </div>
+                      ))}
+                      {d.note && (
+                        <div style={{ color: "#665c52", fontSize: 13, fontStyle: "italic", marginTop: 8, lineHeight: 1.5 }}>
+                          {d.note}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                    <button onClick={() => setBodyIntakeStep(1)} style={{
+                      flex: 1, height: 48, borderRadius: 14, border: "1px solid #d8cec1",
+                      background: "#ede7dc", color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      ĞĞ°Ğ·Ğ°Ğ´
+                    </button>
+                    <button onClick={() => setBodyIntakeStep(3)} style={{
+                      flex: 2, height: 48, borderRadius: 14, border: 0,
+                      background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      ĞĞ°Ñ‡Ğ°Ñ‚ÑŒ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸Ğº
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Step 4: CTA to cabinet */}
+              {bodyIntakeStep === 3 && (
+                <>
+                  <div style={{ textAlign: "center", padding: "20px 0" }}>
+                    <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 12, color: "#2f2925" }}>
+                      Ğ“Ğ¾Ñ‚Ğ¾Ğ²Ñ‹ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ?
+                    </div>
+                    <div style={{ color: "#665c52", fontSize: 15, lineHeight: 1.6, marginBottom: 28 }}>
+                      Ğ’ Ğ»Ğ¸Ñ‡Ğ½Ğ¾Ğ¼ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚Ğµ Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ğ²ĞµÑÑ‚Ğ¸ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸Ğº, ÑĞ¼Ğ¾Ñ‚Ñ€ĞµÑ‚ÑŒ Ğ¸ÑÑ‚Ğ¾Ñ€Ğ¸Ñ Ğ¸ ÑƒĞ¿Ñ€Ğ°Ğ²Ğ»ÑÑ‚ÑŒ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ¾Ğ¼.
+                    </div>
+                    <button onClick={() => { loadBodyCabinet(bodyIntakeResult?.continuation_code); }} style={{
+                      width: "100%", height: 52, borderRadius: 16, border: 0,
+                      background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", marginBottom: 12, fontFamily: "inherit",
+                    }}>
+                      ĞŸĞµÑ€ĞµĞ¹Ñ‚Ğ¸ Ğ² Ğ»Ğ¸Ñ‡Ğ½Ñ‹Ğ¹ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚
+                    </button>
+                    <button onClick={() => { setBodyIntakeStage("idle"); setBodyIntakeResult(null); setBodyScreen("landing"); setMode(""); }} style={{
+                      width: "100%", height: 48, borderRadius: 14, border: "1px solid #d8cec1",
+                      background: "#ede7dc", color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      ĞĞ° Ğ³Ğ»Ğ°Ğ²Ğ½ÑƒÑ
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Debug â€” always accessible at bottom via toggle */}
+              {(window.location.hostname === "localhost" || import.meta.env?.DEV) && (
+                <details style={{ marginTop: 20 }}>
+                  <summary style={{ cursor: "pointer", fontSize: 12, color: "#8d8378", fontWeight: 600, padding: 8 }}>
+                    Ğ˜Ğ½Ñ„Ğ¾Ñ€Ğ¼Ğ°Ñ†Ğ¸Ñ Ğ´Ğ»Ñ Ñ€Ğ°Ğ·Ñ€Ğ°Ğ±Ğ¾Ñ‚ĞºĞ¸
+                  </summary>
+                  <pre style={{ fontSize: 11, color: "#5f574f", lineHeight: 1.5, whiteSpace: "pre-wrap", margin: "8px 0 0" }}>
+{JSON.stringify({
+  module: bodyIntakeResult.module || "body",
+  stage: "intake_completed",
+  session_id: bodyIntakeResult.session_id || null,
+  care_recommendation: bodyIntakeResult.care_recommendation,
+  triggered_red_flags: bodyIntakeResult.triggered_red_flags || [],
+  red_flag_care_level: bodyIntakeResult.red_flag_care_level || null,
+  bmi: bodyIntakeResult.bmi,
+  used_fallback: bodyIntakeResult.used_fallback || false,
+  model_used: bodyIntakeResult.model_used || null,
+}, null, 2)}
+                  </pre>
+                </details>
+              )}
+
+              {/* Detail expand â€” BMI, care reason, JSON */}
+              <details style={{ marginTop: 12 }}>
+                <summary style={{ cursor: "pointer", fontSize: 13, color: "#8d8378", fontWeight: 600, padding: 8 }}>
+                  ĞŸĞ¾Ğ´Ñ€Ğ¾Ğ±Ğ½ĞµĞµ
+                </summary>
+                <div style={{ padding: "8px 0" }}>
+                  {bodyIntakeResult?.bmi && (
+                    <div style={{ padding: 12, borderRadius: 12, background: "#f6f0e7", marginBottom: 10, fontSize: 13, color: "#5f574f", lineHeight: 1.6 }}>
+                      ĞŸĞ¾ Ğ²Ğ²ĞµĞ´ĞµĞ½Ğ½Ñ‹Ğ¼ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğ¼ Ğ˜ĞœĞ¢ Ğ¿Ñ€Ğ¸Ğ¼ĞµÑ€Ğ½Ğ¾ {bodyIntakeResult.bmi}. Ğ­Ñ‚Ğ¾ Ğ¾Ñ€Ğ¸ĞµĞ½Ñ‚Ğ¸Ñ€Ğ¾Ğ²Ğ¾Ñ‡Ğ½Ñ‹Ğ¹ Ğ¿Ğ¾ĞºĞ°Ğ·Ğ°Ñ‚ĞµĞ»ÑŒ: Ğ¾Ğ½ Ğ¿Ğ¾Ğ¼Ğ¾Ğ³Ğ°ĞµÑ‚ ÑƒĞ²Ğ¸Ğ´ĞµÑ‚ÑŒ Ğ¾Ğ±Ñ‰ÑƒÑ ĞºĞ°Ñ€Ñ‚Ğ¸Ğ½Ñƒ, Ğ½Ğ¾ Ğ½Ğµ Ğ·Ğ°Ğ¼ĞµĞ½ÑĞµÑ‚ Ğ¾Ñ†ĞµĞ½ĞºÑƒ ÑĞ¾ÑÑ‚Ğ°Ğ²Ğ° Ñ‚ĞµĞ»Ğ°, Ğ¾Ğ±ÑŠĞµĞ¼Ğ° Ñ‚Ğ°Ğ»Ğ¸Ğ¸, ÑĞ°Ğ¼Ğ¾Ñ‡ÑƒĞ²ÑÑ‚Ğ²Ğ¸Ñ Ğ¸ ĞºĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°.
+                    </div>
+                  )}
+                  {bodyIntakeResult?.care_recommendation && (
+                    <div style={{ padding: 12, borderRadius: 12, background: "#f6f0e7", marginBottom: 10, fontSize: 13, color: "#5f574f", lineHeight: 1.6 }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>Ğ£Ñ€Ğ¾Ğ²ĞµĞ½ÑŒ Ñ€ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´Ğ°Ñ†Ğ¸Ğ¸</div>
+                      {bodyIntakeResult.care_recommendation.level === "self_care" && "Ğ’ Ğ°Ğ½ĞºĞµÑ‚Ğµ Ğ½ĞµÑ‚ Ğ¿Ñ€Ğ¸Ğ·Ğ½Ğ°ĞºĞ¾Ğ², Ñ‚Ñ€ĞµĞ±ÑƒÑÑ‰Ğ¸Ñ… ÑÑ€Ğ¾Ñ‡Ğ½Ğ¾Ğ¹ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰Ğ¸; Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ñ Ğ¼ÑĞ³ĞºĞ¾Ğ³Ğ¾ ÑĞ°Ğ¼Ğ¾Ğ½Ğ°Ğ±Ğ»ÑĞ´ĞµĞ½Ğ¸Ñ."}
+                      {bodyIntakeResult.care_recommendation.level === "medical_consultation" && "Ğ•ÑÑ‚ÑŒ Ğ¿Ñ€Ğ¸Ğ·Ğ½Ğ°ĞºĞ¸ Ğ¸Ğ»Ğ¸ Ğ¾Ğ³Ñ€Ğ°Ğ½Ğ¸Ñ‡ĞµĞ½Ğ¸Ñ, ĞºĞ¾Ñ‚Ğ¾Ñ€Ñ‹Ğµ Ğ»ÑƒÑ‡ÑˆĞµ Ğ¾Ğ±ÑÑƒĞ´Ğ¸Ñ‚ÑŒ ÑĞ¾ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ¼ Ğ¿ĞµÑ€ĞµĞ´ Ğ½Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°Ğ¼Ğ¸."}
+                      {bodyIntakeResult.care_recommendation.level === "urgent_help" && "Ğ’Ñ‹ Ğ¾Ñ‚Ğ¼ĞµÑ‚Ğ¸Ğ»Ğ¸ ÑĞ¸Ğ¼Ğ¿Ñ‚Ğ¾Ğ¼, Ğ¿Ñ€Ğ¸ ĞºĞ¾Ñ‚Ğ¾Ñ€Ğ¾Ğ¼ Ğ»ÑƒÑ‡ÑˆĞµ Ğ½Ğµ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ°Ñ‚ÑŒ Ğ¿Ñ€Ğ¾Ğ³Ñ€Ğ°Ğ¼Ğ¼Ñƒ Ğ¸ Ğ¾Ğ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ÑŒÑÑ Ğ·Ğ° ÑÑ€Ğ¾Ñ‡Ğ½Ğ¾Ğ¹ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒÑ."}
+                    </div>
+                  )}
+                  <button onClick={downloadBodyIntakeJSON} style={{
+                    padding: "8px 18px", borderRadius: 10, border: "1px solid #d8cec1",
+                    background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                  }}>
+                    Ğ¡ĞºĞ°Ñ‡Ğ°Ñ‚ÑŒ JSON
+                  </button>
+                </div>
+              </details>
+            </section>
+          )}
+
+           {/* Health Cabinet */}
+           {activeModule === "body" && bodyScreen === "cabinet" && bodyCabinetData && (
+             <HealthCabinet
+               sessionId={bodyDiarySessionId}
+               accessToken={(getBodySession().sessionId === bodyDiarySessionId ? getBodySession().accessToken : null)}
+               displayName={bodyCabinetData.display_name || null}
+               profile={bodyCabinetData.profile}
+               wallet={bodyCabinetData.wallet}
+               todayLog={bodyCabinetData.today_log}
+               history={bodyCabinetData.history}
+               onNewDiary={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }}
+               onViewDiary={(log) => { clearToast(); setBodyDiaryDayData(log); setBodyScreen("diary_view"); }}
+               onLogout={() => { clearBodySession(); setBodyScreen("landing"); setBodyCabinetData(null); setBodyDiarySessionId(null); }}
+               onRotateCode={regenerateBodyContinuationCode}
+               onOpenHealthContext={() => { clearToast(); setBodyScreen("health_context"); }}
+               onOpenServiceRequests={() => { clearToast(); setBodyScreen("service_requests"); }}
+               onUpdateDisplayName={async (name) => {
+                 try {
+                   const pair = getBodySession();
+                   if (!pair.accessToken || pair.sessionId !== bodyDiarySessionId) {
+                     showToast("Ğ¡ĞµÑÑĞ¸Ñ Ğ½ĞµĞ´ĞµĞ¹ÑÑ‚Ğ²Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ğ°. Ğ’Ğ¾Ğ¹Ğ´Ğ¸Ñ‚Ğµ ÑĞ½Ğ¾Ğ²Ğ° Ğ¿Ğ¾ ĞºĞ¾Ğ´Ñƒ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ.", "error");
+                     return;
+                   }
+                   const res = await fetch("/api/session", {
+                     method: "POST",
+                     headers: { "Content-Type": "application/json" },
+                     body: JSON.stringify({ action: "updateBodyDisplayName", session_id: bodyDiarySessionId, access_token: pair.accessToken, display_name: name }),
+                   });
+                   const data = await res.json();
+                   if (data.ok) {
+                     setBodyCabinetData(prev => ({ ...prev, display_name: data.display_name }));
+                     showToast("Ğ˜Ğ¼Ñ ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¾");
+                   } else {
+                     showToast(data.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¸Ğ¼Ñ", "error");
+                   }
+                 } catch {
+                   showToast("ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ Ğ¸Ğ¼ĞµĞ½Ğ¸", "error");
+                 }
+               }}
+             />
+           )}
+
+          {/* Body onboarding */}
+          {activeModule === "body" && bodyScreen === "onboarding" && (
+            <BodyOnboarding
+              onComplete={() => setBodyScreen("cabinet")}
+              onSkip={() => setBodyScreen("cabinet")}
+            />
+          )}
+
+          {/* Body health context */}
+          {activeModule === "body" && bodyScreen === "health_context" && (
+            <BodyHealthContext
+              onComplete={() => { clearToast(); setBodyScreen("cabinet"); }}
+              onCancel={() => { clearToast(); setBodyScreen("cabinet"); }}
+            />
+          )}
+
+          {/* Body service requests */}
+          {activeModule === "body" && bodyScreen === "service_requests" && (
+            <BodyServiceRequests
+              onBack={() => setBodyScreen("cabinet")}
+            />
+          )}
+
+          {/* Body diary view (read-only past day) */}
+          {activeModule === "body" && bodyScreen === "diary_view" && bodyDiaryDayData && (
+            <BodyDayView
+              logDate={bodyDiaryDayData.date || bodyDiaryDayData.log_date}
+              onEdit={(day) => { setBodyDiaryDayData(day); setBodyScreen("diary_edit"); }}
+              onBack={() => setBodyScreen("cabinet")}
+            />
+          )}
+
+          {/* Body diary form */}
+          {activeModule === "body" && bodyScreen === "diary_edit" && bodyDiarySessionId && (
+            <BodyDiary
+              sessionId={bodyDiarySessionId}
+              dayData={bodyDiaryDayData}
+              onComplete={async (result) => {
+                await loadBodyCabinet();
+                setBodyDiaryDayData(null);
+                if (result?.ok && result?.saved) {
+                  showToast("Ğ”Ğ½ĞµĞ²Ğ½Ğ¸Ğº ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½", "success");
+                } else {
+                  showToast(result?.error || "Ğ”Ğ½ĞµĞ²Ğ½Ğ¸Ğº ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½ Ğ±ĞµĞ· Ğ°Ğ½Ğ°Ğ»Ğ¸Ğ·Ğ°", "success");
+                }
+              }}
+              onCancel={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("cabinet"); }}
+            />
+          )}
+
+          {/* Body diary result */}
+          {activeModule === "body" && bodyScreen === "diary_result" && bodyDiaryResult && (
+            <section style={s.card} className="app-card">
+              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, color: "#2f2925" }}>
+                Ğ˜Ñ‚Ğ¾Ğ³ Ğ´Ğ½Ñ
+              </div>
+              {bodyDiaryResult.ai_day_summary && (
+                <div style={{ fontSize: 15, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#2f2925", marginBottom: 16 }}>
+                  {bodyDiaryResult.ai_day_summary}
+                </div>
+              )}
+              {bodyDiaryResult.ai_focus_tomorrow && (
+                <div style={{ padding: 14, borderRadius: 14, background: "#f0f5f1", border: "1px solid #c4d0c6", marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 4 }}>Ğ¤Ğ¾ĞºÑƒÑ Ğ½Ğ° Ğ·Ğ°Ğ²Ñ‚Ñ€Ğ°</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.6, color: "#5f574f" }}>
+                    {bodyDiaryResult.ai_focus_tomorrow}
+                  </div>
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <button onClick={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }} style={{
+                  padding: "12px 20px", borderRadius: 20, background: "#7D9A89",
+                  color: "#fff", fontWeight: 700, border: 0, cursor: "pointer", flex: 1, minWidth: 160,
+                }}>
+                  Ğ—Ğ°Ğ¿Ğ¸ÑĞ°Ñ‚ÑŒ ĞµÑ‰Ñ‘ Ğ´ĞµĞ½ÑŒ
+                </button>
+                <button onClick={() => { clearToast(); setBodyScreen("cabinet"); }} style={{
+                  padding: "12px 20px", borderRadius: 20, background: "#ede7dc",
+                  color: "#2f2925", fontWeight: 600, border: "1px solid #d8cec1", cursor: "pointer",
+                }}>
+                  Ğ’ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* Diary history modal */}
+          {bodyDiaryHistoryOpen && (
+            <div style={{
+              position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1000,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }} onClick={() => setBodyDiaryHistoryOpen(false)}>
+              <div style={{
+                background: "#ffffff", borderRadius: 20, padding: 28, maxWidth: 640, width: "90%",
+                maxHeight: "80vh", overflowY: "auto",
+              }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "#2f2925" }}>ĞœĞ¾Ğ¸ Ğ¿Ñ€Ğ¾ÑˆĞ»Ñ‹Ğµ Ğ´Ğ½Ğ¸</div>
+                  <button onClick={() => setBodyDiaryHistoryOpen(false)} style={{ background: "none", border: 0, fontSize: 20, cursor: "pointer", color: "#8d8378" }}>âœ•</button>
+                </div>
+                {bodyDiaryHistoryDetail ? (
+                  <div>
+                    <button onClick={() => setBodyDiaryHistoryDetail(null)} style={{
+                      background: "none", border: 0, color: "#7D9A89", cursor: "pointer",
+                      fontWeight: 600, fontSize: 14, marginBottom: 16, display: "inline-flex", alignItems: "center", gap: 4,
+                    }}>
+                      â† ĞĞ°Ğ·Ğ°Ğ´ Ğº ÑĞ¿Ğ¸ÑĞºÑƒ
+                    </button>
+                    <div style={{ fontSize: 14, color: "#2f2925", marginBottom: 8 }}>
+                      {bodyDiaryHistoryDetail.log_date}
+                    </div>
+                    {bodyDiaryHistoryDetail.ai_day_summary && (
+                      <div style={{ padding: 14, borderRadius: 12, background: "#f6f9f7", marginBottom: 12, fontSize: 14, lineHeight: 1.6 }}>
+                        {bodyDiaryHistoryDetail.ai_day_summary}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, color: "#5f574f" }}>
+                      {bodyDiaryHistoryDetail.steps != null && <div>ğŸš¶ Ğ¨Ğ°Ğ³Ğ¸: {bodyDiaryHistoryDetail.steps}</div>}
+                      {bodyDiaryHistoryDetail.workout_done && <div>ğŸ’ª Ğ¢Ñ€ĞµĞ½Ğ¸Ñ€Ğ¾Ğ²ĞºĞ°: {bodyDiaryHistoryDetail.workout_type || "Ğ´Ğ°"}{bodyDiaryHistoryDetail.workout_minutes ? ` (${bodyDiaryHistoryDetail.workout_minutes} Ğ¼Ğ¸Ğ½)` : ""}</div>}
+                      {bodyDiaryHistoryDetail.sleep_hours != null && <div>ğŸ˜´ Ğ¡Ğ¾Ğ½: {bodyDiaryHistoryDetail.sleep_hours} Ñ‡</div>}
+                      {bodyDiaryHistoryDetail.water_l != null && <div>ğŸ’§ Ğ’Ğ¾Ğ´Ğ°: {bodyDiaryHistoryDetail.water_l} Ğ»</div>}
+                      {bodyDiaryHistoryDetail.energy_level != null && <div>âš¡ Ğ­Ğ½ĞµÑ€Ğ³Ğ¸Ñ: {bodyDiaryHistoryDetail.energy_level}/10</div>}
+                      {bodyDiaryHistoryDetail.mood_level != null && <div>ğŸ˜Š ĞĞ°ÑÑ‚Ñ€Ğ¾ĞµĞ½Ğ¸Ğµ: {bodyDiaryHistoryDetail.mood_level}/10</div>}
+                    </div>
+                  </div>
+                ) : (
+                  bodyDiaryHistory?.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {bodyDiaryHistory.map((log, i) => (
+                        <button key={i} onClick={() => setBodyDiaryHistoryDetail(log)} style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          padding: "14px 16px", borderRadius: 14, background: "#f6f0e7",
+                          border: "1px solid #e8e2d8", cursor: "pointer", width: "100%", textAlign: "left",
+                          fontFamily: "inherit", fontSize: 14, color: "#2f2925",
+                        }}>
+                          <span style={{ fontWeight: 600 }}>{log.log_date}</span>
+                          <span style={{ color: "#8d8378", fontSize: 13 }}>
+                            {log.ai_day_summary ? "âœ“ ĞµÑÑ‚ÑŒ Ğ¸Ñ‚Ğ¾Ğ³" : "â€”"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: "center", padding: "30px 0", color: "#8d8378" }}>
+                      {bodyDiaryHistoryLoading ? "Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ°..." : "ĞŸĞ¾ĞºĞ° Ğ½ĞµÑ‚ Ğ·Ğ°Ğ¿Ğ¸ÑĞµĞ¹"}
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Default support card / body card before intake */}
+          {!(activeModule === "body" && bodyScreen !== "landing") && phase !== "cabinet" && phase !== "followup" && (
+          <section style={s.card} className="app-card">
+            <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif" }}>
+              {phase === "questions"
+                ? crisisMode ? "Ğ¡Ğ½Ğ°Ñ‡Ğ°Ğ»Ğ° Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€Ğ¸Ğ¼ Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚ÑŒ" : `Ğ Ğ°ÑƒĞ½Ğ´ ÑƒÑ‚Ğ¾Ñ‡Ğ½ĞµĞ½Ğ¸Ñ ${dialogDepth}`
+                : activeModule === "body"
+                  ? "Ğ“Ğ¾Ñ‚Ğ¾Ğ²Ñ‹ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ?"
+                  : "Ğ¡ Ñ‡ĞµĞ³Ğ¾ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ?"}
+            </div>
+            {phase !== "questions" && (
+              <div style={{ color: "#7A7268", fontSize: 14, marginTop: 6 }}>
+                {activeModule === "body"
+                  ? "Ğ—Ğ°Ğ¿Ğ¾Ğ»Ğ½Ğ¸Ñ‚Ğµ ĞºĞ¾Ñ€Ğ¾Ñ‚ĞºÑƒÑ Ğ°Ğ½ĞºĞµÑ‚Ñƒ â€” ÑÑ‚Ğ¾ Ğ·Ğ°Ğ¹Ğ¼Ñ‘Ñ‚ 2 Ğ¼Ğ¸Ğ½ÑƒÑ‚Ñ‹."
+                  : "ĞĞ¿Ğ¸ÑˆĞ¸Ñ‚Ğµ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ ÑĞ²Ğ¾Ğ¸Ğ¼Ğ¸ ÑĞ»Ğ¾Ğ²Ğ°Ğ¼Ğ¸."}
+              </div>
+            )}
+
+            {activeModule === "body" && localStorage.getItem("body_referral_source") === "alena_client" && bodyScreen === "landing" && (
+              <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "#e8f0ea", border: "1px solid #c4d0c6" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#2f2925", marginBottom: 2 }}>
+                  Ğ’Ñ‹ Ğ·Ğ°Ğ¿Ğ¾Ğ»Ğ½ÑĞµÑ‚Ğµ Ğ°Ğ½ĞºĞµÑ‚Ñƒ Ğ¿Ğ¾ Ğ½Ğ°Ğ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ¸Ñ
+                </div>
+                <div style={{ fontSize: 15, color: "#2f2925", fontWeight: 600 }}>
+                  {localStorage.getItem("body_specialist_name") || "ĞĞ»ĞµĞ½Ğ° Ğ–ÑƒĞºĞ¾Ğ²Ğ°"}
+                </div>
+              </div>
+            )}
+
+            {activeModule === "body" && savedBodyResult && bodyScreen === "landing" && (
+              <div style={{ marginTop: 16 }}>
+                <button onClick={() => {
+                  setBodyIntakeResult(savedBodyResult);
+                  setBodyIntakeStage("result");
+                  setBodyScreen("result");
+                  setBodyIntakeStep(0);
+                }} style={{
+                  padding: "14px 22px", borderRadius: 20, background: "#7D9A89",
+                  color: "#ffffff", fontWeight: 800, fontSize: 15, border: 0, cursor: "pointer", width: "100%",
+                }}>
+                  Ğ’ĞµÑ€Ğ½ÑƒÑ‚ÑŒÑÑ Ğº Ğ¿Ğ¾ÑĞ»ĞµĞ´Ğ½ĞµĞ¼Ñƒ Ğ¿Ğ»Ğ°Ğ½Ñƒ
+                </button>
+                <div style={{ color: "#8d8378", fontSize: 12, marginTop: 6, textAlign: "center" }}>
+                  Ğ£ Ğ²Ğ°Ñ ÑƒĞ¶Ğµ ĞµÑÑ‚ÑŒ Ğ¿Ğ»Ğ°Ğ½ Ğ¾Ñ‚ {localStorage.getItem("body_last_created_at")
+                    ? new Date(localStorage.getItem("body_last_created_at")).toLocaleDateString("ru-RU")
+                    : "Ğ¿Ñ€ĞµĞ´Ñ‹Ğ´ÑƒÑ‰ĞµĞ³Ğ¾ Ñ€Ğ°Ğ·Ğ°"}
+                </div>
+              </div>
+            )}
+
+            {phase === "input" && !isContinuation && !crisisMode && mode !== "voice" && (
+              <InformationFlow key={activeModule} module={activeModule} engaged={Boolean(text.trim())} />
+            )}
+
+            <div style={s.inner}>
+              {mode === "voice" ? (
+                <div style={{ textAlign: "center", padding: "40px 20px" }}>
+                  <div style={{ fontSize: 58 }}>ğŸ™</div>
+                  <h2 style={{ fontSize: 22, fontWeight: 700 }}>Ğ“Ğ¾Ğ»Ğ¾ÑĞ¾Ğ²Ğ¾Ğ¹ Ñ€ĞµĞ¶Ğ¸Ğ¼</h2>
+
+                  <p style={{ color: "#7A7268", lineHeight: 1.6 }}>
+                    ĞĞ°Ğ¶Ğ¼Ğ¸Ñ‚Ğµ "ĞĞ°Ñ‡Ğ°Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ", Ñ€Ğ°ÑÑĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ Ğ¾ ÑĞ²Ğ¾ĞµĞ¼ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğ¸, Ğ·Ğ°Ñ‚ĞµĞ¼ Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚Ğµ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ.
+                    ĞœÑ‹ Ñ€Ğ°ÑÑˆĞ¸Ñ„Ñ€ÑƒĞµĞ¼ Ğ³Ğ¾Ğ»Ğ¾Ñ Ğ¸ Ğ¿ĞµÑ€ĞµĞ½ĞµÑĞµĞ¼ Ñ‚ĞµĞºÑÑ‚ Ğ² Ğ¾Ğ±Ñ‹Ñ‡Ğ½Ğ¾Ğµ Ğ¿Ğ¾Ğ»Ğµ.
+                  </p>
+
+                  {!recording ? (
+                    <button style={s.wide} onClick={startRecording} disabled={transcribing}>
+                      {transcribing ? "Ğ Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²Ñ‹Ğ²Ğ°ĞµĞ¼..." : "ĞĞ°Ñ‡Ğ°Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ"}
+                    </button>
+                  ) : (
+                    <button style={{ ...s.wide, background: "#B85C4A", color: "white" }} onClick={stopRecording}>
+                      ĞÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ Ğ¸ Ñ€Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ
+                    </button>
+                  )}
+
+                  {voiceError && (
+                    <div style={s.error}>
+                      {voiceError}
+                    </div>
+                  )}
+
+                  <div style={{
+                    marginTop: 12,
+                    color: recordingTime > 45 ? "#B85C4A" : "#7A7268",
+                    fontSize: 14
+                  }}>
+                    {recording
+                      ? `Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ: ${recordingTime} ÑĞµĞº / 60 ÑĞµĞº`
+                      : "ĞœĞ°ĞºÑĞ¸Ğ¼Ğ°Ğ»ÑŒĞ½Ğ°Ñ Ğ´Ğ»Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ğ¾ÑÑ‚ÑŒ Ğ·Ğ°Ğ¿Ğ¸ÑĞ¸ â€” 1 Ğ¼Ğ¸Ğ½ÑƒÑ‚Ğ°"}
+                  </div>
+                </div>
+              ) : phase === "input" ? (
+                <>
+                  <textarea
+                    style={s.textarea}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder={isDedicatedSubdomain ? "ĞĞ°Ğ¿Ñ€Ğ¸Ğ¼ĞµÑ€: Ñ…Ğ¾Ñ‡Ñƒ ÑĞ½Ğ¸Ğ·Ğ¸Ñ‚ÑŒ Ğ²ĞµÑ, Ğ½Ğ°Ğ»Ğ°Ğ´Ğ¸Ñ‚ÑŒ Ğ¿Ğ¸Ñ‚Ğ°Ğ½Ğ¸Ğµ, Ğ±Ğ¾Ğ»ÑŒÑˆĞµ Ğ´Ğ²Ğ¸Ğ³Ğ°Ñ‚ÑŒÑÑ, Ğ»ÑƒÑ‡ÑˆĞµ ÑĞ¿Ğ°Ñ‚ÑŒ Ğ¸ Ğ¿Ğ¾Ğ½ÑÑ‚ÑŒ, Ñ Ñ‡ĞµĞ³Ğ¾ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒâ€¦" : "ĞĞ°Ğ¿Ñ€Ğ¸Ğ¼ĞµÑ€: Ğ¿Ğ¾ÑĞ»ĞµĞ´Ğ½Ğ¸Ğµ Ğ½ĞµĞ´ĞµĞ»Ğ¸ Ğ¿Ğ»Ğ¾Ñ…Ğ¾ ÑĞ¿Ğ»Ñ, Ñ‚Ñ€ĞµĞ²Ğ¾Ğ¶ÑƒÑÑŒ, Ğ½Ğµ Ğ¼Ğ¾Ğ³Ñƒ ÑĞ¾Ğ±Ñ€Ğ°Ñ‚ÑŒÑÑ, ÑÑ‚Ğ°Ğ»Ğ¾ Ñ‚Ñ€ÑƒĞ´Ğ½Ğ¾ Ğ·Ğ°Ğ½Ğ¸Ğ¼Ğ°Ñ‚ÑŒÑÑ Ğ¾Ğ±Ñ‹Ñ‡Ğ½Ñ‹Ğ¼Ğ¸ Ğ´ĞµĞ»Ğ°Ğ¼Ğ¸â€¦"}
+                  />
+                  <button
+                    style={s.wide}
+                    onClick={isDedicatedSubdomain ? () => { setBodyIntakeStage("filling"); setBodyScreen("intake"); } : () => submitRound()}
+                    disabled={loading}
+                  >
+                      {loading
+                      ? loadingMessage || "Ğ¤Ğ¾Ñ€Ğ¼Ğ¸Ñ€ÑƒĞµĞ¼ Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹..."
+                      : isDedicatedSubdomain ? "ĞŸĞµÑ€ĞµĞ¹Ñ‚Ğ¸ Ğº Ğ°Ğ½ĞºĞµÑ‚Ğµ" : "ĞĞ°Ñ‡Ğ°Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ±Ğ¾Ñ€"}
+                  </button>
+                </>
+              ) : phase === "questions" ? (
+                <>
+                  {crisisMode && APP_BRAND.isSupportPilot && (
+                    <div role="alert" aria-live="assertive" style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: "#fff1ed", border: "2px solid #b85c4a", color: "#4a2822", lineHeight: 1.55 }}>
+                      <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>Ğ¡Ğ½Ğ°Ñ‡Ğ°Ğ»Ğ° â€” Ğ²Ğ°ÑˆĞ° Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚ÑŒ</div>
+                      <div style={{ marginBottom: 12 }}>Ğ•ÑĞ»Ğ¸ Ğ²Ñ‹ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ¿Ñ€Ğ¸Ñ‡Ğ¸Ğ½Ğ¸Ñ‚ÑŒ ÑĞµĞ±Ğµ Ğ²Ñ€ĞµĞ´ Ğ¸Ğ»Ğ¸ Ğ½Ğµ ÑƒĞ²ĞµÑ€ĞµĞ½Ñ‹, Ñ‡Ñ‚Ğ¾ Ğ¾ÑÑ‚Ğ°Ğ½ĞµÑ‚ĞµÑÑŒ Ğ² Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚Ğ¸, Ğ¿Ğ¾Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ ÑĞµĞ¹Ñ‡Ğ°Ñ 112 Ğ¸Ğ»Ğ¸ 103. ĞŸĞµÑ€ĞµĞ¹Ğ´Ğ¸Ñ‚Ğµ Ñ‚ÑƒĞ´Ğ°, Ğ³Ğ´Ğµ ĞµÑÑ‚ÑŒ Ğ»ÑĞ´Ğ¸, Ğ¸ Ğ¿Ğ¾Ğ¿Ñ€Ğ¾ÑĞ¸Ñ‚Ğµ Ğ±Ğ»Ğ¸Ğ·ĞºĞ¾Ğ³Ğ¾ Ğ¿Ğ¾Ğ±Ñ‹Ñ‚ÑŒ Ñ€ÑĞ´Ğ¾Ğ¼. ĞĞµ Ğ¶Ğ´Ğ¸Ñ‚Ğµ Ğ¾Ñ‚Ğ²ĞµÑ‚Ğ° ÑĞµÑ€Ğ²Ğ¸ÑĞ°.</div>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        {["112", "103"].map((number) => (
+                          <a key={number} href={`tel:${number}`} aria-label={`ĞŸĞ¾Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚ÑŒ ${number}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 112, minHeight: 48, padding: "10px 18px", borderRadius: 10, background: "#9f3425", color: "#fff", fontWeight: 800, textDecoration: "none" }}>
+                            ĞŸĞ¾Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚ÑŒ {number}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {questions?.map((q, index) => (
+                    <div key={index} style={s.questionCard}>
+                      <div style={s.questionText}>
+                        {index + 1}. {q}
+                      </div>
+
+                      <textarea
+                        style={s.answerInput}
+                        aria-label={`ĞÑ‚Ğ²ĞµÑ‚ Ğ½Ğ° Ğ²Ğ¾Ğ¿Ñ€Ğ¾Ñ ${index + 1}: ${q}`}
+                        value={answers[index] || ""}
+                        onChange={(e) =>
+                          setAnswers({
+                            ...answers,
+                            [index]: e.target.value,
+                          })
+                        }
+                        placeholder="Ğ’Ğ°Ñˆ Ğ¾Ñ‚Ğ²ĞµÑ‚..."
+                      />
+
+                      <button
+                        style={{
+                          ...s.secondary,
+                          marginTop: 10,
+                          width: "100%",
+                        }}
+                        onClick={() =>
+                          recordingQuestionIndex === index
+                            ? stopQuestionRecording()
+                            : startQuestionRecording(index)
+                        }
+                        disabled={
+                          questionTranscribingIndex !== null &&
+                          questionTranscribingIndex !== index
+                        }
+                      >
+                        {questionTranscribingIndex === index
+                          ? "Ğ Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²Ñ‹Ğ²Ğ°ĞµĞ¼..."
+                          : recordingQuestionIndex === index
+                            ? "ĞÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ Ğ¸ Ñ€Ğ°ÑÑˆĞ¸Ñ„Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ"
+                            : "ĞÑ‚Ğ²ĞµÑ‚Ğ¸Ñ‚ÑŒ Ğ³Ğ¾Ğ»Ğ¾ÑĞ¾Ğ¼"}
+                      </button>
+
+                      {recordingQuestionIndex === index && (
+                        <div
+                          style={{
+                            marginTop: 8,
+                            color:
+                              questionRecordingTime > 45
+                                ? "#B85C4A"
+                                : "#7A7268",
+                            fontSize: 14,
+                          }}
+                        >
+                          Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ: {questionRecordingTime} ÑĞµĞº / 60 ÑĞµĞº
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    style={s.wide}
+                    onClick={() => submitRound()}
+                    disabled={loading}
+                  >
+                    {loading
+                      ? loadingMessage || "ĞĞ½Ğ°Ğ»Ğ¸Ğ·Ğ¸Ñ€ÑƒĞµĞ¼..."
+                      : crisisMode && APP_BRAND.isSupportPilot
+                        ? "ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ"
+                        : dialogDepth < 3
+                        ? "ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ ÑƒÑ‚Ğ¾Ñ‡Ğ½ĞµĞ½Ğ¸Ğµ"
+                        : "ĞŸĞ¾Ğ»ÑƒÑ‡Ğ¸Ñ‚ÑŒ Ğ¿Ñ€ĞµĞ´Ğ²Ğ°Ñ€Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ñ‹Ğ¹ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚"}
+                  </button>
+                </>
+              ) : null}
+
+              {error && <div style={s.error}>{error}</div>}
+            </div>
+
+            {phase === "report" && result && (
+              <div style={s.result}>
+                <h2 style={{ marginTop: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 22 }}>Ğ ĞµĞ·ÑƒĞ»ÑŒÑ‚Ğ°Ñ‚ Ñ€Ğ°Ğ·Ğ±Ğ¾Ñ€Ğ°</h2>
+
+                {APP_BRAND.isSupportPilot && crisisMode && (
+                  <div role="alert" aria-live="assertive" style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: "#fff1ed", border: "2px solid #b85c4a", color: "#4a2822", lineHeight: 1.55 }}>
+                    <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>ĞŸĞ»Ğ°Ğ½ Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚Ğ¸ Ğ¸ ÑÑ€Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ</div>
+                    <p style={{ margin: "0 0 12px" }}>{crisisBlock?.emergencyRecommended
+                      ? "Ğ‘ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚ÑŒ ÑĞµĞ¹Ñ‡Ğ°Ñ Ğ½Ğµ Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ¶Ğ´ĞµĞ½Ğ° Ğ¸Ğ»Ğ¸ ĞµÑÑ‚ÑŒ Ğ½ĞµĞ¿Ğ¾ÑÑ€ĞµĞ´ÑÑ‚Ğ²ĞµĞ½Ğ½Ğ°Ñ Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚ÑŒ. ĞŸĞ¾Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112 Ğ¸Ğ»Ğ¸ 103 ÑĞµĞ¹Ñ‡Ğ°Ñ Ğ¸ Ğ¿Ğ¾Ğ¿Ñ€Ğ¾ÑĞ¸Ñ‚Ğµ Ñ‡ĞµĞ»Ğ¾Ğ²ĞµĞºĞ°, ĞºĞ¾Ñ‚Ğ¾Ñ€Ğ¾Ğ¼Ñƒ Ğ´Ğ¾Ğ²ĞµÑ€ÑĞµÑ‚Ğµ, Ğ¾ÑÑ‚Ğ°Ğ²Ğ°Ñ‚ÑŒÑÑ Ñ€ÑĞ´Ğ¾Ğ¼."
+                      : "Ğ’Ñ‹ ÑĞ¾Ğ¾Ğ±Ñ‰Ğ¸Ğ»Ğ¸, Ñ‡Ñ‚Ğ¾ ÑĞµĞ¹Ñ‡Ğ°Ñ Ğ² Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚Ğ¸. Ğ¡Ğ²ÑĞ¶Ğ¸Ñ‚ĞµÑÑŒ ÑĞµĞ³Ğ¾Ğ´Ğ½Ñ Ñ Ğ±Ğ»Ğ¸Ğ·ĞºĞ¸Ğ¼ Ñ‡ĞµĞ»Ğ¾Ğ²ĞµĞºĞ¾Ğ¼ Ğ¸ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ¼. Ğ•ÑĞ»Ğ¸ Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚ÑŒ Ğ¿Ğ¾ÑĞ²Ğ¸Ñ‚ÑÑ Ğ¸Ğ»Ğ¸ Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚ÑŒ ÑÑ‚Ğ°Ğ½ĞµÑ‚ Ğ½ĞµÑÑĞ½Ğ¾Ğ¹ â€” Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112 Ğ¸Ğ»Ğ¸ 103."}</p>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      {["112", "103"].map((number) => (
+                        <a key={number} href={`tel:${number}`} aria-label={`ĞŸĞ¾Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚ÑŒ ${number}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 112, minHeight: 48, padding: "10px 18px", borderRadius: 10, background: "#9f3425", color: "#fff", fontWeight: 800, textDecoration: "none" }}>
+                          ĞŸĞ¾Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚ÑŒ {number}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {continuationCode && justFinishedSession && reportSource === "generated" && (
+                  <div style={{
+                    background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
+                    borderRadius: 16, padding: "18px", marginBottom: 16,
+                  }}>
+                    <div style={{ fontWeight: 700, fontSize: 16, color: "#2E2A25", marginBottom: 8 }}>
+                      Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚Ğµ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ
+                    </div>
+                    <div style={{ color: "#5F7D6C", fontSize: 14, lineHeight: 1.5, marginBottom: 12 }}>
+                      ĞĞ½ Ğ¿Ğ¾Ğ½Ğ°Ğ´Ğ¾Ğ±Ğ¸Ñ‚ÑÑ, Ñ‡Ñ‚Ğ¾Ğ±Ñ‹ Ğ²ĞµÑ€Ğ½ÑƒÑ‚ÑŒÑÑ Ğº ÑÑ‚Ğ¾Ğ¼Ñƒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ñƒ Ğ½Ğ° Ğ´Ñ€ÑƒĞ³Ğ¾Ğ¼ ÑƒÑÑ‚Ñ€Ğ¾Ğ¹ÑÑ‚Ğ²Ğµ Ğ¸Ğ»Ğ¸ Ğ¿Ğ¾ÑĞ»Ğµ Ğ¾Ñ‡Ğ¸ÑÑ‚ĞºĞ¸ Ğ±Ñ€Ğ°ÑƒĞ·ĞµÑ€Ğ°.
+                    </div>
+                    <div style={{
+                      background: "#ffffff", border: "1px solid rgba(125,154,137,.25)",
+                      borderRadius: 12, padding: "12px 16px", marginBottom: 14,
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                    }}>
+                      <span style={{ fontWeight: 900, fontSize: 16, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace", wordBreak: "break-all" }}>
+                        {continuationCode}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <button
+                        style={{ ...s.secondary, flex: 1, minWidth: 140 }}
+                        onClick={() => { navigator.clipboard.writeText(continuationCode); showToast("ĞšĞ¾Ğ´ ÑĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½"); }}
+                      >
+                        Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ ĞºĞ¾Ğ´
+                      </button>
+                      <button
+                        style={{ ...s.primary, flex: 1, minWidth: 160 }}
+                        onClick={() => { setJustFinishedSession(false); loadSupportCabinet(); }}
+                      >
+                        ĞŸĞµÑ€ĞµĞ¹Ñ‚Ğ¸ Ğ² Ğ»Ğ¸Ñ‡Ğ½Ñ‹Ğ¹ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {publicCode && !(justFinishedSession && reportSource === "generated") && (
+                  <div style={{
+                    background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
+                    borderRadius: 16, padding: "12px 16px", marginBottom: 16,
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                  }}>
+                    <span style={{ color: "#5F7D6C", fontSize: 13 }}>
+                      ĞšĞ¾Ğ´ Ğ´Ğ¸Ğ°Ğ»Ğ¾Ğ³Ğ° Ğ´Ğ»Ñ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ:
+                    </span>
+                    <span style={{ fontWeight: 900, fontSize: 18, color: "#2E2A25", letterSpacing: 1 }}>
+                      {publicCode}
+                    </span>
+                  </div>
+                )}
+
+                {usageBalance && usageBalance.visible && (() => {
+                  const available = Number(usageBalance.available_credits ?? 0);
+                  const reserved = Number(usageBalance.reserved_credits ?? 0);
+                  const total = Number(usageBalance.balance_total ?? 0);
+                  return (
+                    <div style={{ padding: "8px 12px", background: "#f0fdf4", borderRadius: 8, marginBottom: 16, fontSize: 13, color: "#166534" }}>
+                      Ğ‘Ğ°Ğ»Ğ°Ğ½Ñ: {total.toLocaleString("ru-RU")} ĞºÑ€ĞµĞ´Ğ¸Ñ‚Ğ¾Ğ² Â· Ğ—Ğ°Ñ€ĞµĞ·ĞµÑ€Ğ²Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¾: {reserved.toLocaleString("ru-RU")} Â· Ğ”Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ¾: {available.toLocaleString("ru-RU")}<br />
+                      <span style={{ fontSize: 11, color: "#6b7280" }}>Ğ¢ĞµÑÑ‚Ğ¾Ğ²Ñ‹Ğ¹ Ğ±Ğ°Ğ»Ğ°Ğ½Ñ. Ğ”ĞµĞ½ÑŒĞ³Ğ¸ Ğ½Ğµ ÑĞ¿Ğ¸ÑÑ‹Ğ²Ğ°ÑÑ‚ÑÑ.</span>
+                    </div>
+                  );
+                })()}
+
+                <div style={s.tabs} className="tabs">
+                  <button
+                    style={activeTab === "user" ? s.activeTab : s.tab}
+                    onClick={() => setActiveTab("user")}
+                  >
+                    Ğ”Ğ»Ñ Ğ²Ğ°Ñ
+                  </button>
+                  {expertData && (
+                    <button
+                      style={activeTab === "doctor" ? s.activeTab : s.tab}
+                      onClick={() => setActiveTab("doctor")}
+                    >
+                      Ğ”Ğ»Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°
+                    </button>
+                  )}
+                  <button
+                    onClick={downloadReportPDF}
+                    style={{ ...s.tab, fontSize: 12, marginLeft: "auto" }}
+                    title="Ğ¡ĞºĞ°Ñ‡Ğ°Ñ‚ÑŒ PDF"
+                  >
+                    ğŸ“„ PDF
+                  </button>
+                  <button
+                    onClick={downloadReportDOCX}
+                    style={{ ...s.tab, fontSize: 12 }}
+                    title="Ğ¡ĞºĞ°Ñ‡Ğ°Ñ‚ÑŒ DOCX"
+                  >
+                    ğŸ“ DOCX
+                  </button>
+                  {expertData && (
+                    <button
+                      style={{
+                        ...s.tab,
+                        fontSize: 11,
+                        background: activeTab === "debug" ? "#EDE3D8" : "transparent",
+                        borderColor: activeTab === "debug" ? "#B8A690" : "rgba(46,42,37,.12)",
+                      }}
+                      onClick={() => setActiveTab(activeTab === "debug" ? "user" : "debug")}
+                    >
+                      ğŸ›  Debug
+                    </button>
+                  )}
+                </div>
+
+                <div style={s.reportBlock} className="report-block">
+                  {activeTab === "debug" && expertData && debugInfo ? (
+                    <div style={{ fontSize: 12, lineHeight: 1.6, color: "#5F5A52" }}>
+                      <div style={{ fontWeight: 700, marginBottom: 10, color: "#2E2A25" }}>
+                        Ğ¢ĞµÑ…Ğ½Ğ¸Ñ‡ĞµÑĞºĞ°Ñ Ğ¸Ğ½Ñ„Ğ¾Ñ€Ğ¼Ğ°Ñ†Ğ¸Ñ (Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ğ´Ğ»Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°)
+                      </div>
+                      <div style={{ display: "grid", gap: 8 }}>
+                        <div><b>Prompt version:</b> {debugInfo.prompt_version || "â€”"}</div>
+                        <div><b>Care level:</b> {debugInfo.care_recommendation?.level || "â€”"}</div>
+                        <div><b>Minimum level (backend):</b> {debugInfo.minimum_level || "â€”"}</div>
+                        <div><b>Quality check:</b> {debugInfo.quality_check?.pass ? "âœ… Ğ¿Ñ€Ğ¾Ğ¹Ğ´ĞµĞ½Ğ°" : "âŒ Ğ½Ğ°Ñ€ÑƒÑˆĞµĞ½Ğ°"}</div>
+                        {debugInfo.quality_check?.violations?.length > 0 && (
+                          <div><b>ĞĞ°Ñ€ÑƒÑˆĞµĞ½Ğ¸Ñ:</b> {debugInfo.quality_check.violations.join("; ")}</div>
+                        )}
+                        <div><b>Repair attempted:</b> {debugInfo.repair?.repairAttempted ? "Ğ´Ğ°" : "Ğ½ĞµÑ‚"}</div>
+                        {debugInfo.repair?.repairAttempted && (
+                          <div><b>Repair result:</b> {debugInfo.repair.repairSucceeded ? "âœ… ÑƒÑĞ¿ĞµÑˆĞ½Ğ¾" : "âŒ Ğ½Ğµ ÑƒĞ´Ğ°Ğ»ÑÑ"}</div>
+                        )}
+                        <details>
+                          <summary style={{ cursor: "pointer", fontWeight: 600, marginTop: 8 }}>Raw model response</summary>
+                          <pre style={{ background: "#F5F0E8", padding: 12, borderRadius: 8, marginTop: 6, fontSize: 11, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                            {debugInfo.raw_model_response || "â€”"}
+                          </pre>
+                        </details>
+                        <details>
+                          <summary style={{ cursor: "pointer", fontWeight: 600, marginTop: 4 }}>Parsed user_report</summary>
+                          <pre style={{ background: "#F5F0E8", padding: 12, borderRadius: 8, marginTop: 6, fontSize: 11, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                            {debugInfo.parsed_user_report || "â€”"}
+                          </pre>
+                        </details>
+                        <details>
+                          <summary style={{ cursor: "pointer", fontWeight: 600, marginTop: 4 }}>Parsed doctor_report</summary>
+                          <pre style={{ background: "#F5F0E8", padding: 12, borderRadius: 8, marginTop: 6, fontSize: 11, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                            {debugInfo.parsed_doctor_report || "â€”"}
+                          </pre>
+                        </details>
+                        {debugInfo.care_recommendation && (
+                          <details>
+                            <summary style={{ cursor: "pointer", fontWeight: 600, marginTop: 4 }}>Care recommendation</summary>
+                            <pre style={{ background: "#F5F0E8", padding: 12, borderRadius: 8, marginTop: 6, fontSize: 11, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                              {JSON.stringify(debugInfo.care_recommendation, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                        {debugInfo.care_repair && (
+                          <div><b>Care repair:</b> {debugInfo.care_repair.repairAttempted ? (debugInfo.care_repair.repairSucceeded ? "âœ…" : "âŒ") : "â€”"}</div>
+                        )}
+                      </div>
+                    </div>
+                  ) : activeTab === "user" ? (
+                    renderUserReport(userPart)
+                  ) : expertData ? (
+                    <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+                      {doctorPart}
+                    </div>
+                  ) : (
+                    renderUserReport(userPart)
+                  )}
+                </div>
+
+                {careRecommendation && (
+                  <div style={{ marginTop: 20 }}>
+                    {/* URGENT_HELP block */}
+                    {careRecommendation.level === "urgent_help" && !(APP_BRAND.isSupportPilot && crisisMode) && (
+                      <div style={{
+                        background: "rgba(184,92,74,.12)", border: "2px solid #B85C4A",
+                        borderRadius: 18, padding: 20, marginBottom: 16,
+                      }}>
+                        <div style={{ fontSize: 18, fontWeight: 900, color: "#B85C4A", marginBottom: 10 }}>
+                          ĞÑƒĞ¶Ğ½Ğ° ÑÑ€Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ
+                        </div>
+                        <div style={{ color: "#2E2A25", lineHeight: 1.7, fontSize: 14, marginBottom: 16 }}>
+                          Ğ—Ğ´ĞµÑÑŒ Ğ½ÑƒĞ¶Ğ½Ğ° ÑÑ€Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ ÑĞµĞ³Ğ¾Ğ´Ğ½Ñ. ĞŸĞ¾Ğ¶Ğ°Ğ»ÑƒĞ¹ÑÑ‚Ğ°, Ğ¿Ğ¾Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112, Ğ¾Ğ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ĞµÑÑŒ Ğ² Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞµĞµ Ğ¿Ñ€Ğ¸Ñ‘Ğ¼Ğ½Ğ¾Ğµ Ğ¾Ñ‚Ğ´ĞµĞ»ĞµĞ½Ğ¸Ğµ Ğ¸Ğ»Ğ¸ Ğ¿Ğ¾Ğ¿Ñ€Ğ¾ÑĞ¸Ñ‚Ğµ Ğ±Ğ»Ğ¸Ğ·ĞºĞ¾Ğ³Ğ¾ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‡ÑŒ Ğ²Ğ°Ğ¼ Ğ´Ğ¾Ğ±Ñ€Ğ°Ñ‚ÑŒÑÑ Ğ´Ğ¾ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰Ğ¸. ĞĞµ Ğ¾ÑÑ‚Ğ°Ğ²Ğ°Ğ¹Ñ‚ĞµÑÑŒ ÑĞµĞ¹Ñ‡Ğ°Ñ Ğ¾Ğ´Ğ¸Ğ½.
+                        </div>
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          <a href="tel:112" style={{
+                            display: "inline-block", background: "#B85C4A", color: "white",
+                            borderRadius: 12, padding: "12px 20px", fontWeight: 700, fontSize: 15,
+                            textDecoration: "none", cursor: "pointer",
+                          }}>
+                            ĞŸĞ¾Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚ÑŒ 112
+                          </a>
+                          <button style={{
+                            border: "1px solid #B85C4A", background: "transparent", color: "#B85C4A",
+                            borderRadius: 12, padding: "12px 20px", fontWeight: 600, fontSize: 14,
+                            cursor: "pointer",
+                          }} onClick={() => {
+                            showToast("ĞŸĞ¾Ğ¿Ñ€Ğ¾ÑĞ¸Ñ‚Ğµ Ğ½Ğ°Ñ…Ğ¾Ğ´ÑÑ‰ĞµĞ³Ğ¾ÑÑ Ñ€ÑĞ´Ğ¾Ğ¼ Ñ‡ĞµĞ»Ğ¾Ğ²ĞµĞºĞ° Ğ¿Ğ¾Ğ¼Ğ¾Ñ‡ÑŒ Ğ²Ğ°Ğ¼ Ğ´Ğ¾Ğ±Ñ€Ğ°Ñ‚ÑŒÑÑ Ğ´Ğ¾ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰Ğ¸. ĞĞµ Ğ¾ÑÑ‚Ğ°Ğ²Ğ°Ğ¹Ñ‚ĞµÑÑŒ Ğ¾Ğ´Ğ½Ğ¸.");
+                          }}>
+                            ĞŸĞ¾Ğ¿Ñ€Ğ¾ÑĞ¸Ñ‚ÑŒ Ğ±Ğ»Ğ¸Ğ·ĞºĞ¾Ğ³Ğ¾ Ğ±Ñ‹Ñ‚ÑŒ Ñ€ÑĞ´Ğ¾Ğ¼
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* PROFESSIONAL_CONTACT block */}
+                    {careRecommendation.level === "professional_contact" && (
+                      <div style={{
+                        background: "#F5F0E8", border: "1px solid rgba(46,42,37,.15)",
+                        borderRadius: 18, padding: 20, marginBottom: 16,
+                      }}>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: "#2E2A25", marginBottom: 8 }}>
+                          Ğ ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´ÑƒĞµĞ¼ ÑĞ²ÑĞ·Ğ°Ñ‚ÑŒÑÑ ÑĞ¾ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ¼
+                        </div>
+                        {careRecommendation.timeframe && (
+                          <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
+                            {careRecommendation.timeframe === "today" ? "Ğ¡Ğ²ÑĞ·Ğ°Ñ‚ÑŒÑÑ ÑĞµĞ³Ğ¾Ğ´Ğ½Ñ" :
+                             careRecommendation.timeframe === "within_days" ? "Ğ¡Ğ²ÑĞ·Ğ°Ñ‚ÑŒÑÑ Ğ² Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞ¸Ğµ Ğ´Ğ½Ğ¸" :
+                             "Ğ¡Ğ²ÑĞ·Ğ°Ñ‚ÑŒÑÑ Ğ² Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞµĞµ Ğ²Ñ€ĞµĞ¼Ñ"}
+                          </div>
+                        )}
+                        {careRecommendation.specialist_types?.length > 0 && (
+                          <div style={{ fontSize: 13, color: "#5F7D6C", marginBottom: 14, lineHeight: 1.5 }}>
+                            {careRecommendation.specialist_types.map(st => ({
+                              psychologist: "Ğ¿ÑĞ¸Ñ…Ğ¾Ğ»Ğ¾Ğ³", clinical_psychologist: "ĞºĞ»Ğ¸Ğ½Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ Ğ¿ÑĞ¸Ñ…Ğ¾Ğ»Ğ¾Ğ³",
+                              psychotherapist: "Ğ¿ÑĞ¸Ñ…Ğ¾Ñ‚ĞµÑ€Ğ°Ğ¿ĞµĞ²Ñ‚", psychiatrist: "Ğ¿ÑĞ¸Ñ…Ğ¸Ğ°Ñ‚Ñ€",
+                              general_physician: "Ñ‚ĞµÑ€Ğ°Ğ¿ĞµĞ²Ñ‚", neurologist: "Ğ½ĞµĞ²Ñ€Ğ¾Ğ»Ğ¾Ğ³",
+                              emergency_service: "ÑĞºÑÑ‚Ñ€ĞµĞ½Ğ½Ğ°Ñ ÑĞ»ÑƒĞ¶Ğ±Ğ°", crisis_service: "ĞºÑ€Ğ¸Ğ·Ğ¸ÑĞ½Ğ°Ñ ÑĞ»ÑƒĞ¶Ğ±Ğ°",
+                              orthopedist: "Ğ¾Ñ€Ñ‚Ğ¾Ğ¿ĞµĞ´", cardiologist: "ĞºĞ°Ñ€Ğ´Ğ¸Ğ¾Ğ»Ğ¾Ğ³", gastroenterologist: "Ğ³Ğ°ÑÑ‚Ñ€Ğ¾ÑĞ½Ñ‚ĞµÑ€Ğ¾Ğ»Ğ¾Ğ³",
+                            }[st] || st)).join(", ")}
+                          </div>
+                        )}
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => setShowConsultPrep(true)}>
+                            ĞŸĞ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²Ğ¸Ñ‚ÑŒÑÑ Ğº Ğ¿ĞµÑ€Ğ²Ğ¾Ğ¹ ĞºĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ğ¸
+                          </button>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
+                            setShowSelfAssessment(true);
+                            setShowSupportToolkit(true);
+                          }}>
+                            ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€ Ğ·Ğ´ĞµÑÑŒ
+                          </button>
+                          {careRecommendation.level === "professional_contact" && (
+                            <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px", borderColor: "#B85C4A", color: "#B85C4A" }}
+                              onClick={() => {
+                                showToast("Ğ•ÑĞ»Ğ¸ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ ÑƒÑ…ÑƒĞ´ÑˆĞ°ĞµÑ‚ÑÑ Ğ¸Ğ»Ğ¸ ĞµÑÑ‚ÑŒ Ñ€Ğ¸ÑĞº â€” Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112 Ğ¸Ğ»Ğ¸ 103");
+                              }}>
+                              ĞšĞ¾Ğ³Ğ´Ğ° Ğ½ÑƒĞ¶Ğ½Ğ° ÑÑ€Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ
+                            </button>
+                          )}
+                        </div>
+                        {careRecommendation.interim_support?.length > 0 && (
+                          <div style={{ marginTop: 14, fontSize: 13, color: "#7A7268", lineHeight: 1.6 }}>
+                            <div style={{ fontWeight: 600, marginBottom: 4 }}>Ğ”Ğ¾ ĞºĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ğ¸:</div>
+                            <ul style={{ margin: 0, paddingLeft: 18 }}>
+                              {careRecommendation.interim_support.map((s, i) => (
+                                <li key={i}>{s}</li>
+                              ))}
+                            </ul>
+                            <div style={{ marginTop: 6, fontStyle: "italic" }}>
+                              Ğ­Ñ‚Ğ¸ ÑˆĞ°Ğ³Ğ¸ Ğ½Ğµ Ğ·Ğ°Ğ¼ĞµĞ½ÑÑ‚ Ğ¿Ñ€Ğ¾Ñ„ĞµÑÑĞ¸Ğ¾Ğ½Ğ°Ğ»ÑŒĞ½ÑƒÑ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ, Ğ½Ğ¾ Ğ¼Ğ¾Ğ³ÑƒÑ‚ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‡ÑŒ Ğ¿ĞµÑ€ĞµĞ¶Ğ¸Ñ‚ÑŒ Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞ¸Ğµ Ñ‡Ğ°ÑÑ‹ Ğ¸Ğ»Ğ¸ Ğ´Ğ½Ğ¸ Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½ĞµĞµ.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* MEDICAL_CONSULTATION block (body module) */}
+                    {careRecommendation.level === "medical_consultation" && (
+                      <div style={{
+                        background: "#F5F0E8", border: "1px solid rgba(46,42,37,.15)",
+                        borderRadius: 18, padding: 20, marginBottom: 16,
+                      }}>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: "#2E2A25", marginBottom: 8 }}>
+                          Ğ ĞµĞºĞ¾Ğ¼ĞµĞ½Ğ´ÑƒĞµĞ¼ Ğ¾Ğ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ÑŒÑÑ Ğº Ğ²Ñ€Ğ°Ñ‡Ñƒ
+                        </div>
+                        {careRecommendation.timeframe && (
+                          <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
+                            {careRecommendation.timeframe === "today" ? "ĞĞ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ÑŒÑÑ ÑĞµĞ³Ğ¾Ğ´Ğ½Ñ" :
+                             careRecommendation.timeframe === "within_days" ? "ĞĞ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ÑŒÑÑ Ğ² Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞ¸Ğµ Ğ´Ğ½Ğ¸" :
+                             "ĞĞ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ÑŒÑÑ Ğ² Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞµĞµ Ğ²Ñ€ĞµĞ¼Ñ"}
+                          </div>
+                        )}
+                        {careRecommendation.specialist_types?.length > 0 && (
+                          <div style={{ fontSize: 13, color: "#5F7D6C", marginBottom: 14, lineHeight: 1.5 }}>
+                            {careRecommendation.specialist_types.map(st => ({
+                              psychologist: "Ğ¿ÑĞ¸Ñ…Ğ¾Ğ»Ğ¾Ğ³", clinical_psychologist: "ĞºĞ»Ğ¸Ğ½Ğ¸Ñ‡ĞµÑĞºĞ¸Ğ¹ Ğ¿ÑĞ¸Ñ…Ğ¾Ğ»Ğ¾Ğ³",
+                              psychotherapist: "Ğ¿ÑĞ¸Ñ…Ğ¾Ñ‚ĞµÑ€Ğ°Ğ¿ĞµĞ²Ñ‚", psychiatrist: "Ğ¿ÑĞ¸Ñ…Ğ¸Ğ°Ñ‚Ñ€",
+                              general_physician: "Ñ‚ĞµÑ€Ğ°Ğ¿ĞµĞ²Ñ‚", neurologist: "Ğ½ĞµĞ²Ñ€Ğ¾Ğ»Ğ¾Ğ³",
+                              emergency_service: "ÑĞºÑÑ‚Ñ€ĞµĞ½Ğ½Ğ°Ñ ÑĞ»ÑƒĞ¶Ğ±Ğ°", crisis_service: "ĞºÑ€Ğ¸Ğ·Ğ¸ÑĞ½Ğ°Ñ ÑĞ»ÑƒĞ¶Ğ±Ğ°",
+                              orthopedist: "Ğ¾Ñ€Ñ‚Ğ¾Ğ¿ĞµĞ´", cardiologist: "ĞºĞ°Ñ€Ğ´Ğ¸Ğ¾Ğ»Ğ¾Ğ³", gastroenterologist: "Ğ³Ğ°ÑÑ‚Ñ€Ğ¾ÑĞ½Ñ‚ĞµÑ€Ğ¾Ğ»Ğ¾Ğ³",
+                            }[st] || st)).join(", ")}
+                          </div>
+                        )}
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
+                            showToast("Ğ¡Ğ¸Ğ¼Ğ¿Ñ‚Ğ¾Ğ¼Ñ‹, Ñ‚Ñ€ĞµĞ±ÑƒÑÑ‰Ğ¸Ğµ ÑÑ€Ğ¾Ñ‡Ğ½Ğ¾Ğ³Ğ¾ Ğ²Ğ½Ğ¸Ğ¼Ğ°Ğ½Ğ¸Ñ: Ğ±Ğ¾Ğ»ÑŒ Ğ² Ğ³Ñ€ÑƒĞ´Ğ¸, Ğ¾Ğ´Ñ‹ÑˆĞºĞ°, ÑĞ¸Ğ»ÑŒĞ½Ğ°Ñ Ğ³Ğ¾Ğ»Ğ¾Ğ²Ğ½Ğ°Ñ Ğ±Ğ¾Ğ»ÑŒ, ÑĞ»Ğ°Ğ±Ğ¾ÑÑ‚ÑŒ Ğ² ĞºĞ¾Ğ½ĞµÑ‡Ğ½Ğ¾ÑÑ‚Ğ¸ â€” Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112");
+                          }}>
+                            ĞšĞ¾Ğ³Ğ´Ğ° Ğ½ÑƒĞ¶Ğ½Ğ° ÑÑ€Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ
+                          </button>
+                        </div>
+                        {careRecommendation.interim_support?.length > 0 && (
+                          <div style={{ marginTop: 14, fontSize: 13, color: "#7A7268", lineHeight: 1.6 }}>
+                            <div style={{ fontWeight: 600, marginBottom: 4 }}>Ğ”Ğ¾ Ğ²Ğ¸Ğ·Ğ¸Ñ‚Ğ° Ğº Ğ²Ñ€Ğ°Ñ‡Ñƒ:</div>
+                            <ul style={{ margin: 0, paddingLeft: 18 }}>
+                              {careRecommendation.interim_support.map((s, i) => (
+                                <li key={i}>{s}</li>
+                              ))}
+                            </ul>
+                            <div style={{ marginTop: 6, fontStyle: "italic" }}>
+                              Ğ­Ñ‚Ğ¾ Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ñ‹Ğµ Ğ¼ĞµÑ€Ñ‹, Ğ½Ğµ Ğ·Ğ°Ğ¼ĞµĞ½ÑÑÑ‰Ğ¸Ğµ Ğ¼ĞµĞ´Ğ¸Ñ†Ğ¸Ğ½ÑĞºÑƒÑ ĞºĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ñ.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* SELF_SUPPORT / SELF_CARE block */}
+                    {(careRecommendation.level === "self_support" || careRecommendation.level === "self_care") && (
+                      <div style={{
+                        background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
+                        borderRadius: 18, padding: 20, marginBottom: 16,
+                      }}>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: "#2E2A25", marginBottom: 8 }}>
+                          Ğ§Ñ‚Ğ¾ Ğ´ĞµĞ»Ğ°Ñ‚ÑŒ Ğ´Ğ°Ğ»ÑŒÑˆĞµ
+                        </div>
+                        <div style={{ color: "#2E2A25", lineHeight: 1.7, fontSize: 14, marginBottom: 12 }}>
+                          Ğ¡ĞµĞ¹Ñ‡Ğ°Ñ Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ñ Ğ¿Ğ¾Ğ´Ğ´ĞµÑ€Ğ¶ĞºĞ¸ Ğ±Ğ»Ğ¸Ğ·ĞºĞ¸Ñ… Ğ¸ Ğ½ĞµÑĞºĞ¾Ğ»ÑŒĞºĞ¸Ñ… Ğ¿Ñ€Ğ¾ÑÑ‚Ñ‹Ñ… ÑˆĞ°Ğ³Ğ¾Ğ². Ğ•ÑĞ»Ğ¸ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ Ğ½Ğµ Ğ½Ğ°Ñ‡Ğ½Ñ‘Ñ‚ ÑƒĞ¼ĞµĞ½ÑŒÑˆĞ°Ñ‚ÑŒÑÑ Ğ¸Ğ»Ğ¸ ÑÑ‚Ğ°Ğ½ĞµÑ‚ ÑĞ¸Ğ»ÑŒĞ½ĞµĞµ, ÑÑ‚Ğ¾Ğ¸Ñ‚ Ğ¾Ğ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ÑŒÑÑ Ğº ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ñƒ.
+                        </div>
+                        {careRecommendation.interim_support?.length > 0 && (
+                          <ul style={{ color: "#5F7D6C", fontSize: 13, lineHeight: 1.6, margin: "0 0 12px", paddingLeft: 18 }}>
+                            {careRecommendation.interim_support.map((s, i) => (
+                              <li key={i}>{s}</li>
+                            ))}
+                          </ul>
+                        )}
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
+                            setShowSelfAssessment(true);
+                            setShowSupportToolkit(true);
+                          }}>
+                            ĞŸĞ¾ÑĞ¼Ğ¾Ñ‚Ñ€ĞµÑ‚ÑŒ Ğ¿Ğ¾Ğ´Ğ´ĞµÑ€Ğ¶Ğ¸Ğ²Ğ°ÑÑ‰Ğ¸Ğµ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸ĞºĞ¸
+                          </button>
+                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px", borderColor: "#B85C4A", color: "#B85C4A" }}
+                            onClick={() => {
+                              showToast("Ğ•ÑĞ»Ğ¸ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ ÑƒÑ…ÑƒĞ´ÑˆĞ°ĞµÑ‚ÑÑ Ğ¸Ğ»Ğ¸ ĞµÑÑ‚ÑŒ Ñ€Ğ¸ÑĞº â€” Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112 Ğ¸Ğ»Ğ¸ 103");
+                            }}>
+                            ĞšĞ¾Ğ³Ğ´Ğ° Ğ½ÑƒĞ¶Ğ½Ğ° ÑÑ€Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ¿Ğ¾Ğ¼Ğ¾Ñ‰ÑŒ
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Consultation prep modal */}
+                {showConsultPrep && (
+                  <div style={s.overlay} onClick={() => setShowConsultPrep(false)}>
+                    <div style={s.modal} onClick={(e) => e.stopPropagation()}>
+                      <div style={s.modalTitle}>ĞŸĞ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²Ğ¸Ñ‚ÑŒÑÑ Ğº Ğ¿ĞµÑ€Ğ²Ğ¾Ğ¹ ĞºĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ğ¸</div>
+                      <p style={{ color: "#7A7268", fontSize: 14, lineHeight: 1.6, marginBottom: 16 }}>
+                        Ğ§Ñ‚Ğ¾ Ğ²Ğ°Ğ¶Ğ½Ğ¾ Ñ€Ğ°ÑÑĞºĞ°Ğ·Ğ°Ñ‚ÑŒ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ñƒ:
+                      </p>
+                      <div style={{ background: "#FAF6EF", borderRadius: 14, padding: 16, marginBottom: 16, fontSize: 13, lineHeight: 1.7, color: "#2E2A25" }}>
+                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                          <li>Ğ§Ñ‚Ğ¾ Ğ¿Ñ€Ğ¾Ğ¸Ğ·Ğ¾ÑˆĞ»Ğ¾</li>
+                          <li>ĞšĞ°Ğº Ğ´Ğ°Ğ²Ğ½Ğ¾ ÑÑ‚Ğ¾ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ°ĞµÑ‚ÑÑ</li>
+                          <li>Ğ§Ñ‚Ğ¾ Ğ¿Ñ€Ğ¾Ğ¸ÑÑ…Ğ¾Ğ´Ğ¸Ñ‚ ÑĞ¾ ÑĞ½Ğ¾Ğ¼</li>
+                          <li>ĞšĞ°ĞºĞ¸Ğµ ĞµÑÑ‚ÑŒ Ñ‚ĞµĞ»ĞµÑĞ½Ñ‹Ğµ ÑĞ¸Ğ¼Ğ¿Ñ‚Ğ¾Ğ¼Ñ‹</li>
+                          <li>Ğ§Ñ‚Ğ¾ Ğ¸Ğ·Ğ¼ĞµĞ½Ğ¸Ğ»Ğ¾ÑÑŒ Ğ² Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğµ Ğ¸ Ğ¿Ğ¾Ğ²ÑĞµĞ´Ğ½ĞµĞ²Ğ½Ğ¾Ğ¹ Ğ¶Ğ¸Ğ·Ğ½Ğ¸</li>
+                          <li>Ğ‘Ñ‹Ğ»Ğ¸ Ğ»Ğ¸ Ğ¼Ñ‹ÑĞ»Ğ¸ Ğ¾ ÑĞ¼ĞµÑ€Ñ‚Ğ¸ Ğ¸Ğ»Ğ¸ ÑĞ°Ğ¼Ğ¾Ğ¿Ğ¾Ğ²Ñ€ĞµĞ¶Ğ´ĞµĞ½Ğ¸Ğ¸</li>
+                          <li>ĞšĞ°ĞºĞ¸Ğµ Ğ»ĞµĞºĞ°Ñ€ÑÑ‚Ğ²Ğ°, Ğ°Ğ»ĞºĞ¾Ğ³Ğ¾Ğ»ÑŒ Ğ¸Ğ»Ğ¸ Ğ´Ñ€ÑƒĞ³Ğ¸Ğµ ÑÑ€ĞµĞ´ÑÑ‚Ğ²Ğ° Ğ¸ÑĞ¿Ğ¾Ğ»ÑŒĞ·ÑƒÑÑ‚ÑÑ</li>
+                          <li>ĞšÑ‚Ğ¾ ÑĞµĞ¹Ñ‡Ğ°Ñ Ğ¼Ğ¾Ğ¶ĞµÑ‚ Ğ¿Ğ¾Ğ´Ğ´ĞµÑ€Ğ¶Ğ°Ñ‚ÑŒ</li>
+                        </ul>
+                      </div>
+                      <button
+                        style={{ ...s.wide, background: "#7D9A89", color: "white" }}
+                        onClick={() => {
+                          const text = `Ğ§Ñ‚Ğ¾ Ğ¿Ñ€Ğ¾Ğ¸Ğ·Ğ¾ÑˆĞ»Ğ¾: ${text || "(Ğ±ÑƒĞ´ĞµÑ‚ Ğ·Ğ°Ğ¿Ğ¾Ğ»Ğ½ĞµĞ½Ğ¾ Ğ¿Ñ€Ğ¸ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğµ)"}
+      ĞšĞ°Ğº Ğ´Ğ°Ğ²Ğ½Ğ¾: ${conversationHistory?.length ? "Ğ¾Ğ±ÑÑƒĞ¶Ğ´ĞµĞ½Ğ¾ Ğ² Ğ´Ğ¸Ğ°Ğ»Ğ¾Ğ³Ğµ" : "â€”"}
+      Ğ¡Ğ¾Ğ½: ${userPart?.match(/ÑĞ¾Ğ½/i) ? "Ğ¾Ğ±ÑÑƒĞ¶Ğ´Ğ°Ğ»ÑÑ" : "â€”"}
+      Ğ¢ĞµĞ»ĞµÑĞ½Ñ‹Ğµ ÑĞ¸Ğ¼Ğ¿Ñ‚Ğ¾Ğ¼Ñ‹: ${userPart?.match(/Ñ‚ĞµĞ»ĞµÑĞ½|Ğ±Ğ¾Ğ»|ÑĞµÑ€Ğ´Ñ†|Ğ³Ğ¾Ğ»Ğ¾Ğ²/i) ? "Ğ¾Ğ±ÑÑƒĞ¶Ğ´Ğ°Ğ»Ğ¸ÑÑŒ" : "â€”"}
+      Ğ˜Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ñ Ğ² Ğ¶Ğ¸Ğ·Ğ½Ğ¸: ${userPart?.match(/Ñ€Ğ°Ğ±Ğ¾Ñ‚|ÑƒÑ‡Ñ‘Ğ±/i) ? "Ğ¾Ğ±ÑÑƒĞ¶Ğ´Ğ°Ğ»Ğ¸ÑÑŒ" : "â€”"}
+      ĞœÑ‹ÑĞ»Ğ¸ Ğ¾ ÑĞ¼ĞµÑ€Ñ‚Ğ¸: ${userPart?.match(/ÑĞ¼ĞµÑ€Ñ‚|Ğ¶Ğ¸Ñ‚ÑŒ/i) ? "Ğ¾Ğ±ÑÑƒĞ¶Ğ´Ğ°Ğ»Ğ¸ÑÑŒ" : "â€”"}
+      Ğ›ĞµĞºĞ°Ñ€ÑÑ‚Ğ²Ğ°/Ğ°Ğ»ĞºĞ¾Ğ³Ğ¾Ğ»ÑŒ: ${userPart?.match(/Ğ»ĞµĞºĞ°Ñ€ÑÑ‚Ğ²|Ğ°Ğ»ĞºĞ¾Ğ³Ğ¾Ğ»ÑŒ/i) ? "Ğ¾Ğ±ÑÑƒĞ¶Ğ´Ğ°Ğ»Ğ¸ÑÑŒ" : "â€”"}
+      ĞŸĞ¾Ğ´Ğ´ĞµÑ€Ğ¶ĞºĞ°: ${userPart?.match(/Ğ¿Ğ¾Ğ´Ğ´ĞµÑ€Ğ¶|Ğ±Ğ»Ğ¸Ğ·Ğº/i) ? "Ğ¾Ğ±ÑÑƒĞ¶Ğ´Ğ°Ğ»Ğ°ÑÑŒ" : "â€”"}`;
+                          navigator.clipboard.writeText(text);
+                          showToast("ĞšÑ€Ğ°Ñ‚ĞºĞ¾Ğµ Ğ¾Ğ¿Ğ¸ÑĞ°Ğ½Ğ¸Ğµ ÑĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¾");
+                        }}
+                      >
+                        Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ ĞºÑ€Ğ°Ñ‚ĞºĞ¾Ğµ Ğ¾Ğ¿Ğ¸ÑĞ°Ğ½Ğ¸Ğµ
+                      </button>
+                      <button style={{ ...s.secondary, marginTop: 10 }} onClick={() => setShowConsultPrep(false)}>
+                        Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚ÑŒ
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Message to close person modal */}
+
+                {activeModule === "support" && !showSelfAssessment && !showSupportToolkit && !showSpecialistIntent && (
+                  <div style={{ marginTop: 24, borderTop: "1px solid rgba(46,42,37,.1)", paddingTop: 20 }}>
+                    <div style={{ fontSize: 14, color: "#2E2A25", lineHeight: 1.6, marginBottom: 16, fontFamily: "Georgia, \"PT Serif\", serif" }}>
+                      ĞšĞ°Ğº Ğ²Ğ°Ğ¼ ĞºĞ°Ğ¶ĞµÑ‚ÑÑ, Ğ½Ğ° ÑÑ‚Ğ¾Ğ¼ ÑÑ‚Ğ°Ğ¿Ğµ Ğ²Ñ‹ ÑĞ¼Ğ¾Ğ¶ĞµÑ‚Ğµ ÑĞ¿Ñ€Ğ°Ğ²Ğ»ÑÑ‚ÑŒÑÑ Ñ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸ĞµĞ¼ Ğ±ĞµĞ· Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°?
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button style={{ ...s.wide, flex: "1 1 auto", minWidth: 140 }} onClick={() => { setCanManageWithoutSpecialist("yes"); setShowSelfAssessment(true); setShowSupportToolkit(true); }}>
+                        Ğ”Ğ°, Ğ¿Ğ¾ĞºĞ° Ğ¿Ğ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒÑ ÑĞ°Ğ¼(Ğ°)
+                      </button>
+                      <button style={{ ...s.secondary, flex: "1 1 auto", minWidth: 140 }} onClick={() => { setCanManageWithoutSpecialist("not_sure"); setShowSelfAssessment(true); setShowSupportToolkit(true); }}>
+                        ĞĞµ ÑƒĞ²ĞµÑ€ĞµĞ½(Ğ°)
+                      </button>
+                      <button style={{ ...s.secondary, flex: "1 1 auto", minWidth: 140, borderColor: "#B85C4A", color: "#B85C4A" }} onClick={() => { setCanManageWithoutSpecialist("no"); setShowSelfAssessment(true); setShowSpecialistIntent(true); }}>
+                        ĞĞµÑ‚, Ñ…Ğ¾Ñ‡Ñƒ Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡Ğ¸Ñ‚ÑŒ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {activeModule === "support" && showSpecialistIntent && !specialistIntentDone && (
+                  <div style={{ marginTop: 24, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", borderRadius: 14, padding: 20 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "#2E2A25", marginBottom: 12 }}>Ğ—Ğ°Ğ¿Ñ€Ğ¾Ñ Ğ½Ğ° Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ğµ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°</div>
+                    <p style={{ color: "#7A7268", lineHeight: 1.7, fontSize: 14, margin: "0 0 16px" }}>
+                      Ğ­Ñ‚Ğ° Ğ²Ğ¾Ğ·Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ÑÑ‚ÑŒ Ğ³Ğ¾Ñ‚Ğ¾Ğ²Ğ¸Ñ‚ÑÑ. Ğ¡ĞµĞ¹Ñ‡Ğ°Ñ ÑĞµÑ€Ğ²Ğ¸Ñ Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°ĞµÑ‚ Ğ² Ğ·Ğ°ĞºÑ€Ñ‹Ñ‚Ğ¾Ğ¼ Ñ‚ĞµÑÑ‚Ğ¾Ğ²Ğ¾Ğ¼ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğµ Ğ¸ Ğ½Ğµ ÑĞ²Ğ»ÑĞµÑ‚ÑÑ Ñ‚ĞµĞ»ĞµĞ¼ĞµĞ´Ğ¸Ñ†Ğ¸Ğ½ÑĞºĞ¾Ğ¹ Ğ¿Ğ»Ğ°Ñ‚Ñ„Ğ¾Ñ€Ğ¼Ğ¾Ğ¹. ĞœÑ‹ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ğ¼ Ğ¾Ñ‚Ğ¼ĞµÑ‚ĞºÑƒ Ğ² Ğ²Ğ°ÑˆĞµĞ¹ Ğ°Ğ½Ğ¾Ğ½Ğ¸Ğ¼Ğ½Ğ¾Ğ¹ ÑĞµÑÑĞ¸Ğ¸, Ñ‡Ñ‚Ğ¾Ğ±Ñ‹ Ğ² Ğ±ÑƒĞ´ÑƒÑ‰ĞµĞ¼ Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ğ±Ñ‹Ğ»Ğ¾ Ğ²ĞµÑ€Ğ½ÑƒÑ‚ÑŒÑÑ Ğº ÑÑ‚Ğ¾Ğ¼Ñƒ ÑˆĞ°Ğ³Ñƒ.
+                    </p>
+                    <button
+                      style={{ ...s.wide, background: "#7D9A89", color: "white" }}
+                      onClick={() => {
+                        setSpecialistIntentDone(true);
+                        const newPlan = { ...(supportPlan || {}), specialist_request_intent: true, patient_self_assessment: { ...((supportPlan?.patient_self_assessment) || {}), can_manage_without_specialist: canManageWithoutSpecialist } };
+                        setSupportPlan(newPlan);
+                        saveSupportPlan(newPlan);
+                      }}
+                    >
+                      ĞÑ‚Ğ¼ĞµÑ‚Ğ¸Ñ‚ÑŒ, Ñ‡Ñ‚Ğ¾ Ñ…Ğ¾Ñ‡Ñƒ Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡Ğ¸Ñ‚ÑŒ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°
+                    </button>
+                    {specialistIntentDone && (
+                      <div style={{ color: "#5F7D6C", fontSize: 13, marginTop: 12, lineHeight: 1.5, background: "#E2EBE4", borderRadius: 10, padding: 12 }}>
+                        ĞÑ‚Ğ¼ĞµÑ‚ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ° Ğ² Ğ²Ğ°ÑˆĞµĞ¹ Ğ°Ğ½Ğ¾Ğ½Ğ¸Ğ¼Ğ½Ğ¾Ğ¹ ÑĞµÑÑĞ¸Ğ¸. Ğ•ÑĞ»Ğ¸ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ ÑƒÑ…ÑƒĞ´ÑˆĞ°ĞµÑ‚ÑÑ Ğ¸Ğ»Ğ¸ ĞµÑÑ‚ÑŒ Ñ€Ğ¸ÑĞº Ğ¿Ñ€Ğ¸Ñ‡Ğ¸Ğ½Ğ¸Ñ‚ÑŒ Ğ²Ñ€ĞµĞ´ ÑĞµĞ±Ğµ Ğ¸Ğ»Ğ¸ Ğ´Ñ€ÑƒĞ³Ğ¾Ğ¼Ñƒ Ñ‡ĞµĞ»Ğ¾Ğ²ĞµĞºÑƒ â€” Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112 Ğ¸Ğ»Ğ¸ 103.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {showSupportToolkit && activeModule === "support" && (
+                  <div style={{ marginTop: 24 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "#2E2A25", marginBottom: 12, fontFamily: "Georgia, \"PT Serif\", serif" }}>
+                      Ğ§Ñ‚Ğ¾ Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ğ¿Ğ¾Ğ¿Ñ€Ğ¾Ğ±Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ´Ğ¾ ÑĞ»ĞµĞ´ÑƒÑÑ‰ĞµĞ³Ğ¾ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ°
+                    </div>
+                    <p style={{ color: "#7A7268", lineHeight: 1.6, fontSize: 13, margin: "0 0 16px" }}>
+                      Ğ­Ñ‚Ğ¾ Ğ½Ğµ Ğ»ĞµÑ‡ĞµĞ½Ğ¸Ğµ, Ğ½Ğµ Ñ‚ĞµÑ€Ğ°Ğ¿Ğ¸Ñ Ğ¸ Ğ½Ğµ Ğ·Ğ°Ğ¼ĞµĞ½Ğ° ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ñƒ. ĞĞµĞ¼ĞµĞ´Ğ¸ĞºĞ°Ğ¼ĞµĞ½Ñ‚Ğ¾Ğ·Ğ½Ñ‹Ğµ Ğ¿Ğ¾Ğ´Ğ´ĞµÑ€Ğ¶Ğ¸Ğ²Ğ°ÑÑ‰Ğ¸Ğµ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸ĞºĞ¸ Ğ½Ğ° 24â€“72 Ñ‡Ğ°ÑĞ°.
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {PRACTICES.map((p) => {
+                        const alreadyAdded = supportPlan?.selected_practices?.some(sp => sp.id === p.id);
+                        return (
+                          <div key={p.id} style={{ border: "1px solid rgba(46,42,37,.1)", borderRadius: 12, padding: "12px 16px", background: "#FAF6EF" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 14, fontWeight: 600, color: "#2E2A25", flex: 1 }}>{p.title}</span>
+                              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                                <button style={{ fontSize: 12, padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(46,42,37,.15)", background: "white", color: "#5F7D6C", cursor: "pointer" }} onClick={() => downloadPracticeFile(p.file)}>
+                                  Ğ¡ĞºĞ°Ñ‡Ğ°Ñ‚ÑŒ Ñ‚ĞµĞºÑÑ‚
+                                </button>
+                                <button
+                                  style={{
+                                    fontSize: 12, padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(46,42,37,.15)",
+                                    background: alreadyAdded ? "#E2EBE4" : "white", color: alreadyAdded ? "#5F7D6C" : "#7D9A89",
+                                    cursor: alreadyAdded ? "default" : "pointer", fontWeight: alreadyAdded ? 400 : 600,
+                                  }}
+                                  disabled={alreadyAdded}
+                                  onClick={() => addPracticeToPlan(p.id)}
+                                >
+                                  {alreadyAdded ? "âœ“ Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ»ĞµĞ½Ğ¾" : "Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ² Ğ¼Ğ¾Ğ¹ Ğ¿Ğ»Ğ°Ğ½"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  style={{ ...s.secondary, marginTop: 16 }}
+                  onClick={() => setSessionReviewOpen(!sessionReviewOpen)}
+                >
+                  ĞÑ†ĞµĞ½ĞºĞ° ÑĞµÑÑĞ¸Ğ¸
+                </button>
+
+                {sessionReviewOpen && (
+                  <div style={s.expertBox}>
+                    <h3 style={{ margin: "0 0 16px", fontSize: 18, fontFamily: "Georgia, \"PT Serif\", serif" }}>ĞÑ†ĞµĞ½ĞºĞ° ÑĞµÑÑĞ¸Ğ¸</h3>
+
+                    <label style={s.label}>ĞÑ†ĞµĞ½ĞºĞ° Ğ¿Ğ°Ñ†Ğ¸ĞµĞ½Ñ‚Ğ¾Ğ¼</label>
+                    <div style={{ marginBottom: 6, color: "#7A7268", fontSize: 13 }}>ĞĞ°ÑĞºĞ¾Ğ»ÑŒĞºĞ¾ Ğ¿Ğ¾Ğ»ĞµĞ·Ğ½Ñ‹Ğ¼ Ğ±Ñ‹Ğ» Ñ€Ğ°Ğ·Ğ±Ğ¾Ñ€? 1â€“5</div>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button
+                          key={n}
+                          style={{
+                            width: 44, height: 44, borderRadius: 12, border: "1px solid rgba(46,42,37,.12)",
+                            background: patientRating === n ? "#7D9A89" : "#FAF6EF",
+                            color: patientRating === n ? "white" : "#2E2A25",
+                            fontWeight: 800, fontSize: 18, cursor: "pointer",
+                          }}
+                          onClick={() => setPatientRating(n)}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+
+                    <label style={s.label}>Ğ§Ñ‚Ğ¾ Ğ±Ñ‹Ğ»Ğ¾ Ğ¿Ğ¾Ğ»ĞµĞ·Ğ½Ğ¾?</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={patientUseful}
+                      onChange={(e) => setPatientUseful(e.target.value)}
+                      placeholder="ĞĞ°Ğ¿Ñ€Ğ¸Ğ¼ĞµÑ€: Ğ¿Ğ¾Ğ¼Ğ¾Ğ³Ğ»Ğ¾ ÑÑ‚Ñ€ÑƒĞºÑ‚ÑƒÑ€Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¼Ñ‹ÑĞ»Ğ¸, ÑÑ‚Ğ°Ğ»Ğ¾ Ğ¿Ğ¾Ğ½ÑÑ‚Ğ½Ğ¾, Ğº ĞºĞ¾Ğ¼Ñƒ Ğ¾Ğ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ÑŒÑÑ..."
+                    />
+
+                    <label style={s.label}>Ğ§Ñ‚Ğ¾ Ğ±Ñ‹Ğ»Ğ¾ Ğ½ĞµĞ¿Ğ¾Ğ½ÑÑ‚Ğ½Ğ¾ Ğ¸Ğ»Ğ¸ Ğ±ĞµÑĞ¿Ğ¾Ğ»ĞµĞ·Ğ½Ğ¾?</label>
+                    <textarea
+                      style={s.answerInput}
+                      value={patientUnclear}
+                      onChange={(e) => setPatientUnclear(e.target.value)}
+                      placeholder="ĞĞ°Ğ¿Ñ€Ğ¸Ğ¼ĞµÑ€: Ğ²Ğ¾Ğ¿Ñ€Ğ¾ÑÑ‹ Ğ±Ñ‹Ğ»Ğ¸ ÑĞ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ¾Ğ±Ñ‰Ğ¸Ğ¼Ğ¸, Ğ·Ğ°ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ğµ Ğ½ĞµĞ¿Ğ¾Ğ½ÑÑ‚Ğ½Ğ¾..."
+                    />
+
+                    <button
+                      style={{ ...s.wide, marginTop: 12 }}
+                      onClick={savePatientFeedback}
+                    >
+                      Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¾Ñ‚Ğ·Ñ‹Ğ²
+                    </button>
 
 
-HOˆÂˆÙ]Ø\İ
-ÈY\ÜØYÙNˆˆ‹\Nˆˆ‹Ù^NˆJNÂˆKÌ
-NÂˆBˆ™]\›ˆ
+                  </div>
+                )}
 
-HOˆÈYˆ
-Ø\İ[Y\”™Y‹˜İ\œ™[
-HÛX\•[Y[İ]
-Ø\İ[Y\”™Y‹˜İ\œ™[
-NÈNÂˆKİØ\İšÙ^WJNÂ‚ˆ[˜İ[ÛˆÛX\•Ø\İ
+                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                  {reportSource === "cabinet" && (
+                    <button
+                      style={{ ...s.secondary, flex: 1 }}
+                      onClick={() => { goToSupportCabinet(); setReportSource(null); }}
+                    >
+                      â† ĞĞ°Ğ·Ğ°Ğ´ Ğ² ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚
+                    </button>
+                  )}
+                  <button
+                    style={{ ...s.secondary, flex: 1 }}
+                    onClick={handleReset}
+                  >
+                    ĞĞ°Ñ‡Ğ°Ñ‚ÑŒ Ğ·Ğ°Ğ½Ğ¾Ğ²Ğ¾
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+          ) /* ends !(body && intake not idle) guard */}
 
-HÂˆYˆ
-Ø\İ[Y\”™Y‹˜İ\œ™[
-HÛX\•[Y[İ]
-Ø\İ[Y\”™Y‹˜İ\œ™[
-NÂˆÙ]Ø\İ
-ÈY\ÜØYÙNˆˆ‹\Nˆˆ‹Ù^NˆJNÂˆB‚ˆËÈ˜]šYØ]HÈ›ÙHØXš[™]œ›ÛH[HÛÜšÜÜXÙHØÜ™Y[‚ˆ[˜İ[ÛˆÛÕĞ›ÙPØXš[™]
+          {/* Support Client Cabinet */}
+          {phase === "cabinet" && supportCabinet && (() => {
+            const careNextStep = getCareNextStep(supportCabinet.latest_report?.careRecommendation || supportCabinet.latest_report?.supportPlan?.care_recommendation);
+            const latestSession = supportCabinet.sessions?.[0];
+            const latestDate = latestSession?.createdAt
+              ? new Date(latestSession.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
+              : "â€”";
+            const wallet = !APP_BRAND.isSupportPilot && supportCabinet.wallet?.visible ? supportCabinet.wallet : null;
 
-HÂˆYˆ
-Xİ]™S[Ù[HOOH˜›ÙHŠH™]\›ÂˆYˆ
-›ÙTØÜ™Y[ˆOOH˜ØXš[™]ŠH™]\›ÈËÈ[™XYH\™BˆËÈÛÛ™š\›HYˆ[ˆX\WÙY]Ú][œØ]™YÚ[™Ù\ÂˆYˆ
-›ÙTØÜ™Y[ˆOOH™X\WÙY]ŠHÂˆYˆ
-]Ú[™İË˜ÛÛ™š\›J´$´-t`4/t`ô`´c4`tcÈ4,ˆ4.´,4,t.4/t-t`È4't-t`t/´at`4,4/tdt/t/tbô-H4.4-ô/4-t/t-t/t.4cÈ4/4/´,ô`ô`ˆ4/ô/´`´-t`4cô`´c4`tcËˆŠJH™]\›ÂˆBˆÛX\•Ø\İ
+            return (
+              <section style={{ width: "100%" }} className="app-card-support">
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, flexWrap: "wrap", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: "#2E2A25" }}>
+                      Ğ›Ğ¸Ñ‡Ğ½Ñ‹Ğ¹ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚{supportDisplayName ? ` ${supportDisplayName}` : ""}
+                    </span>
+                    {wallet && (
+                      <span style={{ fontSize: 13, color: "#5F7D6C", fontWeight: 600 }}>
+                        Ğ‘Ğ°Ğ»Ğ°Ğ½Ñ {Number(wallet.balance_total ?? 0).toLocaleString("ru-RU")} Â· Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ¾ {Number(wallet.available_credits ?? 0).toLocaleString("ru-RU")}
+                      </span>
+                    )}
+                    <button
+                      style={{ ...s.secondary, fontSize: 13, padding: "6px 12px" }}
+                      onClick={() => { goToSupportLanding(); setSupportCabinet(null); clearSupportSession(); }}
+                    >
+                      Ğ’Ñ‹Ğ¹Ñ‚Ğ¸
+                    </button>
+                  </div>
+                </div>
 
-NÂˆÙ]›ÙQX\Q^Q]J[
-NÂˆÙ]›ÙTØÜ™Y[Š˜ØXš[™]ŠNÂˆB‚ˆËÈİ\Ü˜]šYØ][ÛˆÛÈÈ[™[™È
-›ÈÙÛİ]
-Bˆ[˜İ[ÛˆÛÕÔİ\Ü[™[™Ê
-HÂˆÙ]İ\ÜØÜ™Y[Š›[™[™ÈŠNÂˆÙ]\ÙJš[œ]ŠNÂˆÙ]İ\Ü™]Ô™\]Y\İÜ[Š˜[ÙJNÂˆÙ]İ\ÜšY]Ú[™ÔÙ\ÜÚ[ÛŠ[
-NÂˆÙ]İ\ÜšY]Ú[™ÔÙ\ÜÚ[Û‘]J[
-NÂˆB‚ˆËÈİ\Ü˜]šYØ][ÛˆÛÈÈØXš[™]ˆ[˜İ[ÛˆÛÕÔİ\ÜØXš[™]
+                <PatientMedicationOrders module="support" />
+                <MedicationCard cards={supportCabinet.medication_cards} />
 
-HÂˆÙ]İ\ÜØÜ™Y[Š˜ØXš[™]ŠNÂˆÙ]\ÙJ˜ØXš[™]ŠNÂˆÙ]İ\Ü™]Ô™\]Y\İÜ[Š˜[ÙJNÂˆÙ]İ\ÜšY]Ú[™ÔÙ\ÜÚ[ÛŠ[
-NÂˆÙ]İ\ÜšY]Ú[™ÔÙ\ÜÚ[Û‘]J[
-NÂˆB‚ˆËÈYZ[ˆ[™[İ]BˆÛÛœİØYZ[”\ÜİÛÜ™Ù]YZ[”\ÜİÛÜ™HH\ÙTİ]JˆŠNÂˆÛÛœİØYZ[]]YÙ]YZ[]]YHH\ÙTİ]J˜[ÙJNÂˆÛÛœİØYZ[”™]šY]ÜËÙ]YZ[”™]šY]Ü×HH\ÙTİ]J×JNÂˆÛÛœİØYZ[•İ[Ù]YZ[•İ[HH\ÙTİ]J
-NÂˆÛÛœİØYZ[‘š[\‹Ù]YZ[‘š[\—HH\ÙTİ]J˜[ŠNÂˆÛÛœİØYZ[‘[‹Ù]YZ[‘[—HH\ÙTİ]J˜[ŠNÂˆÛÛœİØYZ[‘^\š[\‹Ù]YZ[‘^\š[\—HH\ÙTİ]J˜[ŠNÂˆÛÛœİØYZ[“ØY[™ËÙ]YZ[“ØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØYZ[Xİ[Û“ØY[™ËÙ]YZ[Xİ[Û“ØY[™×HH\ÙTİ]J[
-NÂˆÛÛœİÙY][™Ô™]šY]ËÙ]Y][™Ô™]šY]×HH\ÙTİ]J[
-NÂˆÛÛœİØÛÜœ™Xİ[Û‘›Ü›KÙ]ÛÜœ™Xİ[Û‘›Ü›WHH\ÙTİ]JÂˆÜ›Û™×Ü]Y\İ[ÛœÎˆˆ‹Z\ÜÚ[™×Ü]Y\İ[ÛœÎˆˆ‹˜YÜ]Y\İ[Û—İÛÜ™[™Îˆˆ‹ˆÛÜœ™XİYİ\Ù\—Ü™\Üˆˆ‹ÛÜœ™XİYÙØİÜ—Ü™\Üˆˆ‹ˆ›İØÛÛİ\]Nˆˆ‹ÛÜœ™Xİ[Û—ØÛÛ[Y[ˆˆ‹ˆ›ÚXÙWØXØİ\˜XŞNˆˆ‹›ÚXÙWİ\ÙY[™\ÜÎˆˆ‹›ÚXÙWÚ[™›Y[˜ÙYˆˆ‹ˆ›ÚXÙWØÛÛ™š\›YYˆ×K›ÚXÙWØÛÛ[Y[ˆˆ‹ˆJNÂ‚ˆËÈ^\İ]BˆÛÛœİÙ^\]KÙ]^\]WHH\ÙTİ]J
+                {import.meta.env.VITE_SUPPORT_LIVE_ENABLED === 'true' && <div className="health-talk-entry">
+                  <div><strong>Ğ–Ğ¸Ğ²Ğ¾Ğµ Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ Â· Ñ‚ĞµÑÑ‚</strong><p>Ğ Ğ°ÑÑĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ, Ñ‡Ñ‚Ğ¾ Ğ²Ğ°Ñ Ğ²Ğ¾Ğ»Ğ½ÑƒĞµÑ‚. ĞœĞ¾Ğ¶Ğ½Ğ¾ Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ¸Ñ‚ÑŒ Ğ¸ Ğ¿ĞµÑ€ĞµĞ±Ğ¸Ğ²Ğ°Ñ‚ÑŒ. Ğ”Ğ¾ 5 Ğ¼Ğ¸Ğ½ÑƒÑ‚.</p></div>
+                  <button disabled={cabinetVoiceRecording || cabinetVoiceTranscribing} onClick={() => setSupportLiveOpen(true)}>Ğ–Ğ¸Ğ²Ğ¾Ğµ Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ</button>
+                </div>}
+                {supportLiveOpen && <HealthLiveConversation module="support" sessionId={getSupportSession().sessionId} accessToken={getSupportSession().accessToken} onClose={() => setSupportLiveOpen(false)} onSpecialist={() => setSupportNewRequestOpen(true)} />}
 
-HOˆÂˆHÂˆÛÛœİØ]™YHØØ[İÜ˜YÙK™Ù]][JØÚØWÙ^\ŠNÂˆÛÛœİÙ\ÜÚ[ÛÛÙHHÙ\ÜÚ[Û”İÜ˜YÙK™Ù]][JØÚØWÙ^\ØXØÙ\Ü×ØÛÙHŠNÂˆ™]\›ˆØ]™Y	‰ˆÙ\ÜÚ[ÛÛÙHÈ”ÓÓ‹œ\œÙJØ]™Y
-Hˆ[ÂˆHØ]ÚÈ™]\›ˆ[ÈBˆJNÂˆÛÛœİÙ^\[Ù[Ü[‹Ù]^\[Ù[Ü[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÙ^\ÛÙR[œ]Ù]^\ÛÙR[œ]HH\ÙTİ]JˆŠNÂˆÛÛœİÙ^\ÙÙÚ[™Ò[‹Ù]^\ÙÙÚ[™Ò[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜÚİÔ™YÚ\İ\‘›Ü›KÙ]ÚİÔ™YÚ\İ\‘›Ü›WHH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ™YÚ\İ\‘›Ü›KÙ]™YÚ\İ\‘›Ü›WHH\ÙTİ]JÂˆ˜[YNˆˆ‹[XZ[ˆˆ‹[YÜ˜[Nˆˆ‹›ÛNˆœŞXÚÛÙÚ\İ‹ÜXÚX[Nˆˆ‹Ú]Nˆˆ‹Ü™Ø[š^˜][Ûˆˆ‹ˆJNÂˆÛÛœİÜ™YÚ\İ\”Ù[™[™ËÙ]™YÚ\İ\”Ù[™[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ™YÚ\İ˜][Û”™\İ[Ù]™YÚ\İ˜][Û”™\İ[HH\ÙTİ]J[
-NÈËÈÈXØÙ\Ü×ØÛÙK^\B‚ˆËÈÜ™Ø[š^˜][Ûˆİ]BˆÛÛœİÛÜ™Ø[š^˜][ÛœËÙ]Ü™Ø[š^˜][Ûœ×HH\ÙTİ]J×JNÂˆÛÛœİÛÜ™Ñ›Ü›SÜ[‹Ù]Ü™Ñ›Ü›SÜ[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÛÜ™Ñ›Ü›KÙ]Ü™Ñ›Ü›WHH\ÙTİ]JÈ˜[YNˆˆ‹ÛYÎˆˆ‹\Nˆœš]˜]WØÛ[šXÈ‹Ú]Nˆˆ‹ÛÛ[Y[ˆˆˆJNÂ‚ˆÛÛœİÜ™Õ\SX™[ÈHÂˆš]˜]WØÛ[šXÎˆ´)ô,4`t`´/t,4cÈ4.´.ô.4/t.4.´,‹ˆİ]WØÛ[šXÎˆ´$ô/´`t`ô-4,4`4`t`´,´-t/t/t,4cÈ4.´.ô.4/t.4.´,‹ˆ™\ÙX\˜ÚÚ[œİ]][Ûˆ´'t,4`ôaô/t/´-H4`ôaô`4-t-´-4-t/t.4-H‹ˆ\İˆ´(´-t`t`ˆ‹ˆNÂˆÛÛœİÛÜ™Ñ›Ü›QY]YÙ]Ü™Ñ›Ü›QY]YHH\ÙTİ]J[
-NÂˆÛÛœİÛÜ™Ñ]Z[Ù]Ü™Ñ]Z[HH\ÙTİ]J[
-NÂˆÛÛœİÛÜ™Ñ^\ËÙ]Ü™Ñ^\×HH\ÙTİ]J×JNÂˆÛÛœİÛÜ™ĞY^\Ü[‹Ù]Ü™ĞY^\Ü[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÛÜ™ĞY^\YÙ]Ü™ĞY^\YHH\ÙTİ]JˆŠNÂˆÛÛœİÛÜ™ĞY^\›ÛKÙ]Ü™ĞY^\›ÛWHH\ÙTİ]J™ØİÜˆŠNÂ‚ˆËÈ^H]Y[Èİ]H
-^\[™[
-BˆÛÛœİÛ^T]Y[ËÙ]^T]Y[×HH\ÙTİ]J×JNÂˆÛÛœİÛ^T]Y[ÓØY[™ËÙ]^T]Y[ÓØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]Y[[Ù[Ü[‹Ù]]Y[[Ù[Ü[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]Y[[Ù[ÛÙKÙ]]Y[[Ù[ÛÙWHH\ÙTİ]JˆŠNÂ‚ˆËÈ[š]H[šÈİ]BˆÛÛœİÚ[š]S[šÜËÙ][š]S[šÜ×HH\ÙTİ]J×JNÂˆÛÛœİÚ[š]S[šÓ[Ù[Ü[‹Ù][š]S[šÓ[Ù[Ü[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÚ[š]S[šÓX™[Ù][š]S[šÓX™[HH\ÙTİ]JˆŠNÂˆÛÛœİÚ[š]S[šĞÜ™X]YÙ][š]S[šĞÜ™X]YHH\ÙTİ]J[
-NÂ‚ˆËÈ[š]HÚÙ[ˆœ›ÛHT“ˆÛÛœİÚ[š]UÚÙ[‹Ù][š]UÚÙ[—HH\ÙTİ]J
+                {/* ROW 1: ĞŸĞ¾ÑĞ»ĞµĞ´Ğ½Ğ¸Ğ¹ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€ + Ğ¡Ğ»ĞµĞ´ÑƒÑÑ‰Ğ¸Ğ¹ ÑˆĞ°Ğ³ */}
+                {latestSession && (
+                  <div style={{
+                    display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16,
+                    marginBottom: 24,
+                  }}>
+                    {/* ĞŸĞ¾ÑĞ»ĞµĞ´Ğ½Ğ¸Ğ¹ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€ */}
+                    <div style={{
+                      background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
+                      borderRadius: 16, padding: 20,
+                    }}>
+                      <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>ĞŸĞ¾ÑĞ»ĞµĞ´Ğ½Ğ¸Ğ¹ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€</div>
+                      <div style={{ fontWeight: 700, fontSize: 16, color: "#2E2A25", marginBottom: 4 }}>{latestDate}</div>
+                      <div style={{
+                        display: "inline-block", fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
+                        background: latestSession.status === "followup" ? "#EDE3D8" : "rgba(255,255,255,.5)",
+                        color: latestSession.status === "followup" ? "#8B6B4A" : "#5F7D6C",
+                        marginBottom: 12,
+                      }}>
+                        {latestSession.status === "followup" ? "Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ğµ" : "Ğ¿ĞµÑ€Ğ²Ğ¾Ğµ Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ"}
+                      </div>
+                      <div style={{ fontSize: 13, color: "#5F574F", marginBottom: 14 }}>{latestSession.summary?.slice(0, 120)}{latestSession.summary?.length > 120 ? "â€¦" : ""}</div>
+                      {APP_BRAND.isSupportPilot && supportCabinet.latest_report?.crisisBlock && (
+                        <div role="alert" style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "#fff1ed", border: "2px solid #b85c4a", color: "#4a2822", fontSize: 13, lineHeight: 1.5 }}>
+                          <strong>Ğ‘Ğ»Ğ¾Ğº Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚Ğ¸ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ñ‘Ğ½.</strong> Ğ•ÑĞ»Ğ¸ Ğ²Ñ‹ ÑĞµĞ¹Ñ‡Ğ°Ñ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ±Ñ‹Ñ‚ÑŒ Ğ² Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚Ğ¸ Ğ¸Ğ»Ğ¸ Ğ½Ğµ ÑƒĞ²ĞµÑ€ĞµĞ½Ñ‹, Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚Ğµ 112 Ğ¸Ğ»Ğ¸ 103 Ğ¸ Ğ¿Ğ¾Ğ¿Ñ€Ğ¾ÑĞ¸Ñ‚Ğµ Ğ´Ğ¾Ğ²ĞµÑ€ĞµĞ½Ğ½Ğ¾Ğ³Ğ¾ Ñ‡ĞµĞ»Ğ¾Ğ²ĞµĞºĞ° Ğ¿Ğ¾Ğ±Ñ‹Ñ‚ÑŒ Ñ€ÑĞ´Ğ¾Ğ¼.
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                            {["112", "103"].map((number) => <a key={number} href={`tel:${number}`} aria-label={`ĞŸĞ¾Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚ÑŒ ${number}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 104, minHeight: 48, padding: "8px 14px", borderRadius: 9, background: "#9f3425", color: "#fff", fontWeight: 800, textDecoration: "none" }}>ĞŸĞ¾Ğ·Ğ²Ğ¾Ğ½Ğ¸Ñ‚ÑŒ {number}</a>)}
+                          </div>
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button style={{ ...s.primary, fontSize: 13, padding: "8px 14px", flex: 1 }} onClick={startSupportFollowUp}>
+                          ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€
+                        </button>
+                        <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px", flex: 1 }} onClick={() => openSupportReport(latestSession.sessionId)}>
+                          ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚
+                        </button>
+                      </div>
+                      {APP_BRAND.isSupportPilot && (
+                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(46,42,37,.1)" }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#5F7D6C", marginBottom: 6 }}>ĞšĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ</div>
+                          {regeneratedCode ? (
+                            <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 13, wordBreak: "break-all", marginBottom: 8 }}>{regeneratedCode}</div>
+                          ) : (
+                            <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 8 }}>Ğ¡Ğ¾Ğ·Ğ´Ğ°Ğ¹Ñ‚Ğµ ĞºĞ¾Ğ´, Ñ‡Ñ‚Ğ¾Ğ±Ñ‹ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ±ĞµÑĞµĞ´Ñ‹ Ğ½Ğ° Ğ´Ñ€ÑƒĞ³Ğ¾Ğ¼ ÑƒÑÑ‚Ñ€Ğ¾Ğ¹ÑÑ‚Ğ²Ğµ. Ğ¡Ğ¾Ğ·Ğ´Ğ°Ğ½Ğ¸Ğµ Ğ·Ğ°Ğ¼ĞµĞ½Ğ¸Ñ‚ Ğ¿Ñ€ĞµĞ¶Ğ½Ğ¸Ğ¹ ĞºĞ¾Ğ´.</div>
+                          )}
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button style={{ ...s.secondary, fontSize: 12, minHeight: 42 }} onClick={regenerateSupportContinuationCode}>Ğ¡Ğ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ Ğ½Ğ¾Ğ²Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ</button>
+                            {regeneratedCode && <button style={{ ...s.secondary, fontSize: 12, minHeight: 42 }} onClick={() => { navigator.clipboard.writeText(regeneratedCode); showToast("ĞšĞ¾Ğ´ ÑĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½"); }}>Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ ĞºĞ¾Ğ´</button>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
-HOˆÂˆHÂˆÛÛœİHHÚ[™İË›ØØ][Û‹œ]˜[YK›X]Ú
-×—ÊÎœİ\[š]JWÊØK^ŒNWJÊKÚJNÂˆ™]\›ˆHÈVÌWHˆ
-ØØ[İÜ˜YÙK™Ù]][JØÚØWÚ[š]WİÚÙ[ˆŠH[
-NÂˆHØ]ÚÈ™]\›ˆ[ÈBˆJNÂˆÛÛœİÚ[š]R[™›ËÙ][š]R[™›×HH\ÙTİ]J[
-NÂˆÛÛœİÚ[š]PÚXÚÚ[™ËÙ][š]PÚXÚÚ[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÚ[š]TÜXÚX[\İ]]Ù][š]TÜXÚX[\İ]]HH\ÙTİ]JÈØY[™Îˆ˜[ÙK]][XØ]Yˆ˜[ÙK\œ›Üˆ[JNÂˆÛÛœİÛÛ˜›Ø\™[™Ñ›Ü›KÙ]Û˜›Ø\™[™Ñ›Ü›WHH\ÙTİ]JÈ˜[YNˆˆ‹ÛÛXİÙ[XZ[ˆˆ‹ÛÛXİÜÛ™Nˆˆ‹ÛÛ[Y[ˆˆˆJNÂˆÛÛœİÛÛ˜›Ø\™[™ÔİX›Z][™ËÙ]Û˜›Ø\™[™ÔİX›Z][™×HH\ÙTİ]J˜[ÙJNÂ‚ˆËÈ˜[Y]H[š]HÚÙ[ˆÛˆ[İ[ˆ™XXİ\ÙQY™™Xİ
+                    {/* ĞŸĞ¾Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ¸Ğ¼? â€” Quick AI Chat */}
+                    <div style={{
+                      background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
+                      borderRadius: 16, padding: 20, display: "flex", flexDirection: "column",
+                    }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 6 }}>ĞŸĞ¾Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ¸Ğ¼?</div>
+                      <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
+                        ĞœĞ¾Ğ¶Ğ½Ğ¾ Ğ¿Ñ€Ğ¾ÑÑ‚Ğ¾ Ğ·Ğ°Ğ´Ğ°Ñ‚ÑŒ Ğ²Ğ¾Ğ¿Ñ€Ğ¾Ñ Ğ¸Ğ»Ğ¸ Ñ€Ğ°ÑÑĞºĞ°Ğ·Ğ°Ñ‚ÑŒ, Ñ‡Ñ‚Ğ¾ Ğ¿Ñ€Ğ¾Ğ¸Ğ·Ğ¾ÑˆĞ»Ğ¾ ÑĞµĞ³Ğ¾Ğ´Ğ½Ñ.
+                      </div>
 
+                      {/* Current session messages (only new messages from this session) */}
+                      {quickChatMessages.length > 0 && (
+                        <div ref={quickChatContainerRef} onScroll={handleQuickChatScroll} style={{ marginBottom: 12, maxHeight: 240, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                          {quickChatMessages.map((msg) => (
+                            <div key={msg.id} style={{
+                              alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                              maxWidth: "85%",
+                              padding: "8px 12px",
+                              borderRadius: 12,
+                              fontSize: 13,
+                              lineHeight: 1.5,
+                              background: msg.role === "user" ? "#7D9A89" : "#f0f5f1",
+                              color: msg.role === "user" ? "white" : "#2E2A25",
+                            }}>
+                              {msg.ai_response?.answer || msg.message_text}
+                              {msg.ai_response?.safety_note && (
+                                <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(184,92,74,.1)", borderRadius: 8, color: "#B85C4A", fontSize: 12 }}>
+                                  {msg.ai_response.safety_note}
+                                </div>
+                              )}
+                              {/* CTA buttons for navigation/handoff/error intents */}
+                              {(msg.ai_response?.cta === "service_request" || msg.ai_response?.intent_type === "handoff") && (
+                                <div style={{ marginTop: 8 }}>
+                                  <button style={{ fontSize: 12, padding: "6px 12px", background: "#7D9A89", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }} onClick={() => openSupportRequestForSession()}>
+                                    Ğ¡Ğ²ÑĞ·Ğ°Ñ‚ÑŒÑÑ ÑĞ¾ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ¾Ğ¼
+                                  </button>
+                                </div>
+                              )}
+                              {msg.ai_response?.suggest_followup && (
+                                <div style={{ marginTop: 8 }}>
+                                  <button style={{ fontSize: 12, padding: "6px 12px", background: "#E2EBE4", color: "#5F7D6C", border: "1px solid rgba(125,154,137,.3)", borderRadius: 8, cursor: "pointer" }} onClick={startSupportFollowUp}>
+                                    ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                          {quickChatLoading && (
+                            <div style={{ alignSelf: "flex-start", padding: "8px 12px", borderRadius: 12, background: "#f0f5f1", fontSize: 13, color: "#7A7268" }}>
+                              Ğ¢Ğ¾Ñ‡ĞºĞ° ĞĞ¿Ğ¾Ñ€Ñ‹ Ğ¾Ñ‚Ğ²ĞµÑ‡Ğ°ĞµÑ‚â€¦
+                            </div>
+                          )}
+                          {quickChatHasNewResponse && quickChatScrolledUp && (
+                            <button
+                              onClick={() => scrollToQuickChatBottom(true)}
+                              style={{ alignSelf: "center", padding: "6px 14px", borderRadius: 20, background: "#7D9A89", color: "white", border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", marginTop: 4 }}
+                            >
+                              ĞĞ¾Ğ²Ñ‹Ğ¹ Ğ¾Ñ‚Ğ²ĞµÑ‚ â†“
+                            </button>
+                          )}
+                        </div>
+                      )}
 
-HOˆÂˆYˆ
-[š]UÚÙ[ŠHÂˆØØ[İÜ˜YÙKœÙ]][JØÚØWÚ[š]WİÚÙ[ˆ‹[š]UÚÙ[ŠNÂˆÙ][š]PÚXÚÚ[™ÊYJNÂˆ™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ˜[Y]R[š]UÚÙ[ˆ‹ÚÙ[ˆ[š]UÚÙ[ˆJKˆJBˆ[Š
-ŠHOˆ‹šœÛÛŠ
-JBˆ[Š
-
-HOˆÂˆYˆ
-˜[Y	‰ˆš[š]JHÂˆÙ][š]R[™›ÊÈ˜[YˆYK‹‹™š[š]HJNÂˆYˆ
-š[š]K™\™Xİ[ÛˆOOHœ]Y[İ×ÜÜXÚX[\İŠHÂˆÙ][š]TÜXÚX[\İ]]
-ÈØY[™ÎˆYK]][XØ]Yˆ˜[ÙK\œ›Üˆ[JNÂˆ™]Ú
-‹Ø\KÜÜXÚX[\İ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆÜ™Y[X[ÎˆœØ[YK[ÜšYÚ[ˆ‹ˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ›YHˆJKˆJBˆ[Š\Ş[˜È
-™\ÜÛœÙJHOˆ
-È™\ÜÛœÙK]Nˆ]ØZ]™\ÜÛœÙKšœÛÛŠ
-HJJBˆ[Š
-È™\ÜÛœÙK]HJHOˆÂˆYˆ
-]K›ÚÊHÂˆÙ][š]TÜXÚX[\İ]]
-ÈØY[™Îˆ˜[ÙK]][XØ]YˆYK\œ›Üˆ[JNÂˆH[ÙHYˆ
-™\ÜÛœÙKœİ]\ÈOOHH™\ÜÛœÙKœİ]\ÈOOHÊHÂˆÙ][š]TÜXÚX[\İ]]
-ÈØY[™Îˆ˜[ÙK]][XØ]Yˆ˜[ÙK\œ›Üˆ[JNÂˆH[ÙHÂˆÙ][š]TÜXÚX[\İ]]
-ÈØY[™Îˆ˜[ÙK]][XØ]Yˆ˜[ÙK\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4/ô`4/´,´-t`4.4`´c4,´at/´-4`t/ô-ta´.4,4.ô.4`t`´,ˆˆJNÂˆBˆJBˆ˜Ø]Ú
+                      {/* Input */}
+                      <textarea
+                        ref={quickChatInputRef}
+                        style={{ ...s.answerInput, width: "100%", minHeight: 60, maxHeight: 120, marginBottom: 8, resize: "vertical" }}
+                        value={quickChatInput}
+                        onChange={(e) => setQuickChatInput(e.target.value)}
+                        placeholder="Ğ§Ñ‚Ğ¾ Ñƒ Ğ²Ğ°Ñ ÑĞµĞ³Ğ¾Ğ´Ğ½Ñ? ĞœĞ¾Ğ¶Ğ½Ğ¾ ÑĞ¿Ñ€Ğ¾ÑĞ¸Ñ‚ÑŒ Ğ¾ Ñ‡Ñ‘Ğ¼ ÑƒĞ³Ğ¾Ğ´Ğ½Ğ¾â€¦"
+                         rows={2}
+                         onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); sendQuickChatMessage(); } }}
+                       />
+                       {renderSupportCabinetVoice("quick_chat", "Ğ Ğ°ÑÑĞºĞ°Ğ·Ğ°Ñ‚ÑŒ Ğ³Ğ¾Ğ»Ğ¾ÑĞ¾Ğ¼")}
+                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 11, color: "#8a7e72" }}>âŒ˜/Ctrl + Enter â€” Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ</span>
+                        <button
+                          style={{ ...s.primary, fontSize: 13, padding: "10px 20px", opacity: quickChatLoading || !quickChatInput.trim() ? 0.5 : 1 }}
+                          disabled={quickChatLoading || !quickChatInput.trim()}
+                          onClick={() => sendQuickChatMessage()}
+                        >
+                          ĞÑ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ
+                        </button>
+                      </div>
 
+                      {/* Show/Hide previous conversation */}
+                      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                        <button
+                          style={{ background: "none", border: "none", fontSize: 12, color: "#7A7268", cursor: "pointer", textDecoration: "underline", textAlign: "left", padding: 0 }}
+                          onClick={async () => {
+                            if (quickChatShowHistory) {
+                              setQuickChatShowHistory(false);
+                            } else {
+                              await loadSupportChat();
+                              setQuickChatShowHistory(true);
+                            }
+                          }}
+                        >
+                          {quickChatShowHistory ? "Ğ¡ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ¿Ñ€ĞµĞ´Ñ‹Ğ´ÑƒÑ‰Ğ¸Ğ¹ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€" : "ĞŸĞ¾ĞºĞ°Ğ·Ğ°Ñ‚ÑŒ Ğ¿Ñ€ĞµĞ´Ñ‹Ğ´ÑƒÑ‰Ğ¸Ğ¹ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€"}
+                        </button>
 
-HOˆÙ][š]TÜXÚX[\İ]]
-ÈØY[™Îˆ˜[ÙK]][XØ]Yˆ˜[ÙK\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4/ô`4/´,´-t`4.4`´c4,´at/´-4`t/ô-ta´.4,4.ô.4`t`´,ˆˆJJNÂˆBˆH[ÙHÂˆÙ][š]R[™›ÊÈ˜[Yˆ˜[ÙK\œ›Üˆ™\œ›Üˆ´(t`tbô.ô.´,4/t-t-4-t.t`t`´,´.4`´-t.ôc4/t,ˆJNÂˆBˆJBˆ˜Ø]Ú
+                        {quickChatShowHistory && quickChatMessages.length > 0 && (
+                          <div style={{ maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: "8px 0" }}>
+                            {quickChatMessages.map((msg) => (
+                              <div key={msg.id} style={{
+                                alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                                maxWidth: "85%",
+                                padding: "8px 12px",
+                                borderRadius: 12,
+                                fontSize: 12,
+                                lineHeight: 1.4,
+                                background: msg.role === "user" ? "#7D9A89" : "#f0f5f1",
+                                color: msg.role === "user" ? "white" : "#2E2A25",
+                              }}>
+                                {msg.ai_response?.answer || msg.message_text}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
+                      <div style={{ marginTop: 6 }}>
+                        <button style={{ background: "none", border: "none", fontSize: 12, color: "#7A7268", cursor: "pointer", textDecoration: "underline" }} onClick={startSupportFollowUp}>
+                          ĞÑƒĞ¶ĞµĞ½ Ğ¿Ğ¾Ğ´Ñ€Ğ¾Ğ±Ğ½Ñ‹Ğ¹ Ñ€Ğ°Ğ·Ğ±Ğ¾Ñ€? ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€ â†’
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-HOˆÙ][š]R[™›ÊÈ˜[Yˆ˜[ÙK\œ›Üˆ´'´b4.4,t.´,4/ô`4/´,´-t`4.´.4`t`tbô.ô.´.ˆJJBˆ™š[˜[J
+                {/* ROW: Ğ˜ÑÑ‚Ğ¾Ñ€Ğ¸Ñ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ¾Ğ² */}
+                {supportCabinet.sessions?.length > 0 && (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Ğ˜ÑÑ‚Ğ¾Ñ€Ğ¸Ñ Ñ€Ğ°Ğ·Ğ³Ğ¾Ğ²Ğ¾Ñ€Ğ¾Ğ²</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {supportCabinet.sessions.map((sess) => {
+                        const dateStr = sess.createdAt
+                          ? new Date(sess.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
+                          : "â€”";
+                        return (
+                          <div key={sess.sessionId} style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            flexWrap: "wrap", gap: 10,
+                            padding: "12px 16px", borderRadius: 12, background: "#ffffff",
+                            border: "1px solid rgba(46,42,37,.08)",
+                          }}>
+                            <div style={{ flex: 1, minWidth: 200 }}>
+                              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                                <span style={{ fontWeight: 700, fontSize: 14, color: "#2E2A25" }}>â„–{sess.order}</span>
+                                <span style={{ fontSize: 12, color: "#7A7268" }}>{dateStr}</span>
+                                <span style={{
+                                  fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
+                                  background: sess.status === "followup" ? "#EDE3D8" : "#E2EBE4",
+                                  color: sess.status === "followup" ? "#8B6B4A" : "#5F7D6C",
+                                }}>
+                                  {sess.status === "followup" ? "Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ğµ" : "Ğ¿ĞµÑ€Ğ²Ğ¾Ğµ"}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: 13, color: "#5F574F", marginTop: 4, maxWidth: 500 }}>{sess.summary}</div>
+                            </div>
+                            <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px", flexShrink: 0 }} onClick={() => openSupportSessionView(sess.sessionId)}>
+                              ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
-HOˆÙ][š]PÚXÚÚ[™Ê˜[ÙJJNÂˆBˆK×JNÂ‚ˆËÈ[™HÜ™YX[[˜HÈÜÛİ\˜ÙOX[[˜H]Y\H\˜[\Âˆ™XXİ\ÙQY™™Xİ
+                {/* ROW: ĞšĞ°Ğº Ğ²Ñ‹ ÑĞµĞ³Ğ¾Ğ´Ğ½Ñ? â€” Daily check-in */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 4 }}>ĞšĞ°Ğº Ğ²Ñ‹ ÑĞµĞ±Ñ Ñ‡ÑƒĞ²ÑÑ‚Ğ²ÑƒĞµÑ‚Ğµ ÑĞµĞ³Ğ¾Ğ´Ğ½Ñ?</div>
+                  <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 14 }}>ĞÑ‚Ğ¼ĞµÑ‚ÑŒÑ‚Ğµ Ğ¾Ğ±Ñ‰ĞµĞµ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ â€” ÑÑ‚Ğ¾ Ğ¿Ğ¾Ğ¼Ğ¾Ğ¶ĞµÑ‚ ÑƒĞ²Ğ¸Ğ´ĞµÑ‚ÑŒ Ğ¸Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ñ ÑĞ¾ Ğ²Ñ€ĞµĞ¼ĞµĞ½ĞµĞ¼.</div>
 
+                  {/* Wellbeing scale -5 to +5 */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#2E2A25", marginBottom: 8 }}>ĞĞ±Ñ‰ĞµĞµ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ</div>
+                    <div style={{ display: "inline-block" }}>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        {[-5,-4,-3,-2,-1,0,1,2,3,4,5].map((v) => {
+                          const isSelected = checkinWellbeing === v;
+                          const isNeg = v < 0;
+                          const isPos = v > 0;
+                          let bg = "#FAF6EF";
+                          let color = "#7A7268";
+                          let border = "1px solid rgba(46,42,37,.1)";
+                          if (isSelected) {
+                            if (isNeg) { bg = "#E8D8D0"; color = "#6B4A3A"; border = "1px solid #C4A090"; }
+                            else if (isPos) { bg = "#D0E8D8"; color = "#3A6B4A"; border = "1px solid #90C4A0"; }
+                            else { bg = "#E2E0DB"; color = "#4A4A4A"; border = "1px solid #B0AFA8"; }
+                          }
+                          return (
+                            <button
+                              key={v}
+                              onClick={() => setCheckinWellbeing(v)}
+                              style={{
+                                width: 38, height: 38, borderRadius: 10, background: bg, color,
+                                border, fontWeight: 700, fontSize: 14, cursor: "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                              }}
+                            >
+                              {v > 0 ? `+${v}` : v}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                        <span style={{ fontSize: 11, color: "#8a7e72" }}>ĞÑ‡ĞµĞ½ÑŒ Ñ‚ÑĞ¶ĞµĞ»Ğ¾</span>
+                        <span style={{ fontSize: 11, color: "#8a7e72" }}>ĞĞ±Ñ‹Ñ‡Ğ½Ğ¾</span>
+                        <span style={{ fontSize: 11, color: "#8a7e72" }}>ĞÑ‡ĞµĞ½ÑŒ Ñ…Ğ¾Ñ€Ğ¾ÑˆĞ¾</span>
+                      </div>
+                    </div>
+                  </div>
 
-HOˆÂˆHÂˆÛÛœİ\˜[\ÈH™]ÈT“ÙX\˜Ú\˜[\ÊÚ[™İË›ØØ][Û‹œÙX\˜Ú
-NÂˆÛÛœİ™YˆH\˜[\Ë™Ù]
-œ™YˆŠNÂˆÛÛœİÛİ\˜ÙHH\˜[\Ë™Ù]
-œÛİ\˜ÙHŠNÂˆYˆ
-™YˆOOH˜[[˜HˆÛİ\˜ÙHOOH˜[[˜HŠHÂˆØØ[İÜ˜YÙKœÙ]][J˜›ÙWÜ™Y™\œ˜[ÜÛİ\˜ÙH‹˜[[˜WØÛY[ŠNÂˆØØ[İÜ˜YÙKœÙ]][J˜›ÙWÜÜXÚX[\İÚY‹˜[[˜WŞšZÛİ˜HŠNÂˆØØ[İÜ˜YÙKœÙ]][J˜›ÙWÜÜXÚX[\İÛ˜[YH‹´$4.ô-t/t,4%´`ô.´/´,´,ŠNÂˆBˆHØ]Ú
-JHßBˆK×JNÂ‚ˆËÈ]]Ë[ØY›ÙHØXš[™]YˆÙ\ÜÚ[Ûˆ^\İÈÛˆ[İ[ˆ™XXİ\ÙQY™™Xİ
+                  {/* Anxiety scale 0-10 */}
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#2E2A25", marginBottom: 8 }}>ĞĞ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ğµ / Ñ‚Ñ€ĞµĞ²Ğ¾Ğ³Ğ°</div>
+                    <div style={{ display: "inline-block" }}>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        {[0,1,2,3,4,5,6,7,8,9,10].map((v) => {
+                          const isSelected = checkinAnxiety === v;
+                          let bg = "#FAF6EF";
+                          let color = "#7A7268";
+                          let border = "1px solid rgba(46,42,37,.1)";
+                          if (isSelected) {
+                            const intensity = v / 10;
+                            bg = `rgba(184,140,92,${0.15 + intensity * 0.35})`;
+                            color = "#5A4A3A";
+                            border = "1px solid #C4A080";
+                          }
+                          return (
+                            <button
+                              key={v}
+                              onClick={() => setCheckinAnxiety(v)}
+                              style={{
+                                width: 34, height: 34, borderRadius: 8, background: bg, color,
+                                border, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                              }}
+                            >
+                              {v}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                        <span style={{ fontSize: 11, color: "#8a7e72" }}>Ğ¡Ğ¾Ğ²ÑĞµĞ¼ Ğ½ĞµÑ‚</span>
+                        <span style={{ fontSize: 11, color: "#8a7e72" }}>ĞÑ‡ĞµĞ½ÑŒ ÑĞ¸Ğ»ÑŒĞ½Ğ¾</span>
+                      </div>
+                    </div>
+                  </div>
 
+                  {/* Optional comment */}
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 6 }}>Ğ¥Ğ¾Ñ‚Ğ¸Ñ‚Ğµ Ğ´Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ¿Ğ°Ñ€Ñƒ ÑĞ»Ğ¾Ğ²?</div>
+                    <textarea
+                      style={{ ...s.answerInput, minHeight: 50 }}
+                      value={checkinComment}
+                      onChange={(e) => setCheckinComment(e.target.value)}
+                      placeholder="Ğ§Ñ‚Ğ¾ ÑĞµĞ³Ğ¾Ğ´Ğ½Ñ Ğ±Ğ¾Ğ»ÑŒÑˆĞµ Ğ²ÑĞµĞ³Ğ¾ Ğ²Ğ»Ğ¸ÑĞµÑ‚ Ğ½Ğ° Ğ²Ğ°ÑˆĞµ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ?"
+                      maxLength={1000}
+                      onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); saveSupportCheckin(); } }}
+                    />
+                  </div>
 
-HOˆÂˆYˆ
-Xİ]™S[Ù[HOOH˜›ÙHˆ	‰ˆ›ÙTØÜ™Y[ˆOOH›[™[™ÈŠHÂˆÛÛœİØ]™YHÙ]›ÙTÙ\ÜÚ[ÛŠ
-NÂˆYˆ
-Ø]™YœÙ\ÜÚ[Û’Y	‰ˆØ]™Y˜XØÙ\ÜÕÚÙ[ŠHÂˆØY›ÙPØXš[™]
+                  <button
+                    style={{ ...s.primary, fontSize: 13, padding: "10px 18px", opacity: checkinSaving ? 0.6 : 1 }}
+                    disabled={checkinSaving || checkinWellbeing === null}
+                    onClick={saveSupportCheckin}
+                  >
+                    {checkinToday ? (checkinSaving ? "Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ğµ..." : "ĞĞ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ Ğ¾Ñ‚Ğ¼ĞµÑ‚ĞºÑƒ") : (checkinSaving ? "Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ğµ..." : "Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ")}
+                  </button>
+                  {checkinToday && (
+                    <div style={{ fontSize: 12, color: "#5F7D6C", marginTop: 8 }}>
+                      Ğ¡ĞµĞ³Ğ¾Ğ´Ğ½Ñ Ğ²Ñ‹ ÑƒĞ¶Ğµ Ğ¾Ñ‚Ğ¼ĞµÑ‚Ğ¸Ğ»Ğ¸: {checkinToday.wellbeing_score > 0 ? "+" : ""}{checkinToday.wellbeing_score}{checkinToday.anxiety_score !== null ? `, Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ğµ ${checkinToday.anxiety_score}/10` : ""}
+                    </div>
+                  )}
 
-NÂˆBˆBˆK×JNÂ‚ˆËÈÛX\ˆ›ÙHÛÛ[X][Ûˆ\œ›ÜˆÚ[ˆØÜ™Y[ˆÚ[™Ù\Âˆ™XXİ\ÙQY™™Xİ
+                  {/* Dynamic chart â€” show when 2+ days */}
+                  {checkinHistory.length >= 2 && (() => {
+                    const periods = [7, 30, 90];
+                    const chartData = checkinHistory.slice(-30);
+                    const chartW = 360;
+                    const chartH = 100;
+                    const padX = 30;
+                    const padY = 10;
 
+                    // Wellbeing chart: -5 to +5
+                    const wbPoints = chartData.map((d, i) => {
+                      const x = padX + (i / (chartData.length - 1)) * (chartW - padX * 2);
+                      const y = padY + ((5 - d.wellbeing_score) / 10) * (chartH - padY * 2);
+                      return `${x},${y}`;
+                    }).join(" ");
 
-HOˆÂˆÙ]›ÙPÛÛ[X][Û‘\œ›ÜŠˆŠNÂˆKØ›ÙTØÜ™Y[—JNÂ‚ˆÛÛœİØYZ[”™\UX‹Ù]YZ[”™\UX—HH\ÙTİ]Jœ™]šY]ÜÈŠNÂˆÛÛœİØYZ[”™\]Y\İËÙ]YZ[”™\]Y\İ×HH\ÙTİ]J×JNÂˆÛÛœİØYZ[”™\Qš[\‹Ù]YZ[”™\Qš[\—HH\ÙTİ]Jœ[™[™ÈŠNÂ‚ˆËÈYZ[ˆÜš\Ú\È™\]Y\İÈİ]BˆÛÛœİØYZ[Üš\Ú\Ô™\]Y\İËÙ]YZ[Üš\Ú\Ô™\]Y\İ×HH\ÙTİ]J×JNÂˆÛÛœİØYZ[Üš\Ú\Ñš[\‹Ù]YZ[Üš\Ú\Ñš[\—HH\ÙTİ]J›™]ÈŠNÂˆÛÛœİØYZ[Üš\Ú\ÓØY[™ËÙ]YZ[Üš\Ú\ÓØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØYZ[Üš\Ú\ĞXİ[Û“ØY[™ËÙ]YZ[Üš\Ú\ĞXİ[Û“ØY[™×HH\ÙTİ]J[
-NÂˆÛÛœİØYZ[‘\šÓ[ÙKÙ]YZ[‘\šÓ[ÙWHH\ÙTİ]JYJNÂˆÛÛœİØYZ[”™]šY]ÔÚİÕ˜\ÚÙ]YZ[”™]šY]ÔÚİÕ˜\ÚHH\ÙTİ]J˜[ÙJNÂˆÛÛœİÙ[]PÛÛ™š\›T™]šY]ÒYÙ][]PÛÛ™š\›T™]šY]ÒYHH\ÙTİ]J[
-NÂˆÛÛœİÙ[]PÛÛ™š\›PÛÙKÙ][]PÛÛ™š\›PÛÙWHH\ÙTİ]JˆŠNÂˆÛÛœİÙ[]PÛÛ™š\›Tİ\Ù][]PÛÛ™š\›Tİ\HH\ÙTİ]J
-NÂˆÛÛœİÙ[]PÛÛ™š\›U\KÙ][]PÛÛ™š\›U\WHH\ÙTİ]JœÛÙŠNÂ‚ˆËÈYZ[ˆ›ÛH
-İ\\ˆÈİ\ÜÈ›ÙJBˆÛÛœİØYZ[”›ÛKÙ]YZ[”›ÛWHH\ÙTİ]J[
-NÂˆËÈYZ[ˆİX‹\YÙH›ÜˆÔH˜]šYØ][Ûˆ
-[H\š]™Hœ›ÛHT“
-BˆÛÛœİØYZ[”İX”YÙKÙ]YZ[”İX”YÙWHH\ÙTİ]J[
-NÂ‚ˆËÈ›ÙH[ZÙHYZ[ˆİ]BˆÛÛœİØ›ÙR[ZÙT™XÛÜ™ËÙ]›ÙR[ZÙT™XÛÜ™×HH\ÙTİ]J×JNÂˆÛÛœİØ›ÙR[ZÙUİ[Ù]›ÙR[ZÙUİ[HH\ÙTİ]J
-NÂˆÛÛœİØ›ÙR[ZÙSØY[™ËÙ]›ÙR[ZÙSØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙR[ZÙQ]Z[Ù]›ÙR[ZÙQ]Z[HH\ÙTİ]J[
-NÂˆÛÛœİØ›ÙR[ZÙQ]Z[Ü[‹Ù]›ÙR[ZÙQ]Z[Ü[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙR[ZÙTÚİÑ[]YÙ]›ÙR[ZÙTÚİÑ[]YHH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙR[ZÙQ[]PÛÛ™š\›KÙ]›ÙR[ZÙQ[]PÛÛ™š\›WHH\ÙTİ]J[
-NÂˆÛÛœİØ›ÙR[ZÙTÛİ\˜ÙQš[\‹Ù]›ÙR[ZÙTÛİ\˜ÙQš[\—HH\ÙTİ]J˜[ŠNÂ‚ˆÛÛœİØ›ÙPÛÙPÛÜYYÙ]›ÙPÛÙPÛÜYYHH\ÙTİ]J˜[ÙJNÂ‚ˆËÈ›ÙHX\Hİ]BˆÛÛœİØ›ÙQX\TÙ\ÜÚ[Û’YÙ]›ÙQX\TÙ\ÜÚ[Û’YHH\ÙTİ]J[
-NÂˆÛÛœİØ›ÙPÛÛ[X][Û’[œ]Ù]›ÙPÛÛ[X][Û’[œ]HH\ÙTİ]JˆŠNÂˆÛÛœİØ›ÙPÛÛ[X][Û‘\œ›Ü‹Ù]›ÙPÛÛ[X][Û‘\œ›Ü—HH\ÙTİ]JˆŠNÂˆÛÛœİØ›ÙQX\SÜ[‹Ù]›ÙQX\SÜ[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙQX\T™\İ[Ù]›ÙQX\T™\İ[HH\ÙTİ]J[
-NÂˆÛÛœİØ›ÙQX\Q^Q]KÙ]›ÙQX\Q^Q]WHH\ÙTİ]J[
-NÂˆÛÛœİØ›ÙQX\R\İÜKÙ]›ÙQX\R\İÜWHH\ÙTİ]J[
-NÂˆÛÛœİØ›ÙQX\R\İÜSÜ[‹Ù]›ÙQX\R\İÜSÜ[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙQX\R\İÜSØY[™ËÙ]›ÙQX\R\İÜSØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙQX\R\İÜQ]Z[Ù]›ÙQX\R\İÜQ]Z[HH\ÙTİ]J[
-NÂˆÛÛœİØ›ÙQX\T™XÛÜ™ËÙ]›ÙQX\T™XÛÜ™×HH\ÙTİ]J×JNÂˆÛÛœİØ›ÙQX\SØY[™ËÙ]›ÙQX\SØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙQX\Q]Z[Ù]›ÙQX\Q]Z[HH\ÙTİ]J[
-NÂˆÛÛœİØ›ÙQX\Q]Z[Ü[‹Ù]›ÙQX\Q]Z[Ü[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙQX\TÙ\ÜÚ[Û‘š[\‹Ù]›ÙQX\TÙ\ÜÚ[Û‘š[\—HH\ÙTİ]JˆŠNÂˆÛÛœİØ›ÙPYZ[•X‹Ù]›ÙPYZ[•X—HH\ÙTİ]Jš[ZÙHŠNÈËÈ[ZÙHX\H˜\Ú™]šY]ÜÂˆÛÛœİØ›ÙQ^\™]šY]ÜËÙ]›ÙQ^\™]šY]Ü×HH\ÙTİ]J×JNÂˆÛÛœİØ›ÙQ^\™]šY]ÜÓØY[™ËÙ]›ÙQ^\™]šY]ÜÓØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙQ^\™]šY]Ñ›Ü›SÜ[‹Ù]›ÙQ^\™]šY]Ñ›Ü›SÜ[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙQ^\™]šY]Ñ›Ü›KÙ]›ÙQ^\™]šY]Ñ›Ü›WHH\ÙTİ]J[
-NÂˆÛÛœİØ›ÙQ^\™]šY]ÔØ]š[™ËÙ]›ÙQ^\™]šY]ÔØ]š[™×HH\ÙTİ]J˜[ÙJNÂ‚ˆËÈYZ[ˆÜXÚX[\İÛ˜›Ø\™[™ËÛX]Úİ]BˆÛÛœİÛÛ˜›Ø\™[™Ô™\]Y\İËÙ]Û˜›Ø\™[™Ô™\]Y\İ×HH\ÙTİ]J×JNÂˆÛÛœİÛÛ˜›Ø\™[™ÓØY[™ËÙ]Û˜›Ø\™[™ÓØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÛX]Ú™\]Y\İËÙ]X]Ú™\]Y\İ×HH\ÙTİ]J×JNÂˆÛÛœİÛX]ÚØY[™ËÙ]X]ÚØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÛX]Ú^\Ù[XİÜ‹Ù]X]Ú^\Ù[XİÜ—HH\ÙTİ]J[
-NÈËÈ™\]Y\İY™Z[™È\ÜÚYÛ™YˆÛÛœİÛX]Ú^\\İÙ]X]Ú^\\İHH\ÙTİ]J×JNÂˆÛÛœİÛX]Ú\ÜÚYÛš[™ËÙ]X]Ú\ÜÚYÛš[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙQ^Ü[™ĞØ\Ù\ËÙ]›ÙQ^Ü[™ĞØ\Ù\×HH\ÙTİ]J˜[ÙJNÂˆËÈ›ÙHÛY[\ÜÚYÛ›Y[ˆÛÛœİØ›ÙP\ÜÚYÛ›Y[ËÙ]›ÙP\ÜÚYÛ›Y[×HH\ÙTİ]J×JNÂˆÛÛœİØ›ÙP\ÜÚYÛ›Y[ÓØY[™ËÙ]›ÙP\ÜÚYÛ›Y[ÓØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙQ^\ËÙ]›ÙQ^\×HH\ÙTİ]J×JNÂˆÛÛœİØ›ÙP\ÜÚYÛ•\™Ù]Ù]›ÙP\ÜÚYÛ•\™Ù]HH\ÙTİ]J[
-NÈËÈ›ÙWØÛY[Ü™Yˆ™Z[™È\ÜÚYÛ™YˆÛÛœİØ›ÙP\ÜÚYÛ‘^\YÙ]›ÙP\ÜÚYÛ‘^\YHH\ÙTİ]JˆŠNÂˆÛÛœİØ›ÙP\ÜÚYÛ“Ü™ÒYÙ]›ÙP\ÜÚYÛ“Ü™ÒYHH\ÙTİ]J[
-NÂˆÛÛœİØ›ÙP\ÜÚYÛ”Ø]š[™ËÙ]›ÙP\ÜÚYÛ”Ø]š[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙP\ÜÚYÛ’\Ô™X\ÜÚYÛ‹Ù]›ÙP\ÜÚYÛ’\Ô™X\ÜÚYÛ—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØ›ÙP\ÜÚYÛ‘^\Ü™ÜËÙ]›ÙP\ÜÚYÛ‘^\Ü™Ü×HH\ÙTİ]J×JNÂ‚ˆËÈ™\İÜ™H›ÙH[ZÙH™\İ[œ›ÛHØØ[İÜ˜YÙBˆÛÛœİÜØ]™Y›ÙT™\İ[Ù]Ø]™Y›ÙT™\İ[HH\ÙTİ]J
+                    // Anxiety chart: 0 to 10
+                    const axPoints = chartData.map((d, i) => {
+                      if (d.anxiety_score === null || d.anxiety_score === undefined) return null;
+                      const x = padX + (i / (chartData.length - 1)) * (chartW - padX * 2);
+                      const y = padY + ((10 - d.anxiety_score) / 10) * (chartH - padY * 2);
+                      return `${x},${y}`;
+                    }).filter(Boolean).join(" ");
 
-HOˆÂˆHÂˆÛÛœİ˜]ÈHØØ[İÜ˜YÙK™Ù]][J˜›ÙWÛ\İÜ™\İ[ŠNÂˆYˆ
-˜]ÊH™]\›ˆ”ÓÓ‹œ\œÙJ˜]ÊNÂˆHØ]Ú
-JHßBˆ™]\›ˆ[ÂˆJNÂ‚ˆËÈ˜Z[š[™ÈX›Hİ]BˆÛÛœİİ˜Z[š[™ÔÙ\ÜÚ[ÛœËÙ]˜Z[š[™ÔÙ\ÜÚ[Ûœ×HH\ÙTİ]J×JNÂˆÛÛœİİ˜Z[š[™ÓØY[™ËÙ]˜Z[š[™ÓØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİİ˜Z[š[™Ñš[\‹Ù]˜Z[š[™Ñš[\—HH\ÙTİ]JÈİ]\Îˆ˜[‹^XİYØØ\ÙWİ\Nˆ˜[‹ZWÙ]XİYØØ\ÙWİ\Nˆ˜[‹Ù\ÜÚ[Û—ÚÚ[™ˆ˜[‹[Ù[İ\ÙYˆ˜[‹X›X×ØÛÙNˆˆˆJNÂˆÛÛœİİ˜Z[š[™ÑY]YÙ]˜Z[š[™ÑY]YHH\ÙTİ]J[
-NÂˆÛÛœİİ˜Z[š[™ÑY]]KÙ]˜Z[š[™ÑY]]WHH\ÙTİ]JßJNÂˆÛÛœİİ˜Z[š[™Ó™]Ô›İËÙ]˜Z[š[™Ó™]Ô›İ×HH\ÙTİ]J[
-NÂˆÛÛœİİ˜Z[š[™ÔÙ\ÜÚ[ÛœÑ\œ›Ü‹Ù]˜Z[š[™ÔÙ\ÜÚ[ÛœÑ\œ›Ü—HH\ÙTİ]J[
-NÂ‚ˆËÈÜ™X]H˜Z[š[™Èœ›ÛH™]šY]Èİ]BˆÛÛœİİ˜Z[š[™Ñ›Ü›T™]šY]ÒYÙ]˜Z[š[™Ñ›Ü›T™]šY]ÒYHH\ÙTİ]J[
-NÂˆÛÛœİİ˜Z[š[™Ñ›Ü›Q]KÙ]˜Z[š[™Ñ›Ü›Q]WHH\ÙTİ]JÈØÙ[˜\š[×Ü^YYˆˆ‹^XİYØØ\ÙWİ\Nˆˆ‹Ù\ÜÚ[Û—ÚÚ[™ˆš[š]X[‹^\ØÛÛ[Y[ˆˆ‹X›X×ØÛÙNˆˆˆJNÂˆÛÛœİİ˜Z[š[™Ñ›Ü›TX›XĞÛÙP]]ËÙ]˜Z[š[™Ñ›Ü›TX›XĞÛÙP]]×HH\ÙTİ]J˜[ÙJNÂ‚ˆËÈ˜\ÚÈÛÙY[]Hİ]BˆÛÛœİİ˜Z[š[™ÔÚİÕ˜\ÚÙ]˜Z[š[™ÔÚİÕ˜\ÚHH\ÙTİ]J˜[ÙJNÂˆÛÛœİİ˜Z[š[™ÔÙ[Xİ[Û‹Ù]˜Z[š[™ÔÙ[Xİ[Û—HH\ÙTİ]J™]ÈÙ]
+                    const zeroY = padY + (5 / 10) * (chartH - padY * 2);
 
-JNÂˆÛÛœİİ˜Z[š[™Õ˜\ÚÛÛ™š\›KÙ]˜Z[š[™Õ˜\ÚÛÛ™š\›WHH\ÙTİ]J[
-NÂˆÛÛœİİ˜Z[š[™Ô\›X[™[ÛÛ™š\›KÙ]˜Z[š[™Ô\›X[™[ÛÛ™š\›WHH\ÙTİ]J[
-NÂˆÛÛœİİ˜Z[š[™Ñ[][Û”™X\ÛÛ‹Ù]˜Z[š[™Ñ[][Û”™X\ÛÛ—HH\ÙTİ]JˆŠNÂˆÛÛœİİ˜Z[š[™Ñ[][Û”™X\ÛÛİ\İÛKÙ]˜Z[š[™Ñ[][Û”™X\ÛÛİ\İÛWHH\ÙTİ]JˆŠNÂˆÛÛœİİ˜Z[š[™Ğ[ĞÛÛ™š\›KÙ]˜Z[š[™Ğ[ĞÛÛ™š\›WHH\ÙTİ]J[
-NÂ‚ˆËÈ^[™X›H™]šY]ÈÙXİ[ÛœÈİ]BˆÛÛœİÙ^[™YÙXİ[ÛœËÙ]^[™YÙXİ[Ûœ×HH\ÙTİ]JßJNÂˆÛÛœİÛ[Ù[]KÙ][Ù[]WHH\ÙTİ]J[
-NÂ‚ˆËÈ]X[]H[œÚYÚİ]BˆÛÛœİÜ]X[]R[œÚYÚËÙ]]X[]R[œÚYÚ×HH\ÙTİ]J×JNÂˆÛÛœİÜ]X[]Tİ]ËÙ]]X[]Tİ]×HH\ÙTİ]JÈ™]×Ø\›İ™YØÛİ[ˆ\İØ[˜[\Ú\×Ø]ˆ[™XÛÛ[Y[™Yİ×Ø[˜[^™Nˆ˜[ÙHJNÂˆÛÛœİÜ]X[]SØY[™ËÙ]]X[]SØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]X[]QÙ[™\˜][™ËÙ]]X[]QÙ[™\˜][™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]X[]TÙ[XİY™]šY]ÒYËÙ]]X[]TÙ[XİY™]šY]ÒY×HH\ÙTİ]J×JNÂˆÛÛœİÜ]X[]PÛÛ™š\›SÜ[‹Ù]]X[]PÛÛ™š\›SÜ[—HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜ]X[]Q]Z[[œÚYÚÙ]]X[]Q]Z[[œÚYÚHH\ÙTİ]J[
-NÂ‚ˆËÈÙ\ÜÚ[Ûˆ[Y[[™Hİ]BˆÛÛœİİ[Y[[™Q]KÙ][Y[[™Q]WHH\ÙTİ]J[
-NÂˆÛÛœİİ[Y[[™SØY[™ËÙ][Y[[™SØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİİ[Y[[™PÛÙKÙ][Y[[™PÛÙWHH\ÙTİ]J[
-NÂˆÛÛœİİ[Y[[™PØXÚKÙ][Y[[™PØXÚWHH\ÙTİ]JßJNÂˆÛÛœİİ[Y[[™UšY]ËÙ][Y[[™UšY]×HH\ÙTİ]J›\İŠNÈËÈ›\İˆ™]Z[‚ˆÛÛœİİ[Y[[™S\™ÙTÙXİ[Û‹Ù][Y[[™S\™ÙTÙXİ[Û—HH\ÙTİ]J[
-NÂˆÛÛœİÜÙ\ÜÚ[Û‘]Z[Ñ]KÙ]Ù\ÜÚ[Û‘]Z[Ñ]WHH\ÙTİ]J[
-NÂˆÛÛœİÜÙ\ÜÚ[Û‘]Z[ÓØY[™ËÙ]Ù\ÜÚ[Û‘]Z[ÓØY[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİÜÙ\ÜÚ[Û‘]Z[ĞØXÚKÙ]Ù\ÜÚ[Û‘]Z[ĞØXÚWHH\ÙTİ]JßJNÂˆÛÛœİÜÙ\ÜÚ[Û‘]Z[Ñ\œ›Ü‹Ù]Ù\ÜÚ[Û‘]Z[Ñ\œ›Ü—HH\ÙTİ]J[
-NÂ‚ˆÛÛœİUPSUWÔÕUT×ÓP‘SÈHÂˆ™]Îˆ´'t/´,´bô.H‹ˆ[™\—Ü™]šY]Îˆ´(4,4`t`t/4,4`´`4.4,´,4-t`´`tcÈ‹ˆXØÙ\Yˆ´'ô`4.4/tcô`ˆ4.ˆ4`4,4,t/´`´-H‹ˆ\X[WØXØÙ\Yˆ´'ô`4.4/tcô`ˆ4aô,4`t`´.4aô/t/ˆ‹ˆ™Z™XİYˆ´'´`´.´.ô/´/tdt/H‹ˆ\˜Ú]™Yˆ´$4`4at.4,ˆ‹ˆNÂ‚ˆÛÛœİUPSUWÔÑU‘T’UWÓP‘SÈHÂˆİÎˆ´'t.4-ô.´.4.H‹ˆYY][Nˆ´(t`4-t-4/t.4.H‹ˆYÚˆ´$´bô`t/´.´.4.H‹ˆÜš]XØ[ˆ´&´`4.4`´.4aô-t`t.´.4.H‹ˆNÂ‚ˆÛÛœİÑTÔÒSÓ—ÒÒS‘ÓP‘SÈHÂˆ[š]X[ˆ´'ô-t`4,´.4aô/t,4cÈ4`t-t`t`t.4cÈ‹ˆ›Ûİ×İ\ˆ´'ô/´,´`´/´`4/t,4cÈ4`t-t`t`t.4cÈ‹ˆX\WØÚXÚÎˆ´'ô`4/´,´-t`4.´,4-4/t-t,´/t.4.´,‹ˆİ\ÜİÛÛÚ]ØÚXÚÎˆ´'ô`4/´,´-t`4.´,4/ô`4,4.´`´.4.ˆ‹ˆÜš\Ú\×ØÚXÚÎˆ´(t`4/´aô/t/´-H4/´,t`4,4bt-t/t.4-H‹ˆØİÜ—Ü™]šY]Îˆ´$´`4,4aô-t,t/tbô.H4`4,4-ô,t/´`‹ˆİ\ˆ´%4`4`ô,ô/´-H‹ˆNÂ‚ˆÛÛœİĞTÑWÕTWÓP‘SÈHÂˆ[Y]Nˆ´(´`4-t,´/´,ô,‹ˆÛY\ˆ´(t/´/H‹ˆ\™\ÜÚ[Û—ÛZÙNˆ´%4-t/ô`4-t`t`t.4,´/tbô-H4/ô`4.4-ô/t,4.´.‹ˆÜšYYˆ´(ô`´`4,4`´,È4,ô/´`4-H‹ˆ˜][XNˆ´(´`4,4,´/4,4`´.4aô-t`t.´.4.H4/´/ôbô`ˆ‹ˆ›ÙWİ[œÚ[Ûˆ´(´-t.ô-t`t/t/´-H4/t,4/ô`4cô-´-t/t.4-H‹ˆYÛZÙNˆ´'t,4`4`ôb4-t/t.4-H4,´/t.4/4,4/t.4cÈÈ4.4`t/ô/´.ô/t.4`´-t.ôc4/tbô-H4a4`ô/t.´a´.4.‹ˆİXœİ[˜ÙNˆ´'ô$4$ˆÈ4,´-tbt-t`t`´,´,‹ˆ[ÛÚÛˆ´$4.ô.´/´,ô/´.ôc‹ˆš\Û\—Ü™YÙ›YÜÎˆ´$t.4/ô/´.ôcô`4/tbô-H4.´`4,4`t/tbô-H4a4.ô,4,ô.‹ˆŞXÚÜÚ\×Ü™YÙ›YÜÎˆ´'ô`t.4at/´`´.4aô-t`t.´.4-H4.´`4,4`t/tbô-H4a4.ô,4,ô.‹ˆXİ]WÜŞXÚÜÚ\Îˆ´'´`t`´`4bô.H4/ô`t.4at/´-È‹ˆİZXÚYWÜš\ÚÎˆ´(t`ô.4a´.4-4,4.ôc4/tbô.H4`4.4`t.ˆ‹ˆÙ[—Ú\›WÜš\ÚÎˆ´(4.4`t.ˆ4`t,4/4/´/ô/´,´`4-t-´-4-t/t.4cÈ‹ˆYYXØ][Û—Ú\ÜİYNˆ´$´/´/ô`4/´`tbÈ4.ô-t.´,4`4`t`´,ˆ‹ˆZ^Yˆ´(t/4-tb4,4/t/tbô.H4`t.ô`ôaô,4.H‹ˆİ\ˆ´%4`4`ô,ô/´-H‹ˆNÂ‚ˆÛÛœİÕUT×ÓP‘SÈHÂˆ™]Îˆ´'t/´,´bô.H‹ˆ™]šY]ÙYˆ´'ô`4/´`t/4/´`´`4-t/H‹ˆ™YY×Ü›Û\İ\]Nˆ´'t`ô-´/t/ˆ4/´,t/t/´,´.4`´c4/ô`4/´/4/ô`ˆ‹ˆ\›İ™YÙ›Ü—ÛX\›š[™Îˆ´'´-4/´,t`4-t/H4-4.ôcÈ4/´,t`ôaô-t/t.4cÈ‹ˆ™Z™XİYˆ´'´`´.´.ô/´/tdt/H‹ˆ\˜Ú]™Yˆ´$4`4at.4,ˆ‹ˆNÂ‚ˆÛÛœİÚÈH
-ŠHOˆÑTÔÒSÓ—ÒÒS‘ÓP‘SÖİ—HÂˆÛÛœİİH
-ŠHOˆĞTÑWÕTWÓP‘SÖİ—HÂˆÛÛœİİH
-ŠHOˆÕUT×ÓP‘SÖİ—HÂ‚ˆ[˜İ[ÛˆÚİÕØ\İ
-Y\ÜØYÙK\HHœİXØÙ\ÜÈŠHÂˆÙ]Ø\İ
-ÈY\ÜØYÙK\KÙ^Nˆ]K››İÊ
-HJNÂˆB‚ˆ\Ş[˜È[˜İ[Ûˆ[™Q^\ÙÚ[Š
-HÂˆÛÛœİÛÙHH^\ÛÙR[œ]š[J
-NÂˆYˆ
-XÛÙJH™]\›ÂˆÙ]^\ÙÙÚ[™Ò[ŠYJNÂˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ›ÙÚ[ˆ‹XØÙ\Ü×ØÛÙNˆÛÙHJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÈ	‰ˆ]K™^\
-HÂˆHÈÙ\ÜÚ[Û”İÜ˜YÙKœÙ]][JØÚØWÙ^\ØXØÙ\Ü×ØÛÙH‹ÛÙJNÈHØ]ÚßBˆÙ]^\]J]K™^\
-NÂˆØØ[İÜ˜YÙKœÙ]][JØÚØWÙ^\‹”ÓÓ‹œİš[™ÚYJ]K™^\
-JNÂˆÙ]^\[Ù[Ü[Š˜[ÙJNÂˆÙ]^\ÛÙR[œ]
-ˆŠNÂˆÚİÕØ\İ
-4(4-t-´.4/4`t/ô-ta´.4,4.ô.4`t`´,ˆ	Ù]K™^\›˜[Y_X
-NÂˆH[ÙHÂˆÚİÕØ\İ
-]K™\œ›Üˆ´&´/´-4`t/ô-ta´.4,4.ô.4`t`´,4/t-H4/t,4.t-4-t/H‹™\œ›ÜˆŠNÂˆBˆHØ]ÚÂˆÚİÕØ\İ
-´'´b4.4,t.´,4/ô/´-4.´.ôc´aô-t/t.4cÈ‹™\œ›ÜˆŠNÂˆHš[˜[HÂˆÙ]^\ÙÙÚ[™Ò[Š˜[ÙJNÂˆBˆB‚ˆ[˜İ[Ûˆ[™Q^\ÙÛİ]
-
-HÂˆÙ]^\]J[
-NÂˆHÈÙ\ÜÚ[Û”İÜ˜YÙKœ™[[İ™R][JØÚØWÙ^\ØXØÙ\Ü×ØÛÙHŠNÈHØ]ÚßBˆØØ[İÜ˜YÙKœ™[[İ™R][JØÚØWÙ^\ŠNÂˆÚİÕØ\İ
-´(4-t-´.4/4`t/ô-ta´.4,4.ô.4`t`´,4,´bô.´.ôc´aô-t/HŠNÂˆB‚ˆËÈ8¥ 8¥ ^H]Y[È
-^\[™[
-H8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ ‚ˆ\Ş[˜È[˜İ[ÛˆØY^T]Y[Ê
-HÂˆÙ]]Y[[Ù[Ü[ŠYJNÂˆÙ]^T]Y[ÓØY[™ÊYJNÂˆHÂˆÛÛœİ›ÙHHÈXİ[Ûˆ›\İ^T]Y[ÈˆNÂˆYˆ
-^\]JHÂˆ›ÙK™^\ØÛÙHH^\ÛÙR[œ]
-]ØZ]Ù]İÜ™Y^\ÛÙJ
-JHˆÂˆBˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJ›ÙJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÊHÂˆÙ]^T]Y[Ê]Kœ]Y[È×JNÂˆH[ÙHÂˆÚİÕØ\İ
-]K™\œ›Üˆ´'´b4.4,t.´,4-ô,4,ô`4`ô-ô.´.‹™\œ›ÜˆŠNÂˆBˆHØ]ÚÂˆÚİÕØ\İ
-´'´b4.4,t.´,4-ô,4,ô`4`ô-ô.´.4/ô,4a´.4-t/t`´/´,ˆ‹™\œ›ÜˆŠNÂˆHš[˜[HÂˆÙ]^T]Y[ÓØY[™Ê˜[ÙJNÂˆBˆB‚ˆ[˜İ[ÛˆÙ]İÜ™Y^\ÛÙJ
-HÂˆHÂˆÛÛœİÙ\ÜÚ[ÛÛÙHHÙ\ÜÚ[Û”İÜ˜YÙK™Ù]][JØÚØWÙ^\ØXØÙ\Ü×ØÛÙHŠNÂˆYˆ
-Ù\ÜÚ[ÛÛÙJH™]\›ˆÙ\ÜÚ[ÛÛÙNÂˆÛÛœİ^\HØØ[İÜ˜YÙK™Ù]][JØÚØWÙ^\ŠNÂˆ™]\›ˆ^\È”ÓÓ‹œ\œÙJ^\
-OË˜XØÙ\Ü×ØÛÙHˆˆˆˆÂˆHØ]ÚÈ™]\›ˆˆÈBˆB‚ˆ\Ş[˜È[˜İ[Ûˆ[™P\ÜÚYÛ”]Y[
-
-HÂˆÛÛœİÛÙHH]Y[[Ù[ÛÙKš[J
-KÕ\\Ø\ÙJ
-NÂˆYˆ
-XÛÙJH™]\›ÂˆHÂˆÛÛœİ›ÙHHÈXİ[Ûˆ˜\ÜÚYÛ”]Y[Ñ^\‹X›X×ØÛÙNˆÛÙHNÂˆYˆ
-^\]JHÂˆ›ÙK™^\ØÛÙHH^\ÛÙR[œ]
-]ØZ]Ù]İÜ™Y^\ÛÙJ
-JHˆÂˆBˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJ›ÙJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÊHÂˆÚİÕØ\İ
-´'ô,4a´.4-t/t`ˆ4/t,4-ô/t,4aô-t/HŠNÂˆÙ]]Y[[Ù[ÛÙJˆŠNÂˆØY^T]Y[Ê
-NÂˆH[ÙHÂˆÚİÕØ\İ
-]K™\œ›Üˆ´'´b4.4,t.´,‹™\œ›ÜˆŠNÂˆBˆHØ]ÚÂˆÚİÕØ\İ
-´'´b4.4,t.´,4/t,4-ô/t,4aô-t/t.4cÈ‹™\œ›ÜˆŠNÂˆBˆB‚ˆ\Ş[˜È[˜İ[Ûˆ[™PÜ™X]R[š]S[šÊ
-HÂˆHÂˆÛÛœİ›ÙHHÈXİ[Ûˆ˜Ü™X]QØİÜ’[š]S[šÈ‹X™[ˆ[š]S[šÓX™[NÂˆYˆ
-^\]JHÂˆ›ÙK™^\ØÛÙHH^\ÛÙR[œ]
-]ØZ]Ù]İÜ™Y^\ÛÙJ
-JHˆÂˆBˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJ›ÙJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÊHÂˆÙ][š]S[šĞÜ™X]Y
-]Kš[š]WÛ[šÊNÂˆÚİÕØ\İ
-´(t`tbô.ô.´,4`t/´-ô-4,4/t,ŠNÂˆÙ][š]S[šÓX™[
-ˆŠNÂˆØY[š]S[šÜÊ
-NÂˆH[ÙHÂˆÚİÕØ\İ
-]K™\œ›Üˆ´'´b4.4,t.´,‹™\œ›ÜˆŠNÂˆBˆHØ]ÚÂˆÚİÕØ\İ
-´'´b4.4,t.´,4`t/´-ô-4,4/t.4cÈ4`t`tbô.ô.´.‹™\œ›ÜˆŠNÂˆBˆB‚ˆ\Ş[˜È[˜İ[ÛˆØY[š]S[šÜÊ
-HÂˆHÂˆÛÛœİ›ÙHHÈXİ[Ûˆ›\İØİÜ’[š]S[šÜÈˆNÂˆYˆ
-^\]JHÂˆ›ÙK™^\ØÛÙHH^\ÛÙR[œ]
-]ØZ]Ù]İÜ™Y^\ÛÙJ
-JHˆÂˆBˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJ›ÙJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÊHÂˆÙ][š]S[šÜÊ]Kš[š]WÛ[šÜÈ×JNÂˆBˆHØ]ÚßBˆB‚ˆ\Ş[˜È[˜İ[Ûˆ[™Q\ØX›R[š]S[šÊ[šÒY
-HÂˆHÂˆÛÛœİ›ÙHHÈXİ[Ûˆ™\ØX›QØİÜ’[š]S[šÈ‹[š×ÚYˆ[šÒYNÂˆYˆ
-^\]JHÂˆ›ÙK™^\ØÛÙHH^\ÛÙR[œ]
-]ØZ]Ù]İÜ™Y^\ÛÙJ
-JHˆÂˆBˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJ›ÙJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÊHÂˆÚİÕØ\İ
-´(t`tbô.ô.´,4/´`´.´.ôc´aô-t/t,ŠNÂˆØY[š]S[šÜÊ
-NÂˆH[ÙHÂˆÚİÕØ\İ
-]K™\œ›Üˆ´'´b4.4,t.´,‹™\œ›ÜˆŠNÂˆBˆHØ]ÚÂˆÚİÕØ\İ
-´'´b4.4,t.´,‹™\œ›ÜˆŠNÂˆBˆB‚ˆËÈ8¥ 8¥ YZ[ˆÜ™Ø[š^˜][ÛœÈ8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ 8¥ ‚ˆ\Ş[˜È[˜İ[ÛˆYZ[“ØYÜ™Ø[š^˜][ÛœÊ
-HÂˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ›\İÜ™Ø[š^˜][ÛœÈ‹YZ[—ÜÙXÜ™]ˆYZ[”\ÜİÛÜ™JKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÊHÂˆÙ]Ü™Ø[š^˜][ÛœÊ]K›Ü™Ø[š^˜][ÛœÈ×JNÂˆBˆHØ]ÚßBˆB‚ˆ\Ş[˜È[˜İ[Ûˆ[™PÜ™X]SÜ™Ø[š^˜][ÛŠ
-HÂˆYˆ
-[Ü™Ñ›Ü›K›˜[YKš[J
-JHÈÚİÕØ\İ
-´(ô.´,4-´.4`´-H4/t,4-ô,´,4/t.4-H‹™\œ›ÜˆŠNÈ™]\›ÈBˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÂˆXİ[ÛˆÜ™Ñ›Ü›QY]YÈ\]SÜ™Ø[š^˜][Ûˆˆˆ˜Ü™X]SÜ™Ø[š^˜][Ûˆ‹ˆYZ[—ÜÙXÜ™]ˆYZ[”\ÜİÛÜ™ˆYˆÜ™Ñ›Ü›QY]Yˆ‹‹›Ü™Ñ›Ü›KˆJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÊHÂˆÚİÕØ\İ
-Ü™Ñ›Ü›QY]YÈ´'´`4,ô,4/t.4-ô,4a´.4cÈ4/´,t/t/´,´.ô-t/t,ˆˆ´'´`4,ô,4/t.4-ô,4a´.4cÈ4`t/´-ô-4,4/t,ŠNÂˆÙ]Ü™Ñ›Ü›SÜ[Š˜[ÙJNÂˆÙ]Ü™Ñ›Ü›QY]Y
-[
-NÂˆÙ]Ü™Ñ›Ü›JÈ˜[YNˆˆ‹ÛYÎˆˆ‹\Nˆœš]˜]WØÛ[šXÈ‹Ú]Nˆˆ‹ÛÛ[Y[ˆˆˆJNÂˆYZ[“ØYÜ™Ø[š^˜][ÛœÊ
-NÂˆH[ÙHÂˆÚİÕØ\İ
-]K™\œ›Üˆ´'´b4.4,t.´,‹™\œ›ÜˆŠNÂˆBˆHØ]ÚÂˆÚİÕØ\İ
-´'´b4.4,t.´,‹™\œ›ÜˆŠNÂˆBˆB‚ˆ\Ş[˜È[˜İ[ÛˆYZ[“ØYÜ™Ø[š^˜][Û‘^\ÊÜ™ÒY
-HÂˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ›\İÜ™Ø[š^˜][Û‘^\È‹Ü™Ø[š^˜][Û—ÚYˆÜ™ÒYYZ[—ÜÙXÜ™]ˆYZ[”\ÜİÛÜ™JKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÊHÂˆÙ]Ü™Ñ^\Ê]K›Y[X™\œÈ×JNÂˆBˆHØ]ÚßBˆB‚ˆ\Ş[˜È[˜İ[Ûˆ[™PY^\ÓÜ™Ê
-HÂˆYˆ
-[Ü™Ñ]Z[ËšY[Ü™ĞY^\Y
-H™]\›ÂˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÂˆXİ[Ûˆ˜Y^\ÓÜ™Ø[š^˜][Ûˆ‹ˆYZ[—ÜÙXÜ™]ˆYZ[”\ÜİÛÜ™ˆÜ™Ø[š^˜][Û—ÚYˆÜ™Ñ]Z[šYˆ^\ÚYˆÜ™ĞY^\Yˆ›ÛNˆÜ™ĞY^\›ÛKˆJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÊHÂˆÚİÕØ\İ
-´(t/ô-ta´.4,4.ô.4`t`ˆ4-4/´,t,4,´.ô-t/HŠNÂˆÙ]Ü™ĞY^\Ü[Š˜[ÙJNÂˆÙ]Ü™ĞY^\Y
-ˆŠNÂˆYZ[“ØYÜ™Ø[š^˜][Û‘^\ÊÜ™Ñ]Z[šY
-NÂˆH[ÙHÂˆÚİÕØ\İ
-]K™\œ›Üˆ´'´b4.4,t.´,‹™\œ›ÜˆŠNÂˆBˆHØ]ÚÂˆÚİÕØ\İ
-´'´b4.4,t.´,‹™\œ›ÜˆŠNÂˆBˆB‚ˆ\Ş[˜È[˜İ[Ûˆ[™T™[[İ™Q^\œ›ÛSÜ™Ê^\Y
-HÂˆYˆ
-[Ü™Ñ]Z[ËšY
-H™]\›ÂˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÂˆXİ[Ûˆœ™[[İ™Q^\œ›ÛSÜ™Ø[š^˜][Ûˆ‹ˆYZ[—ÜÙXÜ™]ˆYZ[”\ÜİÛÜ™ˆÜ™Ø[š^˜][Û—ÚYˆÜ™Ñ]Z[šYˆ^\ÚYˆ^\YˆJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÊHÂˆÚİÕØ\İ
-´(t/ô-ta´.4,4.ô.4`t`ˆ4`ô-4,4.ôdt/HŠNÂˆYZ[“ØYÜ™Ø[š^˜][Û‘^\ÊÜ™Ñ]Z[šY
-NÂˆH[ÙHÂˆÚİÕØ\İ
-]K™\œ›Üˆ´'´b4.4,t.´,‹™\œ›ÜˆŠNÂˆBˆHØ]ÚÂˆÚİÕØ\İ
-´'´b4.4,t.´,‹™\œ›ÜˆŠNÂˆBˆB‚ˆ\Ş[˜È[˜İ[ÛˆYZ[“\İ[^\Ê
-HÂˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ›\İ[^\È‹YZ[—ÜÙXÜ™]ˆYZ[”\ÜİÛÜ™JKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆ™]\›ˆ]K™^\È×NÂˆHØ]ÚÈ™]\›ˆ×NÈBˆB‚ˆ[˜İ[Ûˆ™\Ù]™YÚ\İ\‘›Ü›J
-HÂˆÙ]™YÚ\İ\‘›Ü›JÈ˜[YNˆˆ‹[XZ[ˆˆ‹[YÜ˜[Nˆˆ‹›ÛNˆœŞXÚÛÙÚ\İ‹ÜXÚX[Nˆˆ‹Ú]Nˆˆ‹Ü™Ø[š^˜][ÛˆˆˆJNÂˆB‚ˆ\Ş[˜È[˜İ[Ûˆ[™Q^\™YÚ\İ\Š
-HÂˆÛÛœİˆH™YÚ\İ\‘›Ü›NÂˆYˆ
-Y‹›˜[YH‹›˜[YKš[J
-K›[™İŠHÂˆÚİÕØ\İ
-´(ô.´,4-´.4`´-H4.4/4cÈ
-4/4.4/t.4/4`ô/ˆ4`t.4/4,´/´.ô,
-H‹™\œ›ÜˆŠNÂˆ™]\›ÂˆB‚ˆÙ]™YÚ\İ\”Ù[™[™ÊYJNÂˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÂˆXİ[Ûˆœ™YÚ\İ\ˆ‹ˆ˜[YNˆ‹›˜[YKš[J
-Kˆ›ÛNˆ‹œ›ÛKˆÜXÚX[Nˆ‹œÜXÚX[HÈ‹œÜXÚX[Kš[J
-Hˆˆ‹ˆJKˆJNÂˆÛÛœİ^H]ØZ]™\Ë^
-
-NÂˆ]]NÂˆHÂˆ]HH”ÓÓ‹œ\œÙJ^
-NÂˆHØ]ÚÂˆÚİÕØ\İ
-4'´b4.4,t.´,4`t-t`4,´-t`4,ˆ	Ü™\Ëœİ]\ßH	Ü™\Ëœİ]\Õ^X™\œ›ÜˆŠNÂˆ™]\›ÂˆBˆYˆ
-\™\Ë›ÚÈY]OË›ÚÊHÂˆÚİÕØ\İ
-4'´b4.4,t.´,4`4-t,ô.4`t`´`4,4a´.4.ˆ	Ù]OË™]Z[È]OË™\œ›Üˆ™\Ëœİ]\Õ^X™\œ›ÜˆŠNÂˆ™]\›ÂˆBˆÙ]™YÚ\İ˜][Û”™\İ[
-]JNÂˆÙ]^\]J]K™^\
-NÂˆØØ[İÜ˜YÙKœÙ]][JØÚØWÙ^\‹”ÓÓ‹œİš[™ÚYJ]K™^\
-JNÂˆÚİÕØ\İ
-4(4-t-´.4/4`t/ô-ta´.4,4.ô.4`t`´,4,4.´`´.4,´.4`4/´,´,4/Nˆ	Ù]K™^\›˜[Y_X
-NÂˆHØ]Ú
-JHÂˆÚİÕØ\İ
-4'´b4.4,t.´,4/ô/´-4.´.ôc´aô-t/t.4cÎˆ	ÙOË›Y\ÜØYÙH´/ô`4/´,´-t`4c4`´-K4-ô,4/ô`ôbt-t/H4.ô.4`t-t`4,´-t`ŸX™\œ›ÜˆŠNÂˆHš[˜[HÂˆÙ]™YÚ\İ\”Ù[™[™Ê˜[ÙJNÂˆBˆB‚ˆ\Ş[˜È[˜İ[ÛˆYZ[“ØY™\]Y\İÊš[\”İ]\ÊHÂˆÛÛœİİHš[\”İ]\ÈYZ[”™\Qš[\ÂˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ›\İ™\]Y\İÈ‹İ]\Îˆİ[Z]ˆLJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÊHÂˆÙ]YZ[”™\]Y\İÊ]Kœ™\]Y\İÈ×JNÂˆBˆHØ]ÚßBˆB‚ˆ\Ş[˜È[˜İ[ÛˆYZ[•\]T™\]Y\İİ]\Ê™\]Y\İYİ]\ÊHÂˆHÂˆ]ØZ]™]Ú
-‹Ø\KÙ^\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ\]T™\]Y\İİ]\È‹™\]Y\İÚYˆ™\]Y\İYİ]\ËYZ[—ÜÙXÜ™]ˆYZ[”\ÜİÛÜ™JKˆJNÂˆÚİÕØ\İ
-´(t`´,4`´`ô`H4-ô,4cô,´.´.4/´,t/t/´,´.ôdt/HŠNÂˆYZ[“ØY™\]Y\İÊYZ[”™\Qš[\ŠNÂˆHØ]ÚÂˆÚİÕØ\İ
-´'´b4.4,t.´,4/´,t/t/´,´.ô-t/t.4cÈ‹™\œ›ÜˆŠNÂˆBˆB‚ˆÛÛœİÜ™XÛÜ™[™Ô]Y\İ[Û’[™^Ù]™XÛÜ™[™Ô]Y\İ[Û’[™^HH\ÙTİ]J[
-NÂˆÛÛœİÜ]Y\İ[Û”™XÛÜ™[™Õ[YKÙ]]Y\İ[Û”™XÛÜ™[™Õ[YWHH\ÙTİ]J
-NÂˆÛÛœİÜ]Y\İ[Û•˜[œØÜšXš[™Ò[™^Ù]]Y\İ[Û•˜[œØÜšXš[™Ò[™^HH\ÙTİ]J[
-NÂ‚ˆÛÛœİ]Y\İ[Û“YYXT™XÛÜ™\”™YˆH\ÙT™YŠ[
-NÂˆÛÛœİ]Y\İ[Û]Y[ĞÚ[šÜÔ™YˆH\ÙT™YŠ×JNÂˆÛÛœİ]Y\İ[Û•[Y\”™YˆH\ÙT™YŠ[
-NÂ‚ˆÛÛœİÜš\Ú\ÓYYXT™XÛÜ™\”™YˆH\ÙT™YŠ[
-NÂˆÛÛœİÜš\Ú\Ğ]Y[ĞÚ[šÜÔ™YˆH\ÙT™YŠ×JNÂˆÛÛœİÜš\Ú\Õ[Y\”™YˆH\ÙT™YŠ[
-NÂ‚ˆÛÛœİØÜš\Ú\Ô™XÛÜ™[™ËÙ]Üš\Ú\Ô™XÛÜ™[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØÜš\Ú\Ô™XÛÜ™[™Õ[YKÙ]Üš\Ú\Ô™XÛÜ™[™Õ[YWHH\ÙTİ]J
-NÂˆÛÛœİØÜš\Ú\Õ˜[œØÜšXš[™ËÙ]Üš\Ú\Õ˜[œØÜšXš[™×HH\ÙTİ]J˜[ÙJNÂˆÛÛœİØÜš\Ú\Õ›ÚXÙQ\œ›Ü‹Ù]Üš\Ú\Õ›ÚXÙQ\œ›Ü—HH\ÙTİ]JˆŠNÂˆÛÛœİØÜš\Ú\ÕØ\›š[™ËÙ]Üš\Ú\ÕØ\›š[™×HH\ÙTİ]JˆŠNÂˆÛÛœİØÜš\Ú\ĞÛÛ™š\›X][Û‹Ù]Üš\Ú\ĞÛÛ™š\›X][Û—HH\ÙTİ]JˆŠNÂˆÛÛœİØÜš\Ú\ÔÚİÒYÚš\ÚÕØ\›š[™ËÙ]Üš\Ú\ÔÚİÒYÚš\ÚÕØ\›š[™×HH\ÙTİ]J˜[ÙJNÂ‚ˆÛÛœİÜš\Ú\ÒÙ^]ÛÜ™ÈHÂˆ´at/´aô`È4`ô/4-t`4-t`´c‹ˆ´/ô/´.´/´/taô.4`´c4`H4`t/´,t/´.H‹ˆ´`t,4/4/´`ô,t.4.H‹ˆ´`t`ô.4a´.4-‹ˆ´`ô,t.4`´c4`t-t,tcÈ‹ˆ´/t-H4at/´aô`È4-´.4`´c‹ˆ´/ô`4.4aô.4/t.4`´c4`t-t,t-H4,´`4-t-‹ˆ´/ô/´`4-t-ô,4`´c‹ˆ´`´,4,t.ô-t`´.´.‹ˆ´/ô/´,´-t`t.4`´c4`tcÈ‹ˆ´/ô`4bô,ô/t`ô`´c‹ˆ´/t,4,´`4-t-4.4`´c4.´/´/4`Ët`´/ˆ‹ˆ´`ô,t.4`´c4.´/´,ô/‹t`´/ˆ‹ˆ´`ô,ô`4/´-´,4c´`ˆ‹ˆ´/4-t/tcÈ4`ô,tc4c´`ˆ‹ˆ´,ô/´.ô/´`t,4/ô`4.4.´,4-ôbô,´,4c´`ˆ‹ˆNÂ‚ˆÛÛœİ›ÛSX\HÂˆŞXÚX]š\İˆ´'ô`t.4at.4,4`´`‹ˆŞXÚÛÙÚ\İˆ´'ô`t.4at/´.ô/´,È‹ˆŞXÚİ\˜\\İˆ´'ô`t.4at/´`´-t`4,4/ô-t,´`ˆ‹ˆÛ[šXØ[ÜŞXÚÛÙÚ\İˆ´&´.ô.4/t.4aô-t`t.´.4.H4/ô`t.4at/´.ô/´,È‹ˆ™]\›ÛÙÚ\İˆ´'t-t,´`4/´.ô/´,È‹ˆİ\ˆ´%4`4`ô,ô/´-H‹ˆNÂ‚ˆ[˜İ[Ûˆ\ĞÜš\Ú\Ôš\ÚÊ˜[YJHÂˆÛÛœİİÙ\ˆH
-˜[YHˆŠKÓİÙ\Ø\ÙJ
-NÂˆ™]\›ˆÜš\Ú\ÒÙ^]ÛÜ™ËœÛÛYJ
-Ù^]ÛÜ™
-HOˆİÙ\‹š[˜ÛY\ÊÙ^]ÛÜ™
-JNÂˆB‚ˆ\Ş[˜È[˜İ[ÛˆİX›Z]Üš\Ú\Ô™\]Y\İ
-
-HÂˆÙ]Üš\Ú\ÕØ\›š[™ÊˆŠNÂˆÙ]Üš\Ú\ĞÛÛ™š\›X][ÛŠˆŠNÂ‚ˆYˆ
-\ĞÜš\Ú\Ôš\ÚÊÜš\Ú\Õ^
-H	‰ˆXÜš\Ú\ÔÚİÒYÚš\ÚÕØ\›š[™ÊHÂˆÙ]Üš\Ú\ÔÚİÒYÚš\ÚÕØ\›š[™ÊYJNÂˆÙ]Üš\Ú\ÕØ\›š[™Ê´%t`t.ô.4-t`t`´c4`4.4`t.ˆ4/ô`4.4aô.4/t.4`´c4,´`4-t-4`t-t,t-H4.4.ô.4-4`4`ô,ô/´/4`È4aô-t.ô/´,´-t.´`È8 %4-ô,´/´/t.4`´-HLLˆ4.4.ô.LÈ4.4/t-H4/´`t`´,4,´,4.t`´-t`tc4/´-4/t.ˆŠNÂˆ™]\›ÂˆB‚ˆYˆ
-XÜš\Ú\ĞÛÛXİš[J
-H	‰ˆXÜš\Ú\Õ^š[J
-JHÂˆÙ]Üš\Ú\ÕØ\›š[™Ê´'´/ô.4b4.4`´-H4`t.4`´`ô,4a´.4cˆ4.4.ô.4`ô.´,4-´.4`´-H4.´/´/t`´,4.´`ˆ4-4.ôcÈ4`t,´cô-ô.ˆ4%t`t.ô.4/´/ô,4`t/t/ˆ4/ô`4cô/4/ˆ4`t-t.taô,4`H8 %4-ô,´/´/t.4`´-HLLˆ4.4.ô.LËˆŠNÂˆ™]\›ÂˆB‚ˆÙ]Üš\Ú\ÔİX›Z][™ÊYJNÂˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KØÜš\Ú\È‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÂˆXİ[ÛˆœØ]™H‹ˆÜš\Ú\×İ^ˆÜš\Ú\Õ^ˆÛÛXİˆÜš\Ú\ĞÛÛXİˆX›X×ØÛÙNˆX›XĞÛÙH[ˆÙ\ÜÚ[Û—ÚYˆÙ\ÜÚ[Û’Y[ˆYÚÜš\Ú×Ù]XİYˆ\ĞÜš\Ú\Ôš\ÚÊÜš\Ú\Õ^
-Kˆš\Ú×ÛX\šÙ\œÎˆ\ĞÜš\Ú\Ôš\ÚÊÜš\Ú\Õ^
-HÈÜš\Ú\ÒÙ^]ÛÜ™Ë™š[\ŠÈOˆ
-Üš\Ú\Õ^ˆŠKÓİÙ\Ø\ÙJ
-Kš[˜ÛY\ÊÊJHˆ[ˆJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-]K›ÚÊHÂˆÙ]Üš\Ú\ĞÛÛ™š\›X][ÛŠ´'´,t`4,4bt-t/t.4-H4`t/´at`4,4/t-t/t/‹ˆ4%t`t.ô.4-t`t`´c4/t-t/ô/´`t`4-t-4`t`´,´-t/t/t,4cÈ4`ô,ô`4/´-ô,4-´.4-ô/t.4.4.ô.4,t-t-ô/´/ô,4`t/t/´`t`´.8 %4/t-H4-´-4.4`´-H4/´`´,´-t`´,4`t-t`4,´.4`t,4-ô,´/´/t.4`´-HLLˆ4.4.ô.LËˆŠNÂˆH[ÙHÂˆÙ]Üš\Ú\ÕØ\›š[™Ê]K™\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4`t/´at`4,4/t.4`´c4/´,t`4,4bt-t/t.4-Kˆ4%t`t.ô.4/´/ô,4`t/t/ˆ4/ô`4cô/4/ˆ4`t-t.taô,4`H8 %4-ô,´/´/t.4`´-HLLˆ4.4.ô.LËˆŠNÂˆBˆHØ]Ú
-JHÂˆÛÛœÛÛK™\œ›ÜŠœİX›Z]Üš\Ú\È\œ›Üˆ‹JNÂˆÙ]Üš\Ú\ÕØ\›š[™Ê´'t-H4`ô-4,4.ô/´`tc4`t/´at`4,4/t.4`´c4/´,t`4,4bt-t/t.4-Kˆ4%t`t.ô.4/´/ô,4`t/t/ˆ4/ô`4cô/4/ˆ4`t-t.taô,4`H8 %4-ô,´/´/t.4`´-HLLˆ4.4.ô.LËˆŠNÂˆHš[˜[HÂˆÙ]Üš\Ú\ÔİX›Z][™Ê˜[ÙJNÂˆBˆB‚ˆ[˜İ[ÛˆÛÛ[YQœ›ÛPÜš\Ú\Ê
-HÂˆÙ]Üš\Ú\ĞÛÛ™š\›X][ÛŠˆŠNÂˆÙ]Üš\Ú\ÕØ\›š[™ÊˆŠNÂ‚ˆYˆ
-Üš\Ú\Õ[Y\”™Y‹˜İ\œ™[
-HÂˆÛX\’[\˜[
-Üš\Ú\Õ[Y\”™Y‹˜İ\œ™[
-NÂˆBˆYˆ
-Üš\Ú\ÓYYXT™XÛÜ™\”™Y‹˜İ\œ™[	‰ˆÜš\Ú\Ô™XÛÜ™[™ÊHÂˆÜš\Ú\ÓYYXT™XÛÜ™\”™Y‹˜İ\œ™[œİÜ
-
-NÂˆBˆYˆ
-Üš\Ú\Õ^š[J
-JHÂˆÙ]^
-Üš\Ú\Õ^
-NÂˆÙ][ÙJ^ŠNÂˆBˆÙ]Üš\Ú\ÓÜ[Š˜[ÙJNÂˆÙ]Üš\Ú\Õ^
-ˆŠNÂˆÙ]Üš\Ú\ĞÛÛXİ
-ˆŠNÂˆÙ]Üš\Ú\Ô™XÛÜ™[™Ê˜[ÙJNÂˆÙ]Üš\Ú\Ô™XÛÜ™[™Õ[YJ
-NÂˆÙ]Üš\Ú\Õ˜[œØÜšXš[™Ê˜[ÙJNÂˆÙ]Üš\Ú\Õ›ÚXÙQ\œ›ÜŠˆŠNÂˆÙ]Üš\Ú\ÕØ\›š[™ÊˆŠNÂˆÙ]Üš\Ú\ÔÚİÒYÚš\ÚÕØ\›š[™Ê˜[ÙJNÂˆB‚ˆ[˜İ[Ûˆ[™PÜš\Ú\ĞÛÜÙJ
-HÂˆYˆ
-Üš\Ú\Õ[Y\”™Y‹˜İ\œ™[
-HÂˆÛX\’[\˜[
-Üš\Ú\Õ[Y\”™Y‹˜İ\œ™[
-NÂˆBˆYˆ
-Üš\Ú\ÓYYXT™XÛÜ™\”™Y‹˜İ\œ™[	‰ˆÜš\Ú\Ô™XÛÜ™[™ÊHÂˆÜš\Ú\ÓYYXT™XÛÜ™\”™Y‹˜İ\œ™[œİÜ
-
-NÂˆBˆÙ]Üš\Ú\ÓÜ[Š˜[ÙJNÂˆÙ]Üš\Ú\ÔİX›Z][™Ê˜[ÙJNÂˆÙ]Üš\Ú\Õ^
-ˆŠNÂˆÙ]Üš\Ú\ĞÛÛXİ
-ˆŠNÂˆÙ]Üš\Ú\Ô™XÛÜ™[™Ê˜[ÙJNÂˆÙ]Üš\Ú\Ô™XÛÜ™[™Õ[YJ
-NÂˆÙ]Üš\Ú\Õ˜[œØÜšXš[™Ê˜[ÙJNÂˆÙ]Üš\Ú\Õ›ÚXÙQ\œ›ÜŠˆŠNÂˆÙ]Üš\Ú\ÕØ\›š[™ÊˆŠNÂˆÙ]Üš\Ú\ĞÛÛ™š\›X][ÛŠˆŠNÂˆÙ]Üš\Ú\ÔÚİÒYÚš\ÚÕØ\›š[™Ê˜[ÙJNÂˆB‚ˆËÈİ\ÜØXš[™]U”[\œÂˆ\Ş[˜È[˜İ[ÛˆØYİ\ÜØXš[™]
-[\™YÛÙJHÂˆÛÛœİØ]™YHÙ]İ\ÜÙ\ÜÚ[ÛŠ
-NÂˆÛÛœİXØÙ\ÜÕÚÙ[ˆHØ]™Y˜XØÙ\ÜÕÚÙ[Â‚ˆÙ]ØXš[™]ØY[™ÊYJNÂˆÙ]ÛÛ[X][ÛÛÙQ\œ›ÜŠˆŠNÂˆÙ]\œ›ÜŠˆŠNÂˆHÂˆ]ØXš[™]]NÂˆ]Y™™Xİ]™TÙ\ÜÚ[Û’YÂˆ]Y™™Xİ]™PXØÙ\ÜÕÚÙ[Â‚ˆYˆ
-XØÙ\ÜÕÚÙ[ˆ	‰ˆØ]™YœÙ\ÜÚ[Û’Y	‰ˆJTĞ”S‘š\Ôİ\Ü[İ	‰ˆ[\™YÛÙJJHÂˆËÈØ[YH]šXÙNˆ\ÙHİÜ™YXØÙ\ÜÈÚÙ[‹‚ˆÛÛœİ›ÙHHÈXİ[Ûˆ™Ù]ØXš[™]‹Ù\ÜÚ[Û’YˆØ]™YœÙ\ÜÚ[Û’YXØÙ\Ü×İÚÙ[ˆXØÙ\ÜÕÚÙ[ˆNÂˆÛÛœİØXš[™]™\ÈH]ØZ]™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÈY]Ùˆ”ÔÕ‹XY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆK›ÙNˆ”ÓÓ‹œİš[™ÚYJ›ÙJHJNÂˆØXš[™]]HH]ØZ]ØXš[™]™\ËšœÛÛŠ
-NÂˆYˆ
-XØXš[™]™\Ë›ÚÈXØXš[™]]K›ÚÊHÂˆ›İÈ™]È\œ›ÜŠØXš[™]]K™\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4/´`´.´`4bô`´c4.´,4,t.4/t-t`ˆŠNÂˆBˆY™™Xİ]™TÙ\ÜÚ[Û’YHØXš[™]]KœÙ\ÜÚ[Û—ÚYØ]™YœÙ\ÜÚ[Û’YÂˆY™™Xİ]™PXØÙ\ÜÕÚÙ[ˆHXØÙ\ÜÕÚÙ[ÂˆH[ÙHYˆ
-[\™YÛÙJHÂˆËÈÜ›ÜÜËY]šXÙNˆ^Ú[™ÙHÛÛ[X][ÛˆÛÙH›ÜˆXØÙ\ÜÈÚÙ[‹[ˆØYØXš[™]‚ˆÛÛœİ^Ú[™ÙT™\ÈH]ØZ]™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ™^Ú[™ÙPÛÛ[X][ÛÜ™Y[X[‹[Ù[Nˆœİ\Ü‹ÛÛ[X][Û—ØÛÙNˆ[\™YÛÙHJKˆJNÂˆÛÛœİ^Ú[™ÙQ]HH]ØZ]^Ú[™ÙT™\ËšœÛÛŠ
-NÂˆYˆ
-Y^Ú[™ÙT™\Ë›ÚÈY^Ú[™ÙQ]K›ÚÊHÂˆ›İÈ™]È\œ›ÜŠ^Ú[™ÙQ]K™\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4/´`´.´`4bô`´c4`4,4-ô,ô/´,´/´`ˆ4'ô`4/´,´-t`4c4`´-H4.´/´-4/ô`4/´-4/´.ô-´-t/t.4cËˆŠNÂˆBˆY™™Xİ]™TÙ\ÜÚ[Û’YH^Ú[™ÙQ]KœÙ\ÜÚ[Û—ÚYÂˆY™™Xİ]™PXØÙ\ÜÕÚÙ[ˆH^Ú[™ÙQ]K˜XØÙ\Ü×İÚÙ[ÂˆØ]™Tİ\ÜÙ\ÜÚ[ÛŠY™™Xİ]™TÙ\ÜÚ[Û’YY™™Xİ]™PXØÙ\ÜÕÚÙ[ŠNÂˆËÈ›İÈØY[ØXš[™]Ú]Ø[]ÜÜXÚX[\İÜ™\]Y\İÂˆÛÛœİØXš[™]™\ÈH]ØZ]™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ™Ù]ØXš[™]‹Ù\ÜÚ[Û’YˆY™™Xİ]™TÙ\ÜÚ[Û’YXØÙ\Ü×İÚÙ[ˆY™™Xİ]™PXØÙ\ÜÕÚÙ[ˆJKˆJNÂˆØXš[™]]HH]ØZ]ØXš[™]™\ËšœÛÛŠ
-NÂˆYˆ
-XØXš[™]™\Ë›ÚÈXØXš[™]]K›ÚÊHÂˆËÈ˜[˜XÚÈÈ^Ú[™ÙHØXš[™]]BˆØXš[™]]HHÈ‹‹™^Ú[™ÙQ]K˜ØXš[™]ÚÎˆYKX›X×ØÛÙNˆ^Ú[™ÙQ]KœX›X×ØÛÙKÙ\ÜÚ[Û—ÚYˆ^Ú[™ÙQ]KœÙ\ÜÚ[Û—ÚYNÂˆBˆH[ÙHÂˆËÈ›ÈİÜ™YÚÙ[ˆ[™›ÈÛÙNˆÚİÈ[Ù[‚ˆÙ]Ù\ÜÚ[Û“[Ù[Ü[ŠYJNÂˆÙ]ØXš[™]ØY[™Ê˜[ÙJNÂˆ™]\›ÂˆB‚ˆÙ]İ\ÜØXš[™]
-ÂˆÙ\ÜÚ[ÛœÎˆØXš[™]]KœÙ\ÜÚ[ÛœÈ×Kˆ]\İÜ™\ÜˆØXš[™]]K›]\İÜ™\Ü[ˆX›X×ØÛÙNˆØXš[™]]KœX›X×ØÛÙHˆ‹ˆØ[]ˆØXš[™]]KØ[][ˆÜXÚX[\İˆØXš[™]]KœÜXÚX[\İ[ˆÙ\šXÙWÜ™\]Y\İÎˆØXš[™]]KœÙ\šXÙWÜ™\]Y\İÈ×KˆX]ÚÜ™\]Y\İÎˆTĞ”S‘š\Ôİ\Ü[İÈØXš[™]]K›X]ÚÜ™\]Y\İÈ×Hˆ×Kˆ[œ™XYÛY\ÜØYÙWØÛİ[ˆØXš[™]]K[œ™XYÛY\ÜØYÙWØÛİ[ˆ\Ü^WÛ˜[YNˆØXš[™]]K™\Ü^WÛ˜[YH[ˆYYXØ][Û—ØØ\™ÎˆØXš[™]]K›YYXØ][Û—ØØ\™È×KˆJNÂˆÙ]İ\Ü\Ü^S˜[YJØXš[™]]K™\Ü^WÛ˜[YH[
-NÂˆÙ]Ù\ÜÚ[Û’Y
-Y™™Xİ]™TÙ\ÜÚ[Û’Y
-NÂˆÙ]X›XĞÛÙJØXš[™]]KœX›X×ØÛÙH[\™YÛÙHØ]™YœÙ\ÜÚ[Û’Y
-NÂˆÙ]\ÙJ˜ØXš[™]ŠNÂˆÙ]İ\ÜØÜ™Y[Š˜ØXš[™]ŠNÂˆËÈÜ[Û˜[ØYÈ8 %›Û‹X›ØÚÚ[™ÂˆØYİ\ÜÚXÚÚ[œÊ
-K˜Ø]Ú
-
-
-HOˆßJNÂˆØYİ\Ü˜XİXÙ\Ê
-K˜Ø]Ú
-
-
-HOˆßJNÂˆØY]Y[[š]][ÛœÊ
-K˜Ø]Ú
-
-
-HOˆßJNÂˆËÈÛ‰İ]]Ë[ØYÚ]8 %ÚİÈœ™\ÚÛÛ\ÜÙ\‚ˆÙ]]ZXÚĞÚ]Y\ÜØYÙ\Ê×JNÂˆÙ]]ZXÚĞÚ][œ]
-ˆŠNÂˆÙ]]ZXÚĞÚ]ÚİÒ\İÜJ˜[ÙJNÂˆ™]\›ˆYNÂˆHØ]Ú
-JHÂˆÛÛœİ\ÙÈHK›Y\ÜØYÙHˆÂˆ]\Ù\“\ÙÈH´'t-H4`ô-4,4.ô/´`tc4/´`´.´`4bô`´c4.´,4,t.4/t-t`‹ˆ4'ô/´/ô`4/´,t`ô.t`´-H4-tbtdH4`4,4-ËˆÂˆYˆ
-TĞ”S‘š\Ôİ\Ü[İ	‰ˆ\ÙËš[˜ÛY\Ê´`t`´,4`4/´.H4,´-t`4`t.4.ŠJHÂˆ\Ù\“\ÙÈH\ÙÎÂˆH[ÙHYˆ
-\ÙËš[˜ÛY\Ê´.´/´-4/ô`4/´-4/´.ô-´-t/t.4cÈŠH\ÙËš[˜ÛY\Ê˜ÛÛ[X][ÛˆŠH\ÙËš[˜ÛY\ÊHŠH\ÙËš[˜ÛY\ÊÈŠJHÂˆ\Ù\“\ÙÈH´'ô`4/´,´-t`4c4`´-H4.´/´-4/ô`4/´-4/´.ô-´-t/t.4cËˆÂˆH[ÙHYˆ
-\ÙËš[˜ÛY\Ê™™]ÚŠH\ÙËš[˜ÛY\Ê“™]ÛÜšÑ\œ›ÜˆŠH\ÙËš[˜ÛY\Ê›™]ÛÜšÈŠJHÂˆ\Ù\“\ÙÈH´'t-H4`ô-4,4.ô/´`tc4`t,´cô-ô,4`´c4`tcÈ4`H4`t-t`4,´.4`t/´/ˆ4'ô/´/ô`4/´,t`ô.t`´-H4-tbtdH4`4,4-ËˆÂˆBˆÙ]ÛÛ[X][ÛÛÙQ\œ›ÜŠ\Ù\“\ÙÊNÂˆYˆ
-JTĞ”S‘š\Ôİ\Ü[İ	‰ˆ\ÙËš[˜ÛY\Ê´`t`´,4`4/´.H4,´-t`4`t.4.ŠJJHÚİÕØ\İ
-\Ù\“\ÙË™\œ›ÜˆŠNÂˆ™]\›ˆ˜[ÙNÂˆHš[˜[HÂˆÙ]ØXš[™]ØY[™Ê˜[ÙJNÂˆBˆB‚ˆ\Ş[˜È[˜İ[ÛˆØY›ÙPØXš[™]
-[\™YÛÙKÜ[ÛœÈHßJHÂˆÛÛœİ™Y™\ÛÙHHÜ[ÛœËœ™Y™\ÛÙHOOHYNÂˆÛÛœİØ]™YHÙ]›ÙTÙ\ÜÚ[ÛŠ
-NÂˆÛÛœİXØÙ\ÜÕÚÙ[ˆHØ]™Y˜XØÙ\ÜÕÚÙ[Â‚ˆÙ]›ÙPØXš[™]ØY[™ÊYJNÂˆÙ]›ÙPÛÛ[X][Û‘\œ›ÜŠˆŠNÂˆÙ]\œ›ÜŠˆŠNÂˆHÂˆ]ØXš[™]]NÂˆ]Y™™Xİ]™TÙ\ÜÚ[Û’YÂˆ]Y™™Xİ]™PXØÙ\ÜÕÚÙ[Â‚ˆËÈ[ˆ^XÚ]H\Ù\‹Y[\™YÛÛ[X][ÛˆÛÙH\È™]™\ˆÚ[[BˆËÈİ™\œšY[ˆHH™]š[İ\ÛHİÜ™YÜ™Y[X[Z\‹‚ˆYˆ
-J™Y™\ÛÙH	‰ˆ[\™YÛÙJH	‰ˆXØÙ\ÜÕÚÙ[ˆ	‰ˆØ]™YœÙ\ÜÚ[Û’Y
-HÂˆÛÛœİH™]È]J
-NÂˆÛÛœİÛY[Ù^HH	Ù™Ù][YX\Š
-_KIÔİš[™Ê™Ù][Û
-
-H
-ÈJKœYİ\
-‹ŒŠ_KIÔİš[™Ê™Ù]]J
-JKœYİ\
-‹ŒŠ_XÂˆÛÛœİ›ÙHHÈXİ[Ûˆ™Ù]›ÙPØXš[™]‹Ù\ÜÚ[Û’YˆØ]™YœÙ\ÜÚ[Û’YXØÙ\ÜÕÚÙ[‹ÛY[Ù^HNÂˆÛÛœİØXš[™]™\ÈH]ØZ]™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJ›ÙJKˆJNÂˆØXš[™]]HH]ØZ]ØXš[™]™\ËšœÛÛŠ
-NÂˆYˆ
-XØXš[™]™\Ë›ÚÈXØXš[™]]K›ÚÊHÂˆ›İÈ™]È\œ›ÜŠØXš[™]]K™\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4/´`´.´`4bô`´c4.´,4,t.4/t-t`ˆŠNÂˆBˆY™™Xİ]™TÙ\ÜÚ[Û’YHØ]™YœÙ\ÜÚ[Û’YÂˆY™™Xİ]™PXØÙ\ÜÕÚÙ[ˆHXØÙ\ÜÕÚÙ[ÂˆH[ÙHYˆ
-[\™YÛÙJHÂˆÛÛœİ^Ú[™ÙT™\ÈH]ØZ]™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ™^Ú[™ÙPÛÛ[X][ÛÜ™Y[X[‹[Ù[Nˆ˜›ÙH‹ÛÛ[X][Û—ØÛÙNˆ[\™YÛÙHJKˆJNÂˆÛÛœİ^Ú[™ÙQ]HH]ØZ]^Ú[™ÙT™\ËšœÛÛŠ
-NÂˆYˆ
-Y^Ú[™ÙT™\Ë›ÚÈY^Ú[™ÙQ]K›ÚÊHÂˆ›İÈ™]È\œ›ÜŠ^Ú[™ÙQ]K™\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4/´`´.´`4bô`´c4/ô`4/´a4.4.ôcˆ4'ô`4/´,´-t`4c4`´-H4.´/´-4/ô`4/´-4/´.ô-´-t/t.4cËˆŠNÂˆBˆY™™Xİ]™TÙ\ÜÚ[Û’YH^Ú[™ÙQ]KœÙ\ÜÚ[Û—ÚYÂˆY™™Xİ]™PXØÙ\ÜÕÚÙ[ˆH^Ú[™ÙQ]K˜XØÙ\Ü×İÚÙ[ÂˆØ]™P›ÙTÙ\ÜÚ[ÛŠY™™Xİ]™TÙ\ÜÚ[Û’YY™™Xİ]™PXØÙ\ÜÕÚÙ[ŠNÂ‚ˆÛÛœİˆH™]È]J
-NÂˆÛÛœİÛY[Ù^LˆH	Ù‹™Ù][YX\Š
-_KIÔİš[™Ê‹™Ù][Û
-
-H
-ÈJKœYİ\
-‹ŒŠ_KIÔİš[™Ê‹™Ù]]J
-JKœYİ\
-‹ŒŠ_XÂˆÛÛœİØXš[™]™\ÈH]ØZ]™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ™Ù]›ÙPØXš[™]‹Ù\ÜÚ[Û’YˆY™™Xİ]™TÙ\ÜÚ[Û’YXØÙ\ÜÕÚÙ[ˆY™™Xİ]™PXØÙ\ÜÕÚÙ[‹ÛY[Ù^NˆÛY[Ù^LˆJKˆJNÂˆØXš[™]]HH]ØZ]ØXš[™]™\ËšœÛÛŠ
-NÂˆYˆ
-XØXš[™]™\Ë›ÚÈXØXš[™]]K›ÚÊHÂˆ›İÈ™]È\œ›ÜŠØXš[™]]K™\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4-ô,4,ô`4`ô-ô.4`´c4.´,4,t.4/t-t`ˆŠNÂˆBˆH[ÙHÂˆÙ]›ÙPØXš[™]ØY[™Ê˜[ÙJNÂˆ™]\›ÂˆB‚ˆÙ]›ÙPØXš[™]]JØXš[™]]JNÂˆÙ]›ÙQX\TÙ\ÜÚ[Û’Y
-Y™™Xİ]™TÙ\ÜÚ[Û’Y
-NÂ‚ˆËÈÚXÚÈYˆÛ˜›Ø\™[™È\È™YYYˆHÂˆ]ÚÙ[ÂˆHÈÚÙ[ˆH]ØZ]Ù]ÛY[ÚÙ[Š˜›ÙH‹œÙ\ÜÚ[ÛˆŠNÈHØ]ÚßBˆÛÛœİœÈHÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆNÂˆYˆ
-ÚÙ[ŠHœÖÈ]]Üš^˜][Ûˆ—HH™X\™\ˆ	İÚÙ[ŸXÂˆÛÛœİÛ˜”™\ÈH]ØZ]™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆœËˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ™Ù]›ÙSÛ˜›Ø\™[™È‹Ù\ÜÚ[Û—ÚYˆY™™Xİ]™TÙ\ÜÚ[Û’YXØÙ\Ü×İÚÙ[ˆY™™Xİ]™PXØÙ\ÜÕÚÙ[ˆJKˆJNÂˆÛÛœİÛ˜‘]HH]ØZ]Û˜”™\ËšœÛÛŠ
-NÂˆYˆ
-Û˜‘]K›ÚÈ	‰ˆ[Û˜‘]K›Û˜›Ø\™[™ÏËš[›×ØÛÛ\]Y
-HÂˆÙ]›ÙTØÜ™Y[Š›Û˜›Ø\™[™ÈŠNÂˆH[ÙHÂˆÙ]›ÙTØÜ™Y[Š˜ØXš[™]ŠNÂˆBˆHØ]ÚÂˆÙ]›ÙTØÜ™Y[Š˜ØXš[™]ŠNÂˆBˆHØ]Ú
-JHÂˆÙ]›ÙPÛÛ[X][Û‘\œ›ÜŠK›Y\ÜØYÙH´'t-H4`ô-4,4.ô/´`tc4/´`´.´`4bô`´c4/ô`4/´a4.4.ôcˆ4'ô`4/´,´-t`4c4`´-H4.´/´-4/ô`4/´-4/´.ô-´-t/t.4cËˆŠNÂˆÚİÕØ\İ
-K›Y\ÜØYÙH´'t-H4`ô-4,4.ô/´`tc4/´`´.´`4bô`´c4/ô`4/´a4.4.ôcˆ‹™\œ›ÜˆŠNÂˆHš[˜[HÂˆÙ]›ÙPØXš[™]ØY[™Ê˜[ÙJNÂˆBˆB‚ˆ\Ş[˜È[˜İ[Ûˆ™YÙ[™\˜]Tİ\ÜÛÛ[X][ÛÛÙJ
-HÂˆÛÛœİØ]™YHÙ]İ\ÜÙ\ÜÚ[ÛŠ
-NÂˆYˆ
-\Ø]™YœÙ\ÜÚ[Û’Y\Ø]™Y˜XØÙ\ÜÕÚÙ[ŠHÂˆÚİÕØ\İ
-´'t`ô-´-t/H4.´/´-4-4/´`t`´`ô/ô,4.ˆ4`4,4-ô,ô/´,´/´`4`Ëˆ‹™\œ›ÜˆŠNÂˆ™]\›ÂˆBˆÙ]ØY[™ÊYJNÂˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆœ™YÙ[™\˜]PÛÛ[X][ÛÜ™Y[X[‹[Ù[Nˆœİ\Ü‹Ù\ÜÚ[Û—ÚYˆØ]™YœÙ\ÜÚ[Û’YXØÙ\Ü×İÚÙ[ˆØ]™Y˜XØÙ\ÜÕÚÙ[ˆJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-\™\Ë›ÚÈY]K›ÚÊHÂˆ›İÈ™]È\œ›ÜŠ]K™\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4`t/´-ô-4,4`´c4/t/´,´bô.H4.´/´-4/ô`4/´-4/´.ô-´-t/t.4cÈŠNÂˆBˆÙ]™YÙ[™\˜]YÛÙJ]K˜ÛÛ[X][Û—ØÛÙJNÂˆÙ]ÛÛ[X][ÛÛÙJ[
-NÂˆHØ]Ú
-JHÂˆÚİÕØ\İ
-K›Y\ÜØYÙH´'t-H4`ô-4,4.ô/´`tc4`t/´-ô-4,4`´c4/t/´,´bô.H4.´/´-4/ô`4/´-4/´.ô-´-t/t.4cÈ‹™\œ›ÜˆŠNÂˆHš[˜[HÂˆÙ]ØY[™Ê˜[ÙJNÂˆBˆB‚ˆ\Ş[˜È[˜İ[Ûˆ™YÙ[™\˜]P›ÙPÛÛ[X][ÛÛÙJ
-HÂˆÛÛœİØ]™YHÙ]›ÙTÙ\ÜÚ[ÛŠ
-NÂˆYˆ
-\Ø]™YœÙ\ÜÚ[Û’Y\Ø]™Y˜XØÙ\ÜÕÚÙ[ŠHÂˆ›İÈ™]È\œ›ÜŠ´'t`ô-´-t/H4.´/´-4-4/´`t`´`ô/ô,4.ˆ4/ô`4/´a4.4.ôc‹ˆŠNÂˆBˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆœ™YÙ[™\˜]PÛÛ[X][ÛÜ™Y[X[‹[Ù[Nˆ˜›ÙH‹Ù\ÜÚ[Û—ÚYˆØ]™YœÙ\ÜÚ[Û’YXØÙ\Ü×İÚÙ[ˆØ]™Y˜XØÙ\ÜÕÚÙ[ˆJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-\™\Ë›ÚÈY]K›ÚÊHÂˆ›İÈ™]È\œ›ÜŠ]K™\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4`t/´-ô-4,4`´c4/t/´,´bô.H4.´/´-4/ô`4/´-4/´.ô-´-t/t.4cÈŠNÂˆBˆ™]\›ˆ]K˜ÛÛ[X][Û—ØÛÙNÂˆB‚ˆ\Ş[˜È[˜İ[ÛˆÜ[”İ\Ü™\Ü
-\™Ù]Ù\ÜÚ[Û’Y
-HÂˆÛÛœİØ]™YHÙ]İ\ÜÙ\ÜÚ[ÛŠ
-NÂˆYˆ
-\Ø]™YœÙ\ÜÚ[Û’Y\Ø]™Y˜XØÙ\ÜÕÚÙ[ŠHÂˆÚİÕØ\İ
-´'t`ô-´-t/H4.´/´-4-4/´`t`´`ô/ô,4.ˆ4`4,4-ô,ô/´,´/´`4`Ëˆ‹™\œ›ÜˆŠNÂˆ™]\›ÂˆBˆÛÛœİÚYH\™Ù]Ù\ÜÚ[Û’YØ]™YœÙ\ÜÚ[Û’YÂˆÙ]ØY[™ÊYJNÂˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ™Ù]™\Ü‹Ù\ÜÚ[Û’YˆÚYXØÙ\Ü×İÚÙ[ˆØ]™Y˜XØÙ\ÜÕÚÙ[ˆJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-\™\Ë›ÚÈY]K›ÚÊHÂˆ›İÈ™]È\œ›ÜŠ]K™\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4/´`´.´`4bô`´c4/´`´aôdt`ˆŠNÂˆBˆÛÛœİÈH]KœÙ\ÜÚ[ÛÂˆÙ]Ù\ÜÚ[Û’Y
-ËœÙ\ÜÚ[Û’YËœÙ\ÜÚ[Û—ÚY
-NÂˆÙ]X›XĞÛÙJËœX›XĞÛÙHËœX›X×ØÛÙJNÂˆÙ]^
-Ëœ]Y[Ú[œ]Ëœ]Y[İ^ˆŠNÂˆÙ]ÛÛ™\œØ][Û’\İÜJË˜ÛÛ™\œØ][Û’\İÜHË˜ÛÛ™\œØ][Û—Ú\İÜH×JNÂˆÙ]X[ÙÑ\
-Ë™X[ÙÑ\
-NÂˆÙ]™]š[İ\Ô]Y[™\Ü
-Ëœ™]š[İ\Ô]Y[™\ÜË\Ù\—Ü™\ÜˆŠNÂˆÙ]™]š[İ\ÑØİÜ”™\Ü
-ˆŠNÂˆÙ]ÛYU\ÚÜÊËšÛYU\ÚÜÈˆŠNÂˆÙ]™\Ûİ\˜ÙQ˜XİÜœÊËœ™\Ûİ\˜ÙQ˜XİÜœÈˆŠNÂˆËÈÛY[\ØY™NˆÛ›H\Ù\—Ü™\Ü›ÈØİÜ—Ü™\ÜˆÙ]™\İ[
-Ë\Ù\—Ü™\ÜˆŠNÂˆÙ]™\ÜÛİ\˜ÙJ˜ØXš[™]ŠNÂˆÙ]\İš[š\ÚYÙ\ÜÚ[ÛŠ˜[ÙJNÂˆYˆ
-İ\ÜØXš[™]ËØ[]
-HÂˆÙ]\ØYÙP˜[[˜ÙJÈ‹‹œİ\ÜØXš[™]Ø[][Ù[Nˆœİ\ÜˆJNÂˆBˆÙ]Xİ]™UXŠ\Ù\ˆŠNÂˆÙ]\ÙJœ™\ÜŠNÂˆÙ]İ\ÜØÜ™Y[Šœ™\ÜŠNÂˆHØ]Ú
-JHÂˆÚİÕØ\İ
-K›Y\ÜØYÙH´'t-H4`ô-4,4.ô/´`tc4/´`´.´`4bô`´c4/´`´aôdt`ˆ‹™\œ›ÜˆŠNÂˆHš[˜[HÂˆÙ]ØY[™Ê˜[ÙJNÂˆBˆB‚ˆ[˜İ[Ûˆİ\İ\Ü›ÛİÕ\
-
-HÂˆÛÛœİØ]™YHÙ]İ\ÜÙ\ÜÚ[ÛŠ
-NÂˆYˆ
-\Ø]™YœÙ\ÜÚ[Û’Y\Ø]™Y˜XØÙ\ÜÕÚÙ[ŠHÂˆÚİÕØ\İ
-´'t`ô-´-t/H4.´/´-4-4/´`t`´`ô/ô,4.ˆ4`4,4-ô,ô/´,´/´`4`Ëˆ‹™\œ›ÜˆŠNÂˆ™]\›ÂˆBˆÛÛœİ]\İHİ\ÜØXš[™]ËœÙ\ÜÚ[ÛœÏË–ÌNÂˆÛÛœİ]\İ™\ÜHİ\ÜØXš[™]Ë›]\İÜ™\ÜßNÂˆÙ]Ù\ÜÚ[Û’Y
-Ø]™YœÙ\ÜÚ[Û’Y
-NÂˆÙ]X›XĞÛÙJ]\İËœX›XĞÛÙHİ\ÜØXš[™]ËœX›X×ØÛÙHØ]™YœÙ\ÜÚ[Û’Y
-NÂˆYˆ
-TĞ”S‘š\Ôİ\Ü[İ	‰ˆ]\İ™\Ü˜Üš\Ú\Ğ›ØÚÏËœİ]\ÈOOHœØY™]WØÚXÚ×Ú[—Ü›ÙÜ™\ÜÈŠHÂˆÛÛœİØY™]T]Y\İ[ÛœÈH]\İ™\Ü˜Üš\Ú\Ğ›ØÚËœ]Y\İ[ÛœÈÂˆ´$´bÈ4`t-t.taô,4`H4,ˆ4,t-t-ô/´/ô,4`t/t/´`t`´.È4%t`t`´c4.ô.4`4.4`t.‹4aô`´/ˆ4,´bÈ4/ô`4.4aô.4/t.4`´-H4`t-t,t-H4,´`4-t-4,ˆ4,t.ô.4-´,4.tb4-t-H4,´`4-t/4cÏÈ‹ˆ´%t`t`´c4.ô.4`È4,´,4`H4`t-t.taô,4`H4/t,4/4-t`4-t/t.4-H4.4.ô.4.´/´/t.´`4-t`´/tbô.H4/ô.ô,4/H4/ô`4.4aô.4/t.4`´c4`t-t,t-H4,´`4-t-È‹ˆ´$´bÈ4`t-t.taô,4`H4/´-4.4/Kô/´-4/t,È4&´`´/ˆ4/4/´-´-t`ˆ4/ô/´,tbô`´c4`4cô-4/´/4.4.ô.4/ô/´,ô/´,´/´`4.4`´c4`H4,´,4/4.È‹ˆ´&´/´/4`È4,´bÈ4/4/´-´-t`´-H4/ô/´-ô,´/´/t.4`´c4.4.ô.4/t,4/ô.4`t,4`´c4/ô`4cô/4/ˆ4`t-t.taô,4`OÈ‹ˆNÂˆÙ]^
-]\İ™\Ü˜Üš\Ú\Ğ›ØÚËš[š]X[ÛY\ÜØYÙH]\İËœİ[[X\HˆŠNÂˆÙ]\ĞÛÛ[X][ÛŠ˜[ÙJNÂˆÙ]™]š[İ\Ô]Y[™\Ü
-ˆŠNÂˆÙ]™]š[İ\ÑØİÜ”™\Ü
-ˆŠNÂˆÙ]ÛÛ™\œØ][Û’\İÜJŞÈ›ÛNˆ˜\ÜÚ\İ[‹]Y\İ[ÛœÎˆØY™]T]Y\İ[ÛœÈWJNÂˆÙ]X[ÙÑ\
-JNÂˆÙ][œİÙ\œÊßJNÂˆÙ]]Y\İ[ÛœÊØY™]T]Y\İ[ÛœÊNÂˆÙ]™\İ[
-[
-NÂˆÙ]Üš\Ú\Ó[ÙJYJNÂˆÙ]Üš\Ú\Ğ›ØÚÊ]\İ™\Ü˜Üš\Ú\Ğ›ØÚÊNÂˆÙ]\ÙJœ]Y\İ[ÛœÈŠNÂˆÙ]İ\ÜØÜ™Y[Šœ]Y\İ[ÛœÈŠNÂˆ™]\›ÂˆBˆÙ]\ĞÛÛ[X][ÛŠYJNÂˆÙ]™]š[İ\Ô]Y[™\Ü
-]\İ™\Ü\Ù\—Ü™\ÜˆŠNÂˆÙ]™]š[İ\ÑØİÜ”™\Ü
-ˆŠNÂˆÙ]ÛYU\ÚÜÊ]\İ™\ÜšÛYU\ÚÜÈˆŠNÂˆÙ]™\Ûİ\˜ÙQ˜XİÜœÊ]\İ™\Üœ™\Ûİ\˜ÙQ˜XİÜœÈˆŠNÂˆÙ]İ\Ü[Š]\İ™\Üœİ\Ü[ˆ[
-NÂˆÙ]ÛÛ™\œØ][Û’\İÜJ×JNÂˆÙ]X[ÙÑ\
-
-NÂˆÙ][œİÙ\œÊßJNÂˆÙ]]Y\İ[ÛœÊ[
-NÂˆÙ]™\İ[
-[
-NÂˆÙ]Üš\Ú\Ó[ÙJ˜[ÙJNÂˆÙ]Üš\Ú\Ğ›ØÚÊ[
-NÂˆÙ]›ÛİÕ\[œİÙ\œÊßJNÂˆÙ]\ÙJ™›Ûİİ\ŠNÂˆÙ]İ\ÜØÜ™Y[Š™›Ûİİ\ŠNÂˆØYİ\Ü˜XİXÙ\Ê
-NÂˆB‚ˆ\Ş[˜È[˜İ[ÛˆİX›Z]›ÛİÕ\
-
-HÂˆÛÛœİØ]™YHÙ]İ\ÜÙ\ÜÚ[ÛŠ
-NÂˆYˆ
-\Ø]™YœÙ\ÜÚ[Û’Y\Ø]™Y˜XØÙ\ÜÕÚÙ[ŠHÂˆÚİÕØ\İ
-´'t`ô-´-t/H4.´/´-4-4/´`t`´`ô/ô,4.ˆ4`4,4-ô,ô/´,´/´`4`Ëˆ‹™\œ›ÜˆŠNÂˆ™]\›ÂˆBˆÛÛœİ[œİÙ\œÈH›ÛİÕ\[œİÙ\œÎÂˆÛÛœİ\ÔİXİ\™YH[œİÙ\œË™[˜[ZXÜÏËš[J
-H[œİÙ\œË›™]×ØÛÛ˜Ù\›œÏËš[J
-H[œİÙ\œËšYYËš[J
-NÂˆÛÛœİ\Ñœ™YU^H[œİÙ\œË™œ™YWİ^Ëš[J
-NÂˆYˆ
-Z\ÔİXİ\™Y	‰ˆZ\Ñœ™YU^
-HÂˆÚİÕØ\İ
-´%ô,4/ô/´.ô/t.4`´-H4at/´`´cÈ4,tbÈ4/´-4/t/ˆ4/ô/´.ô-H4.4.ô.4/t,4/ô.4b4.4`´-H4`t,´/´,t/´-4/tbô.H4`´-t.´`t`‹ˆ‹™\œ›ÜˆŠNÂˆ™]\›ÂˆB‚ˆÙ]ØY[™ÊYJNÂˆÙ]\œ›ÜŠˆŠNÂˆHÂˆËÈÜ™X]HH™]ÈÙ\ÜÚ[Ûˆ›ÜˆH›ÛİË]\[šÙYÈHØ[YHİÛ™\‹İØ[]ˆÛÛœİÜ™X]T™\ÈH]ØZ]™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÂˆXİ[Ûˆ˜Ü™X]Q›ÛİÕ\Ù\ÜÚ[Ûˆ‹ˆ™]š[İ\ÔÙ\ÜÚ[Û’YˆØ]™YœÙ\ÜÚ[Û’YˆXØÙ\Ü×İÚÙ[ˆØ]™Y˜XØÙ\ÜÕÚÙ[‹ˆJKˆJNÂˆÛÛœİÜ™X]Q]HH]ØZ]Ü™X]T™\ËšœÛÛŠ
-NÂˆYˆ
-XÜ™X]T™\Ë›ÚÈXÜ™X]Q]K›ÚÊHÂˆ›İÈ™]È\œ›ÜŠÜ™X]Q]K™\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4/t,4aô,4`´c4/ô`4/´-4/´.ô-´-t/t.4-HŠNÂˆB‚ˆØ]™Tİ\ÜÙ\ÜÚ[ÛŠÜ™X]Q]KœÙ\ÜÚ[Û’YÜ™X]Q]K˜XØÙ\Ü×İÚÙ[ŠNÂˆÙ]Ù\ÜÚ[Û’Y
-Ü™X]Q]KœÙ\ÜÚ[Û’Y
-NÂˆÙ]X›XĞÛÙJÜ™X]Q]KœX›X×ØÛÙJNÂˆÙ\ÜÚ[Û”™Y‹˜İ\œ™[HÈÙ\ÜÚ[Û’YˆÜ™X]Q]KœÙ\ÜÚ[Û’YXØÙ\ÜÕÚÙ[ˆÜ™X]Q]K˜XØÙ\Ü×İÚÙ[ˆNÂ‚ˆÛÛœİ›ÛİÕ\\ÈH×NÂˆYˆ
-[œİÙ\œË™[˜[ZXÜÏËš[J
-JH›ÛİÕ\\Ëœ\Ú
-4(t`´,4.ô/ˆ4.ô-t,ôaô-K4`´cô-´-t.ô-t-H4.4.ô.4/ô`4.4/4-t`4/t/ˆ4`´,4.ˆ4-´-Nˆ	Ø[œİÙ\œË™[˜[ZXÜßX
-NÂˆYˆ
-[œİÙ\œË›™]×ØÛÛ˜Ù\›œÏËš[J
-JH›ÛİÕ\\Ëœ\Ú
-4'ô/´cô,´.4.ô/´`tc4.ô.4aô`´/‹t`´/ˆ4/t/´,´/´-K4aô`´/ˆ4/´`t/´,t-t/t/t/ˆ4,t-t`t/ô/´.´/´.4`ˆ	Ø[œİÙ\œË›™]×ØÛÛ˜Ù\›œßX
-NÂˆYˆ
-[œİÙ\œËšYYËš[J
-JH›ÛİÕ\\Ëœ\Ú
-4)ô`´/ˆ4.4-È4/ô`4-t-4.ô/´-´-t/t/t/´,ô/ˆ4`4,4/tc4b4-H4`ô-4,4.ô/´`tc4/ô/´/ô`4/´,t/´,´,4`´cˆ	Ø[œİÙ\œËšYYX
-NÂˆYˆ
-[œİÙ\œË™œ™YWİ^Ëš[J
-JH›ÛİÕ\\Ëœ\Ú
-4%4/´/ô/´.ô/t.4`´-t.ôc4/t/ˆ4/´`ˆ4/ô/´.ôc4-ô/´,´,4`´-t.ôcÎ—‰Ø[œİÙ\œË™œ™YWİ^X
-NÂ‚ˆËÈY˜XİXÙHÛÛ^›ÜˆRBˆYˆ
-İ\Ü˜XİXÙ\Ë›[™İˆ
-HÂˆÛÛœİ˜XİXÙPÛÛ^Hİ\Ü˜XİXÙ\Âˆ™š[\ŠOˆœİ]\ÈOOH˜Xİ]™HŠBˆ›X\
-OˆH	Ü]_H
-4`t`´,4`´`ô`Nˆ	Ü\Ù\—Üİ]\ÈOOHš[YˆÈ´/ô/´/4/´,ô.ô/ˆˆˆ\Ù\—Üİ]\ÈOOH››İÚ[[ˆÈ´/t-H4/ô/´-4/´b4.ô/ˆˆˆ\Ù\—Üİ]\ÈOOHšYYˆÈ´/ô`4/´,t/´,´,4.Èˆˆ´/t-H4/ô`4/´,t/´,´,4.ÈŸJX
-Bˆš›Ú[Š—ˆŠNÂˆYˆ
-˜XİXÙPÛÛ^
-HÂˆ›ÛİÕ\\Ëœ\Ú
-4(4,4/t-t-H4`4-t.´/´/4-t/t-4/´,´,4/t/tbô-H4/ô`4,4.´`´.4.´.—‰Ü˜XİXÙPÛÛ^X
-NÂˆBˆB‚ˆÛÛœİ›ÛİÕ\^H›ÛİÕ\\Ëš›Ú[Š——ˆŠNÂ‚ˆËÈZ[İXİ\™Y[œİÙ\™YÜXÜÈ›ÜˆRHY\ˆÛÛœİ[œİÙ\™YÜXÜÈHßNÂˆYˆ
-[œİÙ\œË™[˜[ZXÜÏËš[J
-JH[œİÙ\™YÜXÜË›İ™\˜[ØÚ[™ÙHH[œİÙ\œË™[˜[ZXÜËš[J
-NÂˆYˆ
-[œİÙ\œË›™]×ØÛÛ˜Ù\›œÏËš[J
-JH[œİÙ\™YÜXÜË›™]×ØÛÛ˜Ù\›œÈH[œİÙ\œË›™]×ØÛÛ˜Ù\›œËš[J
-NÂˆYˆ
-[œİÙ\œËšYYËš[J
-JH[œİÙ\™YÜXÜËšYYÜ˜XİXÙ\ÈH[œİÙ\œËšYYš[J
-NÂˆYˆ
-[œİÙ\œË™œ™YWİ^Ëš[J
-JH[œİÙ\™YÜXÜË™œ™YWİ^H[œİÙ\œË™œ™YWİ^š[J
-NÂˆËÈY˜XİXÙHİ]\Ù\ÂˆYˆ
-İ\Ü˜XİXÙ\Ë›[™İˆ
-HÂˆ[œİÙ\™YÜXÜËœ˜XİXÙWÜİ]\Ù\ÈHİ\Ü˜XİXÙ\Âˆ™š[\ŠOˆœİ]\ÈOOH˜Xİ]™HŠBˆ›X\
-Oˆ
-È]Nˆ]Kİ]\Îˆ\Ù\—Üİ]\ÈJJNÂˆBˆÙ]›Ûİİ\[œİÙ\™YÜXÜÊ[œİÙ\™YÜXÜÊNÂ‚ˆÙ]^
-›ÛİÕ\^
-NÂˆÙ]ÛÛ™\œØ][Û’\İÜJ×JNÂˆÙ]X[ÙÑ\
-
-NÂˆÙ][œİÙ\œÊßJNÂˆÙ]]Y\İ[ÛœÊ[
-NÂˆÙ]™\İ[
-[
-NÂˆÙ]™\ÜÛİ\˜ÙJ™Ù[™\˜]YŠNÂˆÙ]\İš[š\ÚYÙ\ÜÚ[ÛŠ˜[ÙJNÂ‚ˆËÈÛÛ[YHšXH^\İ[™È[˜[^™H›İÂˆ]ØZ]İX›Z]›İ[™
-›ÛİÕ\^
-NÂˆHØ]Ú
-JHÂˆÚİÕØ\İ
-K›Y\ÜØYÙH´'t-H4`ô-4,4.ô/´`tc4/t,4aô,4`´c4/ô`4/´-4/´.ô-´-t/t.4-H‹™\œ›ÜˆŠNÂˆHš[˜[HÂˆÙ]ØY[™Ê˜[ÙJNÂˆBˆB‚ˆËÈÜ[ˆHÜXÚYšXÈÙ\ÜÚ[Ûˆœ›ÛHØXš[™]
-Ù\ÜÚ[Û—İšY]ÊBˆ\Ş[˜È[˜İ[ÛˆÜ[”İ\ÜÙ\ÜÚ[Û•šY]Ê\™Ù]Ù\ÜÚ[Û’Y
-HÂˆÛÛœİØ]™YHÙ]İ\ÜÙ\ÜÚ[ÛŠ
-NÂˆYˆ
-\Ø]™YœÙ\ÜÚ[Û’Y\Ø]™Y˜XØÙ\ÜÕÚÙ[ŠHÂˆÚİÕØ\İ
-´'t`ô-´-t/H4.´/´-4-4/´`t`´`ô/ô,4.ˆ4`4,4-ô,ô/´,´/´`4`Ëˆ‹™\œ›ÜˆŠNÂˆ™]\›ÂˆBˆÙ]İ\ÜÙ\ÜÚ[Û“ØY[™ÊYJNÂˆHÂˆÛÛœİ™\ÈH]ØZ]™]Ú
-‹Ø\KÜÙ\ÜÚ[Ûˆ‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÈÛÛ[U\Hˆ˜\XØ][Û‹ÚœÛÛˆˆKˆ›ÙNˆ”ÓÓ‹œİš[™ÚYJÈXİ[Ûˆ™Ù]™\Ü‹Ù\ÜÚ[Û’Yˆ\™Ù]Ù\ÜÚ[Û’YXØÙ\Ü×İÚÙ[ˆØ]™Y˜XØÙ\ÜÕÚÙ[ˆJKˆJNÂˆÛÛœİ]HH]ØZ]™\ËšœÛÛŠ
-NÂˆYˆ
-\™\Ë›ÚÈY]K›ÚÊHÂˆ›İÈ™]È\œ›ÜŠ]K™\œ›Üˆ´'t-H4`ô-4,4.ô/´`tc4/´`´.´`4bô`´c4`t-t`t`t.4cˆŠNÂˆBˆÙ]İ\ÜšY]Ú[™ÔÙ\ÜÚ[ÛŠ\™Ù]Ù\ÜÚ[Û’Y
-NÂˆÙ]İ\ÜšY]Ú[™ÔÙ\ÜÚ[Û‘]J]KœÙ\ÜÚ[ÛŠNÂˆÙ]\ÙJœÙ\ÜÚ[Û—İšY]ÈŠNÂˆÙ]İ\ÜØÜ™Y[ŠœÙ\ÜÚ[Û—İšY]ÈŠNÂˆHØ]Ú
-JHÂˆÚİÕØ\İ
-K›Y\ÜØYÙH´'t-H4`ô-4,4.ô/´`tc4/´`´.´`4bô`´c4`t-t`t`t.4cˆ‹™\œ›ÜˆŠNÂˆHš[˜[HÂˆÙ]İ\ÜÙ\ÜÚ[Û“ØY[™Ê˜[ÙJNÂˆBˆB‚ˆËÈİX›Z]H™]Èİ\ÜÙ\šXÙH™\]Y\İˆ[˜İ[ÛˆÜ[”İ\Ü™\]Y\İ›Ü”Ù\ÜÚ[ÛŠ\™Ù]Ù\ÜÚ[Û’YHÙ\ÜÚ[Û’Y
-HÂˆÙ]İ\Ü™\]Y\İÙ\ÜÚ[Û’Y
-\™Ù]Ù\ÜÚ[Û’Y[
-NÂˆ5÷~÷êÚ$z{-®éÜj×              })}
+                    return (
+                      <div style={{ marginTop: 16 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>Ğ”Ğ¸Ğ½Ğ°Ğ¼Ğ¸ĞºĞ° ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ñ</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+                          {/* Wellbeing chart */}
+                          <div style={{ background: "#fff", border: "1px solid rgba(46,42,37,.08)", borderRadius: 12, padding: 12 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: "#5F7D6C", marginBottom: 8 }}>ĞĞ±Ñ‰ĞµĞµ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ</div>
+                            <svg viewBox={`0 0 ${chartW} ${chartH}`} width="100%" height={chartH}>
+                              <line x1={padX} y1={zeroY} x2={chartW - padX} y2={zeroY} stroke="#E2E0DB" strokeWidth="1" strokeDasharray="4" />
+                              <text x={4} y={zeroY + 4} fontSize="9" fill="#8a7e72">0</text>
+                              <text x={4} y={padY + 4} fontSize="9" fill="#8a7e72">+5</text>
+                              <text x={4} y={chartH - padY + 4} fontSize="9" fill="#8a7e72">-5</text>
+                              <polyline fill="none" stroke="#7D9A89" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={wbPoints} />
+                              {chartData.map((d, i) => {
+                                const x = padX + (i / (chartData.length - 1)) * (chartW - padX * 2);
+                                const y = padY + ((5 - d.wellbeing_score) / 10) * (chartH - padY * 2);
+                                return <circle key={i} cx={x} cy={y} r="3" fill="#7D9A89" />;
+                              })}
                             </svg>
                           </div>
                           {/* Anxiety chart */}
