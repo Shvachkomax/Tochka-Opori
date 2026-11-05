@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 // Vercel's project-level brand flags must not change this synthetic unit test.
-for (const key of ['VITE_APP_BRAND', 'SUPPORT_ONLY', 'ANMED_SUPPORT_ONLY', 'PILOT_ID', 'SITE_URL', 'VERCEL_PROJECT_ID']) {
+for (const key of ['VITE_APP_BRAND', 'SUPPORT_ONLY', 'ANMED_SUPPORT_ONLY', 'PILOT_ID', 'SITE_URL', 'VERCEL_ENV', 'VERCEL_PROJECT_ID']) {
   delete process.env[key];
 }
 process.env.CLIENT_API_SIGNING_SECRET = 'test-only-live-key';
