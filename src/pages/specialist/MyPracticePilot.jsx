@@ -4,6 +4,8 @@ import {
   filterOffers, addDaysUTC, busyBlocksForWeek, canPublishBookingLink, rubles,
 } from "../../../lib/my-practice/pilot-data.js";
 import "./MyPracticePilot.css";
+import MyPracticeCatalogEditor from "./MyPracticeCatalogEditor.jsx";
+import {initialDraftCatalog,restoreDraftCatalog,countActiveOffers,DRAFT_STORAGE_KEY} from "../../../lib/my-practice/catalog-draft.js";
 
 // Чистый визуальный прототип. Никаких запросов к API, личных или медицинских данных.
 const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -11,6 +13,7 @@ const TABS = [
   { id: "overview", label: "Обзор" },
   { id: "services", label: "Услуги" },
   { id: "calendar", label: "Занятость" },
+  { id: "manage", label: "Управление" },
 ];
 const formatDay = day => new Intl.DateTimeFormat("ru-RU", {
   day:"numeric", month:"short", timeZone:"UTC",
@@ -23,7 +26,7 @@ function ClinicCard({ clinic, onServices }) {
       <div>
         <h4>{clinic.name}</h4>
         <p>{clinic.address}</p>
-        <p className="mp-muted">Юридический исполнитель — клиника · {clinic.offers.length} услуги</p>
+        <p className="mp-muted">Юридический исполнитель — клиника · {clinic.offers.filter(o=>o.status!=="archived").length} услуги</p>
         <button type="button" onClick={() => onServices(clinic.id)} className="mp-text-btn">Посмотреть услуги</button>
       </div>
     </article>
@@ -96,13 +99,28 @@ function Calendar({ monday, setMonday, clinic, setClinic }) {
 
 export default function MyPracticePilot() {
   const [tab,setTab] = useState("overview");
+  const [catalog,setCatalog] = useState(() => {
+    try {return restoreDraftCatalog(sessionStorage.getItem(DRAFT_STORAGE_KEY));}
+    catch {return initialDraftCatalog();}
+  });
+  const [dirty,setDirty] = useState(false);
+  const [storageMessage,setStorageMessage] = useState("");
+  const changeCatalog = next => { setCatalog(next); setDirty(true); setStorageMessage(""); };
+  const saveDraft = () => {
+    try { sessionStorage.setItem(DRAFT_STORAGE_KEY,JSON.stringify(catalog)); setDirty(false); setStorageMessage("Тестовый черновик сохранён только в этом браузере."); }
+    catch { setStorageMessage("Браузер не разрешил локальное сохранение. Черновик остаётся только на экране."); }
+  };
+  const resetDraft = () => {
+    try {sessionStorage.removeItem(DRAFT_STORAGE_KEY);} catch {}
+    setCatalog(initialDraftCatalog());setDirty(false);setStorageMessage("Исходные демоданные восстановлены.");
+  };
   const [clinicFilter,setClinicFilter] = useState("all");
   const [formatFilter,setFormatFilter] = useState("all");
   const [calendarClinic,setCalendarClinic] = useState("all");
   const [monday,setMonday] = useState("2026-11-09");
   const offers = useMemo(
-    () => filterOffers(DEMO_CLINICS, {clinicId:clinicFilter,format:formatFilter}),
-    [clinicFilter,formatFilter]
+    () => filterOffers(catalog, {clinicId:clinicFilter,format:formatFilter}),
+    [catalog,clinicFilter,formatFilter]
   );
   const switchToClinic = id => { setClinicFilter(id); setTab("services"); };
   return <section className="my-practice-pilot" data-testid="my-practice-pilot" aria-labelledby="my-practice-title">
@@ -128,7 +146,7 @@ export default function MyPracticePilot() {
     </div>
     <div className="mp-stats" aria-label="Показатели учебной практики">
       <div><strong>{DEMO_CLINICS.length}</strong><span>места приёма</span></div>
-      <div><strong>{filterOffers(DEMO_CLINICS).length}</strong><span>услуг в каталоге</span></div>
+      <div><strong>{countActiveOffers(catalog)}</strong><span>услуг в каталоге</span></div>
       <div><strong>{DEMO_BUSY_BLOCKS.length}</strong><span>блоков занятости</span></div>
     </div>
     <div className="mp-tabs" role="tablist" aria-label="Разделы моей практики">
@@ -138,7 +156,7 @@ export default function MyPracticePilot() {
     </div>
     {tab==="overview" && <div role="tabpanel" id="mp-panel-overview" aria-labelledby="mp-tab-overview">
       <div className="mp-section-title"><h3>Места приёма</h3><p>Каждая клиника остаётся самостоятельным исполнителем медицинских услуг.</p></div>
-      <div className="mp-two-col">{DEMO_CLINICS.map(c=><ClinicCard clinic={c} key={c.id} onServices={switchToClinic}/>)}</div>
+      <div className="mp-two-col">{catalog.map(c=><ClinicCard clinic={c} key={c.id} onServices={switchToClinic}/>)}</div>
       <div className="mp-next">
         <h4>Как подключить врача</h4>
         <p>Согласование с клиниками → проверка услуг и цен → запись через канал клиники → календарь реальной занятости.</p>
@@ -150,7 +168,7 @@ export default function MyPracticePilot() {
       <div className="mp-filters">
         <label className="mp-field">Клиника<select value={clinicFilter} onChange={e=>setClinicFilter(e.target.value)}>
           <option value="all">Все клиники</option>
-          {DEMO_CLINICS.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          {catalog.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select></label>
         <label className="mp-field">Формат<select value={formatFilter} onChange={e=>setFormatFilter(e.target.value)}>
           <option value="all">Все форматы</option><option value="offline">Очный приём</option>
@@ -160,6 +178,9 @@ export default function MyPracticePilot() {
       <div className="mp-two-col">{offers.map(o=><OfferCard key={o.id} offer={o}/>)}</div>
       {!offers.length && <p className="mp-muted">По этим условиям учебных услуг нет.</p>}
       <p className="mp-footnote">* Дистанционные медицинские услуги возможны только при соблюдении закона, правил и лицензии клиники. Это не публичная оферта.</p>
+    </div>}
+    {tab==="manage" && <div role="tabpanel" id="mp-panel-manage" aria-labelledby="mp-tab-manage">
+      <MyPracticeCatalogEditor catalog={catalog} onChange={changeCatalog} onSave={saveDraft} onReset={resetDraft} dirty={dirty} storageMessage={storageMessage}/>
     </div>}
     {tab==="calendar" && <div role="tabpanel" id="mp-panel-calendar" aria-labelledby="mp-tab-calendar">
       <div className="mp-section-title"><h3>Общая занятость</h3><p>Без фамилий пациентов, диагнозов и медицинских сведений.</p></div>
