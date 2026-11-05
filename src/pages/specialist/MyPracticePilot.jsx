@@ -4,6 +4,8 @@ import {
   filterOffers, addDaysUTC, busyBlocksForWeek, canPublishBookingLink, rubles,
 } from "../../../lib/my-practice/pilot-data.js";
 import "./MyPracticePilot.css";
+import "./MyPracticeBusinessPilot.css";
+import { MyPracticeFinancialDemo, MyPracticePatientConnectionDemo } from "./MyPracticeBusinessPilot.jsx";
 import MyPracticeCatalogEditor from "./MyPracticeCatalogEditor.jsx";
 import {initialDraftCatalog,restoreDraftCatalog,countActiveOffers,DRAFT_STORAGE_KEY,updateDraftOffer} from "../../../lib/my-practice/catalog-draft.js";
 
@@ -14,6 +16,8 @@ const TABS = [
   { id: "services", label: "Услуги" },
   { id: "calendar", label: "Занятость" },
   { id: "manage", label: "Управление" },
+  { id: "finance", label: "Финансы" },
+  { id: "patients", label: "Пациенты" },
 ];
 const formatDay = day => new Intl.DateTimeFormat("ru-RU", {
   day:"numeric", month:"short", timeZone:"UTC",
@@ -258,6 +262,12 @@ export default function MyPracticePilot() {
     </div>}
     {tab==="manage" && <div role="tabpanel" id="mp-panel-manage" aria-labelledby="mp-tab-manage">
       <MyPracticeCatalogEditor catalog={catalog} onChange={changeCatalog} onSave={saveDraft} onReset={resetDraft} dirty={dirty} storageMessage={storageMessage}/>
+    </div>}
+    {tab==="finance" && <div role="tabpanel" id="mp-panel-finance" aria-labelledby="mp-tab-finance">
+      <MyPracticeFinancialDemo catalog={catalog}/>
+    </div>}
+    {tab==="patients" && <div role="tabpanel" id="mp-panel-patients" aria-labelledby="mp-tab-patients">
+      <MyPracticePatientConnectionDemo/>
     </div>}
     {tab==="calendar" && <div role="tabpanel" id="mp-panel-calendar" aria-labelledby="mp-tab-calendar">
       <div className="mp-section-title"><h3>Общая занятость</h3><p>Без фамилий пациентов, диагнозов и медицинских сведений.</p></div>

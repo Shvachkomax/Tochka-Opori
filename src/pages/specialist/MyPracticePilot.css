@@ -80,3 +80,7 @@
 .mp-services-save span{font-size:12px;color:#637267}
 .mp-services-save .mp-primary:disabled{opacity:.48;cursor:not-allowed}
 @media(max-width:460px){.mp-inline-editor-grid{grid-template-columns:1fr}.mp-inline-editor-actions button{flex:1}}
+
+/* Доступность шести разделов на мобильном экране */
+.mp-tabs{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.mp-tab{white-space:nowrap;flex:0 0 auto}
