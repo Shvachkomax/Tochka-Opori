@@ -1,5759 +1,86 @@
-import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
-import crypto from "crypto";
-import { getSupabase } from "../lib/supabase.js";
-import { maskText, maskSensitiveData, getPrivacySafeMode } from "../lib/sanitize.js";
-import { applyCors, handleOptions } from "../lib/security/cors.js";
-import { rateLimit } from "../lib/security/rate-limit.js";
-import { validateSessionAccess, generateSessionAccessToken } from "../lib/security/access-token.js";
-import {
-  parseContinuationCredential,
-  verifyContinuationSecret,
-  getOwnerType,
-  getContinuationAttemptKey,
-  isLegacyShortCode,
-  ContinuationConfigError,
-  SUPPORTED_MODULES,
-} from "../lib/session/continuation-credential.js";
-import {
-  getOrCreateContinuationCredential,
-  rotateContinuationCredential,
-  fingerprint,
-} from "../lib/session/continuation-store.js";
-import { createReportArtifacts, REPORT_STATUS } from "../lib/report/finalize.js";
-import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
-import { getInviteUrl } from "../lib/config/site-url.js";
-import { recordClinicalEvent } from "../lib/clinical/projection.js";
-import { buildSupportCheckinLogicalSourceId, buildSupportCheckinObservationSnapshot } from "../lib/clinical/observation-mappings.js";
-import { recordClinicalObservation } from "../lib/clinical/projection.js";
-import { getMedicationCardsForOwner, isMedicationSessionEligible } from "../lib/clinical/medication.js";
-import {
-  PATIENT_MEDICATION_REFERENCE_PROVIDER,
-  canExplicitlySelectMedicationConcept,
-  findExactMedicationConceptCandidates,
-  loadMedicationReferenceForOrder,
-  loadMedicationReferenceViews,
-} from "../lib/clinical/medication-reference.js";
-import {
-  buildPatientMedicationContext,
-  buildScheduledMedicationIntakes,
-  isMedicationDate,
-  isPatientMedicationOrderStatus,
-  patientMedicationOwnerMatches,
-  projectMedicationIntakes,
-  validateMedicationIntake,
-  validatePatientMedicationOrder,
-  PATIENT_MEDICATION_SAFETY_INSTRUCTION,
-} from "../lib/clinical/patient-reported-medication.js";
-import { LEGACY_CONTINUATION_CODE_MESSAGE, makeSessionSummary as createSessionSummary, normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
-import { getPilotId, hasBodySessionReference, isAnMedSupportOnlyDeployment, isPilotSessionMatch, rejectUnavailableModule } from "../lib/security/module-availability.js";
-
-const BODY_SESSION_ACTIONS = new Set([
-  "listBodyDailyLogs",
-  "getBodyCabinet",
-  "getBodyOnboarding",
-  "saveBodyOnboarding",
-  "updateBodyDisplayName",
-  "getBodyDiaryDay",
-  "savePlateHistory",
-  "getBodyPlateHistory",
-  "getBodyInsights",
-  "dismissBodyInsight",
-  "getBodyWeeklySummary",
-  "generateBodyWeeklySummary",
-  "getBodyAiChat",
-  "sendBodyAiMessage",
-  "getBodyHealthContext",
-  "saveBodyHealthContext",
-  "createBodyServiceRequest",
-  "createLegacyBodyServiceRequest",
-  "getBodyServiceRequests",
-  "getBodyServiceRequest",
-  "cancelBodyServiceRequest",
-]);
-
-function hashToken(token) {
-  return crypto.createHash("sha256").update(token).digest("hex");
-}
-
-function getClientIp(req) {
-  return req.headers["x-forwarded-for"]?.split(",")[0]?.trim()
-    || req.headers["x-real-ip"]
-    || req.socket?.remoteAddress
-    || "unknown";
-}
-
-// Resolve support owner from session_id + access_token.
-// Returns { ownerId, sessionId, publicCode } or null.
-async function resolveSupportOwner(sessionId, accessToken) {
-  if (!sessionId || !accessToken) return null;
-  const valid = await validateSessionAccess(sessionId, accessToken);
-  if (!valid) return null;
-  const supabase = getSupabase();
-  const { data: session, error } = await supabase
-    .from("sessions")
-    .select("session_id, public_code, anonymous_owner_id, module, json_data")
-    .eq("session_id", sessionId)
-    .eq("module", "support")
-    .maybeSingle();
-  if (error || !session || !session.anonymous_owner_id || !isPilotSessionMatch(session.json_data)) return null;
-  return { ownerId: session.anonymous_owner_id, sessionId: session.session_id, publicCode: session.public_code };
-}
-
-// Medication cards require a non-legacy session token. Legacy access remains
-// available to unrelated historical cabinet flows, but cannot expose C2 data.
-async function resolveMedicationSupportOwner(sessionId, accessToken) {
-  if (!sessionId || !accessToken) return null;
-  const valid = await validateSessionAccess(sessionId, accessToken);
-  if (!valid) return null;
-  const supabase = getSupabase();
-  const { data: session, error } = await supabase
-    .from("sessions")
-    .select("session_id, public_code, anonymous_owner_id, module, legacy_access, json_data")
-    .eq("session_id", sessionId)
-    .eq("module", "support")
-    .maybeSingle();
-  if (error || !isMedicationSessionEligible(session) || !session.anonymous_owner_id || !isPilotSessionMatch(session.json_data)) return null;
-  return { ownerId: session.anonymous_owner_id, sessionId: session.session_id, publicCode: session.public_code };
-}
-
-// Resolve specialist relation for a support owner.
-// Returns { expertId, expertName, expertRole, expertSpecialty, organizationId, organizationName } or null.
-async function resolveSupportSpecialistRelation(ownerId) {
-  const supabase = getSupabase();
-
-  // Find public_code for this owner's sessions
-  const { data: ownerSessions } = await supabase
-    .from("sessions")
-    .select("public_code, primary_expert_id, organization_id")
-    .eq("anonymous_owner_id", ownerId)
-    .eq("module", "support")
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  if (!ownerSessions || ownerSessions.length === 0) return null;
-
-  const latest = ownerSessions[0];
-  let expertId = latest.primary_expert_id;
-  let orgId = latest.organization_id;
-
-  // If session doesn't have expert, check patient_assignments
-  if (!expertId && latest.public_code) {
-    const { data: assignment } = await supabase
-      .from("patient_assignments")
-      .select("primary_expert_id, organization_id")
-      .eq("public_code", latest.public_code)
-      .eq("module", "support")
-      .eq("status", "active")
-      .maybeSingle();
-    if (assignment) {
-      expertId = assignment.primary_expert_id;
-      orgId = orgId || assignment.organization_id;
-    }
-  }
-
-  if (!expertId) return null;
-
-  // Get expert details
-  const { data: expert } = await supabase
-    .from("experts")
-    .select("id, name, role, specialty")
-    .eq("id", expertId)
-    .maybeSingle();
-
-  if (!expert) return null;
-
-  let orgName = null;
-  if (orgId) {
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("id, name")
-      .eq("id", orgId)
-      .maybeSingle();
-    orgName = org?.name || null;
-  }
-
-  return {
-    expertId: expert.id,
-    expertName: expert.name,
-    expertRole: expert.role,
-    expertSpecialty: expert.specialty,
-    organizationId: orgId,
-    organizationName: orgName,
-  };
-}
-
-// Resolve body owner from session_id + access_token.
-// Returns { ownerId, sessionId } or throws with appropriate HTTP status.
-async function resolveBodyOwner(sessionId, accessToken) {
-  if (!sessionId || !accessToken) {
-    return null;
-  }
-  const valid = await validateSessionAccess(sessionId, accessToken);
-  if (!valid) {
-    return null;
-  }
-  const supabase = getSupabase();
-  const { data: client, error: clientError } = await supabase
-    .from("body_clients")
-    .select("anonymous_owner_id")
-    .eq("session_id", sessionId)
-    .maybeSingle();
-  if (clientError || !client) {
-    return null;
-  }
-  // If anonymous_owner_id is missing (legacy row), generate and persist one
-  if (!client.anonymous_owner_id) {
-    const { randomUUID } = await import("node:crypto");
-    const newOwnerId = randomUUID();
-    const { error: updateError } = await supabase
-      .from("body_clients")
-      .update({ anonymous_owner_id: newOwnerId })
-      .eq("session_id", sessionId);
-    if (updateError) {
-      console.error("[resolveBodyOwner] failed to assign owner:", updateError.code);
-      return null;
-    }
-    return { ownerId: newOwnerId, sessionId };
-  }
-  return { ownerId: client.anonymous_owner_id, sessionId };
-}
-
-// Anonymous Continuation Credential Pass helpers
-async function buildCabinetSessions({ module, ownerId, supabase }) {
-  const table = module === "body" ? "body_clients" : "sessions";
-  const isBody = module === "body";
-
-  const selectCols = isBody
-    ? "session_id, display_name, created_at"
-    : "session_id, public_code, module, patient_text, created_at, json_data";
-
-  let query = supabase
-    .from(table)
-    .select(selectCols)
-    .eq("anonymous_owner_id", ownerId);
-
-  if (!isBody) {
-    query = query.eq("module", module);
-  }
-
-  const { data, error } = await query.order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("buildCabinetSessions error", error);
-    return [];
-  }
-
-  return (data || []).map((s, idx) => {
-    if (isBody) {
-      return {
-        sessionId: s.session_id,
-        publicCode: s.session_id,
-        createdAt: s.created_at,
-        summary: s.display_name ? `ĞĞ½ĞºĞµÑ‚Ğ° Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ: ${s.display_name}` : "ĞĞ½ĞºĞµÑ‚Ğ° Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ",
-        status: "first_contact",
-        order: idx + 1,
-      };
-    }
-    const json = s.json_data || {};
-    const input = (s.patient_text || "").trim();
-    const summary = isAnMedSupportOnlyDeployment()
-      ? createSessionSummary(s)
-      : input
-        ? `${input.split(/[.!?\n]/)[0].trim().slice(0, 110)}${input.split(/[.!?\n]/)[0].trim().length > 110 ? "â€¦" : ""}`
-        : "ĞĞ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ Ğ±ĞµĞ· Ñ‚ĞµĞºÑÑ‚Ğ¾Ğ²Ğ¾Ğ³Ğ¾ Ğ¾Ğ¿Ğ¸ÑĞ°Ğ½Ğ¸Ñ.";
-    return {
-      sessionId: s.session_id,
-      publicCode: s.public_code,
-      createdAt: s.created_at,
-      summary,
-      status: json.isContinuation || json.previousPatientReport ? "followup" : "first_contact",
-      order: idx + 1,
-    };
-  });
-}
-
-async function buildCabinetData({ module, ownerId, supabase }) {
-  const sessions = await buildCabinetSessions({ module, ownerId, supabase });
-  const latestSession = sessions[0];
-  let latestReport = null;
-
-  if (latestSession?.sessionId) {
-    const isBody = module === "body";
-    const table = isBody ? "body_intake_forms" : "sessions";
-    const selectCols = isBody
-      ? "session_id, answers, care_recommendation, bmi, created_at"
-      : "session_id, public_code, patient_text, user_report, doctor_report, support_plan, json_data, created_at";
-    const { data } = await supabase
-      .from(table)
-      .select(selectCols)
-      .eq("session_id", latestSession.sessionId)
-      .maybeSingle();
-    if (data) {
-      if (isBody) {
-        const answers = data.answers || {};
-        latestReport = {
-          sessionId: data.session_id,
-          publicCode: data.session_id,
-          userReport: `ĞĞ½ĞºĞµÑ‚Ğ° Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ Ğ·Ğ°Ğ¿Ğ¾Ğ»Ğ½ĞµĞ½Ğ°. Ğ˜ĞœĞ¢: ${data.bmi ?? "â€”"}. Ğ¦ĞµĞ»ÑŒ: ${answers.goal || "â€”"}.`,
-          doctorReport: "",
-          supportPlan: data.care_recommendation || null,
-          homeTasks: "",
-          resourceFactors: "",
-          previousPatientReport: "",
-          previousDoctorReport: "",
-          dialogDepth: 0,
-          conversationHistory: [],
-        };
-      } else {
-        const json = data.json_data || {};
-        latestReport = {
-          sessionId: data.session_id,
-          publicCode: data.public_code,
-          userReport: data.user_report || "",
-          doctorReport: data.doctor_report || "",
-          supportPlan: data.support_plan || null,
-          homeTasks: json.homeTasks || "",
-          resourceFactors: json.resourceFactors || "",
-          previousPatientReport: json.previousPatientReport || "",
-          previousDoctorReport: json.previousDoctorReport || "",
-          dialogDepth: json.dialogDepth ?? 0,
-          conversationHistory: data.conversation_history || [],
-          crisisBlock: isAnMedSupportOnlyDeployment() ? json.crisis_block || null : null,
-        };
-      }
-    }
-  }
-
-  return { sessions, latestReport };
-}
-
-async function getUsageBalanceForOwner({ module, ownerId }) {
-  const { getWallet, getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
-  const ownerType = getOwnerType(module);
-  const wallet = await getWallet({ ownerType, ownerId, module });
-  if (!wallet) return { ok: true, visible: false };
-  return await getUsageBalanceForClient({ walletId: wallet.id });
-}
-
-function isValidSessionId(id) {
-  if (!id || typeof id !== "string") return false;
-  return /^[a-zA-Z0-9_-]{8,64}$/.test(id);
-}
-
-export default async function handler(req, res) {
-  if (handleOptions(req, res)) return;
-
-  applyCors(req, res);
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 60, prefix: "session:" });
-  const limited = await limit(req, res);
-  if (limited) return;
-
-  const { action, module } = req.body || {};
-  if (rejectUnavailableModule(res, module)) return;
-  if (isAnMedSupportOnlyDeployment() && (BODY_SESSION_ACTIONS.has(action) || hasBodySessionReference(req.body))) {
-    return res.status(403).json({ ok: false, error: "ĞœĞ¾Ğ´ÑƒĞ»ÑŒ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿ĞµĞ½ Ğ² ÑÑ‚Ğ¾Ğ¹ ÑĞ±Ğ¾Ñ€ĞºĞµ" });
-  }
-
-  try {
-    switch (action) {
-      case "save":
-        return await handleSave(req, res);
-      case "load":
-        return await handleLoad(req, res);
-      case "getCabinet":
-        return await handleGetCabinet(req, res);
-      case "getMedicationCard":
-        return await handleGetMedicationCard(req, res);
-      case "getReport":
-        return await handleGetReport(req, res);
-      case "updateSupportPlan":
-        return await handleUpdateSupportPlan(req, res);
-      case "save_conversation_pairs":
-        return await handleSaveConversationPairs(req, res);
-      case "validateInviteToken":
-        return await handleValidateInviteToken(req, res);
-      case "listBodyDailyLogs":
-        return await handleListBodyDailyLogs(req, res);
-      case "generateAccessToken":
-        return await handleGenerateAccessToken(req, res);
-      case "createFollowUpSession":
-        return await handleCreateFollowUpSession(req, res);
-      case "exchangeContinuationCredential":
-        return await handleExchangeContinuationCredential(req, res);
-      case "regenerateContinuationCredential":
-        return await handleRegenerateContinuationCredential(req, res);
-      case "getReportStatus":
-        return await handleGetReportStatus(req, res);
-      case "getBodyCabinet":
-        return await handleGetBodyCabinet(req, res);
-      case "getBodyOnboarding":
-        return await handleGetBodyOnboarding(req, res);
-      case "saveBodyOnboarding":
-        return await handleSaveBodyOnboarding(req, res);
-      case "updateBodyDisplayName":
-        return await handleUpdateBodyDisplayName(req, res);
-      case "getBodyDiaryDay":
-        return await handleGetBodyDiaryDay(req, res);
-      case "savePlateHistory":
-        return await handleSavePlateHistory(req, res);
-      case "getBodyPlateHistory":
-        return await handleGetBodyPlateHistory(req, res);
-      case "getBodyInsights":
-        return await handleGetBodyInsights(req, res);
-      case "dismissBodyInsight":
-        return await handleDismissBodyInsight(req, res);
-      case "getBodyWeeklySummary":
-        return await handleGetBodyWeeklySummary(req, res);
-      case "generateBodyWeeklySummary":
-        return await handleGenerateBodyWeeklySummary(req, res);
-      case "getBodyAiChat":
-        return await handleGetBodyAiChat(req, res);
-      case "sendBodyAiMessage":
-        return await handleSendBodyAiMessage(req, res);
-      case "getBodyHealthContext":
-        return await handleGetBodyHealthContext(req, res);
-      case "saveBodyHealthContext":
-        return await handleSaveBodyHealthContext(req, res);
-      case "listPatientMedicationOrders":
-        return await handleListPatientMedicationOrders(req, res);
-      case "savePatientMedicationOrder":
-        return await handleSavePatientMedicationOrder(req, res);
-      case "updatePatientMedicationOrderStatus":
-        return await handleUpdatePatientMedicationOrderStatus(req, res);
-      case "recordMedicationIntake":
-        return await handleRecordMedicationIntake(req, res);
-      case "findPatientMedicationReferenceCandidates":
-        return await handleFindPatientMedicationReferenceCandidates(req, res);
-      case "confirmPatientMedicationReferenceMatch":
-        return await handleConfirmPatientMedicationReferenceMatch(req, res);
-      case "createBodyServiceRequest":
-        return await handleCreateBodyServiceRequest(req, res, { legacy: false });
-      case "createLegacyBodyServiceRequest":
-        return await handleCreateBodyServiceRequest(req, res, { legacy: true });
-      case "getBodyServiceRequests":
-        return await handleGetBodyServiceRequests(req, res);
-      case "getBodyServiceRequest":
-        return await handleGetBodyServiceRequest(req, res);
-      case "cancelBodyServiceRequest":
-        return await handleCancelBodyServiceRequest(req, res);
-      case "getServicePricing":
-        return await handleGetServicePricing(req, res);
-      case "createSupportServiceRequest":
-        return await handleCreateSupportServiceRequest(req, res);
-      case "listSupportServiceRequests":
-        return await handleListSupportServiceRequests(req, res);
-      case "getSupportServiceRequest":
-        return await handleGetSupportServiceRequest(req, res);
-      case "cancelSupportServiceRequest":
-        return await handleCancelSupportServiceRequest(req, res);
-      case "getSupportCheckins":
-        return await handleGetSupportCheckins(req, res);
-      case "saveSupportCheckin":
-        return await handleSaveSupportCheckin(req, res);
-      case "getSupportPractices":
-        return await handleGetSupportPractices(req, res);
-      case "saveSupportPractice":
-        return await handleSaveSupportPractice(req, res);
-      case "updateSupportPracticeStatus":
-        return await handleUpdateSupportPracticeStatus(req, res);
-      case "getSupportProfile":
-        return await handleGetSupportProfile(req, res);
-      case "saveSupportProfile":
-        return await handleSaveSupportProfile(req, res);
-      case "getSupportChat":
-        return await handleGetSupportChat(req, res);
-      case "sendSupportMessage":
-        return await handleSendSupportMessage(req, res);
-      case "acceptSpecialistInvitation":
-        return await handleAcceptSpecialistInvitation(req, res);
-      case "declineSpecialistInvitation":
-        return await handleDeclineSpecialistInvitation(req, res);
-      case "acceptPatientInvitationById":
-        return await handleAcceptPatientInvitationById(req, res);
-      case "declinePatientInvitationById":
-        return await handleDeclinePatientInvitationById(req, res);
-      case "createPatientInvitation":
-        return await handleCreatePatientInvitation(req, res);
-      case "listPatientInvitations":
-        return await handleListPatientInvitations(req, res);
-      case "createMatchRequest":
-        return await handleCreateMatchRequest(req, res);
-      case "submitOnboardingRequest":
-        return await handleSubmitOnboardingRequest(req, res);
-      default:
-        return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
-    }
-  } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message || "Internal error" });
-  }
-}
-
-async function handleSave(req, res) {
-  try {
-    const {
-      sessionId, patient_text, conversationHistory,
-      user_report, doctor_report, riskLevel, supportPlan,
-      dialogDepth, previousPatientReport, previousDoctorReport,
-      homeTasks, resourceFactors, questions, answers,
-      voiceObservations, _debug, care_recommendation,
-      invite_token, module: sessionModule,
-    } = req.body || {};
-
-    if (!sessionId) {
-      return res.status(400).json({ ok: false, error: "Missing sessionId" });
-    }
-    if (!isValidSessionId(sessionId)) {
-      return res.status(400).json({ ok: false, error: "Invalid sessionId format" });
-    }
-
-    const supabase = getSupabase();
-
-    const privacy = getPrivacySafeMode();
-    const maskedPatientText = privacy ? maskText(patient_text || "") : patient_text;
-    const maskedUserReport = privacy ? maskSensitiveData(user_report || "") : user_report;
-    const maskedDoctorReport = privacy ? maskSensitiveData(doctor_report || "") : doctor_report;
-    const maskedConversation = privacy ? maskSensitiveData(conversationHistory || []) : conversationHistory;
-
-    const { generatePublicCode } = await import("../lib/publicCode.js");
-    const { validateInviteToken, useInviteToken } = await import("./experts.js");
-    const { ensureWallet, setWalletVisible } = await import("../lib/usage/wallet.js");
-
-    const existing = await supabase
-      .from("sessions")
-      .select("public_code, organization_id, primary_expert_id, access_token_hash, legacy_access, anonymous_owner_id")
-      .eq("session_id", sessionId)
-      .maybeSingle();
-
-    if (existing.error) {
-      console.error("handleSave: SELECT error", existing.error);
-      return res.status(500).json({ ok: false, error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ." });
-    }
-
-    if (deploymentOrganizationId() && !existing?.data) {
-      return res.status(403).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°" });
-    }
-    let publicCode = existing?.data?.public_code;
-    let organizationId = existing?.data?.organization_id || null;
-    let primaryExpertId = existing?.data?.primary_expert_id || null;
-    let inviteToken = existing?.data?.invite_token || null;
-    const isNewSession = !existing?.data;
-    const alreadyHasToken = existing?.data?.access_token_hash != null;
-
-    // Ensure anonymous_owner_id exists (created server-side, never from frontend)
-    let anonymousOwnerId = existing?.data?.anonymous_owner_id || null;
-    const codeJustCreated = !publicCode;
-
-    if (publicCode && (organizationId || primaryExpertId)) {
-      // keep
-    } else if (publicCode && !organizationId && !primaryExpertId) {
-      const { data: assignment } = await supabase
-        .from("patient_assignments")
-        .select("organization_id, primary_expert_id")
-        .eq("public_code", publicCode)
-        .eq("module", "support")
-        .eq("status", "active")
-        .maybeSingle();
-      if (assignment) {
-        organizationId = assignment.organization_id;
-        primaryExpertId = assignment.primary_expert_id;
-      }
-    }
-
-    // Generate anonymous_owner_id for new sessions
-    if (!anonymousOwnerId) {
-      const { randomUUID } = await import("node:crypto");
-      anonymousOwnerId = randomUUID();
-    }
-
-    let newWalletId = null;
-    if (!publicCode) {
-      publicCode = generatePublicCode();
-
-      // Create wallet (hidden) once code is generated.
-      // Visibility set only after DB save confirms code persistence.
-      const wallet = await ensureWallet({ ownerType: "anonymous_case", ownerId: anonymousOwnerId, module: "support" });
-      newWalletId = wallet?.id || null;
-
-      if (invite_token) {
-        const invite = await validateInviteToken(invite_token);
-        if (invite) {
-          organizationId = invite.organization_id;
-          primaryExpertId = invite.expert_id;
-          inviteToken = invite_token;
-
-          const { data: existingAssignment } = await supabase
-            .from("patient_assignments")
-            .select("id")
-            .eq("public_code", publicCode)
-            .eq("module", "support")
-            .maybeSingle();
-
-          if (!existingAssignment) {
-            await supabase.from("patient_assignments").insert({
-              public_code: publicCode,
-              organization_id: organizationId,
-              primary_expert_id: primaryExpertId,
-              assigned_by_expert_id: primaryExpertId,
-              assigned_by_expert_name: "auto",
-              source: "invite_link",
-              status: "active",
-              module: "support",
-            });
-
-            await supabase.from("patient_access").insert({
-              public_code: publicCode,
-              organization_id: organizationId,
-              expert_id: primaryExpertId,
-              access_role: "owner",
-              granted_by_expert_id: primaryExpertId,
-              granted_by_expert_name: "auto",
-              module: "support",
-            });
-          }
-
-          await useInviteToken(invite_token);
-        }
-      }
-    }
-
-    const { data: existingRow } = await supabase
-      .from("sessions")
-      .select("id, json_data")
-      .eq("session_id", sessionId)
-      .maybeSingle();
-
-    const existingPairs = existingRow?.json_data?.conversation_pairs || [];
-
-    const payload = {
-      session_id: sessionId,
-      module: sessionModule || 'support',
-      anonymous_owner_id: anonymousOwnerId,
-      patient_text: maskedPatientText,
-      conversation_history: maskedConversation,
-      user_report: maskedUserReport,
-      doctor_report: maskedDoctorReport,
-      risk_level: riskLevel || null,
-      support_plan: supportPlan || null,
-      public_code: publicCode,
-      organization_id: organizationId,
-      primary_expert_id: primaryExpertId,
-      invite_token: inviteToken,
-      json_data: {
-        ...(existingRow?.json_data?.pilot_id || getPilotId()
-          ? { pilot_id: getPilotId() || existingRow.json_data.pilot_id }
-          : {}),
-        dialogDepth: dialogDepth ?? 0,
-        previousPatientReport: previousPatientReport || "",
-        previousDoctorReport: previousDoctorReport || "",
-        homeTasks: homeTasks || "",
-        resourceFactors: resourceFactors || "",
-        questions: questions || null,
-        answers: answers || {},
-        voiceObservations: voiceObservations || null,
-        _debug: _debug || null,
-        care_recommendation: care_recommendation || null,
-        ...(existingPairs.length > 0 ? { conversation_pairs: existingPairs } : {}),
-      },
-    };
-
-    let error;
-    if (existingRow) {
-      ({ error } = await supabase.from("sessions").update(payload).eq("session_id", sessionId));
-    } else {
-      ({ error } = await supabase.from("sessions").insert(payload));
-    }
-
-    if (error) {
-      console.error("save-session supabase error", error);
-      return res.status(500).json({
-        ok: false,
-        error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ ÑĞµÑÑĞ¸Ñ. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ.",
-        details: process.env.VERCEL ? undefined : error.message,
-      });
-    }
-
-    // Only make wallet visible after code persistence is confirmed
-    if (newWalletId) {
-      const { setWalletVisible } = await import("../lib/usage/wallet.js");
-      setWalletVisible({ walletId: newWalletId });
-    }
-
-    // Generate access_token for sessions that don't have one yet
-    let accessToken = null;
-    if (isNewSession || !alreadyHasToken) {
-      accessToken = await generateSessionAccessToken(sessionId);
-      if (!accessToken) {
-        console.error("handleSave: failed to generate/store access token for", sessionId);
-        // Don't fail the save â€” token can be regenerated later.
-        // Legacy access still works until migrations are applied.
-      }
-    }
-
-    // Create owner-level continuation credential on first completed report (cross-device access)
-    let continuationCode = null;
-    const moduleForCredential = sessionModule || "support";
-    if (moduleForCredential === "support" && anonymousOwnerId) {
-      try {
-        const { credential, secret, isNew } = await getOrCreateContinuationCredential({
-          module: moduleForCredential,
-          ownerId: anonymousOwnerId,
-          supabase,
-        });
-        if (credential && (isNew || secret)) {
-          continuationCode = isNew && secret ? `${credential.lookup_code}-${secret}` : null;
-        }
-      } catch (credErr) {
-        if (credErr instanceof ContinuationConfigError) {
-          console.error("handleSave: continuation credential config error", credErr.message);
-        } else {
-          console.error("handleSave: failed to get/create continuation credential", credErr);
-        }
-        // Don't fail the save; credential can be regenerated later.
-      }
-    }
-
-    // Return wallet balance if visible
-    let usageBalance = null;
-    try {
-      const wallet = await ensureWallet({ ownerType: "anonymous_case", ownerId: anonymousOwnerId, module: "support" });
-      if (wallet) {
-        const { getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
-        usageBalance = await getUsageBalanceForClient({ walletId: wallet.id });
-      }
-    } catch (_) { /* non-blocking */ }
-
-    return res.status(200).json({
-      ok: true,
-      message: "Ğ¡ĞµÑÑĞ¸Ñ ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ°. Ğ’Ñ‹ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶Ğ¸Ñ‚ÑŒ Ğ¿Ğ¾Ğ·Ğ¶Ğµ.",
-      sessionId,
-      publicCode,
-      continuation_code: continuationCode,
-      organization_id: organizationId,
-      primary_expert_id: primaryExpertId,
-      access_token: accessToken,
-      usage_balance: usageBalance,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      error: error.message || "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ ÑĞµÑÑĞ¸Ğ¸",
-    });
-  }
-}
-
-async function handleLoad(req, res) {
-  try {
-    const { publicCode, access_token } = req.body || {};
-
-    if (!publicCode || typeof publicCode !== "string") {
-      return res.status(400).json({ error: "Ğ’Ğ²ĞµĞ´Ğ¸Ñ‚Ğµ ĞºĞ¾Ğ´ Ğ´Ğ¸Ğ°Ğ»Ğ¾Ğ³Ğ°" });
-    }
-
-    const normalized = publicCode.trim().toUpperCase();
-
-    const isSupportCode = /^Ğ¢ĞĞ§ĞšĞ-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(normalized);
-    const isHealthCode = /^HEALTH-[A-Z0-9]{4}-[A-Z0-9]{3}$/.test(normalized);
-    if (!isSupportCode && !isHealthCode) {
-      return res.status(400).json({
-        ok: false,
-        error: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ Ñ„Ğ¾Ñ€Ğ¼Ğ°Ñ‚ ĞºĞ¾Ğ´Ğ°. ĞĞ¶Ğ¸Ğ´Ğ°ĞµÑ‚ÑÑ Ğ¢ĞĞ§ĞšĞ-XXXX-XXXX Ğ¸Ğ»Ğ¸ HEALTH-XXXX-XXX.",
-      });
-    }
-
-    const { data, error } = await getSupabase()
-      .from("sessions")
-      .select("" +
-        "session_id, module, public_code, patient_text, conversation_history, " +
-        "user_report, doctor_report, support_plan, risk_level, json_data, " +
-        "organization_id, primary_expert_id, invite_token, legacy_access, created_at, anonymous_owner_id"
-      )
-      .eq("public_code", normalized)
-      .maybeSingle();
-
-    if (error) {
-      return res.status(500).json({
-        ok: false,
-        error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ.",
-      });
-    }
-
-    if (!data) {
-      return res.status(404).json({
-        ok: false,
-        error: "ĞšĞ¾Ğ´ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½. ĞŸÑ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ Ğ¿Ñ€Ğ°Ğ²Ğ¸Ğ»ÑŒĞ½Ğ¾ÑÑ‚ÑŒ Ğ²Ğ²Ğ¾Ğ´Ğ°.",
-      });
-    }
-
-    if (isHealthCode && data.module !== "body") {
-      return res.status(404).json({ ok: false, error: "ĞšĞ¾Ğ´ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½." });
-    }
-    if (isSupportCode && data.module !== "support" && data.module !== "body") {
-      return res.status(404).json({ ok: false, error: "ĞšĞ¾Ğ´ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½." });
-    }
-
-    // Access token validation
-    if (!data.legacy_access) {
-      if (!access_token) {
-        return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ° Ğº ÑĞµÑÑĞ¸Ğ¸." });
-      }
-      const valid = await validateSessionAccess(data.session_id, access_token);
-      if (!valid) {
-        return res.status(403).json({ ok: false, error: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-      }
-    }
-
-    const jsonData = data.json_data || {};
-    const pairs = jsonData.conversation_pairs || [];
-    const session = {
-      sessionId: data.session_id,
-      module: data.module || 'support',
-      publicCode: data.public_code,
-      patient_input: data.patient_text,
-      conversationHistory: data.conversation_history,
-      conversationPairs: Array.isArray(pairs) ? pairs : [],
-      user_report: data.user_report,
-      doctor_report: data.doctor_report,
-      supportPlan: data.support_plan,
-      riskLevel: data.risk_level,
-      dialogDepth: jsonData.dialogDepth ?? 0,
-      previousPatientReport: jsonData.previousPatientReport || "",
-      previousDoctorReport: jsonData.previousDoctorReport || "",
-      homeTasks: jsonData.homeTasks || "",
-      resourceFactors: jsonData.resourceFactors || "",
-      questions: jsonData.questions || null,
-      answers: jsonData.answers || {},
-      // Legacy flag so frontend knows if access_token is needed for writes
-      legacyAccess: data.legacy_access === true,
-    };
-
-    // Return wallet balance if visible
-    let usageBalance = null;
-    if (data.anonymous_owner_id) {
-      try {
-        const { ensureWallet, getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
-        const wallet = await ensureWallet({ ownerType: "anonymous_case", ownerId: data.anonymous_owner_id, module: "support" });
-        if (wallet) {
-          usageBalance = await getUsageBalanceForClient({ walletId: wallet.id });
-        }
-      } catch (_) { /* non-blocking */ }
-    }
-
-    return res.status(200).json({
-      ok: true,
-      message: "Ğ¡ĞµÑÑĞ¸Ñ Ğ·Ğ°Ğ³Ñ€ÑƒĞ¶ĞµĞ½Ğ°.",
-      session,
-      usage_balance: usageBalance,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      error: error.message || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¿Ñ€Ğ¸ Ğ¿Ğ¾Ğ¸ÑĞºĞµ ÑĞµÑÑĞ¸Ğ¸",
-    });
-  }
-}
-
-function makeSessionSummary(session) {
-  // Privacy-safe one-sentence summary from user's own words.
-  // Avoids diagnoses and medical conclusions.
-  const input = (session.patient_text || "").trim();
-  if (!input) return "ĞĞ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ğµ Ğ±ĞµĞ· Ñ‚ĞµĞºÑÑ‚Ğ¾Ğ²Ğ¾Ğ³Ğ¾ Ğ¾Ğ¿Ğ¸ÑĞ°Ğ½Ğ¸Ñ.";
-  // First sentence: up to first sentence terminator.
-  const firstSentence = input.split(/[.!?\n]/)[0].trim();
-  const limited = firstSentence.slice(0, 110);
-  const suffix = firstSentence.length > 110 ? "â€¦" : "";
-  return `${limited}${suffix}`;
-}
-
-async function handleGetCabinet(req, res) {
-  try {
-    const { sessionId, publicCode, access_token } = req.body || {};
-
-    if (!access_token) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-    }
-
-    const supabase = getSupabase();
-    let effectiveSessionId = sessionId;
-
-    if (publicCode) {
-      const normalized = publicCode.trim().toUpperCase();
-      const { data: resolved, error: resolvedError } = await supabase
-        .from("sessions")
-        .select("session_id, module")
-        .eq("public_code", normalized)
-        .maybeSingle();
-      if (resolvedError) {
-        console.error("handleGetCabinet: resolve publicCode error", resolvedError);
-        return res.status(500).json({ ok: false, error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°." });
-      }
-      if (!resolved) {
-        return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°." });
-      }
-      if (resolved.module !== "support" && resolved.module !== "body") {
-        return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°." });
-      }
-      effectiveSessionId = resolved.session_id;
-    }
-
-    if (!effectiveSessionId || typeof effectiveSessionId !== "string" || !isValidSessionId(effectiveSessionId)) {
-      return res.status(400).json({ ok: false, error: "Missing sessionId or publicCode" });
-    }
-
-    const valid = await validateSessionAccess(effectiveSessionId, access_token);
-    if (!valid) {
-      return res.status(403).json({ ok: false, error: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-    }
-
-    const { data: currentSession, error: currentError } = await supabase
-      .from("sessions")
-      .select("session_id, public_code, anonymous_owner_id, module, legacy_access, created_at, json_data")
-      .eq("session_id", effectiveSessionId)
-      .maybeSingle();
-
-    if (currentError) {
-      console.error("handleGetCabinet: SELECT error", currentError);
-      return res.status(500).json({ ok: false, error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°." });
-    }
-    if (!currentSession) {
-      return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°." });
-    }
-
-    const ownerId = currentSession.anonymous_owner_id;
-    if (!ownerId) {
-      return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°." });
-    }
-
-    // All sessions for this owner (cabinet view, chronological desc).
-    const { data: sessions, error: sessionsError } = await supabase
-      .from("sessions")
-      .select(isAnMedSupportOnlyDeployment()
-        ? "session_id, public_code, module, patient_text, user_report, support_plan, care_recommendation, conversation_history, created_at, json_data"
-        : "session_id, public_code, module, patient_text, created_at, json_data")
-      .eq("anonymous_owner_id", ownerId)
-      .eq("module", "support")
-      .order("created_at", { ascending: false });
-
-    if (sessionsError) {
-      console.error("handleGetCabinet: sessions list error", sessionsError);
-      return res.status(500).json({ ok: false, error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°." });
-    }
-
-    const sessionList = (sessions || []).map((s, idx) => {
-      const json = s.json_data || {};
-      const isContinuation = !!(json.previousPatientReport || json.isContinuation);
-      return {
-        sessionId: s.session_id,
-        publicCode: s.public_code,
-        createdAt: s.created_at,
-        summary: isAnMedSupportOnlyDeployment() ? createSessionSummary(s) : makeSessionSummary(s),
-        status: isContinuation ? "followup" : "first_contact",
-        order: idx + 1,
-      };
-    });
-
-    // Latest session context needed for follow-up (client-safe: no doctor_report)
-    const latest = sessions?.[0];
-    const latestJson = latest?.json_data || {};
-    const latestReport = latest ? {
-      user_report: latest.user_report || "",
-      previousPatientReport: latestJson.previousPatientReport || "",
-      homeTasks: latestJson.homeTasks || "",
-      resourceFactors: latestJson.resourceFactors || "",
-      supportPlan: latest.support_plan || null,
-      careRecommendation: latest.care_recommendation || null,
-      crisisBlock: isAnMedSupportOnlyDeployment() ? latestJson.crisis_block || null : null,
-      dialogDepth: latestJson.dialogDepth ?? 0,
-      conversationHistory: latest.conversation_history || [],
-      createdAt: latest.created_at,
-    } : null;
-
-    // Wallet balance (critical â€” but degrade gracefully)
-    let balance = null;
-    try {
-      const { getWallet, getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
-      const wallet = await getWallet({ ownerType: "anonymous_case", ownerId, module: "support" });
-      if (wallet) {
-        balance = await getUsageBalanceForClient({ walletId: wallet.id });
-      }
-    } catch (walletError) {
-      console.error("[getCabinet] wallet error (non-blocking):", walletError.message);
-    }
-
-    // Specialist relation (optional)
-    let specialist = null;
-    try {
-      specialist = await resolveSupportSpecialistRelation(ownerId);
-    } catch (specError) {
-      console.error("[getCabinet] specialist error (non-blocking):", specError.message);
-    }
-
-    // Service requests (optional)
-    let serviceRequests = [];
-    try {
-      const { data: sr } = await supabase
-        .from("service_requests")
-        .select(isAnMedSupportOnlyDeployment()
-          ? "id, request_type, meeting_format, title, message, status, specialist_name, specialist_response, scheduled_at, scheduled_comment, answered_at, created_at"
-          : "id, request_type, meeting_format, title, message, status, specialist_name, scheduled_at, created_at")
-        .eq("module", "support")
-        .eq("owner_type", "anonymous_case")
-        .eq("owner_id", ownerId)
-        .order("created_at", { ascending: false })
-        .limit(20);
-      serviceRequests = sr || [];
-    } catch (srError) {
-      console.error("[getCabinet] service_requests error (non-blocking):", srError.message);
-    }
-
-    let matchRequests = [];
-    if (isAnMedSupportOnlyDeployment()) {
-      try {
-        const { data: matches } = await supabase
-          .from("specialist_match_requests")
-          .select("id, session_id, status, assigned_expert_id, created_at, assigned_at")
-          .eq("owner_type", "anonymous_case")
-          .eq("owner_id", ownerId)
-          .eq("module", "support")
-          .order("created_at", { ascending: false })
-          .limit(10);
-        matchRequests = matches || [];
-        const assignedIds = [...new Set(matchRequests.map((request) => request.assigned_expert_id).filter(Boolean))];
-        if (assignedIds.length > 0) {
-          const { data: experts } = await supabase.from("experts").select("id, name").in("id", assignedIds);
-          const names = new Map((experts || []).map((expert) => [expert.id, expert.name]));
-          matchRequests = matchRequests.map((request) => ({ ...request, assigned_expert_name: names.get(request.assigned_expert_id) || null }));
-        }
-      } catch (matchError) {
-        console.error("[getCabinet] AnMed specialist_match_requests error (non-blocking):", matchError.message);
-      }
-    }
-
-    // Owner display_name (optional)
-    let ownerDisplayName = null;
-    try {
-      const { data: ownerProfile } = await supabase
-        .from("support_owner_profiles")
-        .select("display_name")
-        .eq("owner_type", "anonymous_case")
-        .eq("owner_id", ownerId)
-        .maybeSingle();
-      ownerDisplayName = ownerProfile?.display_name || null;
-    } catch (profileError) {
-      console.error("[getCabinet] profile error (non-blocking):", profileError.message);
-    }
-
-    let medicationCards = [];
-    if (isMedicationSessionEligible(currentSession)) {
-      try {
-        medicationCards = await getMedicationCardsForOwner({
-          supabase,
-          ownerType: "anonymous_case",
-          ownerId,
-          module: "support",
-        });
-      } catch (medicationError) {
-        console.error("[getCabinet] medication card error (non-blocking):", medicationError.code || medicationError.message);
-      }
-    }
-
-    return res.status(200).json({
-      ok: true,
-      public_code: currentSession.public_code,
-      session_id: currentSession.session_id,
-      sessions: sessionList,
-      latest_report: latestReport,
-      wallet: balance,
-      specialist: specialist ? {
-        expertId: specialist.expertId,
-        expertName: specialist.expertName,
-        expertRole: specialist.expertRole,
-        expertSpecialty: specialist.expertSpecialty,
-        organizationName: specialist.organizationName,
-      } : null,
-      service_requests: serviceRequests,
-      match_requests: matchRequests,
-      unread_message_count: 0,
-      display_name: ownerDisplayName,
-      medication_cards: medicationCards,
-    });
-  } catch (error) {
-    console.error("handleGetCabinet error", error);
-    return res.status(500).json({ ok: false, error: error.message || "ĞÑˆĞ¸Ğ±ĞºĞ° ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚Ğ°" });
-  }
-}
-
-async function handleGetMedicationCard(req, res) {
-  try {
-    const { session_id, access_token } = req.body || {};
-    const owner = await resolveMedicationSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-    const cards = await getMedicationCardsForOwner({
-      supabase,
-      ownerType: "anonymous_case",
-      ownerId: owner.ownerId,
-      module: "support",
-    });
-    return res.status(200).json({ ok: true, cards, patient_medication_ai_enabled: false });
-  } catch (error) {
-    console.error("handleGetMedicationCard error:", error.code || error.message);
-    return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ñ." });
-  }
-}
-
-async function handleGetReport(req, res) {
-  try {
-    const { sessionId, publicCode, access_token } = req.body || {};
-
-    if (!access_token) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-    }
-
-    const supabase = getSupabase();
-    let effectiveSessionId = sessionId;
-
-    if (publicCode) {
-      const normalized = publicCode.trim().toUpperCase();
-      const { data: resolved, error: resolvedError } = await supabase
-        .from("sessions")
-        .select("session_id, module")
-        .eq("public_code", normalized)
-        .maybeSingle();
-      if (resolvedError) {
-        console.error("handleGetReport: resolve publicCode error", resolvedError);
-        return res.status(500).json({ ok: false, error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°." });
-      }
-      if (!resolved) {
-        return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°." });
-      }
-      if (resolved.module !== "support" && resolved.module !== "body") {
-        return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°." });
-      }
-      effectiveSessionId = resolved.session_id;
-    }
-
-    if (!effectiveSessionId || typeof effectiveSessionId !== "string" || !isValidSessionId(effectiveSessionId)) {
-      return res.status(400).json({ ok: false, error: "Missing sessionId or publicCode" });
-    }
-
-    let valid = await validateSessionAccess(effectiveSessionId, access_token);
-    if (!valid) {
-      // Owner-based fallback: token may belong to another session of the same owner (cabinet access).
-      const { data: target } = await supabase
-        .from("sessions")
-        .select("anonymous_owner_id")
-        .eq("session_id", effectiveSessionId)
-        .maybeSingle();
-      if (!target?.anonymous_owner_id) {
-        return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°." });
-      }
-      const { data: tokenSession } = await supabase
-        .from("sessions")
-        .select("session_id, anonymous_owner_id, access_token_hash, legacy_access")
-        .eq("access_token_hash", hashToken(access_token))
-        .maybeSingle();
-      valid = !!tokenSession && tokenSession.anonymous_owner_id === target.anonymous_owner_id;
-    }
-    if (!valid) {
-      return res.status(403).json({ ok: false, error: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-    }
-
-    const { data, error } = await supabase
-      .from("sessions")
-      .select(
-        "session_id, module, public_code, patient_text, conversation_history, " +
-        "user_report, doctor_report, support_plan, risk_level, json_data, " +
-        "organization_id, primary_expert_id, created_at"
-      )
-      .eq("session_id", effectiveSessionId)
-      .maybeSingle();
-
-    if (error) {
-      console.error("handleGetReport: SELECT error", error);
-      return res.status(500).json({ ok: false, error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°." });
-    }
-    if (!data) {
-      return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°." });
-    }
-
-    const jsonData = data.json_data || {};
-    const pairs = jsonData.conversation_pairs || [];
-    // Client-safe response: no doctor_report, no expert fields
-    const session = {
-      sessionId: data.session_id,
-      module: data.module || "support",
-      publicCode: data.public_code,
-      patient_input: data.patient_text,
-      conversationHistory: data.conversation_history,
-      conversationPairs: Array.isArray(pairs) ? pairs : [],
-      user_report: data.user_report,
-      supportPlan: data.support_plan,
-      careRecommendation: data.care_recommendation || null,
-      riskLevel: data.risk_level,
-      dialogDepth: jsonData.dialogDepth ?? 0,
-      previousPatientReport: jsonData.previousPatientReport || "",
-      homeTasks: jsonData.homeTasks || "",
-      resourceFactors: jsonData.resourceFactors || "",
-      questions: jsonData.questions || null,
-      answers: jsonData.answers || {},
-      crisisBlock: isAnMedSupportOnlyDeployment() ? jsonData.crisis_block || null : null,
-      createdAt: data.created_at,
-    };
-
-    return res.status(200).json({
-      ok: true,
-      session,
-    });
-  } catch (error) {
-    console.error("handleGetReport error", error);
-    return res.status(500).json({ ok: false, error: error.message || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚Ğ°" });
-  }
-}
-
-async function handleCreateFollowUpSession(req, res) {
-  try {
-    const { previousSessionId, access_token } = req.body || {};
-
-    if (!previousSessionId || typeof previousSessionId !== "string") {
-      return res.status(400).json({ ok: false, error: "Missing previousSessionId" });
-    }
-    if (!isValidSessionId(previousSessionId)) {
-      return res.status(400).json({ ok: false, error: "Invalid previousSessionId format" });
-    }
-    if (!access_token) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-    }
-
-    const valid = await validateSessionAccess(previousSessionId, access_token);
-    if (!valid) {
-      return res.status(403).json({ ok: false, error: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-    }
-
-    const supabase = getSupabase();
-    const { data: parent, error: parentError } = await supabase
-      .from("sessions")
-      .select("anonymous_owner_id, module, public_code, json_data")
-      .eq("session_id", previousSessionId)
-      .maybeSingle();
-
-    if (parentError) {
-      console.error("handleCreateFollowUpSession: SELECT error", parentError);
-      return res.status(500).json({ ok: false, error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°." });
-    }
-    if (!parent || !parent.anonymous_owner_id) {
-      return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°." });
-    }
-    if (!isPilotSessionMatch(parent.json_data)) {
-      return res.status(403).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ° Ğ² ÑÑ‚Ğ¾Ğ¼ ÑĞµÑ€Ğ²Ğ¸ÑĞµ." });
-    }
-
-    const { generatePublicCode } = await import("../lib/publicCode.js");
-    const { randomUUID } = await import("node:crypto");
-
-    const newSessionId = randomUUID();
-    const newPublicCode = generatePublicCode();
-
-    const { error: insertError } = await supabase.from("sessions").insert({
-      session_id: newSessionId,
-      module: parent.module || "support",
-      anonymous_owner_id: parent.anonymous_owner_id,
-      public_code: newPublicCode,
-      patient_text: "",
-      conversation_history: [],
-      json_data: {
-        ...(getPilotId() || parent.json_data?.pilot_id
-          ? { pilot_id: getPilotId() || parent.json_data.pilot_id }
-          : {}),
-        previousPublicCode: parent.public_code,
-        isContinuation: true,
-      },
-    });
-
-    if (insertError) {
-      console.error("handleCreateFollowUpSession: INSERT error", insertError);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ ÑĞµÑÑĞ¸Ñ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ." });
-    }
-
-    const newAccessToken = await generateSessionAccessToken(newSessionId);
-    if (!newAccessToken) {
-      console.error("handleCreateFollowUpSession: failed to generate token for", newSessionId);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-    }
-
-    return res.status(200).json({
-      ok: true,
-      sessionId: newSessionId,
-      access_token: newAccessToken,
-      public_code: newPublicCode,
-      previous_session_id: previousSessionId,
-    });
-  } catch (error) {
-    console.error("handleCreateFollowUpSession error", error);
-    return res.status(500).json({ ok: false, error: error.message || "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ğ·Ğ´Ğ°Ğ½Ğ¸Ñ ÑĞµÑÑĞ¸Ğ¸ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ" });
-  }
-}
-
-async function handleGenerateAccessToken(req, res) {
-  try {
-    const { sessionId, publicCode, access_token } = req.body || {};
-
-    if (!sessionId && !publicCode) {
-      return res.status(400).json({ ok: false, error: "Missing sessionId or publicCode" });
-    }
-
-    const supabase = getSupabase();
-    let query = supabase.from("sessions").select("session_id, legacy_access").maybeSingle();
-
-    if (sessionId) {
-      query = query.eq("session_id", sessionId);
-    } else {
-      query = query.eq("public_code", publicCode);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      console.error("handleGenerateAccessToken: SELECT error", error);
-      return res.status(500).json({ ok: false, error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ." });
-    }
-    if (!data) {
-      return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°" });
-    }
-    if (data.legacy_access === true) {
-      return res.status(403).json({ ok: false, error: "Ğ”Ğ»Ñ ÑÑ‚Ğ¾Ğ¹ ÑĞµÑÑĞ¸Ğ¸ Ñ‚Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ·Ğ°Ñ‰Ğ¸Ñ‰Ñ‘Ğ½Ğ½Ñ‹Ğ¹ Ğ²Ñ…Ğ¾Ğ´ Ğ¿Ğ¾ ĞºĞ¾Ğ´Ñƒ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ." });
-    }
-    if (!access_token || !(await validateSessionAccess(data.session_id, access_token))) {
-      return res.status(403).json({ ok: false, error: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-    }
-
-    const rawToken = await generateSessionAccessToken(data.session_id);
-    if (!rawToken) {
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ³ĞµĞ½ĞµÑ€Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ñ‚Ğ¾ĞºĞµĞ½" });
-    }
-
-    return res.status(200).json({ ok: true, access_token: rawToken });
-  } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message || "Error" });
-  }
-}
-
-async function handleUpdateSupportPlan(req, res) {
-  try {
-    const { public_code, session_id, support_plan, access_token } = req.body || {};
-
-    if (!public_code && !session_id) {
-      return res.status(400).json({ ok: false, error: "Missing public_code or session_id" });
-    }
-
-    const effectiveSessionId = session_id || public_code;
-
-    // Check access if non-legacy
-    const supabase = getSupabase();
-    const { data: sessionData, error: sessionError } = await supabase
-      .from("sessions")
-      .select("session_id, legacy_access")
-      .eq(session_id ? "session_id" : "public_code", effectiveSessionId)
-      .maybeSingle();
-
-    if (sessionError) {
-      console.error("handleUpdateSupportPlan: SELECT error", sessionError);
-      return res.status(500).json({ ok: false, error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ." });
-    }
-
-    if (sessionData && !sessionData.legacy_access) {
-      if (!access_token) {
-        return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-      }
-      const valid = await validateSessionAccess(sessionData.session_id, access_token);
-      if (!valid) {
-        return res.status(403).json({ ok: false, error: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-      }
-    }
-
-    let query = supabase.from("sessions").update({ support_plan, updated_at: new Date().toISOString() });
-
-    if (public_code) {
-      query = query.eq("public_code", public_code);
-    } else {
-      query = query.eq("session_id", session_id);
-    }
-
-    const { error: updateError } = await query;
-
-    if (updateError) {
-      console.error("updateSupportPlan error:", updateError);
-      return res.status(500).json({ ok: false, error: "Failed to update support plan" });
-    }
-
-    return res.status(200).json({ ok: true, message: "ĞŸĞ»Ğ°Ğ½ Ğ¿Ğ¾Ğ´Ğ´ĞµÑ€Ğ¶ĞºĞ¸ Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»Ñ‘Ğ½" });
-  } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message || "Error updating support plan" });
-  }
-}
-
-async function handleSaveConversationPairs(req, res) {
-  try {
-    const { sessionId, pairs, access_token } = req.body || {};
-
-    if (!sessionId) {
-      return res.status(400).json({ ok: false, error: "Missing sessionId" });
-    }
-    if (!isValidSessionId(sessionId)) {
-      return res.status(400).json({ ok: false, error: "Invalid sessionId format" });
-    }
-
-    if (!Array.isArray(pairs)) {
-      return res.status(400).json({ ok: false, error: "pairs must be an array" });
-    }
-
-    const supabase = getSupabase();
-
-    // Check access
-    const { data: sessionData, error: sessionError } = await supabase
-      .from("sessions")
-      .select("legacy_access")
-      .eq("session_id", sessionId)
-      .maybeSingle();
-
-    if (sessionError) {
-      console.error("handleSaveConversationPairs: SELECT error", sessionError);
-      return res.status(500).json({ ok: false, error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ." });
-    }
-
-    if (sessionData && !sessionData.legacy_access) {
-      if (!access_token) {
-        return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-      }
-      const valid = await validateSessionAccess(sessionId, access_token);
-      if (!valid) {
-        return res.status(403).json({ ok: false, error: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-      }
-    }
-
-    const { data: existingRow } = await supabase
-      .from("sessions")
-      .select("id, json_data")
-      .eq("session_id", sessionId)
-      .maybeSingle();
-
-    const existingJson = existingRow?.json_data || {};
-    const existingPairs = Array.isArray(existingJson.conversation_pairs) ? existingJson.conversation_pairs : [];
-    const merged = mergePairs(existingPairs, pairs);
-
-    const payload = {
-      json_data: { ...existingJson, conversation_pairs: merged },
-      updated_at: new Date().toISOString(),
-    };
-
-    let error;
-    if (existingRow) {
-      ({ error } = await supabase.from("sessions").update(payload).eq("session_id", sessionId));
-    } else {
-      payload.session_id = sessionId;
-      ({ error } = await supabase.from("sessions").insert(payload));
-    }
-
-    if (error) {
-      return res.status(500).json({ ok: false, error: error.message });
-    }
-
-    return res.status(200).json({ ok: true });
-  } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message || "Error saving conversation pairs" });
-  }
-}
-
-function mergePairs(existing, incoming) {
-  const seen = new Set();
-  const merged = [];
-  for (const p of existing) {
-    if (p.round !== undefined && !seen.has(p.round)) {
-      seen.add(p.round);
-      merged.push(p);
-    }
-  }
-  for (const p of incoming) {
-    if (p.round !== undefined && !seen.has(p.round)) {
-      seen.add(p.round);
-      merged.push(p);
-    }
-  }
-  merged.sort((a, b) => (a.round || 0) - (b.round || 0));
-  return merged;
-}
-
-async function handleListBodyDailyLogs(req, res) {
-  try {
-    const { session_id, access_token } = req.body || {};
-
-    if (!session_id) {
-      return res.status(400).json({ ok: false, error: "Missing session_id" });
-    }
-
-    const supabase = getSupabase();
-
-    // Check access if non-legacy
-    const { data: sessionData, error: sessionError } = await supabase
-      .from("sessions")
-      .select("legacy_access")
-      .eq("session_id", session_id)
-      .maybeSingle();
-
-    if (sessionError) {
-      console.error("handleListBodyDailyLogs: SELECT error", sessionError);
-      return res.status(500).json({ ok: false, error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ." });
-    }
-
-    if (sessionData && !sessionData.legacy_access) {
-      if (!access_token) {
-        return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-      }
-      const valid = await validateSessionAccess(session_id, access_token);
-      if (!valid) {
-        return res.status(403).json({ ok: false, error: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-      }
-    }
-
-    const { data, error } = await supabase
-      .from("body_daily_logs")
-      .select("*")
-      .eq("session_id", session_id)
-      .order("log_date", { ascending: false })
-      .limit(30);
-
-    if (error) {
-      return res.status(500).json({ ok: false, error: error.message });
-    }
-
-    return res.status(200).json({ ok: true, logs: data || [] });
-  } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message || "Error listing diary logs" });
-  }
-}
-
-async function handleValidateInviteToken(req, res) {
-  try {
-    const { token } = req.body || {};
-    if (!token) {
-      return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ token" });
-    }
-
-    const { validateInviteToken } = await import("./experts.js");
-    const invite = await validateInviteToken(token);
-
-    if (!invite) {
-      return res.status(200).json({
-        ok: false,
-        valid: false,
-        error: "Ğ¡ÑÑ‹Ğ»ĞºĞ° Ğ½ĞµĞ´ĞµĞ¹ÑÑ‚Ğ²Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ğ° Ğ¸Ğ»Ğ¸ ÑƒÑÑ‚Ğ°Ñ€ĞµĞ»Ğ°",
-      });
-    }
-
-    return res.status(200).json({
-      ok: true,
-      valid: true,
-      invite: {
-        invitation_id: invite.id || null,
-        invite_kind: invite.invite_kind,
-        direction: invite.direction || null,
-        module: invite.module || null,
-        status: invite.status || null,
-        expires_at: invite.expires_at || null,
-        expert_name: invite.expert_name || null,
-        organization_id: invite.organization_id || null,
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ĞºĞ¸ Ñ‚Ğ¾ĞºĞµĞ½Ğ°" });
-  }
-}
-
-const EXCHANGE_RATE_LIMIT_ERROR = "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ. ĞŸÑ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ.";
-const LEGACY_CODE_ERROR = "Ğ­Ñ‚Ğ¾Ñ‚ ĞºĞ¾Ğ´ Ğ±Ñ‹Ğ» ÑĞ¾Ğ·Ğ´Ğ°Ğ½ Ğ² ÑÑ‚Ğ°Ñ€Ğ¾Ğ¹ Ñ‚ĞµÑÑ‚Ğ¾Ğ²Ğ¾Ğ¹ Ğ²ĞµÑ€ÑĞ¸Ğ¸. Ğ¡Ğ¾Ğ·Ğ´Ğ°Ğ¹Ñ‚Ğµ Ğ½Ğ¾Ğ²Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ¸Ğ»Ğ¸ Ğ¾Ğ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ĞµÑÑŒ Ğº ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ñƒ.";
-
-async function handleExchangeContinuationCredential(req, res) {
-  try {
-    const { module: reqModule, continuation_code } = req.body || {};
-
-    if (!SUPPORTED_MODULES.includes(reqModule)) {
-      return res.status(400).json({ ok: false, error: "Invalid module" });
-    }
-
-    const parsed = parseContinuationCredential(continuation_code);
-    if (!parsed) {
-      // Legacy short codes (Ğ¢ĞĞ§ĞšĞ-XXXX-XXXX or HEALTH-XXXX-XXX) are never valid alone.
-      if (isLegacyShortCode(continuation_code)) {
-        return res.status(403).json({ ok: false, error: isAnMedSupportOnlyDeployment() ? LEGACY_CONTINUATION_CODE_MESSAGE : LEGACY_CODE_ERROR });
-      }
-      return res.status(401).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
-    }
-
-    if (parsed.module !== reqModule) {
-      return res.status(401).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
-    }
-
-    const supabase = getSupabase();
-
-    // Anti-abuse: high threshold per IP, independent of credential lock.
-    const abuseLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, prefix: "continuation_abuse:" });
-    const abuseLimited = await abuseLimit(req, res);
-    if (abuseLimited) return;
-
-    // Unified failure limiter keyed by IP + HMAC(lookup_code). It works identically
-    // whether the lookup_code exists in continuation_credentials or not, preventing
-    // enumeration of existing credentials.
-    const clientIp = getClientIp(req);
-    let attemptKey;
-    try {
-      attemptKey = getContinuationAttemptKey(clientIp, parsed.lookupCode);
-    } catch (pepperError) {
-      if (pepperError instanceof ContinuationConfigError) {
-        console.error("handleExchangeContinuationCredential: config error", pepperError.message);
-        return res.status(500).json({ ok: false, error: "Server configuration error" });
-      }
-      throw pepperError;
-    }
-
-    const now = new Date().toISOString();
-    const commonError = { status: 401, data: { ok: false, error: EXCHANGE_RATE_LIMIT_ERROR } };
-
-    // Check existing lock first (before touching the credential row).
-    const { data: existingAttempts } = await supabase
-      .from("continuation_failed_attempts")
-      .select("failed_attempt_count, locked_until")
-      .eq("attempt_key", attemptKey)
-      .maybeSingle();
-
-    if (existingAttempts?.locked_until && existingAttempts.locked_until > now) {
-      return res.status(429).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
-    }
-
-    const { data: credential } = await supabase
-      .from("continuation_credentials")
-      .select("id, module, owner_type, owner_id, lookup_code, secret_hash, secret_version, revoked_at, created_at")
-      .eq("lookup_code", parsed.lookupCode)
-      .maybeSingle();
-
-    const credentialFound = !!credential;
-    const isRevoked = credential && credential.revoked_at;
-    const secretValid = credential
-      && credential.module === reqModule
-      && !credential.revoked_at
-      && verifyContinuationSecret(parsed.secret, credential.secret_hash);
-
-    if (!secretValid) {
-      // Specific error for revoked credentials
-      if (credentialFound && isRevoked) {
-        return res.status(401).json({ ok: false, error: "Ğ­Ñ‚Ğ¾Ñ‚ ĞºĞ¾Ğ´ Ğ±Ñ‹Ğ» Ğ·Ğ°Ğ¼ĞµĞ½Ñ‘Ğ½ Ğ½Ğ¾Ğ²Ñ‹Ğ¼. Ğ˜ÑĞ¿Ğ¾Ğ»ÑŒĞ·ÑƒĞ¹Ñ‚Ğµ Ğ°ĞºÑ‚ÑƒĞ°Ğ»ÑŒĞ½Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ." });
-      }
-
-      console.log("[exchange]", JSON.stringify({
-        action: "exchange",
-        lookup_fingerprint: fingerprint(parsed.lookupCode),
-        credential_id_fingerprint: credential ? fingerprint(credential.id) : "none",
-        credential_found: credentialFound,
-        secret_valid: false,
-        response_status: 401,
-      }));
-
-      // Atomically increment failures for this IP + lookup pair. The same RPC is used
-      // regardless of whether the credential exists, so the responses are identical.
-      const { data: incremented, error: incrementError } = await supabase.rpc(
-        "increment_continuation_failed_attempts",
-        { p_attempt_key: attemptKey }
-      );
-
-      if (incrementError) {
-        console.error("handleExchangeContinuationCredential: increment failed", incrementError);
-        return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€Ğ¸Ñ‚ÑŒ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğµ. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·." });
-      }
-
-      if (incremented?.[0]?.locked_until && incremented[0].locked_until > now) {
-        return res.status(429).json({ ok: false, error: EXCHANGE_RATE_LIMIT_ERROR });
-      }
-
-      return res.status(commonError.status).json(commonError.data);
-    }
-
-    // Success: clear failures for this IP + lookup pair, issue new access token.
-    await supabase.rpc("clear_continuation_failed_attempts", { p_attempt_key: attemptKey });
-
-    console.log("[exchange] start module=" + reqModule + " lookup_prefix=" + parsed.lookupCode.slice(0, 8));
-
-    // Step 1: Find target session
-    const targetTable = reqModule === "body" ? "body_clients" : "sessions";
-    let targetQuery = supabase
-      .from(targetTable)
-      .select(reqModule === "body" ? "session_id" : "session_id, json_data")
-      .eq("anonymous_owner_id", credential.owner_id);
-
-    if (reqModule !== "body") {
-      targetQuery = targetQuery.eq("module", reqModule);
-    }
-
-    const { data: targetSession, error: targetError } = await targetQuery
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (targetError) {
-      console.error("[exchange] target query error:", targetError.code, targetError.message);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ¿Ñ€Ğ¾Ñ„Ğ¸Ğ»ÑŒ. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ." });
-    }
-    if (!targetSession?.session_id) {
-      console.log("[exchange] no target session for owner");
-      return res.status(404).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ½Ğ°Ğ¹Ñ‚Ğ¸ Ğ·Ğ°Ğ¿Ğ¸ÑÑŒ Ğ´Ğ»Ñ ÑÑ‚Ğ¾Ğ³Ğ¾ ĞºĞ¾Ğ´Ğ°. ĞĞ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ĞµÑÑŒ Ğº ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ñƒ." });
-    }
-
-    if (!isPilotSessionMatch(targetSession.json_data)) {
-      return res.status(403).json({ ok: false, error: "ĞšĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ Ğ½Ğµ Ğ¿Ñ€Ğ¸Ğ½Ğ°Ğ´Ğ»ĞµĞ¶Ğ¸Ñ‚ ÑÑ‚Ğ¾Ğ¼Ñƒ ÑĞµÑ€Ğ²Ğ¸ÑÑƒ." });
-    }
-
-    console.log("[exchange] target session found");
-
-    // Step 2: Build cabinet
-    let cabinet;
-    try {
-      cabinet = await buildCabinetData({ module: reqModule, ownerId: credential.owner_id, supabase });
-      console.log("[exchange] cabinet built sessions=" + (cabinet.sessions?.length || 0));
-    } catch (cabinetError) {
-      console.error("[exchange] cabinet build error:", cabinetError.message);
-      throw cabinetError;
-    }
-
-    // Step 3: Get balance
-    let usageBalance;
-    try {
-      usageBalance = await getUsageBalanceForOwner({ module: reqModule, ownerId: credential.owner_id });
-      console.log("[exchange] balance ok=" + usageBalance.ok);
-    } catch (balanceError) {
-      console.error("[exchange] balance error:", balanceError.message);
-      throw balanceError;
-    }
-
-    // Step 4: Generate access token
-    const newAccessToken = await generateSessionAccessToken(targetSession.session_id, {
-      module: reqModule,
-      anonymousOwnerId: credential.owner_id,
-      publicCode: cabinet.sessions?.[0]?.publicCode || null,
-    });
-    if (!newAccessToken) {
-      console.error("[exchange] token generation returned null, retrying with direct insert");
-      // Fallback: ensure sessions row exists directly
-      const crypto = await import("crypto");
-      const fallbackToken = crypto.randomBytes(32).toString("hex");
-      const fallbackHash = crypto.createHash("sha256").update(fallbackToken).digest("hex");
-      const { error: fallbackErr } = await supabase.from("sessions").upsert({
-        session_id: targetSession.session_id,
-        module: reqModule,
-        anonymous_owner_id: credential.owner_id,
-        public_code: cabinet.sessions?.[0]?.publicCode || null,
-        patient_text: "",
-        conversation_history: [],
-        json_data: getPilotId() ? { pilot_id: getPilotId() } : {},
-        access_token_hash: fallbackHash,
-        access_token_generated_at: new Date().toISOString(),
-        legacy_access: false,
-      }, { onConflict: "session_id" });
-      if (fallbackErr) {
-        console.error("[exchange] fallback insert failed:", fallbackErr.message);
-        return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ." });
-      }
-      // Verify the row was created
-      const { data: verifyRow } = await supabase
-        .from("sessions")
-        .select("session_id")
-        .eq("session_id", targetSession.session_id)
-        .maybeSingle();
-      if (!verifyRow) {
-        console.error("[exchange] verification failed after fallback insert");
-        return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ." });
-      }
-      console.log("[exchange] fallback token created successfully");
-      return res.status(200).json({
-        ok: true,
-        session_id: targetSession.session_id,
-        access_token: fallbackToken,
-        module: reqModule,
-        public_code: cabinet.sessions?.[0]?.publicCode || null,
-        cabinet,
-        usage_balance: usageBalance,
-      });
-    }
-
-    // Verify sessions row exists after token generation
-    const { data: verifySession } = await supabase
-      .from("sessions")
-      .select("session_id, access_token_hash")
-      .eq("session_id", targetSession.session_id)
-      .maybeSingle();
-    if (!verifySession || !verifySession.access_token_hash) {
-      console.error("[exchange] sessions row verification failed after token generation");
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ğ¾Ğ´Ñ‚Ğ²ĞµÑ€Ğ´Ğ¸Ñ‚ÑŒ ÑĞµÑÑĞ¸Ñ. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ." });
-    }
-
-    console.log("[exchange] success");
-
-    console.log("[exchange]", JSON.stringify({
-      action: "exchange",
-      lookup_fingerprint: fingerprint(parsed.lookupCode),
-      credential_id_fingerprint: fingerprint(credential.id),
-      owner_fingerprint: fingerprint(credential.owner_id),
-      target_session_fingerprint: fingerprint(targetSession.session_id),
-      secret_version: credential.secret_version,
-      credential_found: true,
-      secret_valid: true,
-      response_status: 200,
-    }));
-
-    return res.status(200).json({
-      ok: true,
-      session_id: targetSession.session_id,
-      access_token: newAccessToken,
-      module: reqModule,
-      public_code: cabinet.sessions?.[0]?.publicCode || null,
-      cabinet,
-      usage_balance: usageBalance,
-    });
-  } catch (error) {
-    if (error instanceof ContinuationConfigError) {
-      console.error("handleExchangeContinuationCredential: config error", error.message);
-      return res.status(500).json({ ok: false, error: "Server configuration error" });
-    }
-    console.error("handleExchangeContinuationCredential error", error);
-    return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€Ğ¸Ñ‚ÑŒ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğµ. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·." });
-  }
-}
-
-async function handleRegenerateContinuationCredential(req, res) {
-  try {
-    const { session_id, access_token, module: reqModule } = req.body || {};
-
-    if (!session_id || !access_token) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-    }
-
-    const valid = await validateSessionAccess(session_id, access_token);
-    if (!valid) {
-      return res.status(403).json({ ok: false, error: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ°." });
-    }
-
-    const module = reqModule || "support";
-    if (!SUPPORTED_MODULES.includes(module)) {
-      return res.status(400).json({ ok: false, error: "Invalid module" });
-    }
-
-    const supabase = getSupabase();
-    const table = module === "body" ? "body_clients" : "sessions";
-    const { data: session, error: sessionError } = await supabase
-      .from(table)
-      .select("anonymous_owner_id")
-      .eq("session_id", session_id)
-      .maybeSingle();
-
-    if (sessionError) {
-      console.error("[handleRegenerateContinuationCredential] session lookup failed:", sessionError.code, "module:", module);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€Ğ¸Ñ‚ÑŒ ÑĞµÑÑĞ¸Ñ. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ." });
-    }
-    if (!session?.anonymous_owner_id) {
-      return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°." });
-    }
-
-    const rotationResult = await rotateContinuationCredential({
-      module,
-      ownerId: session.anonymous_owner_id,
-      supabase,
-    });
-
-    console.log("[rotate]", JSON.stringify({
-      action: "rotate",
-      credential_id_fingerprint: rotationResult.credentialIdFingerprint,
-      owner_fingerprint: fingerprint(session.anonymous_owner_id),
-      old_lookup_fingerprint: rotationResult.oldLookupFingerprint,
-      new_lookup_fingerprint: rotationResult.newLookupFingerprint,
-      old_secret_version: (rotationResult.secretVersion || 1) - 1,
-      new_secret_version: rotationResult.secretVersion,
-      old_lookup_still_exists: false,
-    }));
-
-    return res.status(200).json({
-      ok: true,
-      continuation_code: rotationResult.combinedCode,
-      message: "Ğ¡Ñ‚Ğ°Ñ€Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ Ğ±Ğ¾Ğ»ÑŒÑˆĞµ Ğ½Ğµ Ğ´ĞµĞ¹ÑÑ‚Ğ²ÑƒĞµÑ‚.",
-    });
-  } catch (error) {
-    if (error instanceof ContinuationConfigError) {
-      console.error("handleRegenerateContinuationCredential: config error", error.message);
-      return res.status(500).json({ ok: false, error: "Server configuration error" });
-    }
-    console.error("handleRegenerateContinuationCredential error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ Ğ½Ğ¾Ğ²Ñ‹Ğ¹ ĞºĞ¾Ğ´ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ." });
-  }
-}
-
-async function handleGetReportStatus(req, res) {
-  try {
-    const { sessionId, reportRequestId } = req.body || {};
-    if (!sessionId || !isValidSessionId(sessionId)) {
-      return res.status(400).json({ ok: false, error: "Missing sessionId" });
-    }
-
-    const supabase = getSupabase();
-    const { data: session, error } = await supabase
-      .from("sessions")
-      .select("session_id, module, anonymous_owner_id, public_code, report_generation_status, report_request_id, user_report, doctor_report, care_recommendation, access_token_hash, json_data")
-      .eq("session_id", sessionId)
-      .maybeSingle();
-
-    if (error) {
-      console.error("handleGetReportStatus: SELECT error", error);
-      return res.status(500).json({ ok: false, error: "Ğ‘Ğ°Ğ·Ğ° Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°." });
-    }
-    if (!session) {
-      return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°." });
-    }
-
-    const status = session.report_generation_status;
-    const response = {
-      ok: true,
-      session_id: session.session_id,
-      status: status || "not_started",
-      report_request_id: session.report_request_id || null,
-    };
-
-    if (status === REPORT_STATUS.READY) {
-      const artifacts = await createReportArtifacts({
-        supabase,
-        sessionId,
-        module: session.module || "support",
-        anonymousOwnerId: session.anonymous_owner_id,
-      });
-      const userPart = session.user_report || "";
-      const doctorPart = session.doctor_report || "";
-      const report = userPart.includes("===USER_REPORT===")
-        ? userPart
-        : `===USER_REPORT===\n\n${userPart}\n\n===DOCTOR_REPORT===\n\n${doctorPart}`;
-      response.type = "final";
-      response.report = report;
-      response.care_recommendation = session.care_recommendation || null;
-      response.public_code = session.public_code;
-      response.access_token = artifacts.accessToken;
-      response.continuation_code = artifacts.continuationCode;
-    } else if (status === REPORT_STATUS.PROCESSING) {
-      response.message = "ĞÑ‚Ñ‡Ñ‘Ñ‚ ĞµÑ‰Ñ‘ Ñ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€ÑƒĞµÑ‚ÑÑ. ĞŸĞ¾Ğ´Ğ¾Ğ¶Ğ´Ğ¸Ñ‚Ğµ Ğ½ĞµĞ¼Ğ½Ğ¾Ğ³Ğ¾.";
-    } else if (status === REPORT_STATUS.FAILED) {
-      response.message = "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑÑ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ ĞµÑ‰Ñ‘ Ñ€Ğ°Ğ·.";
-      response.error_code = session.report_error_code || null;
-    }
-
-    return res.status(200).json(response);
-  } catch (error) {
-    console.error("handleGetReportStatus error", error);
-    return res.status(500).json({ ok: false, error: error.message || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ĞºĞ¸ ÑÑ‚Ğ°Ñ‚ÑƒÑĞ°" });
-  }
-}
-
-async function handleGetBodyCabinet(req, res) {
-  try {
-    const { sessionId, accessToken, clientToday } = req.body || {};
-    if (!sessionId || !accessToken) {
-      return res.status(400).json({ ok: false, error: "Missing sessionId or accessToken" });
-    }
-
-    // Validate clientToday format (YYYY-MM-DD)
-    const today = (clientToday && /^\d{4}-\d{2}-\d{2}$/.test(clientToday))
-      ? clientToday
-      : new Date().toISOString().slice(0, 10);
-
-    const supabase = getSupabase();
-
-    // 1. Look up body_clients â€” only real columns
-    const { data: client, error: clientError } = await supabase
-      .from("body_clients")
-      .select("session_id, anonymous_owner_id, display_name, goal, created_at")
-      .eq("session_id", sessionId)
-      .maybeSingle();
-
-    if (clientError) {
-      console.error("[handleGetBodyCabinet] body_clients query error:", clientError.code, clientError.message);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚" });
-    }
-    if (!client) {
-      return res.status(404).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°" });
-    }
-
-    // 2. Validate access token against sessions table
-    const valid = await validateSessionAccess(sessionId, accessToken);
-    if (!valid) {
-      return res.status(403).json({ ok: false, error: "Ğ¡ĞµÑÑĞ¸Ñ Ğ¸ÑÑ‚ĞµĞºĞ»Ğ°. Ğ’Ğ¾Ğ¹Ğ´Ğ¸Ñ‚Ğµ ÑĞ½Ğ¾Ğ²Ğ° Ğ¿Ğ¾ ĞºĞ¾Ğ´Ñƒ Ğ¿Ñ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ñ." });
-    }
-
-    const ownerId = client.anonymous_owner_id;
-
-    // 3. Get all session_ids for this owner
-    const { data: ownerSessions, error: ownerSessionsError } = await supabase
-      .from("body_clients")
-      .select("session_id")
-      .eq("anonymous_owner_id", ownerId);
-
-    if (ownerSessionsError) {
-      console.error("[handleGetBodyCabinet] owner sessions query error:", ownerSessionsError.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚" });
-    }
-
-    const ownerSessionIds = (ownerSessions || []).map(s => s.session_id);
-
-    let profile = {};
-    if (ownerSessionIds.length > 0) {
-      const { data: latestIntake } = await supabase
-        .from("body_intake_forms")
-        .select("answers, bmi, care_recommendation, created_at")
-        .in("session_id", ownerSessionIds)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const answers = latestIntake?.answers || {};
-      profile = {
-        age: answers.age || null,
-        gender: answers.sex || null,
-        height_cm: answers.height_cm || null,
-        weight_kg: answers.weight_kg || null,
-        target_weight_kg: answers.target_weight_kg || null,
-        activity_level: answers.work_activity_level || null,
-        sleep_hours: answers.sleep_hours_estimate || null,
-        stress_level: answers.stress_level || null,
-      };
-    }
-
-    // 4. Wallet
-    const { data: wallet } = await supabase
-      .from("usage_wallets")
-      .select("id, balance, total_used, status")
-      .eq("owner_type", "anonymous_profile")
-      .eq("owner_id", ownerId)
-      .eq("module", "body")
-      .maybeSingle();
-    const { getWalletSummary } = await import("../lib/usage/wallet.js");
-    const walletSummary = wallet ? await getWalletSummary({ walletId: wallet.id, wallet }) : null;
-
-    // 5. Owner-level diary history (all sessions, last 90 days, deduplicated by date)
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
-    let allLogs = [];
-    if (ownerSessionIds.length > 0) {
-      const { data: ownerLogs, error: ownerLogsError } = await supabase
-        .from("body_daily_logs")
-        .select("session_id, log_date, weight_kg, waist_cm, steps, workout_done, workout_minutes, calories, meals_count, water_l, sleep_hours, sleep_quality, energy_level, mood_level, plate_photos, created_at, updated_at")
-        .in("session_id", ownerSessionIds)
-        .gte("log_date", ninetyDaysAgo)
-        .order("log_date", { ascending: false });
-
-      if (ownerLogsError) {
-        console.error("[handleGetBodyCabinet] owner logs query error:", ownerLogsError.code, ownerLogsError.message);
-        return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ¸ÑÑ‚Ğ¾Ñ€Ğ¸Ñ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ°" });
-      }
-
-      allLogs = ownerLogs || [];
-    }
-
-    // Deduplicate by date: keep the latest entry per date (by updated_at or created_at)
-    const byDate = new Map();
-    for (const log of allLogs) {
-      const existing = byDate.get(log.log_date);
-      if (!existing) {
-        byDate.set(log.log_date, log);
-      } else {
-        const logTime = log.updated_at || log.created_at || "";
-        const existingTime = existing.updated_at || existing.created_at || "";
-        if (logTime > existingTime) {
-          byDate.set(log.log_date, log);
-        }
-      }
-    }
-
-    const dedupedHistory = Array.from(byDate.values())
-      .sort((a, b) => b.log_date.localeCompare(a.log_date));
-
-    // Today's log â€” search across all owner sessions
-    const todayLog = dedupedHistory.find(l => l.log_date === today) || null;
-
-    // Diagnostic log (privacy-safe)
-    console.log("[body_cabinet_history]", JSON.stringify({
-      action: "body_cabinet_history",
-      owner_fingerprint: fingerprint(ownerId),
-      session_count: ownerSessionIds.length,
-      raw_log_count: allLogs.length,
-      unique_day_count: dedupedHistory.length,
-      response_status: 200,
-    }));
-
-    // 6. Credential existence (for code rotation UI)
-    const { data: credential } = await supabase
-      .from("continuation_credentials")
-      .select("lookup_code")
-      .eq("owner_id", ownerId)
-      .eq("owner_type", "anonymous_profile")
-      .eq("module", "body")
-      .is("revoked_at", null)
-      .maybeSingle();
-
-    return res.status(200).json({
-      ok: true,
-      session_id: sessionId,
-      display_name: client.display_name || null,
-      profile,
-      wallet: walletSummary ? {
-        balance: walletSummary.available_credits,
-        available_credits: walletSummary.available_credits,
-        reserved_credits: walletSummary.reserved_credits,
-        balance_total: walletSummary.balance_total,
-        total_used: walletSummary.total_used,
-      } : null,
-      today_log: todayLog || null,
-      history: dedupedHistory.map((l) => ({
-        date: l.log_date,
-        weight_kg: l.weight_kg,
-        waist_cm: l.waist_cm,
-        steps: l.steps,
-        workout_done: l.workout_done,
-        workout_minutes: l.workout_minutes,
-        calories: l.calories,
-        calorie_intake_source: l.calorie_intake_source,
-        activity_calories: l.activity_calories,
-        activity_calories_source: l.activity_calories_source,
-        meals_count: l.meals_count,
-        water_l: l.water_l,
-        sleep_hours: l.sleep_hours,
-        sleep_quality: l.sleep_quality,
-        energy_level: l.energy_level,
-        mood_level: l.mood_level,
-        has_photos: Array.isArray(l.plate_photos) && l.plate_photos.length > 0,
-      })),
-      has_credential: !!credential,
-      created_at: client.created_at,
-    });
-  } catch (error) {
-    console.error("handleGetBodyCabinet error", error);
-    return res.status(500).json({ ok: false, error: error.message || "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ ĞºĞ°Ğ±Ğ¸Ğ½ĞµÑ‚Ğ°" });
-  }
-}
-
-async function handleUpdateBodyDisplayName(req, res) {
-  try {
-    const { session_id, access_token, display_name } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-    const name = typeof display_name === "string" ? display_name.trim() : "";
-    if (name.length > 100) {
-      return res.status(400).json({ ok: false, error: "Ğ˜Ğ¼Ñ ÑĞ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ´Ğ»Ğ¸Ğ½Ğ½Ğ¾Ğµ." });
-    }
-    const supabase = getSupabase();
-    const { error } = await supabase
-      .from("body_clients")
-      .update({ display_name: name || null })
-      .eq("anonymous_owner_id", owner.ownerId);
-    if (error) {
-      console.error("[updateBodyDisplayName] error:", error.message);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¸Ğ¼Ñ." });
-    }
-    return res.status(200).json({ ok: true, display_name: name || null });
-  } catch (error) {
-    console.error("handleUpdateBodyDisplayName error", error);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ Ğ¸Ğ¼ĞµĞ½Ğ¸." });
-  }
-}
-
-// ============================================================
-// Body Onboarding
-// ============================================================
-
-async function handleGetBodyOnboarding(req, res) {
-  try {
-    const { session_id, access_token } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from("body_onboarding")
-      .select("*")
-      .eq("owner_type", "anonymous_profile")
-      .eq("owner_id", owner.ownerId)
-      .maybeSingle();
-
-    if (error) {
-      console.error("[getBodyOnboarding] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ½Ğ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ¸." });
-    }
-
-    return res.status(200).json({
-      ok: true,
-      onboarding: data || {
-        intro_completed: false,
-        activity_tracker_used: null,
-        activity_tracker_name: null,
-        tracked_metrics: [],
-        calorie_tracking_mode: null,
-        data_entry_preference: null,
-        priority_metrics: [],
-        support_style: null,
-      },
-    });
-  } catch (error) {
-    console.error("handleGetBodyOnboarding error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ½Ğ°ÑÑ‚Ñ€Ğ¾ĞµĞº." });
-  }
-}
-
-async function handleSaveBodyOnboarding(req, res) {
-  try {
-    const { session_id, access_token, onboarding } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!onboarding || typeof onboarding !== "object") {
-      return res.status(400).json({ ok: false, error: "Missing onboarding data." });
-    }
-
-    const supabase = getSupabase();
-    const now = new Date().toISOString();
-
-    const ALLOWED_FIELDS = [
-      "intro_completed", "intro_completed_at",
-      "activity_tracker_used", "activity_tracker_name", "activity_tracker_other",
-      "tracked_metrics",
-      "calorie_tracking_mode", "calorie_tracking_app", "calorie_tracking_other",
-      "data_entry_preference", "priority_metrics", "support_style",
-    ];
-
-    const payload = { owner_type: "anonymous_profile", owner_id: owner.ownerId, updated_at: now };
-    for (const key of ALLOWED_FIELDS) {
-      if (onboarding[key] !== undefined) {
-        payload[key] = onboarding[key];
-      }
-    }
-    if (payload.intro_completed && !payload.intro_completed_at) {
-      payload.intro_completed_at = now;
-    }
-
-    // Upsert
-    const { data: existing } = await supabase
-      .from("body_onboarding")
-      .select("id")
-      .eq("owner_type", "anonymous_profile")
-      .eq("owner_id", owner.ownerId)
-      .maybeSingle();
-
-    let result;
-    if (existing) {
-      const { data: updated, error: updateError } = await supabase
-        .from("body_onboarding")
-        .update(payload)
-        .eq("id", existing.id)
-        .select("*")
-        .single();
-      if (updateError) {
-        console.error("[saveBodyOnboarding] update error:", updateError.code);
-        return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ½Ğ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ¸." });
-      }
-      result = updated;
-    } else {
-      const { data: inserted, error: insertError } = await supabase
-        .from("body_onboarding")
-        .insert(payload)
-        .select("*")
-        .single();
-      if (insertError) {
-        console.error("[saveBodyOnboarding] insert error:", insertError.code);
-        return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ½Ğ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ¸." });
-      }
-      result = inserted;
-    }
-
-    return res.status(200).json({ ok: true, onboarding: result });
-  } catch (error) {
-    console.error("handleSaveBodyOnboarding error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ Ğ½Ğ°ÑÑ‚Ñ€Ğ¾ĞµĞº." });
-  }
-}
-
-// ============================================================
-// Body Diary Day View
-// ============================================================
-
-async function handleGetBodyDiaryDay(req, res) {
-  try {
-    const { session_id, access_token, log_date } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!log_date || !/^\d{4}-\d{2}-\d{2}$/.test(log_date)) {
-      return res.status(400).json({ ok: false, error: "Invalid log_date format." });
-    }
-
-    const supabase = getSupabase();
-
-    // Find all body sessions for this owner
-    const { data: ownerSessions } = await supabase
-      .from("body_clients")
-      .select("session_id")
-      .eq("anonymous_owner_id", owner.ownerId);
-
-    const ownerSessionIds = (ownerSessions || []).map(s => s.session_id);
-
-    if (ownerSessionIds.length === 0) {
-      return res.status(404).json({ ok: false, error: "Ğ”Ğ½ĞµĞ²Ğ½Ğ¸Ğº Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½." });
-    }
-
-    // Find the diary day across all owner sessions
-    const { data: dayLog, error: dayError } = await supabase
-      .from("body_daily_logs")
-      .select("*")
-      .in("session_id", ownerSessionIds)
-      .eq("log_date", log_date)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (dayError) {
-      console.error("[getBodyDiaryDay] query error:", dayError.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸Ğº." });
-    }
-    if (!dayLog) {
-      return res.status(404).json({ ok: false, error: "Ğ—Ğ°Ğ¿Ğ¸ÑÑŒ Ğ·Ğ° ÑÑ‚Ñƒ Ğ´Ğ°Ñ‚Ñƒ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ°." });
-    }
-
-    // Calculate weight change from previous day
-    let weightChange = null;
-    if (dayLog.weight_kg != null) {
-      const { data: prevLog } = await supabase
-        .from("body_daily_logs")
-        .select("weight_kg")
-        .in("session_id", ownerSessionIds)
-        .lt("log_date", log_date)
-        .not("weight_kg", "is", null)
-        .order("log_date", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (prevLog?.weight_kg != null) {
-        weightChange = Math.round((dayLog.weight_kg - prevLog.weight_kg) * 10) / 10;
-      }
-    }
-
-    // Get plate history for this day
-    const { data: plateHistory } = await supabase
-      .from("body_plate_history")
-      .select("id, meal_type, photo_index, detected_foods, plate_components, vegetables_assessment, protein_assessment, carbohydrate_assessment, balance_summary, what_is_missing, gentle_suggestion, confidence, created_at")
-      .eq("owner_id", owner.ownerId)
-      .eq("log_date", log_date)
-      .order("created_at", { ascending: true });
-
-    return res.status(200).json({
-      ok: true,
-      day: {
-        id: dayLog.id,
-        session_id: dayLog.session_id,
-        log_date: dayLog.log_date,
-        weight_kg: dayLog.weight_kg,
-        waist_cm: dayLog.waist_cm,
-        steps: dayLog.steps,
-        activity_comment: dayLog.activity_comment,
-        workout_done: dayLog.workout_done,
-        workout_type: dayLog.workout_type,
-        workout_minutes: dayLog.workout_minutes,
-        workout_intensity: dayLog.workout_intensity,
-        workout_comment: dayLog.workout_comment,
-        workout_entries: dayLog.workout_entries || null,
-        calories: dayLog.calories,
-        activity_calories: dayLog.activity_calories,
-        activity_calories_source: dayLog.activity_calories_source,
-        calorie_intake_source: dayLog.calorie_intake_source,
-        meals_count: dayLog.meals_count,
-        breakfast: dayLog.breakfast,
-        lunch: dayLog.lunch,
-        dinner: dayLog.dinner,
-        snacks: dayLog.snacks,
-        nutrition_comment: dayLog.nutrition_comment,
-        overeating_level: dayLog.overeating_level,
-        sweet_cravings: dayLog.sweet_cravings,
-        water_l: dayLog.water_l,
-        sleep_hours: dayLog.sleep_hours,
-        sleep_quality: dayLog.sleep_quality,
-        energy_level: dayLog.energy_level,
-        mood_level: dayLog.mood_level,
-        day_text: dayLog.day_text,
-        voice_transcript: dayLog.voice_transcript,
-        plate_photos: dayLog.plate_photos,
-        plate_analysis: dayLog.plate_analysis,
-        ai_day_summary: dayLog.ai_day_summary,
-        ai_focus_tomorrow: dayLog.ai_focus_tomorrow,
-        ai_positive_observation: dayLog.ai_positive_observation,
-        ai_pattern_observation: dayLog.ai_pattern_observation,
-        ai_question_for_user: dayLog.ai_question_for_user,
-        daily_log_version: dayLog.daily_log_version,
-        weight_change: weightChange,
-        created_at: dayLog.created_at,
-        updated_at: dayLog.updated_at,
-      },
-      plate_history: plateHistory || [],
-    });
-  } catch (error) {
-    console.error("handleGetBodyDiaryDay error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ°." });
-  }
-}
-
-// ============================================================
-// Body Plate History
-// ============================================================
-
-async function handleSavePlateHistory(req, res) {
-  try {
-    const { session_id, access_token, daily_log_id, log_date, plate_results } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!daily_log_id || !log_date || !Array.isArray(plate_results)) {
-      return res.status(400).json({ ok: false, error: "Missing daily_log_id, log_date, or plate_results." });
-    }
-
-    const supabase = getSupabase();
-    const now = new Date().toISOString();
-    let savedCount = 0;
-
-    for (const result of plate_results) {
-      if (result.error) continue; // Skip failed analyses
-
-      const photoIndex = result.photo_index ?? 0;
-      const fingerprint = `${daily_log_id}:${photoIndex}`;
-
-      const payload = {
-        owner_type: "anonymous_profile",
-        owner_id: owner.ownerId,
-        session_id,
-        daily_log_id,
-        log_date,
-        photo_ref: fingerprint,
-        photo_index: photoIndex,
-        meal_type: result.meal_type || null,
-        detected_foods: result.detected_foods || null,
-        plate_components: result.plate_components || null,
-        vegetables_assessment: result.plate_components?.vegetables != null ? (result.plate_components.vegetables >= 40 ? "enough" : result.plate_components.vegetables > 0 ? "low" : "missing") : null,
-        protein_assessment: result.plate_components?.protein != null ? (result.plate_components.protein >= 20 ? "enough" : result.plate_components.protein > 0 ? "low" : "missing") : null,
-        carbohydrate_assessment: result.plate_components?.carbohydrates != null ? (result.plate_components.carbohydrates <= 35 ? "enough" : result.plate_components.carbohydrates > 50 ? "excess" : "ok") : null,
-        balance_summary: result.balance_summary || null,
-        what_is_missing: result.what_is_missing || null,
-        gentle_suggestion: result.gentle_suggestion || null,
-        confidence: result.confidence || null,
-        model_used: result.model_used || null,
-        prompt_version: result.prompt_version || null,
-        updated_at: now,
-      };
-
-      // Upsert by owner_id + daily_log_id + photo_index
-      const { data: existing } = await supabase
-        .from("body_plate_history")
-        .select("id")
-        .eq("owner_id", owner.ownerId)
-        .eq("daily_log_id", daily_log_id)
-        .eq("photo_index", photoIndex)
-        .maybeSingle();
-
-      if (existing) {
-        const { error: updateError } = await supabase
-          .from("body_plate_history")
-          .update(payload)
-          .eq("id", existing.id);
-        if (updateError) {
-          console.error("[savePlateHistory] update error:", updateError.code, "photo:", photoIndex);
-        } else {
-          savedCount++;
-        }
-      } else {
-        const { error: insertError } = await supabase
-          .from("body_plate_history")
-          .insert(payload);
-        if (insertError) {
-          console.error("[savePlateHistory] insert error:", insertError.code, "photo:", photoIndex);
-        } else {
-          savedCount++;
-        }
-      }
-    }
-
-    return res.status(200).json({ ok: true, saved: savedCount });
-  } catch (error) {
-    console.error("handleSavePlateHistory error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ Ğ¸ÑÑ‚Ğ¾Ñ€Ğ¸Ğ¸ Ñ‚Ğ°Ñ€ĞµĞ»Ğ¾Ğº." });
-  }
-}
-
-async function handleGetBodyPlateHistory(req, res) {
-  try {
-    const { session_id, access_token, period_days } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const days = period_days === 30 ? 30 : 7;
-    const sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
-    const supabase = getSupabase();
-
-    const { data: history, error: historyError } = await supabase
-      .from("body_plate_history")
-      .select("id, log_date, photo_index, meal_type, detected_foods, plate_components, vegetables_assessment, protein_assessment, carbohydrate_assessment, balance_summary, what_is_missing, gentle_suggestion, confidence, created_at")
-      .eq("owner_id", owner.ownerId)
-      .gte("log_date", sinceDate)
-      .order("log_date", { ascending: false })
-      .order("photo_index", { ascending: true });
-
-    if (historyError) {
-      console.error("[getBodyPlateHistory] query error:", historyError.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ¸ÑÑ‚Ğ¾Ñ€Ğ¸Ñ." });
-    }
-
-    const entries = history || [];
-
-    // Compute aggregates
-    const uniqueDays = new Set(entries.map(e => e.log_date));
-    const totalPhotos = entries.length;
-    const daysWithPhotos = uniqueDays.size;
-
-    let proteinEnough = 0, proteinLow = 0, proteinMissing = 0;
-    let vegEnough = 0, vegLow = 0, vegMissing = 0;
-    let carbEnough = 0, carbExcess = 0;
-    const missingCounts = {};
-    let confidenceSum = 0, confidenceCount = 0;
-
-    for (const e of entries) {
-      if (e.protein_assessment === "enough") proteinEnough++;
-      else if (e.protein_assessment === "low") proteinLow++;
-      else if (e.protein_assessment === "missing") proteinMissing++;
-
-      if (e.vegetables_assessment === "enough") vegEnough++;
-      else if (e.vegetables_assessment === "low") vegLow++;
-      else if (e.vegetables_assessment === "missing") vegMissing++;
-
-      if (e.carbohydrate_assessment === "enough") carbEnough++;
-      else if (e.carbohydrate_assessment === "excess") carbExcess++;
-
-      if (Array.isArray(e.what_is_missing)) {
-        for (const item of e.what_is_missing) {
-          missingCounts[item] = (missingCounts[item] || 0) + 1;
-        }
-      }
-
-      if (e.confidence != null) {
-        confidenceSum += Number(e.confidence);
-        confidenceCount++;
-      }
-    }
-
-    const frequentMissing = Object.entries(missingCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([item, count]) => ({ item, count }));
-
-    return res.status(200).json({
-      ok: true,
-      period_days: days,
-      aggregates: {
-        total_photos: totalPhotos,
-        days_with_photos: daysWithPhotos,
-        protein_enough: proteinEnough,
-        protein_low: proteinLow,
-        protein_missing: proteinMissing,
-        vegetables_enough: vegEnough,
-        vegetables_low: vegLow,
-        vegetables_missing: vegMissing,
-        carbohydrates_enough: carbEnough,
-        carbohydrates_excess: carbExcess,
-        frequent_missing: frequentMissing,
-        average_confidence: confidenceCount > 0 ? Math.round((confidenceSum / confidenceCount) * 100) / 100 : null,
-      },
-      entries: entries.slice(0, 20), // Last 20 for display
-    });
-  } catch (error) {
-    console.error("handleGetBodyPlateHistory error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ¸ÑÑ‚Ğ¾Ñ€Ğ¸Ğ¸ Ñ‚Ğ°Ñ€ĞµĞ»Ğ¾Ğº." });
-  }
-}
-
-// ============================================================
-// Body Insights
-// ============================================================
-
-async function handleGetBodyInsights(req, res) {
-  try {
-    const { session_id, access_token } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-    const { data: insights, error } = await supabase
-      .from("body_insights")
-      .select("id, insight_type, insight_date, title, insight_text, priority, status, created_at")
-      .eq("owner_id", owner.ownerId)
-      .eq("status", "active")
-      .order("priority", { ascending: true })
-      .order("created_at", { ascending: false })
-      .limit(3);
-
-    if (error) {
-      console.error("[getBodyInsights] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ½Ğ°Ğ±Ğ»ÑĞ´ĞµĞ½Ğ¸Ñ." });
-    }
-
-    return res.status(200).json({ ok: true, insights: insights || [] });
-  } catch (error) {
-    console.error("handleGetBodyInsights error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ½Ğ°Ğ±Ğ»ÑĞ´ĞµĞ½Ğ¸Ğ¹." });
-  }
-}
-
-async function handleDismissBodyInsight(req, res) {
-  try {
-    const { session_id, access_token, insight_id } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!insight_id) {
-      return res.status(400).json({ ok: false, error: "Missing insight_id." });
-    }
-
-    const supabase = getSupabase();
-    const { error } = await supabase
-      .from("body_insights")
-      .update({ status: "dismissed", updated_at: new Date().toISOString() })
-      .eq("id", insight_id)
-      .eq("owner_id", owner.ownerId);
-
-    if (error) {
-      console.error("[dismissBodyInsight] update error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞºÑ€Ñ‹Ñ‚ÑŒ Ğ½Ğ°Ğ±Ğ»ÑĞ´ĞµĞ½Ğ¸Ğµ." });
-    }
-
-    return res.status(200).json({ ok: true });
-  } catch (error) {
-    console.error("handleDismissBodyInsight error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞºÑ€Ñ‹Ñ‚Ğ¸Ñ Ğ½Ğ°Ğ±Ğ»ÑĞ´ĞµĞ½Ğ¸Ñ." });
-  }
-}
-
-// ============================================================
-// Body Weekly Summary
-// ============================================================
-
-function getLocalDateString() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-async function handleGetBodyWeeklySummary(req, res) {
-  try {
-    const { session_id, access_token, period_start, period_end } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!period_start || !period_end) {
-      return res.status(400).json({ ok: false, error: "Missing period_start or period_end." });
-    }
-
-    const supabase = getSupabase();
-    const { data: summary, error } = await supabase
-      .from("body_weekly_summaries")
-      .select("*")
-      .eq("owner_type", "anonymous_profile")
-      .eq("owner_id", owner.ownerId)
-      .eq("summary_type", "weekly")
-      .eq("period_start", period_start)
-      .maybeSingle();
-
-    if (error) {
-      console.error("[getBodyWeeklySummary] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ¸Ñ‚Ğ¾Ğ³." });
-    }
-
-    // Detect stale: compare source_snapshot with current logs
-    let isStale = false;
-    if (summary?.source_snapshot) {
-      const ownerSessionIds = (await supabase
-        .from("body_clients").select("session_id").eq("anonymous_owner_id", owner.ownerId)
-      ).data?.map(s => s.session_id) || [];
-
-      if (ownerSessionIds.length > 0) {
-        const { count: currentLogsCount } = await supabase
-          .from("body_daily_logs")
-          .select("*", { count: "exact", head: true })
-          .in("session_id", ownerSessionIds)
-          .gte("log_date", period_start)
-          .lte("log_date", period_end);
-
-        if ((currentLogsCount || 0) > (summary.source_snapshot.logs_count || 0)) {
-          isStale = true;
-        }
-      }
-    }
-
-    return res.status(200).json({
-      ok: true,
-      summary: summary || null,
-      cached: !!summary,
-      stale: isStale,
-    });
-  } catch (error) {
-    console.error("handleGetBodyWeeklySummary error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ¸Ñ‚Ğ¾Ğ³Ğ° Ğ½ĞµĞ´ĞµĞ»Ğ¸." });
-  }
-}
-
-async function handleGenerateBodyWeeklySummary(req, res) {
-  try {
-    const { session_id, access_token, period_start, period_end, force } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!period_start || !period_end) {
-      return res.status(400).json({ ok: false, error: "Missing period_start or period_end." });
-    }
-
-    const supabase = getSupabase();
-
-    // Check cache
-    if (!force) {
-      const { data: cached } = await supabase
-        .from("body_weekly_summaries")
-        .select("*")
-        .eq("owner_type", "anonymous_profile")
-        .eq("owner_id", owner.ownerId)
-        .eq("summary_type", "weekly")
-        .eq("period_start", period_start)
-        .maybeSingle();
-
-      if (cached) {
-        return res.status(200).json({ ok: true, summary: cached, cached: true, credits_charged: 0 });
-      }
-    }
-
-    // Gather data for the period
-    const { data: ownerSessions } = await supabase
-      .from("body_clients")
-      .select("session_id")
-      .eq("anonymous_owner_id", owner.ownerId);
-    const ownerSessionIds = (ownerSessions || []).map(s => s.session_id);
-
-    let dailyLogs = [];
-    if (ownerSessionIds.length > 0) {
-      const { data: logs } = await supabase
-        .from("body_daily_logs")
-        .select("log_date, weight_kg, waist_cm, steps, workout_done, workout_type, workout_minutes, meals_count, overeating_level, sweet_cravings, water_l, sleep_hours, sleep_quality, energy_level, mood_level, ai_positive_observation, ai_pattern_observation, ai_focus_tomorrow")
-        .in("session_id", ownerSessionIds)
-        .gte("log_date", period_start)
-        .lte("log_date", period_end)
-        .order("log_date", { ascending: true });
-      dailyLogs = logs || [];
-    }
-
-    if (dailyLogs.length === 0) {
-      return res.status(200).json({ ok: true, summary: null, cached: false, reason: "no_logs" });
-    }
-
-    // Plate aggregates
-    const { data: plateEntries } = await supabase
-      .from("body_plate_history")
-      .select("log_date, protein_assessment, vegetables_assessment, carbohydrate_assessment, what_is_missing")
-      .eq("owner_id", owner.ownerId)
-      .gte("log_date", period_start)
-      .lte("log_date", period_end);
-
-    const plates = plateEntries || [];
-    const plateAggregates = {
-      total_photos: plates.length,
-      days_with_photos: new Set(plates.map(p => p.log_date)).size,
-      protein_present_count: plates.filter(p => p.protein_assessment === "enough").length,
-      vegetables_present_count: plates.filter(p => p.vegetables_assessment === "enough").length,
-      complex_carbs_present_count: plates.filter(p => p.carbohydrate_assessment === "enough").length,
-      frequent_missing: (() => {
-        const counts = {};
-        for (const p of plates) {
-          if (Array.isArray(p.what_is_missing)) {
-            for (const item of p.what_is_missing) {
-              counts[item] = (counts[item] || 0) + 1;
-            }
-          }
-        }
-        return Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, 5).map(([item]) => item);
-      })(),
-    };
-
-    // Active insights
-    const { data: insights } = await supabase
-      .from("body_insights")
-      .select("title, insight_text, priority")
-      .eq("owner_id", owner.ownerId)
-      .eq("status", "active")
-      .order("priority", { ascending: true })
-      .limit(3);
-
-    // Onboarding preferences
-    const { data: onboarding } = await supabase
-      .from("body_onboarding")
-      .select("activity_tracker_used, support_style, priority_metrics")
-      .eq("owner_id", owner.ownerId)
-      .maybeSingle();
-
-    const context = {
-      period: { start: period_start, end: period_end, days_count: 7, logs_count: dailyLogs.length },
-      daily_logs: dailyLogs,
-      plate_aggregates: plateAggregates,
-      active_insights: (insights || []).map(i => ({ title: i.title, text: i.insight_text, priority: i.priority })),
-      onboarding_preferences: {
-        tracker_enabled: onboarding?.activity_tracker_used || false,
-        support_style: onboarding?.support_style || "gentle",
-        priority_metrics: onboarding?.priority_metrics || [],
-      },
-    };
-
-    // Read prompt
-    const { readModulePrompt } = await import("../lib/prompts.js");
-    const weeklyPrompt = readModulePrompt("body", "weekly-summary.md") || "";
-    const { readCorePrompt } = await import("../lib/prompts.js");
-    const conversationStyle = readCorePrompt("conversation-style.md") || "";
-
-    const systemPrompt = `${weeklyPrompt}\n\n${conversationStyle}`;
-    const userPrompt = `Ğ¡Ñ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€ÑƒĞ¹ Ğ½ĞµĞ´ĞµĞ»ÑŒĞ½Ñ‹Ğ¹ Ğ¸Ñ‚Ğ¾Ğ³ Ğ½Ğ° Ğ¾ÑĞ½Ğ¾Ğ²Ğµ Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ…:\n\n${JSON.stringify(context, null, 2)}`;
-
-    const MODEL = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
-    const FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
-    const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
-
-    const result = await runTask(TASK_TYPES.BODY_INTAKE, {
-      systemPrompt,
-      userPrompt,
-      model: MODEL,
-      fallbackModel: FALLBACK,
-      reasoningEffort: REASONING_EFFORT,
-    });
-
-    const parsed = result.parsed;
-    if (!parsed || !parsed.period_summary) {
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑÑ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¸Ñ‚Ğ¾Ğ³ Ğ½ĞµĞ´ĞµĞ»Ğ¸. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ." });
-    }
-
-    // Save to DB
-    const requestId = `weekly-${owner.ownerId}-${period_start}-${Date.now()}`;
-    const sourceSnapshot = {
-      logs_count: dailyLogs.length,
-      latest_log_updated_at: dailyLogs.length > 0 ? dailyLogs[dailyLogs.length - 1].log_date : null,
-      generated_at: new Date().toISOString(),
-    };
-    const { error: insertError } = await supabase
-      .from("body_weekly_summaries")
-      .insert({
-        owner_type: "anonymous_profile",
-        owner_id: owner.ownerId,
-        summary_type: "weekly",
-        period_start,
-        period_end,
-        source_days: dailyLogs.length,
-        source_plate_count: plates.length,
-        source_snapshot: sourceSnapshot,
-        summary_json: parsed,
-        user_summary: parsed.period_summary,
-        focus_next_period: parsed.next_week_focus,
-        model_used: result.model_used,
-        request_id: requestId,
-        generation_status: "ready",
-      });
-
-    if (insertError) {
-      console.error("[generateBodyWeeklySummary] insert error:", insertError.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¸Ñ‚Ğ¾Ğ³. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ." });
-    }
-
-    return res.status(200).json({
-      ok: true,
-      summary: { summary_json: parsed, user_summary: parsed.period_summary, period_start, period_end },
-      cached: false,
-      credits_charged: 2,
-    });
-  } catch (error) {
-    console.error("handleGenerateBodyWeeklySummary error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ñ„Ğ¾Ñ€Ğ¼Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¸Ñ Ğ¸Ñ‚Ğ¾Ğ³Ğ° Ğ½ĞµĞ´ĞµĞ»Ğ¸." });
-  }
-}
-
-// ============================================================
-// Body AI Chat
-// ============================================================
-
-async function handleGetBodyAiChat(req, res) {
-  try {
-    const { session_id, access_token, limit } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-    const msgLimit = Math.min(limit || 20, 50);
-
-    const { data: messages, error } = await supabase
-      .from("body_ai_chat")
-      .select("id, role, message_text, created_at, model_used, request_id")
-      .eq("owner_id", owner.ownerId)
-      .order("created_at", { ascending: false })
-      .limit(msgLimit);
-
-    if (error) {
-      console.error("[getBodyAiChat] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ¸ÑÑ‚Ğ¾Ñ€Ğ¸Ñ Ñ‡Ğ°Ñ‚Ğ°." });
-    }
-
-    // Return in chronological order, recovering full response from message_text JSON
-    const sorted = (messages || []).reverse().map(msg => {
-      // If message_text looks like JSON (fallback serialization), parse it back
-      if (msg.role === "assistant" && msg.message_text && msg.message_text.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(msg.message_text);
-          return { ...msg, ai_response: parsed, message_text: parsed.answer || msg.message_text };
-        } catch {}
-      }
-      return msg;
-    });
-    return res.status(200).json({ ok: true, messages: sorted });
-  } catch (error) {
-    console.error("handleGetBodyAiChat error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ñ‡Ğ°Ñ‚Ğ°." });
-  }
-}
-
-async function handleSendBodyAiMessage(req, res) {
-  const startTime = Date.now();
-  try {
-    const { session_id, access_token, message_text } = req.body || {};
-    console.log("[chat] step=1 received:", { has_session: !!session_id, has_token: !!access_token, msg_len: message_text?.length || 0 });
-
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      console.log("[chat] step=2 resolveBodyOwner FAILED");
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-    console.log("[chat] step=2 owner resolved");
-
-    if (!message_text || typeof message_text !== "string") {
-      return res.status(400).json({ ok: false, error: "Missing message_text." });
-    }
-
-    const trimmed = message_text.trim();
-    if (trimmed.length > 3000) {
-      return res.status(400).json({ ok: false, error: "Ğ¡Ğ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ´Ğ»Ğ¸Ğ½Ğ½Ñ‹Ğ¹ Ğ²Ğ¾Ğ¿Ñ€Ğ¾Ñ. Ğ¡Ğ¾ĞºÑ€Ğ°Ñ‚Ğ¸Ñ‚Ğµ, Ğ¿Ğ¾Ğ¶Ğ°Ğ»ÑƒĞ¹ÑÑ‚Ğ°." });
-    }
-
-    const supabase = getSupabase();
-
-    // Save user message
-    const userMsgId = crypto.randomUUID();
-    const { error: userInsertErr } = await supabase.from("body_ai_chat").insert({
-      id: userMsgId,
-      owner_type: "anonymous_profile",
-      owner_id: owner.ownerId,
-      session_id,
-      role: "user",
-      message_text: trimmed,
-      created_at: new Date().toISOString(),
-    });
-    if (userInsertErr) {
-      console.error("[chat] step=3 user message insert FAILED:", userInsertErr.code, userInsertErr.message);
-    } else {
-      console.log("[chat] step=3 user message saved");
-    }
-
-    // === DETERMINISTIC INTENT ROUTING (before AI) ===
-    const config = getModuleConfig("body");
-    const intentContext = {};
-    try {
-      const { getWallet, getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
-      const wallet = await getWallet({ ownerType: "anonymous_profile", ownerId: owner.ownerId, module: "body" });
-      if (wallet) {
-        const balance = await getUsageBalanceForClient({ walletId: wallet.id });
-        intentContext.wallet_balance = balance?.balance ?? null;
-      }
-      // Body-specific context
-      const { count: plateCount } = await supabase
-        .from("body_plate_photos")
-        .select("*", { count: "exact", head: true })
-        .eq("owner_id", owner.ownerId);
-      intentContext.plate_count = plateCount || 0;
-    } catch (ctxError) {
-      // Non-blocking â€” continue without context
-    }
-
-    const intentResult = detectIntent(trimmed, config, intentContext);
-    if (intentResult) {
-      // Save deterministic response
-      try {
-        await supabase.from("body_ai_chat").insert({
-          owner_type: "anonymous_profile",
-          owner_id: owner.ownerId,
-          session_id,
-          role: "assistant",
-          message_text: intentResult.answer,
-          ai_response: intentResult,
-          model_used: "deterministic",
-          created_at: new Date().toISOString(),
-        });
-      } catch (_) { /* ai_response column may not exist; message_text is saved by caller */ }
-      return res.status(200).json({
-        ok: true,
-        message: {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          answer: intentResult.answer,
-          small_next_step: null,
-          question_for_specialist: null,
-          safety_note: intentResult.safety_note || null,
-          confidence: intentResult.confidence || "high",
-          created_at: new Date().toISOString(),
-        },
-      });
-    }
-
-    // Build context snapshot
-    let context;
-    try {
-      context = await buildAiChatContext({ supabase, ownerId: owner.ownerId });
-      console.log("[chat] step=4 context built:", {
-        logs: context.recent_daily_logs?.length || 0,
-        insights: context.active_insights?.length || 0,
-        weekly: !!context.weekly_summary,
-        chat: context.recent_chat_messages?.length || 0,
-      });
-    } catch (ctxErr) {
-      console.error("[chat] step=4 context build FAILED:", ctxErr.message);
-      context = {};
-    }
-
-    // Read prompt
-    let chatPrompt = "";
-    let conversationStyle = "";
-    try {
-      const { readModulePrompt, readCorePrompt } = await import("../lib/prompts.js");
-      chatPrompt = readModulePrompt("body", "ai-chat.md") || "";
-      conversationStyle = readCorePrompt("conversation-style.md") || "";
-      console.log("[chat] step=5 prompts loaded:", { chat_prompt_len: chatPrompt.length, style_len: conversationStyle.length });
-    } catch (promptErr) {
-      console.error("[chat] step=5 prompt load FAILED:", promptErr.message);
-    }
-
-    const medicationSafety = context.patient_medication_context
-      ? `\n\nĞŸÑ€Ğ°Ğ²Ğ¸Ğ»Ğ¾ Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚Ğ¸ Ğ¿Ğ¾ Ğ»ĞµĞºĞ°Ñ€ÑÑ‚Ğ²Ğ°Ğ¼:\n${PATIENT_MEDICATION_SAFETY_INSTRUCTION}`
-      : "";
-    const systemPrompt = `${chatPrompt}\n\n${conversationStyle}${medicationSafety}\n\nĞšĞ¾Ğ½Ñ‚ĞµĞºÑÑ‚ Ğ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ĞµĞ»Ñ:\n${JSON.stringify(context, null, 2)}`;
-    const userPrompt = trimmed;
-
-    const MODEL = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
-    const FALLBACK = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
-    const REASONING_EFFORT = process.env.AI_REASONING_EFFORT || "medium";
-
-    let result;
-    try {
-      console.log("[chat] step=6 calling AI:", { model: MODEL, fallback: FALLBACK });
-      result = await runTask(TASK_TYPES.BODY_INTAKE, {
-        systemPrompt,
-        userPrompt,
-        model: MODEL,
-        fallbackModel: FALLBACK,
-        reasoningEffort: REASONING_EFFORT,
-      });
-      console.log("[chat] step=6 AI returned:", {
-        has_parsed: !!result.parsed,
-        has_answer: !!result.parsed?.answer,
-        raw_len: result.raw?.length || 0,
-        model_used: result.model_used,
-        duration_ms: Date.now() - startTime,
-      });
-    } catch (aiErr) {
-      console.error("[chat] step=6 AI call FAILED:", aiErr.message, "duration:", Date.now() - startTime, "ms");
-      return res.status(200).json({
-        ok: true,
-        message: { role: "assistant", answer: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ²ĞµÑ‚Ğ¸Ñ‚ÑŒ ÑĞµĞ¹Ñ‡Ğ°Ñ. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿Ğ¾Ğ·Ğ¶Ğµ.", confidence: "low" },
-        credits_charged: 0,
-      });
-    }
-
-    const parsed = result.parsed;
-    const raw = result.raw || "";
-    const requestId = `chat-${owner.ownerId}-${Date.now()}`;
-
-    // Build response: prefer parsed JSON, fallback to raw text
-    let aiAnswer;
-    let aiSmallStep = null;
-    let aiQuestion = null;
-    let aiSafety = null;
-    let aiConfidence = "medium";
-
-    if (parsed && parsed.answer) {
-      aiAnswer = parsed.answer;
-      aiSmallStep = parsed.small_next_step || null;
-      aiQuestion = parsed.question_for_specialist || null;
-      aiSafety = parsed.safety_note || null;
-      aiConfidence = parsed.confidence || "medium";
-      console.log("[chat] step=7 using parsed JSON answer");
-    } else if (raw) {
-      aiAnswer = raw.slice(0, 2000);
-      aiConfidence = "low";
-      console.log("[chat] step=7 using raw text fallback, len:", raw.length);
-    } else {
-      aiAnswer = "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ğ¾Ğ»ÑƒÑ‡Ğ¸Ñ‚ÑŒ Ğ¾Ñ‚Ğ²ĞµÑ‚. ĞŸĞ¾Ğ¿Ñ€Ğ¾Ğ±ÑƒĞ¹Ñ‚Ğµ Ğ¿ĞµÑ€ĞµÑ„Ğ¾Ñ€Ğ¼ÑƒĞ»Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ²Ğ¾Ğ¿Ñ€Ğ¾Ñ.";
-      aiConfidence = "low";
-      console.log("[chat] step=7 no answer available");
-    }
-
-    // Save assistant response
-    const assistantMsgId = crypto.randomUUID();
-    let assistantPayload = {
-      id: assistantMsgId,
-      owner_type: "anonymous_profile",
-      owner_id: owner.ownerId,
-      session_id,
-      role: "assistant",
-      message_text: aiAnswer,
-      context_snapshot: {
-        logs_count: context.recent_daily_logs?.length || 0,
-        insights_count: context.active_insights?.length || 0,
-        has_weekly: !!context.weekly_summary,
-      },
-      request_id: requestId,
-      model_used: result.model_used,
-      created_at: new Date().toISOString(),
-    };
-    let assistantInsertErr = null;
-    const fullResponse = { answer: aiAnswer, small_next_step: aiSmallStep, question_for_specialist: aiQuestion, safety_note: aiSafety, confidence: aiConfidence };
-    ({ error: assistantInsertErr } = await supabase.from("body_ai_chat").insert({
-      ...assistantPayload,
-      ai_response: fullResponse,
-    }));
-    if (assistantInsertErr && assistantInsertErr.code === "42703") {
-      // ai_response column does not exist â€” serialize full response into message_text
-      assistantPayload.message_text = JSON.stringify(fullResponse);
-      ({ error: assistantInsertErr } = await supabase.from("body_ai_chat").insert(assistantPayload));
-    }
-    if (assistantInsertErr) {
-      console.error("[chat] step=8 assistant insert FAILED:", assistantInsertErr.code);
-    } else {
-      console.log("[chat] step=8 assistant saved, total_duration:", Date.now() - startTime, "ms");
-    }
-
-    return res.status(200).json({
-      ok: true,
-      message: {
-        id: assistantMsgId,
-        role: "assistant",
-        answer: aiAnswer,
-        small_next_step: aiSmallStep,
-        question_for_specialist: aiQuestion,
-        safety_note: aiSafety,
-        confidence: aiConfidence,
-        created_at: new Date().toISOString(),
-      },
-      credits_charged: 1,
-    });
-  } catch (error) {
-    console.error("handleSendBodyAiMessage error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²ĞºĞ¸ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ñ." });
-  }
-}
-
-async function buildAiChatContext({ supabase, ownerId }) {
-  const context = {};
-
-  // Profile
-  try {
-    const { data: latestIntake } = await supabase
-      .from("body_intake_forms")
-      .select("answers, bmi, care_recommendation")
-      .in("session_id", (await supabase.from("body_clients").select("session_id").eq("anonymous_owner_id", ownerId)).data?.map(s => s.session_id) || ["__none__"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (latestIntake) {
-      context.profile = {
-        goal: latestIntake.answers?.goal || null,
-        bmi: latestIntake.bmi || null,
-        care_recommendation: latestIntake.care_recommendation || null,
-      };
-    }
-  } catch {}
-
-  // Onboarding preferences
-  try {
-    const { data: onboarding } = await supabase
-      .from("body_onboarding")
-      .select("activity_tracker_used, support_style, priority_metrics")
-      .eq("owner_id", ownerId)
-      .maybeSingle();
-    if (onboarding) {
-      context.onboarding_preferences = {
-        tracker_enabled: onboarding.activity_tracker_used || false,
-        support_style: onboarding.support_style || "gentle",
-        priority_metrics: onboarding.priority_metrics || [],
-      };
-    }
-  } catch {}
-
-  // Recent daily logs (max 7)
-  try {
-    const ownerSessionIds = (await supabase.from("body_clients").select("session_id").eq("anonymous_owner_id", ownerId)).data?.map(s => s.session_id) || [];
-    if (ownerSessionIds.length > 0) {
-      const { data: logs } = await supabase
-        .from("body_daily_logs")
-        .select("log_date, weight_kg, steps, workout_done, workout_minutes, meals_count, sleep_hours, sleep_quality, energy_level, mood_level, ai_positive_observation, ai_pattern_observation")
-        .in("session_id", ownerSessionIds)
-        .order("log_date", { ascending: false })
-        .limit(7);
-      context.recent_daily_logs = logs || [];
-    }
-  } catch {}
-
-  // Plate aggregates (30 days)
-  try {
-    const sinceDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const { data: plates } = await supabase
-      .from("body_plate_history")
-      .select("protein_assessment, vegetables_assessment, carbohydrate_assessment, what_is_missing")
-      .eq("owner_id", ownerId)
-      .gte("log_date", sinceDate);
-    const p = plates || [];
-    const missingCounts = {};
-    for (const entry of p) {
-      if (Array.isArray(entry.what_is_missing)) {
-        for (const item of entry.what_is_missing) {
-          missingCounts[item] = (missingCounts[item] || 0) + 1;
-        }
-      }
-    }
-    context.plate_aggregates_30d = {
-      total_photos: p.length,
-      protein_present: p.filter(e => e.protein_assessment === "enough").length,
-      vegetables_present: p.filter(e => e.vegetables_assessment === "enough").length,
-      frequent_missing: Object.entries(missingCounts).sort(([, a], [, b]) => b - a).slice(0, 5).map(([item]) => item),
-    };
-  } catch {}
-
-  // Active insights (max 3)
-  try {
-    const { data: insights } = await supabase
-      .from("body_insights")
-      .select("title, insight_text, priority")
-      .eq("owner_id", ownerId)
-      .eq("status", "active")
-      .order("priority", { ascending: true })
-      .limit(3);
-    context.active_insights = (insights || []).map(i => ({ title: i.title, text: i.insight_text }));
-  } catch {}
-
-  // Weekly summary (latest cached)
-  try {
-    const { data: weekly } = await supabase
-      .from("body_weekly_summaries")
-      .select("period_start, period_end, user_summary, summary_json")
-      .eq("owner_id", ownerId)
-      .eq("summary_type", "weekly")
-      .order("period_start", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (weekly) {
-      context.weekly_summary = {
-        period: `${weekly.period_start} â€” ${weekly.period_end}`,
-        summary: weekly.user_summary,
-        positive_changes: weekly.summary_json?.positive_changes || [],
-        patterns: weekly.summary_json?.patterns || [],
-      };
-    }
-  } catch {}
-
-  // Recent chat messages (max 5)
-  try {
-    const { data: recentChat } = await supabase
-      .from("body_ai_chat")
-      .select("role, message_text")
-      .eq("owner_id", ownerId)
-      .order("created_at", { ascending: false })
-      .limit(5);
-    context.recent_chat_messages = (recentChat || []).reverse();
-  } catch {}
-
-  const medicationContext = await loadPatientMedicationContext(supabase, "anonymous_profile", ownerId, "health");
-  if (medicationContext) context.patient_medication_context = medicationContext;
-
-  return context;
-}
-
-// ============================================================
-// Body Health Context
-// ============================================================
-
-async function handleGetBodyHealthContext(req, res) {
-  try {
-    const { session_id, access_token } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-    const { data, error } = await supabase
-      .from("body_health_contexts")
-      .select("*")
-      .eq("owner_type", "anonymous_profile")
-      .eq("owner_id", owner.ownerId)
-      .eq("module", "body")
-      .maybeSingle();
-
-    if (error) {
-      console.error("[getBodyHealthContext] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ ĞºĞ¾Ğ½Ñ‚ĞµĞºÑÑ‚ Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ." });
-    }
-
-    return res.status(200).json({
-      ok: true,
-      context: data || {
-        health_conditions: [],
-        medications: [],
-        supplements: [],
-        lab_notes: {},
-        documents_note: null,
-        doctor_observation: null,
-        safety_flags: [],
-        consent_acknowledged: false,
-      },
-    });
-  } catch (error) {
-    console.error("handleGetBodyHealthContext error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ ĞºĞ¾Ğ½Ñ‚ĞµĞºÑÑ‚Ğ° Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ." });
-  }
-}
-
-async function handleSaveBodyHealthContext(req, res) {
-  try {
-    const { session_id, access_token, health_context } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!health_context || typeof health_context !== "object") {
-      return res.status(400).json({ ok: false, error: "Missing health_context." });
-    }
-
-    // Validate sizes
-    if (Array.isArray(health_context.health_conditions) && health_context.health_conditions.length > 30) {
-      return res.status(400).json({ ok: false, error: "Ğ¡Ğ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ¼Ğ½Ğ¾Ğ³Ğ¾ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğ¹ (Ğ¼Ğ°ĞºÑĞ¸Ğ¼ÑƒĞ¼ 30)." });
-    }
-    if (Array.isArray(health_context.medications) && health_context.medications.length > 30) {
-      return res.status(400).json({ ok: false, error: "Ğ¡Ğ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ¼Ğ½Ğ¾Ğ³Ğ¾ Ğ¿Ñ€ĞµĞ¿Ğ°Ñ€Ğ°Ñ‚Ğ¾Ğ² (Ğ¼Ğ°ĞºÑĞ¸Ğ¼ÑƒĞ¼ 30)." });
-    }
-    if (Array.isArray(health_context.supplements) && health_context.supplements.length > 30) {
-      return res.status(400).json({ ok: false, error: "Ğ¡Ğ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ¼Ğ½Ğ¾Ğ³Ğ¾ Ğ‘ĞĞ”Ğ¾Ğ² (Ğ¼Ğ°ĞºÑĞ¸Ğ¼ÑƒĞ¼ 30)." });
-    }
-
-    const supabase = getSupabase();
-    const now = new Date().toISOString();
-
-    const ALLOWED = [
-      "health_conditions", "medications", "supplements",
-      "lab_notes", "documents_note", "doctor_observation",
-      "safety_flags", "consent_acknowledged",
-    ];
-
-    const payload = { owner_type: "anonymous_profile", owner_id: owner.ownerId, module: "body", updated_at: now };
-    for (const key of ALLOWED) {
-      if (health_context[key] !== undefined) {
-        payload[key] = health_context[key];
-      }
-    }
-
-    const { data: existing } = await supabase
-      .from("body_health_contexts")
-      .select("id")
-      .eq("owner_type", "anonymous_profile")
-      .eq("owner_id", owner.ownerId)
-      .eq("module", "body")
-      .maybeSingle();
-
-    let result;
-    if (existing) {
-      const { data: updated, error: updateError } = await supabase
-        .from("body_health_contexts")
-        .update(payload)
-        .eq("id", existing.id)
-        .select("*")
-        .single();
-      if (updateError) {
-        console.error("[saveBodyHealthContext] update error:", updateError.code);
-        return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ ĞºĞ¾Ğ½Ñ‚ĞµĞºÑÑ‚ Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ." });
-      }
-      result = updated;
-    } else {
-      payload.created_at = now;
-      const { data: inserted, error: insertError } = await supabase
-        .from("body_health_contexts")
-        .insert(payload)
-        .select("*")
-        .single();
-      if (insertError) {
-        console.error("[saveBodyHealthContext] insert error:", insertError.code);
-        return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ ĞºĞ¾Ğ½Ñ‚ĞµĞºÑÑ‚ Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ." });
-      }
-      result = inserted;
-    }
-
-    return res.status(200).json({ ok: true, context: result });
-  } catch (error) {
-    console.error("handleSaveBodyHealthContext error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ ĞºĞ¾Ğ½Ñ‚ĞµĞºÑÑ‚Ğ° Ğ·Ğ´Ğ¾Ñ€Ğ¾Ğ²ÑŒÑ." });
-  }
-}
-
-async function resolvePatientMedicationOwner(reqBody = {}) {
-  const { module, session_id, access_token } = reqBody;
-  if (module === "health") {
-    const owner = await resolveBodyOwner(session_id, access_token);
-    return owner ? { ...owner, ownerType: "anonymous_profile", sourceModule: "health" } : null;
-  }
-  if (module === "support") {
-    const owner = await resolveSupportOwner(session_id, access_token);
-    return owner ? { ...owner, ownerType: "anonymous_case", sourceModule: "support" } : null;
-  }
-  return null;
-}
-
-async function handleListPatientMedicationOrders(req, res) {
-  const body = req.body || {};
-  const owner = await resolvePatientMedicationOwner(body);
-  if (!owner) return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-  const scheduledDate = isMedicationDate(body.scheduled_date)
-    ? body.scheduled_date
-    : new Date().toISOString().slice(0, 10);
-  const supabase = getSupabase();
-  const { data: orders, error } = await supabase
-    .from("patient_medication_orders")
-    .select("*")
-    .eq("owner_type", owner.ownerType)
-    .eq("owner_id", owner.ownerId)
-    .eq("source_module", owner.sourceModule)
-    .order("status", { ascending: true })
-    .order("start_date", { ascending: false });
-  if (error) {
-    console.error("[patient-medication-list] query failed:", error.code);
-    return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ ÑĞ¿Ğ¸ÑĞ¾Ğº." });
-  }
-
-  const ownedOrders = (orders || []).filter((order) => patientMedicationOwnerMatches(order, owner));
-  let referenceByOrder = new Map();
-  try {
-    referenceByOrder = await loadMedicationReferenceViews(supabase, ownedOrders);
-  } catch (referenceError) {
-    console.warn("[patient-medication-list] verified reference unavailable:", referenceError.code || "query_failed");
-  }
-  const ordersWithReference = ownedOrders.map((order) => ({
-    ...order,
-    medication_reference: referenceByOrder.get(order.id) || {
-      status: order.reference_status || "unresolved",
-      concept: null,
-      candidates: [],
-      verified_reference: null,
-    },
-  }));
-  let schedule = [];
-  if (body.include_schedule === true) {
-    const tasks = buildScheduledMedicationIntakes(ownedOrders, scheduledDate);
-    const { data: logs, error: logError } = tasks.length
-      ? await supabase.from("medication_intake_logs").select("*")
-        .eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
-        .eq("scheduled_date", scheduledDate)
-      : { data: [], error: null };
-    if (logError) {
-      console.error("[patient-medication-list] intake query failed:", logError.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ¾Ñ‚Ğ¼ĞµÑ‚ĞºĞ¸ Ğ¿Ñ€Ğ¸Ñ‘Ğ¼Ğ°." });
-    }
-    schedule = projectMedicationIntakes(tasks, logs || []);
-  }
-  return res.status(200).json({ ok: true, orders: ordersWithReference, schedule, scheduled_date: scheduledDate });
-}
-
-async function handleSavePatientMedicationOrder(req, res) {
-  const body = req.body || {};
-  const owner = await resolvePatientMedicationOwner(body);
-  if (!owner) return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-  const validated = validatePatientMedicationOrder(body.order || {});
-  if (!validated.ok) return res.status(400).json({ ok: false, error: validated.error });
-
-  const supabase = getSupabase();
-  const payload = {
-    ...validated.order,
-    owner_type: owner.ownerType,
-    owner_id: owner.ownerId,
-    source_module: owner.sourceModule,
-    session_id: owner.sessionId,
-    updated_at: new Date().toISOString(),
-  };
-  let query;
-  if (body.order_id) {
-    const { data: existing, error: existingError } = await supabase.from("patient_medication_orders")
-      .select("id, item_type, name, dosage_form, strength")
-      .eq("id", body.order_id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
-      .eq("source_module", owner.sourceModule).maybeSingle();
-    if (existingError || !existing) return res.status(404).json({ ok: false, error: "ĞĞ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ğµ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ¾." });
-    const identityChanged = existing.item_type !== payload.item_type
-      || existing.name !== payload.name
-      || existing.dosage_form !== payload.dosage_form
-      || existing.strength !== payload.strength;
-    if (identityChanged) {
-      Object.assign(payload, {
-        medication_concept_id: null,
-        reference_status: "unresolved",
-        reference_candidate_concepts: [],
-        reference_confidence: null,
-        reference_matched_by: null,
-        reference_match_method: null,
-        reference_matched_at: null,
-        reference_source_provider: null,
-        reference_source_snapshot_id: null,
-      });
-    }
-    query = supabase.from("patient_medication_orders").update(payload)
-      .eq("id", body.order_id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
-      .eq("source_module", owner.sourceModule).select("*").maybeSingle();
-  } else {
-    query = supabase.from("patient_medication_orders").insert(payload).select("*").single();
-  }
-  const { data, error } = await query;
-  if (error || !data) {
-    console.error("[patient-medication-save] write failed:", error?.code || "not_found");
-    return res.status(error?.code === "23514" ? 400 : 500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ğµ." });
-  }
-  return res.status(200).json({ ok: true, order: data, message: body.order_id ? "Ğ˜Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ñ ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ñ‹." : "ĞĞ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ğµ Ğ´Ğ¾Ğ±Ğ°Ğ²Ğ»ĞµĞ½Ğ¾ Ğ² Ğ²Ğ°Ñˆ ÑĞ¿Ğ¸ÑĞ¾Ğº." });
-}
-
-async function handleUpdatePatientMedicationOrderStatus(req, res) {
-  const body = req.body || {};
-  const owner = await resolvePatientMedicationOwner(body);
-  if (!owner) return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-  if (!body.order_id || !isPatientMedicationOrderStatus(body.status)) return res.status(400).json({ ok: false, error: "ĞĞµĞºĞ¾Ñ€Ñ€ĞµĞºÑ‚Ğ½Ñ‹Ğ¹ ÑÑ‚Ğ°Ñ‚ÑƒÑ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ñ." });
-  const { data, error } = await getSupabase().from("patient_medication_orders")
-    .update({ status: body.status, updated_at: new Date().toISOString() })
-    .eq("id", body.order_id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
-    .eq("source_module", owner.sourceModule).select("*").maybeSingle();
-  if (error || !data) return res.status(404).json({ ok: false, error: "ĞĞ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ğµ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ¾." });
-  return res.status(200).json({ ok: true, order: data });
-}
-
-async function handleRecordMedicationIntake(req, res) {
-  const body = req.body || {};
-  const owner = await resolvePatientMedicationOwner(body);
-  if (!owner) return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-  const validated = validateMedicationIntake(body.intake || {});
-  if (!validated.ok) return res.status(400).json({ ok: false, error: validated.error });
-
-  const supabase = getSupabase();
-  const { data: order, error: orderError } = await supabase.from("patient_medication_orders")
-    .select("id, item_type, name, single_dose, dose_unit, frequency_type, times_per_day, scheduled_times, start_date, end_date, ongoing, status")
-    .eq("id", body.order_id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
-    .eq("source_module", owner.sourceModule).maybeSingle();
-  if (orderError || !order) return res.status(404).json({ ok: false, error: "ĞĞ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ğµ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ¾." });
-  const scheduled = buildScheduledMedicationIntakes([order], validated.intake.scheduled_date)
-    .some((task) => task.scheduled_slot === validated.intake.scheduled_slot);
-  if (!scheduled) return res.status(400).json({ ok: false, error: "Ğ”Ğ»Ñ ÑÑ‚Ğ¾Ğ³Ğ¾ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ñ Ğ½ĞµÑ‚ Ğ·Ğ°Ğ¿Ğ»Ğ°Ğ½Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ğ¾Ğ³Ğ¾ Ğ¿Ñ€Ğ¸Ñ‘Ğ¼Ğ° Ğ² Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½ÑƒÑ Ğ´Ğ°Ñ‚Ñƒ." });
-
-  const task = buildScheduledMedicationIntakes([order], validated.intake.scheduled_date)
-    .find((item) => item.scheduled_slot === validated.intake.scheduled_slot);
-  const { data, error } = await supabase.from("medication_intake_logs").upsert({
-    owner_type: owner.ownerType,
-    owner_id: owner.ownerId,
-    medication_order_id: order.id,
-    scheduled_date: validated.intake.scheduled_date,
-    scheduled_time: task.scheduled_time,
-    ...validated.intake,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "medication_order_id,scheduled_date,scheduled_slot" }).select("*").single();
-  if (error) {
-    console.error("[patient-medication-intake] save failed:", error.code);
-    return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¾Ñ‚Ğ¼ĞµÑ‚ĞºÑƒ." });
-  }
-  return res.status(200).json({ ok: true, intake: data });
-}
-
-async function handleFindPatientMedicationReferenceCandidates(req, res) {
-  const body = req.body || {};
-  const owner = await resolvePatientMedicationOwner(body);
-  if (!owner) return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-  if (!body.order_id) return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ğµ." });
-
-  const supabase = getSupabase();
-  const { data: order, error: orderError } = await supabase.from("patient_medication_orders")
-    .select("id, item_type, name, owner_type, owner_id, source_module, reference_status, medication_concept_id, reference_source_snapshot_id")
-    .eq("id", body.order_id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
-    .eq("source_module", owner.sourceModule).maybeSingle();
-  if (orderError || !order) return res.status(404).json({ ok: false, error: "ĞĞ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ğµ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ¾." });
-  if (order.item_type === "supplement") {
-    return res.status(200).json({ ok: true, reference_status: "unresolved", candidates: [], reason: "supplement_reference_unavailable" });
-  }
-  if (["matched", "verified"].includes(order.reference_status)) {
-    const { data: concept } = order.medication_concept_id
-      ? await supabase.from("medication_concepts").select("id, display_name, canonical_name, concept_kind, source_system").eq("id", order.medication_concept_id).eq("test_only", false).maybeSingle()
-      : { data: null };
-    const reference = await loadMedicationReferenceForOrder(supabase, order);
-    return res.status(200).json({ ok: true, reference_status: order.reference_status, candidates: [], concept, verified_reference: reference });
-  }
-
-  const { data: concepts, error: conceptsError, count } = await supabase.from("medication_concepts")
-    .select("id, concept_code, source_system, jurisdiction, canonical_name, display_name, concept_kind, status, test_only", { count: "exact" })
-    .eq("jurisdiction", "RU").eq("status", "active").eq("test_only", false).limit(5000);
-  if (conceptsError) {
-    console.warn("[medication-reference-search] catalog unavailable:", conceptsError.code);
-    return res.status(200).json({ ok: true, reference_status: "unresolved", candidates: [], reason: "reference_provider_unavailable" });
-  }
-  if ((count || 0) > (concepts || []).length) {
-    return res.status(200).json({ ok: true, reference_status: "unresolved", candidates: [], reason: "catalog_limit_reached" });
-  }
-
-  let providerCandidateIds = new Set();
-  try {
-    const providerResult = await PATIENT_MEDICATION_REFERENCE_PROVIDER.searchMedication(order.name);
-    if (providerResult?.available === true && Array.isArray(providerResult.candidates)) {
-      providerCandidateIds = new Set(providerResult.candidates.map((candidate) => candidate.medication_concept_id).filter(Boolean));
-    }
-  } catch (providerError) {
-    console.warn("[medication-reference-search] provider unavailable:", providerError.code || "query_failed");
-  }
-  const internalMatch = findExactMedicationConceptCandidates(order.name, (concepts || []).filter((concept) => concept.source_system === "internal"));
-  const providerMatch = findExactMedicationConceptCandidates(order.name, (concepts || []).filter((concept) => providerCandidateIds.has(concept.id)));
-  const candidateMap = new Map([...internalMatch.candidates, ...providerMatch.candidates].map((candidate) => [candidate.medication_concept_id, candidate]));
-  const matchedCandidates = [...candidateMap.values()];
-  const result = {
-    reference_status: matchedCandidates.length === 0 ? "unresolved" : matchedCandidates.length === 1 ? "candidate" : "ambiguous",
-    confidence: matchedCandidates.length === 1 ? 1 : null,
-  };
-  const candidates = matchedCandidates.map((candidate) => ({
-    medication_concept_id: candidate.medication_concept_id,
-    concept_code: candidate.concept_code,
-    display_name: candidate.display_name,
-    canonical_name: candidate.canonical_name,
-    concept_kind: candidate.concept_kind,
-    source_system: candidate.source_system,
-    confidence: candidate.confidence,
-    confidence_method: candidate.confidence_method,
-  }));
-  const { error: updateError } = await supabase.from("patient_medication_orders").update({
-    reference_status: result.reference_status,
-    reference_candidate_concepts: candidates,
-    reference_confidence: result.confidence,
-    reference_matched_by: null,
-    reference_match_method: candidates.length ? "exact_normalized_name" : null,
-    reference_matched_at: null,
-    reference_source_provider: candidates.length === 1 ? candidates[0].source_system : candidates.length ? "multiple_catalog_sources" : null,
-    medication_concept_id: null,
-    reference_source_snapshot_id: null,
-    updated_at: new Date().toISOString(),
-  }).eq("id", order.id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
-    .eq("source_module", owner.sourceModule);
-  if (updateError) return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ñ€ĞµĞ·ÑƒĞ»ÑŒÑ‚Ğ°Ñ‚ ÑĞ¾Ğ¿Ğ¾ÑÑ‚Ğ°Ğ²Ğ»ĞµĞ½Ğ¸Ñ." });
-  return res.status(200).json({ ok: true, reference_status: result.reference_status, candidates });
-}
-
-async function handleConfirmPatientMedicationReferenceMatch(req, res) {
-  const body = req.body || {};
-  const owner = await resolvePatientMedicationOwner(body);
-  if (!owner) return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-  if (!body.order_id || !body.medication_concept_id) return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ğµ Ğ¸ Ğ²Ğ°Ñ€Ğ¸Ğ°Ğ½Ñ‚ Ğ¿Ñ€ĞµĞ¿Ğ°Ñ€Ğ°Ñ‚Ğ°." });
-
-  const supabase = getSupabase();
-  const { data: order, error: orderError } = await supabase.from("patient_medication_orders")
-    .select("id, item_type, name, reference_status, reference_candidate_concepts")
-    .eq("id", body.order_id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
-    .eq("source_module", owner.sourceModule).maybeSingle();
-  if (orderError || !order) return res.status(404).json({ ok: false, error: "ĞĞ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ğµ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ¾." });
-  if (order.item_type !== "medication" || !["candidate", "ambiguous"].includes(order.reference_status)
-    || !(order.reference_candidate_concepts || []).some((candidate) => candidate.medication_concept_id === body.medication_concept_id)) {
-    return res.status(400).json({ ok: false, error: "Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ Ğ¾Ğ´Ğ¸Ğ½ Ğ¸Ğ· Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ½Ñ‹Ñ… Ñ‚Ğ¾Ñ‡Ğ½Ñ‹Ñ… Ğ²Ğ°Ñ€Ğ¸Ğ°Ğ½Ñ‚Ğ¾Ğ²." });
-  }
-
-  const { data: concept, error: conceptError } = await supabase.from("medication_concepts")
-    .select("id, concept_code, source_system, jurisdiction, canonical_name, display_name, concept_kind, status, test_only")
-    .eq("id", body.medication_concept_id).eq("jurisdiction", "RU").eq("status", "active").eq("test_only", false).maybeSingle();
-  const candidateConceptIds = (order.reference_candidate_concepts || []).map((candidate) => candidate.medication_concept_id);
-  if (conceptError || !concept?.source_system || !canExplicitlySelectMedicationConcept(order.name, candidateConceptIds, concept)) {
-    return res.status(400).json({ ok: false, error: "Ğ’Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ñ‹Ğ¹ Ğ²Ğ°Ñ€Ğ¸Ğ°Ğ½Ñ‚ Ğ±Ğ¾Ğ»ÑŒÑˆĞµ Ğ½Ğµ ÑĞ²Ğ»ÑĞµÑ‚ÑÑ Ñ‚Ğ¾Ñ‡Ğ½Ñ‹Ğ¼ ÑĞ¾Ğ²Ğ¿Ğ°Ğ´ĞµĞ½Ğ¸ĞµĞ¼." });
-  }
-
-  const { data: updated, error } = await supabase.from("patient_medication_orders").update({
-    medication_concept_id: concept.id,
-    reference_status: "matched",
-    reference_confidence: 1,
-    reference_matched_by: "patient",
-    reference_match_method: "patient_confirmed_exact_normalized_name",
-    reference_matched_at: new Date().toISOString(),
-    reference_source_provider: concept.source_system,
-    reference_source_snapshot_id: null,
-    updated_at: new Date().toISOString(),
-  }).eq("id", order.id).eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
-    .eq("source_module", owner.sourceModule).select("*").maybeSingle();
-  if (error || !updated) return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ ÑĞ¾Ğ¿Ğ¾ÑÑ‚Ğ°Ğ²Ğ»ĞµĞ½Ğ¸Ğµ." });
-  return res.status(200).json({ ok: true, order: updated, concept, verified: false });
-}
-
-// ============================================================
-// Service Requests
-// ============================================================
-
-const REQUEST_TYPE_CONFIG = {
-  text_question: { label: "ĞĞ½Ğ»Ğ°Ğ¹Ğ½-Ğ²Ğ¾Ğ¿Ñ€Ğ¾Ñ", meeting_format: "text", sla_hours: 24, reserved_credits: 300 },
-  phone_call: { label: "Ğ¢ĞµĞ»ĞµÑ„Ğ¾Ğ½Ğ½Ñ‹Ğ¹ Ğ·Ğ²Ğ¾Ğ½Ğ¾Ğº", meeting_format: "phone", sla_hours: 24, reserved_credits: 700 },
-  video_call: { label: "Ğ’Ğ¸Ğ´ĞµĞ¾ĞºĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ñ", meeting_format: "video", sla_hours: 48, reserved_credits: 1500 },
-  offline_visit: { label: "ĞÑ‡Ğ½Ğ°Ñ ĞºĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ñ", meeting_format: "offline", sla_hours: 48, reserved_credits: 0, pricing_note: "Ğ¡Ñ‚Ğ¾Ğ¸Ğ¼Ğ¾ÑÑ‚ÑŒ Ğ¸ Ğ²Ñ€ĞµĞ¼Ñ ÑƒÑ‚Ğ¾Ñ‡Ğ½Ğ¸Ñ‚ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚" },
-  diary_review: { label: "Ğ Ğ°Ğ·Ğ±Ğ¾Ñ€ Ğ´Ğ½ĞµĞ²Ğ½Ğ¸ĞºĞ°", meeting_format: "text", sla_hours: 24, reserved_credits: 500 },
-  labs_medications_review: { label: "Ğ Ğ°Ğ·Ğ±Ğ¾Ñ€ Ğ°Ğ½Ğ°Ğ»Ğ¸Ğ·Ğ¾Ğ² Ğ¸ Ğ¿Ñ€ĞµĞ¿Ğ°Ñ€Ğ°Ñ‚Ğ¾Ğ²", meeting_format: "text", sla_hours: 24, reserved_credits: 700 },
-  other: { label: "Ğ”Ñ€ÑƒĞ³Ğ¾Ğ¹ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ", meeting_format: "text", sla_hours: 24, reserved_credits: 300 },
-};
-
-const BODY_TOPICS = ["labs", "medications_supplements", "diary_nutrition", "general_health", "other"];
-const BODY_REQUEST_TYPE_BY_FORMAT = {
-  text: "text_question",
-  phone: "phone_call",
-  video: "video_call",
-  offline: "offline_visit",
-};
-
-function validateBodyPricingTopic(serviceCode, tariff, serviceTopic) {
-  if (!BODY_TOPICS.includes(serviceTopic)) return "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ ĞºĞ¾Ñ€Ñ€ĞµĞºÑ‚Ğ½ÑƒÑ Ñ‚ĞµĞ¼Ñƒ Ğ¾Ğ±Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ñ.";
-
-  if (!tariff.service_topic) return null; // Universal phone/video/offline product.
-  if (serviceCode === "health_written_consultation" && serviceTopic === "other") return null;
-  if (tariff.service_topic !== serviceTopic) return "Ğ­Ñ‚Ğ° ÑƒÑĞ»ÑƒĞ³Ğ° Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ° Ğ´Ğ»Ñ Ğ²Ñ‹Ğ±Ñ€Ğ°Ğ½Ğ½Ğ¾Ğ¹ Ñ‚ĞµĞ¼Ñ‹.";
-  return null;
-}
-
-async function handleCreateBodyServiceRequest(req, res, { legacy = false } = {}) {
-  try {
-    const {
-      session_id, access_token, request_type, service_code, service_topic,
-      message, context_options, client_contact,
-      price_credits, credits, reserved_credits, meeting_format: clientMeetingFormat,
-    } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!message || typeof message !== "string" || message.trim().length < 2) {
-      return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ." });
-    }
-    if (message.length > 3000) {
-      return res.status(400).json({ ok: false, error: "Ğ¡Ğ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ´Ğ»Ğ¸Ğ½Ğ½Ğ¾Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ (Ğ¼Ğ°ĞºÑĞ¸Ğ¼ÑƒĞ¼ 3000 ÑĞ¸Ğ¼Ğ²Ğ¾Ğ»Ğ¾Ğ²)." });
-    }
-
-    const supabase = getSupabase();
-
-    let config;
-    let requestType = request_type;
-    let effectiveMeetingFormat;
-    let effectiveServiceCode = typeof service_code === "string" && service_code.trim() ? service_code.trim() : null;
-    let effectiveServiceTopic = null;
-    let priceSnapshot = null;
-    let reservedCredits = 0;
-    let pricingNote = null;
-
-    if (effectiveServiceCode) {
-      const { data: tariff, error: pricingError } = await supabase
-        .from("service_pricing")
-        .select("service_code, module, label, service_topic, meeting_format, credits, active")
-        .eq("service_code", effectiveServiceCode)
-        .eq("module", "body")
-        .eq("active", true)
-        .maybeSingle();
-
-      if (pricingError || !tariff) {
-        return res.status(400).json({ ok: false, error: "ĞĞµĞ¸Ğ·Ğ²ĞµÑÑ‚Ğ½Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿ ÑƒÑĞ»ÑƒĞ³Ğ¸." });
-      }
-      if (!tariff.meeting_format || !BODY_REQUEST_TYPE_BY_FORMAT[tariff.meeting_format]) {
-        return res.status(400).json({ ok: false, error: "Ğ£ ÑƒÑĞ»ÑƒĞ³Ğ¸ Ğ½Ğµ Ğ½Ğ°ÑÑ‚Ñ€Ğ¾ĞµĞ½ Ñ„Ğ¾Ñ€Ğ¼Ğ°Ñ‚ ĞºĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ğ¸." });
-      }
-      const topicError = validateBodyPricingTopic(effectiveServiceCode, tariff, service_topic);
-      if (topicError) return res.status(400).json({ ok: false, error: topicError });
-
-      effectiveServiceTopic = service_topic;
-      effectiveMeetingFormat = tariff.meeting_format;
-      requestType = BODY_REQUEST_TYPE_BY_FORMAT[tariff.meeting_format];
-      config = {
-        label: tariff.label,
-        meeting_format: tariff.meeting_format,
-        sla_hours: tariff.meeting_format === "text" ? 24 : tariff.meeting_format === "offline" ? 48 : 24,
-      };
-      priceSnapshot = tariff.credits;
-    } else {
-      if (!legacy) {
-        return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ canonical service_code ÑƒÑĞ»ÑƒĞ³Ğ¸." });
-      }
-      // Legacy Body clients may still send request_type. Keep this path
-      // separate: it does not create a new pricing snapshot.
-      config = REQUEST_TYPE_CONFIG[request_type];
-      if (!config) {
-        return res.status(400).json({ ok: false, error: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ°." });
-      }
-      effectiveMeetingFormat = config.meeting_format;
-      reservedCredits = config.reserved_credits;
-      pricingNote = config.pricing_note || null;
-    }
-
-    // Resolve specialist from patient_assignments (canonical expert.id)
-    let specialistId = null;
-    let specialistName = null;
-
-    const { data: assignment } = await supabase
-      .from("patient_assignments")
-      .select("primary_expert_id")
-      .eq("owner_type", "anonymous_profile")
-      .eq("owner_id", owner.ownerId)
-      .eq("module", "body")
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!assignment?.primary_expert_id) {
-      return res.status(400).json({ ok: false, error: "ĞĞµÑ‚ Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½Ğ¾Ğ³Ğ¾ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½Ğ¸Ñ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚Ğ°. ĞĞ±Ñ€Ğ°Ñ‚Ğ¸Ñ‚ĞµÑÑŒ Ğº Ğ°Ğ´Ğ¼Ğ¸Ğ½Ğ¸ÑÑ‚Ñ€Ğ°Ñ‚Ğ¾Ñ€Ñƒ." });
-    }
-
-    specialistId = String(assignment.primary_expert_id);
-    const { data: expert } = await supabase
-      .from("experts")
-      .select("id, name")
-      .eq("id", assignment.primary_expert_id)
-      .maybeSingle();
-    specialistName = expert?.name || "Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚";
-
-    // Build safe context snapshot
-    const contextSnapshot = {
-      include_recent_diary: !!context_options?.include_recent_diary,
-      include_plate_history: !!context_options?.include_plate_history,
-      include_weekly_summary: !!context_options?.include_weekly_summary,
-      include_health_context: !!context_options?.include_health_context,
-    };
-
-    // Enrich with counts
-    const ownerSessionIds = (await supabase
-      .from("body_clients").select("session_id").eq("anonymous_owner_id", owner.ownerId)
-    ).data?.map(s => s.session_id) || [];
-
-    if (contextSnapshot.include_recent_diary && ownerSessionIds.length > 0) {
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      const { count } = await supabase
-        .from("body_daily_logs").select("*", { count: "exact", head: true })
-        .in("session_id", ownerSessionIds).gte("log_date", sevenDaysAgo);
-      contextSnapshot.diary_days_count = count || 0;
-    }
-
-    if (contextSnapshot.include_health_context) {
-      const { data: hc } = await supabase
-        .from("body_health_contexts")
-        .select("health_conditions, medications, supplements, lab_notes")
-        .eq("owner_id", owner.ownerId).eq("module", "body").maybeSingle();
-      if (hc) {
-        contextSnapshot.health_context_summary = {
-          conditions_count: (hc.health_conditions || []).length,
-          medications_count: (hc.medications || []).length,
-          supplements_count: (hc.supplements || []).length,
-          has_recent_labs: !!hc.lab_notes?.has_recent_labs,
-        };
-      }
-    }
-
-    const now = new Date().toISOString();
-    const dueAt = config.sla_hours
-      ? new Date(Date.now() + config.sla_hours * 60 * 60 * 1000).toISOString()
-      : null;
-
-    const { data: inserted, error: insertError } = await supabase
-      .from("service_requests")
-      .insert({
-        module: "body",
-        owner_type: "anonymous_profile",
-        owner_id: owner.ownerId,
-        session_id,
-        specialist_id: specialistId,
-        specialist_name: specialistName,
-        request_type: requestType,
-        service_code: effectiveServiceCode,
-        service_topic: effectiveServiceTopic,
-        meeting_format: effectiveMeetingFormat,
-        title: config.label,
-        message: message.trim(),
-        status: "submitted",
-        priority: "normal",
-        sla_hours: config.sla_hours,
-        due_at: dueAt,
-        reserved_credits: reservedCredits,
-        charged_credits: 0,
-        price_credits: priceSnapshot,
-        pricing_note: pricingNote,
-        context_snapshot: contextSnapshot,
-        client_contact: client_contact || {},
-        created_at: now,
-        updated_at: now,
-      })
-      .select("id, request_type, service_code, service_topic, meeting_format, price_credits, status, reserved_credits, charged_credits, due_at, created_at")
-      .single();
-
-    if (insertError) {
-      console.error("[createBodyServiceRequest] insert error:", insertError.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ." });
-    }
-
-    await recordClinicalEvent({
-      module: "body",
-      ownerType: "anonymous_profile",
-      ownerId: owner.ownerId,
-      eventType: "service_request_created",
-      occurredAt: inserted.created_at || now,
-      sourceType: "service_request",
-      sourceId: inserted.id,
-      sourceEventKey: "created",
-      provenance: "patient_reported",
-      payload: {
-        request_type: requestType,
-        service_code: effectiveServiceCode,
-        service_topic: effectiveServiceTopic,
-        meeting_format: effectiveMeetingFormat,
-      },
-    });
-
-    return res.status(200).json({ ok: true, request: inserted });
-  } catch (error) {
-    console.error("handleCreateBodyServiceRequest error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²ĞºĞ¸ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ°." });
-  }
-}
-
-async function handleGetBodyServiceRequests(req, res) {
-  try {
-    const { session_id, access_token } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-    const { data: requests, error } = await supabase
-      .from("service_requests")
-      .select("id, request_type, service_code, service_topic, meeting_format, title, message, status, priority, sla_hours, due_at, price_credits, reserved_credits, charged_credits, pricing_note, specialist_name, specialist_response, client_contact, scheduled_at, scheduled_comment, created_at, answered_at, completed_at, cancelled_at")
-      .eq("owner_type", "anonymous_profile")
-      .eq("owner_id", owner.ownerId)
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    if (error) {
-      console.error("[getBodyServiceRequests] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑÑ‹." });
-    }
-
-    return res.status(200).json({ ok: true, requests: requests || [] });
-  } catch (error) {
-    console.error("handleGetBodyServiceRequests error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ¾Ğ²." });
-  }
-}
-
-async function handleGetBodyServiceRequest(req, res) {
-  try {
-    const { session_id, access_token, request_id } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!request_id) {
-      return res.status(400).json({ ok: false, error: "Missing request_id." });
-    }
-
-    const supabase = getSupabase();
-    const { data: request, error } = await supabase
-      .from("service_requests")
-      .select("*")
-      .eq("id", request_id)
-      .eq("owner_type", "anonymous_profile")
-      .eq("owner_id", owner.ownerId)
-      .maybeSingle();
-
-    if (error) {
-      console.error("[getBodyServiceRequest] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ." });
-    }
-    if (!request) {
-      return res.status(404).json({ ok: false, error: "Ğ—Ğ°Ğ¿Ñ€Ğ¾Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½." });
-    }
-
-    return res.status(200).json({ ok: true, request });
-  } catch (error) {
-    console.error("handleGetBodyServiceRequest error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ°." });
-  }
-}
-
-async function handleCancelBodyServiceRequest(req, res) {
-  try {
-    const { session_id, access_token, request_id } = req.body || {};
-    const owner = await resolveBodyOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!request_id) {
-      return res.status(400).json({ ok: false, error: "Missing request_id." });
-    }
-
-    const supabase = getSupabase();
-    const { data: request, error: findError } = await supabase
-      .from("service_requests")
-      .select("id, status, owner_type, owner_id")
-      .eq("id", request_id)
-      .eq("module", "body")
-      .eq("owner_type", "anonymous_profile")
-      .eq("owner_id", owner.ownerId)
-      .maybeSingle();
-
-    if (findError || !request) {
-      return res.status(404).json({ ok: false, error: "Ğ—Ğ°Ğ¿Ñ€Ğ¾Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½." });
-    }
-
-    const cancellable = ["submitted", "accepted", "needs_clarification", "scheduled"];
-    if (!cancellable.includes(request.status)) {
-      return res.status(400).json({ ok: false, error: "ĞĞµĞ²Ğ¾Ğ·Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ğ¾Ñ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ Ğ² Ñ‚ĞµĞºÑƒÑ‰ĞµĞ¼ ÑÑ‚Ğ°Ñ‚ÑƒÑĞµ." });
-    }
-
-    const { data: result, error: transitionError } = await supabase.rpc("transition_service_request", {
-      p_request_id: request_id,
-      p_transition: "cancel",
-    });
-    if (transitionError) {
-      console.error("[cancelBodyServiceRequest] transition error:", transitionError.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ." });
-    }
-    if (!result?.ok) return res.status(400).json({ ok: false, error: result.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ.", code: result.code || "TRANSITION_FAILED" });
-    if (!result.idempotent_replay) {
-      await recordClinicalEvent({
-        module: "body",
-        ownerType: request.owner_type,
-        ownerId: request.owner_id,
-        eventType: "service_request_status_changed",
-        sourceType: "service_request",
-        sourceId: request_id,
-        sourceEventKey: `${request.status}->${result.status}`,
-        provenance: "system_generated",
-        payload: { from_status: request.status, to_status: result.status },
-      });
-    }
-    return res.status(200).json(result);
-  } catch (error) {
-    console.error("handleCancelBodyServiceRequest error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ñ‚Ğ¼ĞµĞ½Ñ‹ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ°." });
-  }
-}
-
-// ============================================================
-// Service Pricing (public endpoint)
-// ============================================================
-
-async function handleGetServicePricing(req, res) {
-  try {
-    const { module: reqModule } = req.body || {};
-    const supabase = getSupabase();
-
-    let query = supabase
-      .from("service_pricing")
-      .select("service_code, module, label, service_topic, meeting_format, credits, active")
-      .eq("active", true)
-      .order("credits", { ascending: true });
-
-    if (reqModule) {
-      query = query.eq("module", reqModule);
-    }
-
-    const { data: pricing, error } = await query;
-
-    if (error) {
-      console.error("[getServicePricing] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ñ‚Ğ°Ñ€Ğ¸Ñ„Ñ‹." });
-    }
-
-    return res.status(200).json({ ok: true, pricing: pricing || [] });
-  } catch (error) {
-    console.error("handleGetServicePricing error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ñ‚Ğ°Ñ€Ğ¸Ñ„Ğ¾Ğ²." });
-  }
-}
-
-// ============================================================
-// Patient â†” Specialist Linking
-// ============================================================
-
-// Accept specialist's invitation (patient side)
-// Uses atomic RPC to guarantee invitation status and patient_assignment consistency.
-async function handleAcceptSpecialistInvitation(req, res) {
-  try {
-    const { session_id, access_token, invitation_token } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!invitation_token || typeof invitation_token !== "string") {
-      return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ invitation_token" });
-    }
-
-    const supabase = getSupabase();
-    const tokenHash = hashToken(invitation_token);
-    return sendInvitationAcceptResult(res, await executeInvitationAccept({ supabase, tokenHash, owner }));
-  } catch (error) {
-    console.error("handleAcceptSpecialistInvitation error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ€Ğ²ĞµÑ€Ğ°" });
-  }
-}
-
-async function handleAcceptPatientInvitationById(req, res) {
-  try {
-    const { session_id, access_token, invitation_id } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    if (!invitation_id || typeof invitation_id !== "string") {
-      return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ invitation_id" });
-    }
-
-    const supabase = getSupabase();
-    const { data: invitation, error } = await supabase
-      .from("patient_specialist_invitations")
-      .select("id, token_hash, direction, module, status, expires_at, target_owner_id")
-      .eq("id", invitation_id)
-      .maybeSingle();
-
-    if (error || !invitation) return res.status(404).json({ ok: false, error: "ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ¾" });
-    if (invitation.direction !== "specialist_to_patient") {
-      return res.status(400).json({ ok: false, error: "ĞĞµĞºĞ¾Ñ€Ñ€ĞµĞºÑ‚Ğ½Ğ¾Ğµ Ğ¿Ñ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ" });
-    }
-    if (invitation.target_owner_id !== owner.ownerId) {
-      return res.status(403).json({ ok: false, error: "Ğ”Ğ¾ÑÑ‚ÑƒĞ¿ Ğ·Ğ°Ğ¿Ñ€ĞµÑ‰Ñ‘Ğ½" });
-    }
-
-    return sendInvitationAcceptResult(res, await executeInvitationAccept({
-      supabase,
-      tokenHash: invitation.token_hash,
-      owner,
-    }));
-  } catch (error) {
-    console.error("handleAcceptPatientInvitationById error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ€Ğ²ĞµÑ€Ğ°" });
-  }
-}
-
-async function executeInvitationAccept({ supabase, tokenHash, owner }) {
-  const { data: result, error: rpcError } = await supabase
-    .rpc("accept_specialist_invitation", {
-      p_token_hash: tokenHash,
-      p_owner_id: owner.ownerId,
-      p_public_code: owner.publicCode,
-    });
-
-  if (rpcError) {
-    console.error("[acceptSpecialistInvitation] RPC error:", rpcError.code, rpcError.message);
-    return { status: 500, body: { ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ€Ğ²ĞµÑ€Ğ°" } };
-  }
-
-  if (!result || !result.ok) {
-    const statusMap = {
-      NOT_FOUND: 404,
-      INVALID_DIRECTION: 400,
-      ALREADY_PROCESSED: 400,
-      EXPIRED: 400,
-      MODULE_MISMATCH: 400,
-      FORBIDDEN: 403,
-      EXPERT_UNAVAILABLE: 400,
-      NO_MODULE_ENTITLEMENT: 400,
-      ASSIGNMENT_CONFLICT: 409,
-      OWNER_MISMATCH: 403,
-    };
-    return {
-      status: statusMap[result?.code] || 400,
-      body: { ok: false, error: result?.error || "ĞÑˆĞ¸Ğ±ĞºĞ°", code: result?.code || "UNKNOWN" },
-    };
-  }
-
-  return { status: 200, body: { ok: true, message: result.message || "Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚ Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½" } };
-}
-
-function sendInvitationAcceptResult(res, result) {
-  return res.status(result.status).json(result.body);
-}
-
-// Decline specialist's invitation (patient side)
-async function handleDeclineSpecialistInvitation(req, res) {
-  try {
-    const { session_id, access_token, invitation_token } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!invitation_token) {
-      return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ invitation_token" });
-    }
-
-    const supabase = getSupabase();
-    const tokenHash = hashToken(invitation_token);
-
-    const { data: invitation, error: findError } = await supabase
-      .from("patient_specialist_invitations")
-      .select("id, direction, status, expires_at, target_owner_id")
-      .eq("token_hash", tokenHash)
-      .maybeSingle();
-
-    if (findError || !invitation) return res.status(404).json({ ok: false, error: "ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ¾" });
-    if (invitation.direction !== "specialist_to_patient") {
-      return res.status(400).json({ ok: false, error: "ĞĞµĞºĞ¾Ñ€Ñ€ĞµĞºÑ‚Ğ½Ğ¾Ğµ Ğ¿Ñ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ" });
-    }
-    if (invitation.status !== "pending") {
-      return res.status(400).json({ ok: false, error: "ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ ÑƒĞ¶Ğµ Ğ¾Ğ±Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°Ğ½Ğ¾" });
-    }
-    if (invitation.expires_at && new Date(invitation.expires_at) < new Date()) {
-      return res.status(400).json({ ok: false, error: "ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ Ğ¸ÑÑ‚ĞµĞºĞ»Ğ¾" });
-    }
-    if (invitation.target_owner_id && invitation.target_owner_id !== owner.ownerId) {
-      return res.status(403).json({ ok: false, error: "Ğ”Ğ¾ÑÑ‚ÑƒĞ¿ Ğ·Ğ°Ğ¿Ñ€ĞµÑ‰Ñ‘Ğ½" });
-    }
-
-    // Atomic conditional transition: pending â†’ declined
-    const now = new Date().toISOString();
-    const { data: updated, error: updateError } = await supabase
-      .from("patient_specialist_invitations")
-      .update({
-        status: "declined",
-        declined_at: now,
-        target_owner_id: owner.ownerId,
-        target_owner_type: "anonymous_case",
-        updated_at: now,
-      })
-      .eq("id", invitation.id)
-      .eq("status", "pending")
-      .select("id")
-      .maybeSingle();
-
-    if (updateError) {
-      console.error("[declineSpecialistInvitation] update error:", updateError.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ğ±Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°Ñ‚ÑŒ Ğ¿Ñ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ" });
-    }
-
-    if (!updated) {
-      return res.status(400).json({ ok: false, error: "ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ¾ Ğ¸Ğ»Ğ¸ ÑƒĞ¶Ğµ Ğ¾Ğ±Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°Ğ½Ğ¾" });
-    }
-
-    return res.status(200).json({ ok: true });
-  } catch (error) {
-    console.error("handleDeclineSpecialistInvitation error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ€Ğ²ĞµÑ€Ğ°" });
-  }
-}
-
-async function handleDeclinePatientInvitationById(req, res) {
-  try {
-    const { session_id, access_token, invitation_id } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    if (!invitation_id || typeof invitation_id !== "string") {
-      return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ invitation_id" });
-    }
-
-    const supabase = getSupabase();
-    const now = new Date().toISOString();
-    const { data: updated, error } = await supabase
-      .from("patient_specialist_invitations")
-      .update({ status: "declined", declined_at: now, updated_at: now })
-      .eq("id", invitation_id)
-      .eq("direction", "specialist_to_patient")
-      .eq("target_owner_id", owner.ownerId)
-      .eq("status", "pending")
-      .gt("expires_at", now)
-      .select("id")
-      .maybeSingle();
-
-    if (error) return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ğ±Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°Ñ‚ÑŒ Ğ¿Ñ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ" });
-    if (!updated) return res.status(400).json({ ok: false, error: "ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ¾ Ğ¸Ğ»Ğ¸ ÑƒĞ¶Ğµ Ğ¾Ğ±Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°Ğ½Ğ¾" });
-    return res.status(200).json({ ok: true });
-  } catch (error) {
-    console.error("handleDeclinePatientInvitationById error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ€Ğ²ĞµÑ€Ğ°" });
-  }
-}
-
-// Create patient invitation (patient â†’ specialist)
-async function handleCreatePatientInvitation(req, res) {
-  try {
-    const { session_id, access_token, message } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-
-    const rawToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = hashToken(rawToken);
-    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(); // 14 days
-
-    const { data: invitation, error } = await supabase
-      .from("patient_specialist_invitations")
-      .insert({
-        token_hash: tokenHash,
-        direction: "patient_to_specialist",
-        module: "support",
-        inviter_owner_type: "anonymous_case",
-        inviter_owner_id: owner.ownerId,
-        // target_owner_id/expert_id left null â€” doctor is unknown at creation time
-        status: "pending",
-        expires_at: expiresAt,
-      })
-      .select("id, direction, module, status, expires_at, created_at")
-      .single();
-
-    if (error) {
-      console.error("[createPatientInvitation] insert error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ Ğ¿Ñ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ" });
-    }
-
-    return res.status(200).json({
-      ok: true,
-      invitation: {
-        ...invitation,
-        token: rawToken,
-        url: getInviteUrl(rawToken),
-      },
-    });
-  } catch (error) {
-    console.error("handleCreatePatientInvitation error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ€Ğ²ĞµÑ€Ğ°" });
-  }
-}
-
-// List patient invitations
-async function handleListPatientInvitations(req, res) {
-  try {
-    const { session_id, access_token } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-    const { data: invitations, error } = await supabase
-      .from("patient_specialist_invitations")
-      .select("id, direction, module, status, expires_at, created_at, accepted_at, declined_at, revoked_at")
-      .or(`target_owner_id.eq.${owner.ownerId},inviter_owner_id.eq.${owner.ownerId}`)
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    if (error) {
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ¿Ñ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ñ" });
-    }
-
-    const currentInvitations = isAnMedSupportOnlyDeployment() ? normalizeInvitationStatuses(invitations || []) : (invitations || []);
-    const expiredIds = currentInvitations.filter((invitation, index) => invitation.status === "expired" && invitations?.[index]?.status === "pending").map((invitation) => invitation.id);
-    if (isAnMedSupportOnlyDeployment() && expiredIds.length > 0) {
-      await supabase.from("patient_specialist_invitations")
-        .update({ status: "expired", updated_at: new Date().toISOString() })
-        .in("id", expiredIds)
-        .eq("status", "pending");
-    }
-    return res.status(200).json({ ok: true, invitations: currentInvitations });
-  } catch (error) {
-    console.error("handleListPatientInvitations error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ€Ğ²ĞµÑ€Ğ°" });
-  }
-}
-
-// Create match request (patient asks platform to assign specialist)
-async function handleCreateMatchRequest(req, res) {
-  try {
-    const { session_id, access_token, message } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-
-    // Check no active assignment exists
-    const { data: existing } = await supabase
-      .from("patient_assignments")
-      .select("id")
-      .eq("public_code", owner.publicCode)
-      .eq("module", "support")
-      .eq("status", "active")
-      .maybeSingle();
-
-    if (existing) {
-      return res.status(400).json({ ok: false, error: "Ğ£ Ğ²Ğ°Ñ ÑƒĞ¶Ğµ ĞµÑÑ‚ÑŒ Ğ·Ğ°ĞºÑ€ĞµĞ¿Ğ»Ñ‘Ğ½Ğ½Ñ‹Ğ¹ ÑĞ¿ĞµÑ†Ğ¸Ğ°Ğ»Ğ¸ÑÑ‚" });
-    }
-
-    if (isAnMedSupportOnlyDeployment()) {
-      const { data: activeRequest } = await supabase
-        .from("specialist_match_requests")
-        .select("id, session_id, status, created_at")
-        .eq("owner_type", "anonymous_case")
-        .eq("owner_id", owner.ownerId)
-        .eq("module", "support")
-        .eq("status", "submitted")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (activeRequest) return res.status(200).json({ ok: true, request: activeRequest, message: "Ğ—Ğ°Ğ¿Ñ€Ğ¾Ñ ÑƒĞ¶Ğµ Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½" });
-    }
-
-    const requestFields = {
-      owner_type: "anonymous_case",
-      owner_id: owner.ownerId,
-      module: "support",
-      message: message || null,
-      status: "submitted",
-    };
-    if (isAnMedSupportOnlyDeployment()) requestFields.session_id = owner.sessionId;
-
-    const { data: request, error } = await supabase
-      .from("specialist_match_requests")
-      .insert(requestFields)
-      .select("id, status, created_at")
-      .single();
-
-    if (error) {
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ Ğ·Ğ°ÑĞ²ĞºÑƒ" });
-    }
-
-    return res.status(200).json({ ok: true, request });
-  } catch (error) {
-    console.error("handleCreateMatchRequest error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ€Ğ²ĞµÑ€Ğ°" });
-  }
-}
-
-// Submit onboarding request (unknown doctor opens patientâ†’specialist invitation)
-// This is public/unauthenticated â€” the token is the only credential.
-// Doctor does NOT receive any patient clinical data.
-async function handleSubmitOnboardingRequest(req, res) {
-  try {
-    const { invitation_token, name, contact_email, contact_phone, comment } = req.body || {};
-
-    if (!invitation_token || typeof invitation_token !== "string") {
-      return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ invitation_token" });
-    }
-    if (!name || typeof name !== "string" || name.trim().length < 2) {
-      return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ Ğ¸Ğ¼Ñ (Ğ¼Ğ¸Ğ½Ğ¸Ğ¼ÑƒĞ¼ 2 ÑĞ¸Ğ¼Ğ²Ğ¾Ğ»Ğ°)" });
-    }
-
-    const supabase = getSupabase();
-    const tokenHash = hashToken(invitation_token);
-
-    // Find invitation by token hash
-    const { data: invitation, error: findError } = await supabase
-      .from("patient_specialist_invitations")
-      .select("id, direction, module, organization_id, status, expires_at")
-      .eq("token_hash", tokenHash)
-      .maybeSingle();
-
-    if (findError || !invitation) {
-      return res.status(404).json({ ok: false, error: "ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½Ğ¾" });
-    }
-
-    // Validate invitation
-    if (invitation.direction !== "patient_to_specialist") {
-      return res.status(400).json({ ok: false, error: "ĞĞµĞºĞ¾Ñ€Ñ€ĞµĞºÑ‚Ğ½Ğ¾Ğµ Ğ¿Ñ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ" });
-    }
-    if (invitation.status !== "pending") {
-      return res.status(400).json({ ok: false, error: "ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ ÑƒĞ¶Ğµ Ğ¾Ğ±Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°Ğ½Ğ¾" });
-    }
-    if (new Date(invitation.expires_at) < new Date()) {
-      return res.status(400).json({ ok: false, error: "ĞŸÑ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ğµ Ğ¸ÑÑ‚ĞµĞºĞ»Ğ¾" });
-    }
-
-    // Check for existing onboarding request for this invitation (prevent spam)
-    const { data: existingRequest } = await supabase
-      .from("specialist_onboarding_requests")
-      .select("id, status")
-      .eq("invitation_id", invitation.id)
-      .maybeSingle();
-
-    if (existingRequest) {
-      if (existingRequest.status === "submitted") {
-        return res.status(200).json({ ok: true, message: "Ğ—Ğ°ÑĞ²ĞºĞ° ÑƒĞ¶Ğµ Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ°", status: "submitted" });
-      }
-      if (existingRequest.status === "approved") {
-        return res.status(200).json({ ok: true, message: "Ğ—Ğ°ÑĞ²ĞºĞ° ÑƒĞ¶Ğµ Ğ¾Ğ´Ğ¾Ğ±Ñ€ĞµĞ½Ğ°", status: "approved" });
-      }
-      return res.status(400).json({ ok: false, error: "Ğ—Ğ°ÑĞ²ĞºĞ° Ğ¿Ğ¾ ÑÑ‚Ğ¾Ğ¼Ñƒ Ğ¿Ñ€Ğ¸Ğ³Ğ»Ğ°ÑˆĞµĞ½Ğ¸Ñ ÑƒĞ¶Ğµ Ğ¾Ğ±Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğ°Ğ½Ğ°" });
-    }
-
-    // Create onboarding request (no patient data exposed)
-    const { data: request, error: insertError } = await supabase
-      .from("specialist_onboarding_requests")
-      .insert({
-        invitation_id: invitation.id,
-        module: invitation.module,
-        organization_id: invitation.organization_id || null,
-        name: name.trim(),
-        contact_email: contact_email || null,
-        contact_phone: contact_phone || null,
-        comment: comment || null,
-        status: "submitted",
-      })
-      .select("id, status, created_at")
-      .single();
-
-    if (insertError) {
-      console.error("[submitOnboardingRequest] insert error:", insertError.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ·Ğ°ÑĞ²ĞºÑƒ" });
-    }
-
-    return res.status(200).json({ ok: true, request });
-  } catch (error) {
-    console.error("handleSubmitOnboardingRequest error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞµÑ€Ğ²ĞµÑ€Ğ°" });
-  }
-}
-
-// ============================================================
-// Support Service Requests
-// ============================================================
-
-const SUPPORT_REQUEST_TYPE_CONFIG = {
-  question: { label: "ĞĞ½Ğ»Ğ°Ğ¹Ğ½-Ğ²Ğ¾Ğ¿Ñ€Ğ¾Ñ", meeting_format: "text", sla_hours: 24 },
-  phone: { label: "Ğ¢ĞµĞ»ĞµÑ„Ğ¾Ğ½Ğ½Ñ‹Ğ¹ Ğ·Ğ²Ğ¾Ğ½Ğ¾Ğº", meeting_format: "phone", sla_hours: 24 },
-  urgent: { label: "Ğ¡Ñ€Ğ¾Ñ‡Ğ½Ğ°Ñ ÑĞ²ÑĞ·ÑŒ", meeting_format: "phone", sla_hours: 4 },
-  video: { label: "Ğ’Ğ¸Ğ´ĞµĞ¾ĞºĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ñ", meeting_format: "video", sla_hours: 48 },
-  offline: { label: "ĞÑ‡Ğ½Ğ°Ñ Ğ²ÑÑ‚Ñ€ĞµÑ‡Ğ°", meeting_format: "offline", sla_hours: 48 },
-};
-
-// Canonical service_code â†’ request_type mapping (validated server-side)
-const SERVICE_CODE_MAP = {
-  short_followup: { request_type: "question", meeting_format: "text" },
-  therapy_review: { request_type: "question", meeting_format: "text" },
-  written_consultation: { request_type: "question", meeting_format: "text" },
-  phone_consultation: { request_type: "phone", meeting_format: "phone" },
-  urgent_contact: { request_type: "urgent", meeting_format: "phone" },
-  online_consultation: { request_type: "video", meeting_format: "video" },
-  offline_consultation: { request_type: "offline", meeting_format: "offline" },
-};
-
-const SUPPORT_REASON_LABELS = {
-  discuss_report: "ĞĞ±ÑÑƒĞ¶Ğ´ĞµĞ½Ğ¸Ğµ Ğ¾Ñ‚Ñ‡Ñ‘Ñ‚Ğ°",
-  follow_up: "ĞŸÑ€Ğ¾Ğ´Ğ¾Ğ»Ğ¶ĞµĞ½Ğ¸Ğµ Ğ½Ğ°Ğ±Ğ»ÑĞ´ĞµĞ½Ğ¸Ñ",
-  new_concern: "ĞĞ¾Ğ²Ğ°Ñ Ğ¿Ñ€Ğ¾Ğ±Ğ»ĞµĞ¼Ğ°",
-  other: "Ğ”Ñ€ÑƒĞ³Ğ¾Ğµ",
-};
-
-async function handleCreateSupportServiceRequest(req, res) {
-  try {
-    const { session_id, access_token, service_code: clientServiceCode, request_type: clientRequestType, reason, message, preferred_date, time_from, time_to, comment } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!message || typeof message !== "string" || message.trim().length < 2) {
-      return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ." });
-    }
-    if (message.length > 3000) {
-      return res.status(400).json({ ok: false, error: "Ğ¡Ğ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ´Ğ»Ğ¸Ğ½Ğ½Ğ¾Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ (Ğ¼Ğ°ĞºÑĞ¸Ğ¼ÑƒĞ¼ 3000 ÑĞ¸Ğ¼Ğ²Ğ¾Ğ»Ğ¾Ğ²)." });
-    }
-
-    const supabase = getSupabase();
-
-    // â”€â”€ Resolve service_code and validate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    let serviceCode = typeof clientServiceCode === "string" && clientServiceCode.trim()
-      ? clientServiceCode.trim()
-      : null;
-    let requestType = clientRequestType;
-    let meetingFormat;
-    let priceSnapshot = null;
-
-    if (serviceCode) {
-      // Validate service_code against canonical pricing
-      const { data: pricing, error: pricingError } = await supabase
-        .from("service_pricing")
-        .select("service_code, module, label, credits, active")
-        .eq("service_code", serviceCode)
-        .eq("module", "support")
-        .maybeSingle();
-
-      if (pricingError || !pricing) {
-        return res.status(400).json({ ok: false, error: "ĞĞµĞ¸Ğ·Ğ²ĞµÑÑ‚Ğ½Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿ ÑƒÑĞ»ÑƒĞ³Ğ¸." });
-      }
-      if (!pricing.active) {
-        return res.status(400).json({ ok: false, error: "Ğ”Ğ°Ğ½Ğ½Ğ°Ñ ÑƒÑĞ»ÑƒĞ³Ğ° Ğ²Ñ€ĞµĞ¼ĞµĞ½Ğ½Ğ¾ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ°." });
-      }
-      if (pricing.module !== "support") {
-        return res.status(400).json({ ok: false, error: "Ğ”Ğ°Ğ½Ğ½Ğ°Ñ ÑƒÑĞ»ÑƒĞ³Ğ° Ğ½Ğµ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ğ° Ğ² Ğ¼Ğ¾Ğ´ÑƒĞ»Ğµ Support." });
-      }
-
-      // Derive request_type from canonical mapping
-      const mapping = SERVICE_CODE_MAP[serviceCode];
-      if (!mapping) {
-        return res.status(400).json({ ok: false, error: "ĞĞµĞ¸Ğ·Ğ²ĞµÑÑ‚Ğ½Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿ ÑƒÑĞ»ÑƒĞ³Ğ¸." });
-      }
-      requestType = mapping.request_type;
-      meetingFormat = mapping.meeting_format;
-      priceSnapshot = pricing.credits;
-    } else {
-      // Legacy: use request_type directly (backward compat)
-      const config = SUPPORT_REQUEST_TYPE_CONFIG[clientRequestType];
-      if (!config) {
-        return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ Ñ‚Ğ¸Ğ¿ ÑƒÑĞ»ÑƒĞ³Ğ¸." });
-      }
-      requestType = clientRequestType;
-      meetingFormat = config.meeting_format;
-    }
-
-    const config = SUPPORT_REQUEST_TYPE_CONFIG[requestType];
-    if (!config) {
-      return res.status(400).json({ ok: false, error: "ĞĞµĞ²ĞµÑ€Ğ½Ñ‹Ğ¹ Ñ‚Ğ¸Ğ¿ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ°." });
-    }
-
-    // â”€â”€ Resolve specialist from relation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const specialist = await resolveSupportSpecialistRelation(owner.ownerId);
-
-    const reasonLabel = SUPPORT_REASON_LABELS[reason] || reason || "";
-    const title = `${config.label}${reasonLabel ? " â€” " + reasonLabel : ""}`;
-
-    const now = new Date().toISOString();
-    const dueAt = config.sla_hours
-      ? new Date(Date.now() + config.sla_hours * 60 * 60 * 1000).toISOString()
-      : null;
-
-    const { data: inserted, error: insertError } = await supabase
-      .from("service_requests")
-      .insert({
-        module: "support",
-        owner_type: "anonymous_case",
-        owner_id: owner.ownerId,
-        session_id: owner.sessionId,
-        specialist_id: specialist?.expertId || null,
-        specialist_name: specialist?.expertName || null,
-        request_type: requestType,
-        meeting_format: meetingFormat,
-        title,
-        message: message.trim(),
-        status: "submitted",
-        priority: "normal",
-        sla_hours: config.sla_hours,
-        due_at: dueAt,
-        reserved_credits: 0,
-        service_code: serviceCode,
-        price_credits: priceSnapshot,
-        context_snapshot: {
-          reason: reason || null,
-          preferred_date: preferred_date || null,
-          time_from: time_from || null,
-          time_to: time_to || null,
-          comment: comment || null,
-          session_summary: owner.publicCode,
-        },
-        created_at: now,
-        updated_at: now,
-      })
-      .select("id, request_type, meeting_format, title, status, specialist_name, due_at, service_code, price_credits, created_at")
-      .single();
-
-    if (insertError) {
-      console.error("[createSupportServiceRequest] insert error:", insertError.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ." });
-    }
-
-    await recordClinicalEvent({
-      module: "support",
-      ownerType: "anonymous_case",
-      ownerId: owner.ownerId,
-      eventType: "service_request_created",
-      occurredAt: inserted.created_at || now,
-      sourceType: "service_request",
-      sourceId: inserted.id,
-      sourceEventKey: "created",
-      provenance: "patient_reported",
-      payload: {
-        request_type: requestType,
-        service_code: serviceCode,
-        meeting_format: meetingFormat,
-      },
-    });
-
-    return res.status(200).json({ ok: true, request: inserted });
-  } catch (error) {
-    console.error("handleCreateSupportServiceRequest error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²ĞºĞ¸ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ°." });
-  }
-}
-
-async function handleListSupportServiceRequests(req, res) {
-  try {
-    const { session_id, access_token } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-    const { data: requests, error } = await supabase
-      .from("service_requests")
-      .select("id, request_type, meeting_format, title, message, status, priority, sla_hours, due_at, specialist_name, specialist_response, scheduled_at, scheduled_comment, created_at, answered_at, completed_at, cancelled_at")
-      .eq("module", "support")
-      .eq("owner_type", "anonymous_case")
-      .eq("owner_id", owner.ownerId)
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    if (error) {
-      console.error("[listSupportServiceRequests] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑÑ‹." });
-    }
-
-    return res.status(200).json({ ok: true, requests: requests || [] });
-  } catch (error) {
-    console.error("handleListSupportServiceRequests error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ¾Ğ²." });
-  }
-}
-
-async function handleGetSupportServiceRequest(req, res) {
-  try {
-    const { session_id, access_token, request_id } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!request_id) {
-      return res.status(400).json({ ok: false, error: "Missing request_id." });
-    }
-
-    const supabase = getSupabase();
-    const { data: request, error } = await supabase
-      .from("service_requests")
-      .select("*")
-      .eq("id", request_id)
-      .eq("module", "support")
-      .eq("owner_type", "anonymous_case")
-      .eq("owner_id", owner.ownerId)
-      .maybeSingle();
-
-    if (error) {
-      console.error("[getSupportServiceRequest] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ." });
-    }
-    if (!request) {
-      return res.status(404).json({ ok: false, error: "Ğ—Ğ°Ğ¿Ñ€Ğ¾Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½." });
-    }
-
-    return res.status(200).json({ ok: true, request });
-  } catch (error) {
-    console.error("handleGetSupportServiceRequest error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ°." });
-  }
-}
-
-async function handleCancelSupportServiceRequest(req, res) {
-  try {
-    const { session_id, access_token, request_id } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!request_id) {
-      return res.status(400).json({ ok: false, error: "Missing request_id." });
-    }
-
-    const supabase = getSupabase();
-    const { data: request, error: findError } = await supabase
-      .from("service_requests")
-      .select("id, status, owner_type, owner_id")
-      .eq("id", request_id)
-      .eq("module", "support")
-      .eq("owner_type", "anonymous_case")
-      .eq("owner_id", owner.ownerId)
-      .maybeSingle();
-
-    if (findError || !request) {
-      return res.status(404).json({ ok: false, error: "Ğ—Ğ°Ğ¿Ñ€Ğ¾Ñ Ğ½Ğµ Ğ½Ğ°Ğ¹Ğ´ĞµĞ½." });
-    }
-
-    const cancellable = ["submitted", "accepted", "needs_clarification", "scheduled"];
-    if (!cancellable.includes(request.status)) {
-      return res.status(400).json({ ok: false, error: "ĞĞµĞ²Ğ¾Ğ·Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ğ¾Ñ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ Ğ² Ñ‚ĞµĞºÑƒÑ‰ĞµĞ¼ ÑÑ‚Ğ°Ñ‚ÑƒÑĞµ." });
-    }
-
-    const { data: result, error: transitionError } = await supabase.rpc("transition_service_request", {
-      p_request_id: request_id,
-      p_transition: "cancel",
-    });
-    if (transitionError) {
-      console.error("[cancelSupportServiceRequest] transition error:", transitionError.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ." });
-    }
-    if (!result?.ok) return res.status(400).json({ ok: false, error: result.error || "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ·Ğ°Ğ¿Ñ€Ğ¾Ñ.", code: result.code || "TRANSITION_FAILED" });
-    if (!result.idempotent_replay) {
-      await recordClinicalEvent({
-        module: "support",
-        ownerType: request.owner_type,
-        ownerId: request.owner_id,
-        eventType: "service_request_status_changed",
-        sourceType: "service_request",
-        sourceId: request_id,
-        sourceEventKey: `${request.status}->${result.status}`,
-        provenance: "system_generated",
-        payload: { from_status: request.status, to_status: result.status },
-      });
-    }
-    return res.status(200).json(result);
-  } catch (error) {
-    console.error("handleCancelSupportServiceRequest error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ñ‚Ğ¼ĞµĞ½Ñ‹ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ°." });
-  }
-}
-
-// ============================================================
-// Support Daily Check-ins
-// ============================================================
-
-async function handleGetSupportCheckins(req, res) {
-  try {
-    const { session_id, access_token, days } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const lookbackDays = Math.min(Math.max(parseInt(days) || 90, 1), 365);
-    const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
-    const supabase = getSupabase();
-    const { data: checkins, error } = await supabase
-      .from("support_daily_checkins")
-      .select("id, checkin_date, wellbeing_score, anxiety_score, comment, created_at")
-      .eq("owner_type", "anonymous_case")
-      .eq("owner_id", owner.ownerId)
-      .gte("checkin_date", since)
-      .order("checkin_date", { ascending: true });
-
-    if (error) {
-      console.error("[getSupportCheckins] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğµ." });
-    }
-
-    const today = new Date().toISOString().slice(0, 10);
-    const todayCheckin = (checkins || []).find(c => c.checkin_date === today) || null;
-
-    return res.status(200).json({
-      ok: true,
-      today: todayCheckin,
-      history: checkins || [],
-    });
-  } catch (error) {
-    console.error("handleGetSupportCheckins error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ…." });
-  }
-}
-
-async function handleSaveSupportCheckin(req, res) {
-  try {
-    const { session_id, access_token, wellbeing_score, anxiety_score, comment } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (wellbeing_score === undefined || wellbeing_score === null || !Number.isInteger(wellbeing_score) || wellbeing_score < -5 || wellbeing_score > 5) {
-      return res.status(400).json({ ok: false, error: "ĞÑ†ĞµĞ½ĞºĞ° ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ñ Ğ´Ğ¾Ğ»Ğ¶Ğ½Ğ° Ğ±Ñ‹Ñ‚ÑŒ Ğ¾Ñ‚ -5 Ğ´Ğ¾ +5." });
-    }
-    if (anxiety_score !== undefined && anxiety_score !== null && (!Number.isInteger(anxiety_score) || anxiety_score < 0 || anxiety_score > 10)) {
-      return res.status(400).json({ ok: false, error: "ĞÑ†ĞµĞ½ĞºĞ° Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ñ Ğ´Ğ¾Ğ»Ğ¶Ğ½Ğ° Ğ±Ñ‹Ñ‚ÑŒ Ğ¾Ñ‚ 0 Ğ´Ğ¾ 10." });
-    }
-    if (comment && typeof comment === "string" && comment.length > 1000) {
-      return res.status(400).json({ ok: false, error: "ĞšĞ¾Ğ¼Ğ¼ĞµĞ½Ñ‚Ğ°Ñ€Ğ¸Ğ¹ ÑĞ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ´Ğ»Ğ¸Ğ½Ğ½Ñ‹Ğ¹ (Ğ¼Ğ°ĞºÑĞ¸Ğ¼ÑƒĞ¼ 1000 ÑĞ¸Ğ¼Ğ²Ğ¾Ğ»Ğ¾Ğ²)." });
-    }
-
-    const today = new Date().toISOString().slice(0, 10);
-    const now = new Date().toISOString();
-    const supabase = getSupabase();
-
-    const row = {
-      owner_type: "anonymous_case",
-      owner_id: owner.ownerId,
-      checkin_date: today,
-      wellbeing_score,
-      anxiety_score: anxiety_score ?? null,
-      comment: comment?.trim() || null,
-      source: "client_cabinet",
-      updated_at: now,
-    };
-
-    const { data: saved, error } = await supabase
-      .from("support_daily_checkins")
-      .upsert(row, { onConflict: "owner_type,owner_id,checkin_date" })
-      .select("id, checkin_date, wellbeing_score, anxiety_score, comment")
-      .single();
-
-    if (error) {
-      console.error("[saveSupportCheckin] upsert error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ." });
-    }
-
-    const observationSet = buildSupportCheckinObservationSnapshot(saved);
-    const logicalSourceId = buildSupportCheckinLogicalSourceId("anonymous_case", owner.ownerId, saved.checkin_date);
-    const checkinEventId = await recordClinicalEvent({
-      module: "support",
-      ownerType: "anonymous_case",
-      ownerId: owner.ownerId,
-      eventType: "checkin_recorded",
-      occurredAt: `${saved.checkin_date}T00:00:00.000Z`,
-      sourceType: "support_daily_checkin",
-      sourceId: logicalSourceId,
-      sourceEventKey: observationSet.sourceEventKey,
-      provenance: "patient_reported",
-      payload: { checkin_date: saved.checkin_date, revision_hash: observationSet.revisionHash },
-    });
-    if (checkinEventId) {
-      for (const observation of observationSet.observations) {
-        await recordClinicalObservation({
-          clinicalEventId: checkinEventId,
-          module: "support",
-          ownerType: "anonymous_case",
-          ownerId: owner.ownerId,
-          concept: observation.concept,
-          valueNumeric: observation.valueNumeric,
-          unit: observation.unit,
-          metadata: observation.metadata,
-          observedAt: `${saved.checkin_date}T00:00:00.000Z`,
-          sourceType: "support_daily_checkin",
-          sourceId: logicalSourceId,
-          sourceEventKey: observationSet.sourceEventKey,
-          provenance: "patient_reported",
-          validationStatus: "unreviewed",
-          qualityLevel: 0,
-        });
-      }
-    }
-
-    return res.status(200).json({ ok: true, checkin: saved });
-  } catch (error) {
-    console.error("handleSaveSupportCheckin error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ." });
-  }
-}
-
-// ============================================================
-// Support Owner Practices
-// ============================================================
-
-// Known practice definitions (mirror of PRACTICES constant in App.jsx)
-const PRACTICE_DEFS = {
-  breathing: {
-    title: "Ğ”Ñ‹Ñ…Ğ°Ğ½Ğ¸Ğµ 4â€“6 Ğ¼Ğ¸Ğ½ÑƒÑ‚ Ğ¿Ñ€Ğ¸ Ñ‚Ñ€ĞµĞ²Ğ¾Ğ³Ğµ",
-    description: "ĞœĞµĞ´Ğ»ĞµĞ½Ğ½Ğ¾Ğµ Ğ´Ñ‹Ñ…Ğ°Ğ½Ğ¸Ğµ Ñ Ğ±Ğ¾Ğ»ĞµĞµ Ğ´Ğ»Ğ¸Ğ½Ğ½Ñ‹Ğ¼ Ğ²Ñ‹Ğ´Ğ¾Ñ…Ğ¾Ğ¼, Ñ‡Ñ‚Ğ¾Ğ±Ñ‹ Ğ½ĞµĞ¼Ğ½Ğ¾Ğ³Ğ¾ ÑĞ½Ğ¸Ğ·Ğ¸Ñ‚ÑŒ Ñ‚ĞµĞ»ĞµÑĞ½Ğ¾Ğµ Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ğµ.",
-    instructions: [{ step: 1, text: "Ğ¡ÑĞ´ÑŒÑ‚Ğµ ÑƒĞ´Ğ¾Ğ±Ğ½Ğ¾ Ğ¸Ğ»Ğ¸ Ğ»ÑĞ³Ñ‚Ğµ." }, { step: 2, text: "ĞœĞµĞ´Ğ»ĞµĞ½Ğ½Ğ¾ Ğ²Ğ´Ğ¾Ñ…Ğ½Ğ¸Ñ‚Ğµ Ğ½Ğ° 4 ÑÑ‡Ñ‘Ñ‚Ğ°." }, { step: 3, text: "Ğ’Ñ‹Ğ´Ğ¾Ñ…Ğ½Ğ¸Ñ‚Ğµ Ğ½Ğ° 6â€“8 ÑÑ‡Ñ‘Ñ‚Ğ¾Ğ²." }, { step: 4, text: "ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€ÑĞ¹Ñ‚Ğµ 5â€“10 Ğ¼Ğ¸Ğ½ÑƒÑ‚." }],
-    duration_minutes: 5,
-    when_to_use: "ĞŸÑ€Ğ¸ Ñ‚Ñ€ĞµĞ²Ğ¾Ğ³Ğµ, Ğ¿Ğ°Ğ½Ğ¸ĞºĞµ, Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ğ¸ Ğ¿ĞµÑ€ĞµĞ´ ÑĞ½Ğ¾Ğ¼.",
-    safety_note: null,
-    category: "breathing",
-  },
-  grounding: {
-    title: "Ğ—Ğ°Ğ·ĞµĞ¼Ğ»ĞµĞ½Ğ¸Ğµ 5â€“4â€“3â€“2â€“1",
-    description: "Ğ¢ĞµÑ…Ğ½Ğ¸ĞºĞ° Ğ·Ğ°Ğ·ĞµĞ¼Ğ»ĞµĞ½Ğ¸Ñ Ñ‡ĞµÑ€ĞµĞ· Ğ¾Ñ€Ğ³Ğ°Ğ½Ñ‹ Ñ‡ÑƒĞ²ÑÑ‚Ğ² Ğ´Ğ»Ñ Ğ²Ğ¾Ğ·Ğ²Ñ€Ğ°Ñ‰ĞµĞ½Ğ¸Ñ Ğ² Ğ½Ğ°ÑÑ‚Ğ¾ÑÑ‰Ğ¸Ğ¹ Ğ¼Ğ¾Ğ¼ĞµĞ½Ñ‚.",
-    instructions: [{ step: 1, text: "ĞĞ°Ğ·Ğ¾Ğ²Ğ¸Ñ‚Ğµ 5 Ğ²ĞµÑ‰ĞµĞ¹, ĞºĞ¾Ñ‚Ğ¾Ñ€Ñ‹Ğµ Ğ²Ğ¸Ğ´Ğ¸Ñ‚Ğµ." }, { step: 2, text: "4 Ğ²ĞµÑ‰Ğ¸, ĞºĞ¾Ñ‚Ğ¾Ñ€Ñ‹Ğµ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ¿Ğ¾Ñ‚Ñ€Ğ¾Ğ³Ğ°Ñ‚ÑŒ." }, { step: 3, text: "3 Ğ·Ğ²ÑƒĞºĞ°, ĞºĞ¾Ñ‚Ğ¾Ñ€Ñ‹Ğµ ÑĞ»Ñ‹ÑˆĞ¸Ñ‚Ğµ." }, { step: 4, text: "2 Ğ·Ğ°Ğ¿Ğ°Ñ…Ğ°." }, { step: 5, text: "1 Ğ²ĞºÑƒÑ." }],
-    duration_minutes: 5,
-    when_to_use: "ĞŸÑ€Ğ¸ Ğ´Ğ¸ÑÑĞ¾Ñ†Ğ¸Ğ°Ñ†Ğ¸Ğ¸, Ğ½Ğ°Ğ²ÑĞ·Ñ‡Ğ¸Ğ²Ñ‹Ñ… Ğ¼Ñ‹ÑĞ»ÑÑ…, Ğ¿Ğ°Ğ½Ğ¸ĞºĞµ.",
-    safety_note: null,
-    category: "grounding",
-  },
-  jaw_relaxation: {
-    title: "ĞœÑĞ³ĞºĞ¾Ğµ Ñ€Ğ°ÑÑĞ»Ğ°Ğ±Ğ»ĞµĞ½Ğ¸Ğµ Ğ»Ğ¸Ñ†Ğ° Ğ¸ Ñ‡ĞµĞ»ÑÑÑ‚Ğ¸",
-    description: "Ğ¡Ğ½ÑÑ‚Ğ¸Ğµ Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ñ Ñ Ğ»Ğ¸Ñ†Ğ°, Ñ‡ĞµĞ»ÑÑÑ‚Ğ¸ Ğ¸ ÑˆĞµĞ¸.",
-    instructions: [{ step: 1, text: "ĞœÑĞ³ĞºĞ¾ Ğ¿Ñ€Ğ¸Ğ¾Ñ‚ĞºÑ€Ğ¾Ğ¹Ñ‚Ğµ Ñ€Ğ¾Ñ‚." }, { step: 2, text: "ĞœĞ°ÑÑĞ¸Ñ€ÑƒĞ¹Ñ‚Ğµ Ñ‡ĞµĞ»ÑÑÑ‚ÑŒ ĞºÑ€ÑƒĞ³Ğ¾Ğ²Ñ‹Ğ¼Ğ¸ Ğ´Ğ²Ğ¸Ğ¶ĞµĞ½Ğ¸ÑĞ¼Ğ¸." }, { step: 3, text: "ĞŸĞ¾Ñ‚ÑĞ½Ğ¸Ñ‚Ğµ ÑˆĞµÑ Ğ² ÑÑ‚Ğ¾Ñ€Ğ¾Ğ½Ñ‹." }, { step: 4, text: "ĞŸĞ¾ĞºĞ°Ñ‚Ğ°Ğ¹Ñ‚Ğµ Ğ¿Ğ»ĞµÑ‡Ğ°Ğ¼Ğ¸." }],
-    duration_minutes: 5,
-    when_to_use: "ĞŸÑ€Ğ¸ ÑĞ¶Ğ°Ñ‚Ğ¸Ğ¸ Ñ‡ĞµĞ»ÑÑÑ‚Ğ¸, Ğ³Ğ¾Ğ»Ğ¾Ğ²Ğ½Ğ¾Ğ¹ Ğ±Ğ¾Ğ»Ğ¸ Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ñ.",
-    safety_note: null,
-    category: "grounding",
-  },
-  sleep_prep: {
-    title: "ĞŸÑ€Ğ°ĞºÑ‚Ğ¸ĞºĞ° Ğ¿ĞµÑ€ĞµĞ´ ÑĞ½Ğ¾Ğ¼",
-    description: "ĞœÑĞ³ĞºĞ°Ñ Ğ¿Ğ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²ĞºĞ° ĞºĞ¾ ÑĞ½Ñƒ Ğ¿Ñ€Ğ¸ Ñ‚Ñ€ĞµĞ²Ğ¾Ğ³Ğµ Ğ¸Ğ»Ğ¸ Ğ±ĞµÑÑĞ¾Ğ½Ğ½Ğ¸Ñ†Ğµ.",
-    instructions: [{ step: 1, text: "Ğ—Ğ° 1 Ñ‡Ğ°Ñ Ğ´Ğ¾ ÑĞ½Ğ° ÑƒĞ±ĞµÑ€Ğ¸Ñ‚Ğµ ÑĞºÑ€Ğ°Ğ½Ñ‹." }, { step: 2, text: "Ğ¡Ğ´ĞµĞ»Ğ°Ğ¹Ñ‚Ğµ Ğ´Ñ‹Ñ…Ğ°Ğ½Ğ¸Ğµ 4â€“6." }, { step: 3, text: "Ğ—Ğ°Ğ¿Ğ¸ÑˆĞ¸Ñ‚Ğµ 3 Ğ²ĞµÑ‰Ğ¸ Ğ·Ğ° Ğ´ĞµĞ½ÑŒ." }, { step: 4, text: "Ğ›ÑĞ³Ñ‚Ğµ Ğ² Ñ‚Ñ‘Ğ¼Ğ½Ğ¾Ğ¹ Ğ¿Ñ€Ğ¾Ñ…Ğ»Ğ°Ğ´Ğ½Ğ¾Ğ¹ ĞºĞ¾Ğ¼Ğ½Ğ°Ñ‚Ğµ." }],
-    duration_minutes: 15,
-    when_to_use: "ĞŸÑ€Ğ¸ Ğ±ĞµÑÑĞ¾Ğ½Ğ½Ğ¸Ñ†Ğµ, Ñ‚Ñ€ĞµĞ²Ğ¾Ğ³Ğµ Ğ¿ĞµÑ€ĞµĞ´ ÑĞ½Ğ¾Ğ¼.",
-    safety_note: null,
-    category: "sleep",
-  },
-  neck_shoulders_stretch: {
-    title: "ĞœÑĞ³ĞºĞ°Ñ Ñ€Ğ°ÑÑ‚ÑĞ¶ĞºĞ° ÑˆĞµĞ¸ Ğ¸ Ğ¿Ğ»ĞµÑ‡",
-    description: "Ğ¡Ğ½ÑÑ‚Ğ¸Ğµ Ğ¼Ñ‹ÑˆĞµÑ‡Ğ½Ğ¾Ğ³Ğ¾ Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ñ Ğ² Ğ²ĞµÑ€Ñ…Ğ½ĞµĞ¹ Ñ‡Ğ°ÑÑ‚Ğ¸ Ñ‚ĞµĞ»Ğ°.",
-    instructions: [{ step: 1, text: "ĞĞ°ĞºĞ»Ğ¾Ğ½Ğ¸Ñ‚Ğµ Ğ³Ğ¾Ğ»Ğ¾Ğ²Ñƒ Ğ²Ğ¿Ñ€Ğ°Ğ²Ğ¾, Ğ·Ğ°Ğ´ĞµÑ€Ğ¶Ğ¸Ñ‚Ğµ 15 ÑĞµĞº." }, { step: 2, text: "ĞŸĞ¾Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ñ‚Ğµ Ğ²Ğ»ĞµĞ²Ğ¾." }, { step: 3, text: "ĞšÑ€ÑƒĞ³Ğ¾Ğ²Ñ‹Ğµ Ğ´Ğ²Ğ¸Ğ¶ĞµĞ½Ğ¸Ñ Ğ¿Ğ»ĞµÑ‡Ğ°Ğ¼Ğ¸." }, { step: 4, text: "Ğ¡Ñ†ĞµĞ¿Ğ¸Ñ‚Ğµ Ñ€ÑƒĞºĞ¸ Ğ·Ğ° ÑĞ¿Ğ¸Ğ½Ğ¾Ğ¹ Ğ¸ Ğ¿Ğ¾Ñ‚ÑĞ½Ğ¸Ñ‚Ğµ." }],
-    duration_minutes: 5,
-    when_to_use: "ĞŸÑ€Ğ¸ Ğ¼Ñ‹ÑˆĞµÑ‡Ğ½Ğ¾Ğ¼ Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½Ğ¸Ğ¸, ÑĞ¸Ğ´ÑÑ‡ĞµĞ¹ Ñ€Ğ°Ğ±Ğ¾Ñ‚Ğµ.",
-    safety_note: null,
-    category: "activity",
-  },
-  diary: {
-    title: "Ğ”Ğ½ĞµĞ²Ğ½Ğ¸Ğº ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ñ Ğ½Ğ° 3 Ğ´Ğ½Ñ",
-    description: "ĞšÑ€Ğ°Ñ‚ĞºĞ¸Ğµ ĞµĞ¶ĞµĞ´Ğ½ĞµĞ²Ğ½Ñ‹Ğµ Ğ·Ğ°Ğ¿Ğ¸ÑĞ¸ Ğ´Ğ»Ñ Ğ¾Ñ‚ÑĞ»ĞµĞ¶Ğ¸Ğ²Ğ°Ğ½Ğ¸Ñ Ğ¸Ğ·Ğ¼ĞµĞ½ĞµĞ½Ğ¸Ğ¹.",
-    instructions: [{ step: 1, text: "Ğ£Ñ‚Ñ€Ğ¾Ğ¼: ĞºĞ°Ğº ÑĞ¿Ğ°Ğ»Ğ¸, Ğ¾Ğ±Ñ‰ĞµĞµ ÑĞ¾ÑÑ‚Ğ¾ÑĞ½Ğ¸Ğµ." }, { step: 2, text: "Ğ’ĞµÑ‡ĞµÑ€Ğ¾Ğ¼: Ñ‡Ñ‚Ğ¾ Ğ¿Ğ¾Ğ¼Ğ¾Ğ³Ğ»Ğ¾, Ñ‡Ñ‚Ğ¾ Ğ±Ñ‹Ğ»Ğ¾ Ñ‚Ñ€ÑƒĞ´Ğ½Ğ¾." }, { step: 3, text: "Ğ—Ğ°Ğ¼ĞµÑ‡Ğ°Ğ¹Ñ‚Ğµ Ğ¿Ğ°Ñ‚Ñ‚ĞµÑ€Ğ½Ñ‹ Ğ±ĞµĞ· Ğ¾Ñ†ĞµĞ½ĞºĞ¸." }],
-    duration_minutes: 5,
-    when_to_use: "Ğ”Ğ»Ñ Ğ¿Ğ¾Ğ½Ğ¸Ğ¼Ğ°Ğ½Ğ¸Ñ Ğ´Ğ¸Ğ½Ğ°Ğ¼Ğ¸ĞºĞ¸, Ğ¿Ğ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²ĞºĞ¸ Ğº ĞºĞ¾Ğ½ÑÑƒĞ»ÑŒÑ‚Ğ°Ñ†Ğ¸Ğ¸.",
-    safety_note: null,
-    category: "journaling",
-  },
-  "24h_plan": {
-    title: "ĞŸĞ»Ğ°Ğ½ 24 Ñ‡Ğ°ÑĞ° Ğ±ĞµĞ· ÑƒÑ…ÑƒĞ´ÑˆĞµĞ½Ğ¸Ñ",
-    description: "ĞŸĞ¾ÑˆĞ°Ğ³Ğ¾Ğ²Ñ‹Ğ¹ Ğ¿Ğ»Ğ°Ğ½ Ğ½Ğ° Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞ¸Ğµ ÑÑƒÑ‚ĞºĞ¸.",
-    instructions: [{ step: 1, text: "ĞĞ¿Ñ€ĞµĞ´ĞµĞ»Ğ¸Ñ‚Ğµ Ğ¾Ğ´Ğ¸Ğ½ Ğ³Ğ»Ğ°Ğ²Ğ½Ñ‹Ğ¹ Ğ¿Ñ€Ğ¸Ğ¾Ñ€Ğ¸Ñ‚ĞµÑ‚ Ğ½Ğ° Ğ´ĞµĞ½ÑŒ." }, { step: 2, text: "Ğ—Ğ°Ğ¿Ğ»Ğ°Ğ½Ğ¸Ñ€ÑƒĞ¹Ñ‚Ğµ Ğ¾Ğ´Ğ¸Ğ½ Ğ¿Ñ€Ğ¸ÑÑ‚Ğ½Ñ‹Ğ¹ Ğ¼Ğ°Ğ»ĞµĞ½ÑŒĞºĞ¸Ğ¹ ÑˆĞ°Ğ³." }, { step: 3, text: "ĞĞ¿Ñ€ĞµĞ´ĞµĞ»Ğ¸Ñ‚Ğµ Ğ²Ñ€ĞµĞ¼Ñ Ğ´Ğ»Ñ Ğ¾Ñ‚Ğ´Ñ‹Ñ…Ğ°." }, { step: 4, text: "ĞÑ‚Ğ¼ĞµÑ‚ÑŒÑ‚Ğµ Ğ²ĞµÑ‡ĞµÑ€Ğ¾Ğ¼ Ñ‡Ñ‚Ğ¾ Ğ¿Ğ¾Ğ»ÑƒÑ‡Ğ¸Ğ»Ğ¾ÑÑŒ." }],
-    duration_minutes: null,
-    when_to_use: "ĞŸÑ€Ğ¸ Ñ‡ÑƒĞ²ÑÑ‚Ğ²Ğµ Ğ¿ĞµÑ€ĞµĞ³Ñ€ÑƒĞ¶ĞµĞ½Ğ½Ğ¾ÑÑ‚Ğ¸, Ğ½ĞµÑÑĞ½Ğ¾ÑÑ‚Ğ¸ Ñ Ñ‡ĞµĞ³Ğ¾ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ.",
-    safety_note: null,
-    category: "routine",
-  },
-  short_walk: {
-    title: "ĞšĞ¾Ñ€Ğ¾Ñ‚ĞºĞ°Ñ Ğ¿Ñ€Ğ¾Ğ³ÑƒĞ»ĞºĞ°",
-    description: "ĞŸÑ€Ğ¾Ğ³ÑƒĞ»ĞºĞ° Ğ½Ğ° ÑĞ²ĞµĞ¶ĞµĞ¼ Ğ²Ğ¾Ğ·Ğ´ÑƒÑ…Ğµ Ğ´Ğ»Ñ ÑĞ¼ĞµĞ½Ñ‹ Ğ¾Ğ±ÑÑ‚Ğ°Ğ½Ğ¾Ğ²ĞºĞ¸ Ğ¸ Ğ»Ñ‘Ğ³ĞºĞ¾Ğ¹ Ñ„Ğ¸Ğ·Ğ¸Ñ‡ĞµÑĞºĞ¾Ğ¹ Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½Ğ¾ÑÑ‚Ğ¸.",
-    instructions: [{ step: 1, text: "Ğ’Ñ‹Ğ¹Ğ´Ğ¸Ñ‚Ğµ Ğ½Ğ° 15â€“30 Ğ¼Ğ¸Ğ½ÑƒÑ‚." }, { step: 2, text: "Ğ˜Ğ´Ğ¸Ñ‚Ğµ Ğ±ĞµĞ· Ñ†ĞµĞ»Ğ¸, Ğ¿Ñ€Ğ¾ÑÑ‚Ğ¾ Ğ·Ğ°Ğ¼ĞµÑ‡Ğ°Ğ¹Ñ‚Ğµ Ğ¾ĞºÑ€ÑƒĞ¶ĞµĞ½Ğ¸Ğµ." }, { step: 3, text: "Ğ•ÑĞ»Ğ¸ ×§×©×” â€” Ñ…Ğ¾Ñ‚Ñ Ğ±Ñ‹ Ğ´Ğ¾ Ğ±Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞµĞ¹ ÑĞºĞ°Ğ¼ĞµĞ¹ĞºĞ¸." }],
-    duration_minutes: 20,
-    when_to_use: "ĞŸÑ€Ğ¸ Ñ‚Ñ€ĞµĞ²Ğ¾Ğ³Ğµ, Ğ½Ğ¸Ğ·ĞºĞ¾Ğ¹ Ğ¼Ğ¾Ñ‚Ğ¸Ğ²Ğ°Ñ†Ğ¸Ğ¸, Ğ¿Ğ¾Ñ‚Ñ€ĞµĞ±Ğ½Ğ¾ÑÑ‚Ğ¸ Ğ² ÑĞ¼ĞµĞ½Ğµ Ğ¾Ğ±ÑÑ‚Ğ°Ğ½Ğ¾Ğ²ĞºĞ¸.",
-    safety_note: null,
-    category: "activity",
-  },
-};
-
-// ============================================================
-// Practice Matching & Sync
-// ============================================================
-
-// Canonical alias mapping for deterministic practice detection
-const PRACTICE_ALIASES = {
-  breathing: [/Ğ´Ñ‹Ñ…Ğ°Ğ½Ğ¸Ğµ\s*4[\-\sâ€“]*6/i, /Ğ¼ĞµĞ´Ğ»ĞµĞ½Ğ½\w+\s*Ğ´Ñ‹Ñ…Ğ°Ğ½/i, /ÑƒĞ´Ğ»Ğ¸Ğ½[ĞµÑ‘]Ğ½Ğ½\w+\s*Ğ²Ñ‹Ğ´Ğ¾Ñ…/i, /Ğ³Ğ»ÑƒĞ±Ğ¾Ğº\w+\s*Ğ´Ñ‹Ñ…Ğ°Ğ½/i, /Ğ´Ñ‹Ñ…Ğ°Ñ‚ĞµĞ»ÑŒĞ½\w+\s*ÑƒĞ¿Ñ€Ğ°Ğ¶Ğ½ĞµĞ½/i],
-  grounding: [/Ğ·Ğ°Ğ·ĞµĞ¼Ğ»ĞµĞ½/i, /5[\-\s]*4[\-\s]*3[\-\s]*2[\-\s]*1/i, /5\s*4\s*3\s*2\s*1/i, /Ğ¾Ñ€Ğ³Ğ°Ğ½Ñ‹\s*Ñ‡ÑƒĞ²ÑÑ‚Ğ²/i],
-  jaw_relaxation: [/Ñ€Ğ°ÑÑĞ»Ğ°Ğ±Ğ»ĞµĞ½\w+\s*(Ğ»Ğ¸Ñ†|Ñ‡ĞµĞ»ÑÑÑ‚)/i, /Ğ»Ğ¸Ñ†[Ğ°Ğ¾]\s*Ñ‡ĞµĞ»ÑÑÑ‚/i, /Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½\w+\s*(Ğ»Ğ¸Ñ†|Ñ‡ĞµĞ»ÑÑÑ‚)/i],
-  sleep_prep: [/Ğ¿Ğ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²Ğº\w+\s*ĞºĞ¾\s*ÑĞ½Ñƒ/i, /Ñ€Ğ¸Ñ‚ÑƒĞ°Ğ»\w*\s*Ğ¿ĞµÑ€ĞµĞ´\s*ÑĞ½Ğ¾Ğ¼/i, /ÑĞ¿Ğ¾ĞºĞ¾Ğ¹Ğ½\w+\s*Ğ²ĞµÑ‡ĞµÑ€/i, /Ñ€ĞµĞ¶Ğ¸Ğ¼\w*\s*ÑĞ½Ğ°/i],
-  neck_shoulders_stretch: [/Ñ€Ğ°ÑÑ‚ÑĞ¶Ğº\w+\s*(ÑˆĞµ|Ğ¿Ğ»ĞµÑ‡)/i, /ÑˆĞµ[ÑĞ¸Ñ]\s*Ğ¸\s*Ğ¿Ğ»ĞµÑ‡/i, /Ğ¼Ñ‹ÑˆĞµÑ‡Ğ½\w+\s*Ğ½Ğ°Ğ¿Ñ€ÑĞ¶ĞµĞ½/i],
-  diary: [/Ğ´Ğ½ĞµĞ²Ğ½Ğ¸Ğº/i, /Ğ·Ğ°Ğ¿Ğ¸Ñ\w+\s*ÑĞ¾ÑÑ‚Ğ¾ÑĞ½/i, /Ğ¾Ñ‚ÑĞ»ĞµĞ¶Ğ¸Ğ²Ğ°Ğ½/i],
-  "24h_plan": [/Ğ¿Ğ»Ğ°Ğ½\w*\s*24/i, /24\s*Ñ‡Ğ°Ñ/i, /Ğ¿Ğ¾ÑˆĞ°Ğ³Ğ¾Ğ²/i],
-  short_walk: [/Ğ¿Ñ€Ğ¾Ğ³ÑƒĞ»Ğº/i, /Ğ¿Ñ€Ğ¾Ğ¹Ñ‚Ğ¸ÑÑŒ/i, /ÑĞ²ĞµĞ¶\w+\s*Ğ²Ğ¾Ğ·Ğ´ÑƒÑ…/i, /Ğ²Ñ‹Ğ¹Ñ‚Ğ¸\s*Ğ½Ğ°/i],
-};
-
-// Match text to practice keys
-function matchPractices(text) {
-  if (!text || typeof text !== "string") return [];
-  const matches = [];
-  for (const [key, patterns] of Object.entries(PRACTICE_ALIASES)) {
-    for (const pat of patterns) {
-      if (pat.test(text)) {
-        matches.push(key);
-        break;
-      }
-    }
-  }
-  return matches;
-}
-
-// Sync practices from report to owner-level storage
-async function syncPracticesFromReport({ supabase, ownerId, sessionId, userReport, careRecommendation, supportPlan }) {
-  try {
-    // Collect recommendation text from multiple sources
-    const texts = [];
-    if (userReport) texts.push(userReport);
-    if (careRecommendation?.interim_support) texts.push(careRecommendation.interim_support.join(" "));
-    if (supportPlan?.selected_practices) {
-      for (const p of supportPlan.selected_practices) {
-        if (p.id) {
-          // Direct practice ID from user selection
-          await upsertPractice(supabase, ownerId, sessionId, p.id);
-        }
-      }
-    }
-
-    // Deterministic match from report text
-    const combinedText = texts.join(" ");
-    const matchedKeys = matchPractices(combinedText);
-
-    for (const key of matchedKeys) {
-      await upsertPractice(supabase, ownerId, sessionId, key);
-    }
-  } catch (syncError) {
-    console.error("[syncPracticesFromReport] non-blocking error:", syncError.message);
-    // Don't throw â€” report save must not fail because of practice sync
-  }
-}
-
-// Upsert a single practice
-async function upsertPractice(supabase, ownerId, sessionId, practiceKey) {
-  const def = PRACTICE_DEFS[practiceKey];
-  if (!def) return;
-
-  const now = new Date().toISOString();
-
-  const { data: existing } = await supabase
-    .from("support_owner_practices")
-    .select("id, recommendation_count, source_session_ids")
-    .eq("owner_type", "anonymous_case")
-    .eq("owner_id", ownerId)
-    .eq("practice_key", practiceKey)
-    .maybeSingle();
-
-  if (existing) {
-    // Update existing â€” preserve user status
-    const sourceIds = existing.source_session_ids || [];
-    const newSourceIds = sessionId && !sourceIds.includes(sessionId)
-      ? [...sourceIds, sessionId]
-      : sourceIds;
-
-    await supabase
-      .from("support_owner_practices")
-      .update({
-        last_recommended_at: now,
-        recommendation_count: (existing.recommendation_count || 1) + 1,
-        source_session_ids: newSourceIds,
-        instructions: def.instructions || null,
-        duration_minutes: def.duration_minutes || null,
-        when_to_use: def.when_to_use || null,
-        safety_note: def.safety_note || null,
-        category: def.category || null,
-        updated_at: now,
-      })
-      .eq("id", existing.id);
-  } else {
-    // Insert new
-    await supabase
-      .from("support_owner_practices")
-      .insert({
-        owner_type: "anonymous_case",
-        owner_id: ownerId,
-        practice_key: practiceKey,
-        title: def.title,
-        description: def.description,
-        instructions: def.instructions || null,
-        duration_minutes: def.duration_minutes || null,
-        when_to_use: def.when_to_use || null,
-        safety_note: def.safety_note || null,
-        category: def.category || null,
-        first_recommended_at: now,
-        last_recommended_at: now,
-        recommendation_count: 1,
-        source_session_ids: sessionId ? [sessionId] : [],
-        status: "active",
-        helpfulness: "unknown",
-        user_status: "not_tried",
-      });
-  }
-}
-
-async function handleGetSupportPractices(req, res) {
-  try {
-    const { session_id, access_token } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-    let { data: practices, error } = await supabase
-      .from("support_owner_practices")
-      .select("id, practice_key, title, description, instructions, duration_minutes, when_to_use, safety_note, category, first_recommended_at, last_recommended_at, recommendation_count, status, helpfulness, user_status, source_session_ids")
-      .eq("owner_type", "anonymous_case")
-      .eq("owner_id", owner.ownerId)
-      .order("last_recommended_at", { ascending: false });
-
-    if (error) {
-      console.error("[getSupportPractices] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸ĞºĞ¸." });
-    }
-
-    // Lazy backfill: if no practices exist, scan existing reports
-    if (!practices || practices.length === 0) {
-      try {
-        const { data: sessions } = await supabase
-          .from("sessions")
-          .select("session_id, user_report, support_plan")
-          .eq("anonymous_owner_id", owner.ownerId)
-          .eq("module", "support")
-          .order("created_at", { ascending: false })
-          .limit(10);
-
-        if (sessions && sessions.length > 0) {
-          for (const sess of sessions) {
-            if (sess.user_report) {
-              await syncPracticesFromReport({
-                supabase,
-                ownerId: owner.ownerId,
-                sessionId: sess.session_id,
-                userReport: sess.user_report,
-                supportPlan: sess.support_plan || null,
-              });
-            }
-          }
-
-          // Re-query after backfill
-          const { data: refreshed } = await supabase
-            .from("support_owner_practices")
-            .select("id, practice_key, title, description, instructions, duration_minutes, when_to_use, safety_note, category, first_recommended_at, last_recommended_at, recommendation_count, status, helpfulness, user_status, source_session_ids")
-            .eq("owner_type", "anonymous_case")
-            .eq("owner_id", owner.ownerId)
-            .order("last_recommended_at", { ascending: false });
-          practices = refreshed || [];
-        }
-      } catch (backfillError) {
-        console.error("[getSupportPractices] lazy backfill non-blocking error:", backfillError.message);
-        // Continue with empty practices â€” don't fail the request
-      }
-    }
-
-    return res.status(200).json({ ok: true, practices: practices || [] });
-  } catch (error) {
-    console.error("handleGetSupportPractices error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸Ğº." });
-  }
-}
-
-async function handleSaveSupportPractice(req, res) {
-  try {
-    const { session_id, access_token, practice_key, status: newStatus, helpfulness: newHelpfulness, user_status: newUserStatus } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!practice_key || typeof practice_key !== "string") {
-      return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸ĞºÑƒ." });
-    }
-
-    const def = PRACTICE_DEFS[practice_key];
-    if (!def) {
-      return res.status(400).json({ ok: false, error: "ĞĞµĞ¸Ğ·Ğ²ĞµÑÑ‚Ğ½Ğ°Ñ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸ĞºĞ°." });
-    }
-
-    const supabase = getSupabase();
-    const now = new Date().toISOString();
-
-    // Try to find existing practice
-    const { data: existing } = await supabase
-      .from("support_owner_practices")
-      .select("id, recommendation_count, source_session_ids")
-      .eq("owner_type", "anonymous_case")
-      .eq("owner_id", owner.ownerId)
-      .eq("practice_key", practice_key)
-      .maybeSingle();
-
-    if (existing) {
-      // Update existing
-      const updateFields = { last_recommended_at: now, updated_at: now };
-      if (newStatus) updateFields.status = newStatus;
-      if (newHelpfulness) updateFields.helpfulness = newHelpfulness;
-      if (newUserStatus) updateFields.user_status = newUserStatus;
-
-      const { error: updateError } = await supabase
-        .from("support_owner_practices")
-        .update(updateFields)
-        .eq("id", existing.id);
-
-      if (updateError) {
-        console.error("[saveSupportPractice] update error:", updateError.code);
-        return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸ĞºÑƒ." });
-      }
-
-      return res.status(200).json({ ok: true, practice: { ...existing, ...updateFields } });
-    }
-
-    // Insert new
-    const { data: inserted, error: insertError } = await supabase
-      .from("support_owner_practices")
-      .insert({
-        owner_type: "anonymous_case",
-        owner_id: owner.ownerId,
-        practice_key,
-        title: def.title,
-        description: def.description,
-        instructions: def.instructions || null,
-        duration_minutes: def.duration_minutes || null,
-        when_to_use: def.when_to_use || null,
-        safety_note: def.safety_note || null,
-        category: def.category || null,
-        first_recommended_at: now,
-        last_recommended_at: now,
-        recommendation_count: 1,
-        source_session_ids: [owner.sessionId],
-        status: newStatus || "active",
-        helpfulness: newHelpfulness || "unknown",
-        user_status: newUserStatus || "not_tried",
-      })
-      .select("id, practice_key, title, description, instructions, duration_minutes, when_to_use, safety_note, category, first_recommended_at, last_recommended_at, recommendation_count, status, helpfulness, user_status")
-      .single();
-
-    if (insertError) {
-      console.error("[saveSupportPractice] insert error:", insertError.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸ĞºÑƒ." });
-    }
-
-    return res.status(200).json({ ok: true, practice: inserted });
-  } catch (error) {
-    console.error("handleSaveSupportPractice error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸ĞºĞ¸." });
-  }
-}
-
-async function handleUpdateSupportPracticeStatus(req, res) {
-  try {
-    const { session_id, access_token, practice_key, user_status: newUserStatus, helpfulness: newHelpfulness } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    if (!practice_key) {
-      return res.status(400).json({ ok: false, error: "Ğ£ĞºĞ°Ğ¶Ğ¸Ñ‚Ğµ Ğ¿Ñ€Ğ°ĞºÑ‚Ğ¸ĞºÑƒ." });
-    }
-
-    const supabase = getSupabase();
-    const updateFields = { updated_at: new Date().toISOString() };
-    if (newUserStatus) updateFields.user_status = newUserStatus;
-    if (newHelpfulness) updateFields.helpfulness = newHelpfulness;
-
-    const { data: updated, error } = await supabase
-      .from("support_owner_practices")
-      .update(updateFields)
-      .eq("owner_type", "anonymous_case")
-      .eq("owner_id", owner.ownerId)
-      .eq("practice_key", practice_key)
-      .select("id, practice_key, user_status, helpfulness")
-      .single();
-
-    if (error) {
-      console.error("[updateSupportPracticeStatus] error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ ÑÑ‚Ğ°Ñ‚ÑƒÑ." });
-    }
-
-    return res.status(200).json({ ok: true, practice: updated });
-  } catch (error) {
-    console.error("handleUpdateSupportPracticeStatus error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ." });
-  }
-}
-
-// ============================================================
-// Support Owner Profile (display_name)
-// ============================================================
-
-async function handleGetSupportProfile(req, res) {
-  try {
-    const { session_id, access_token } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-    const { data: profile } = await supabase
-      .from("support_owner_profiles")
-      .select("display_name, created_at")
-      .eq("owner_type", "anonymous_case")
-      .eq("owner_id", owner.ownerId)
-      .maybeSingle();
-
-    return res.status(200).json({ ok: true, display_name: profile?.display_name || null });
-  } catch (error) {
-    console.error("handleGetSupportProfile error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ğ¿Ñ€Ğ¾Ñ„Ğ¸Ğ»Ñ." });
-  }
-}
-
-async function handleSaveSupportProfile(req, res) {
-  try {
-    const { session_id, access_token, display_name } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const cleanName = typeof display_name === "string" ? display_name.trim().slice(0, 50) : "";
-
-    const supabase = getSupabase();
-    const now = new Date().toISOString();
-
-    const { error } = await supabase
-      .from("support_owner_profiles")
-      .upsert({
-        owner_type: "anonymous_case",
-        owner_id: owner.ownerId,
-        display_name: cleanName || null,
-        updated_at: now,
-      }, { onConflict: "owner_type,owner_id" });
-
-    if (error) {
-      console.error("[saveSupportProfile] upsert error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ğ¸Ğ¼Ñ." });
-    }
-
-    return res.status(200).json({ ok: true, display_name: cleanName || null });
-  } catch (error) {
-    console.error("handleSaveSupportProfile error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¸Ñ." });
-  }
-}
-
-// ============================================================
-// Support Quick Chat
-// ============================================================
-
-async function handleGetSupportChat(req, res) {
-  try {
-    const { session_id, access_token, limit: msgLimit } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const supabase = getSupabase();
-    const lim = Math.min(Math.max(parseInt(msgLimit) || 20, 1), 50);
-
-    const { data: messages, error } = await supabase
-      .from("support_ai_chat")
-      .select("id, role, message_text, ai_response, created_at")
-      .eq("owner_type", "anonymous_case")
-      .eq("owner_id", owner.ownerId)
-      .order("created_at", { ascending: false })
-      .limit(lim);
-
-    if (error) {
-      console.error("[getSupportChat] query error:", error.code);
-      return res.status(500).json({ ok: false, error: "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ Ñ‡Ğ°Ñ‚." });
-    }
-
-    return res.status(200).json({ ok: true, messages: (messages || []).reverse() });
-  } catch (error) {
-    console.error("handleGetSupportChat error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ¸ Ñ‡Ğ°Ñ‚Ğ°." });
-  }
-}
-
-// ============================================================
-// Shared Intent Router
-// ============================================================
-
-import { detectIntent, buildFallbackResponse } from "../lib/intent-router.js";
-import { supportConfig } from "../lib/intent-configs/support.js";
-import { bodyConfig } from "../lib/intent-configs/body.js";
-
-const MODULE_CONFIGS = {
-  support: supportConfig,
-  body: bodyConfig,
-};
-
-function getModuleConfig(module) {
-  return MODULE_CONFIGS[module] || supportConfig; // fallback to support
-}
-
-async function handleSendSupportMessage(req, res) {
-  try {
-    const { session_id, access_token, message } = req.body || {};
-    const owner = await resolveSupportOwner(session_id, access_token);
-    if (!owner) {
-      return res.status(401).json({ ok: false, error: "Ğ¢Ñ€ĞµĞ±ÑƒĞµÑ‚ÑÑ Ğ°Ğ²Ñ‚Ğ¾Ñ€Ğ¸Ğ·Ğ°Ñ†Ğ¸Ñ." });
-    }
-
-    const trimmed = typeof message === "string" ? message.trim() : "";
-    if (!trimmed || trimmed.length < 2) {
-      return res.status(400).json({ ok: false, error: "Ğ¡Ğ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ ÑĞ»Ğ¸ÑˆĞºĞ¾Ğ¼ ĞºĞ¾Ñ€Ğ¾Ñ‚ĞºĞ¾Ğµ." });
-    }
-    if (trimmed.length > 3000) {
-      return res.status(400).json({ ok: false, error: "Ğ¡Ğ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ ÑĞ»Ğ¸ÑˆĞºĞ¾Ğ¼ Ğ´Ğ»Ğ¸Ğ½Ğ½Ğ¾Ğµ (Ğ¼Ğ°ĞºÑĞ¸Ğ¼ÑƒĞ¼ 3000)." });
-    }
-
-    const supabase = getSupabase();
-    const now = new Date().toISOString();
-
-    // Save user message
-    await supabase.from("support_ai_chat").insert({
-      owner_type: "anonymous_case",
-      owner_id: owner.ownerId,
-      role: "user",
-      message_text: trimmed,
-      source_session_id: owner.sessionId,
-      created_at: now,
-    });
-
-    // === DETERMINISTIC INTENT ROUTING (before AI) ===
-    const config = getModuleConfig("support");
-
-    // Build context for dynamic FAQ answers
-    const intentContext = {};
-    try {
-      const { getWallet } = await import("../lib/usage/wallet.js");
-      const wallet = await getWallet({ ownerType: "anonymous_case", ownerId: owner.ownerId, module: "support" });
-      if (wallet) {
-        const { getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
-        const balance = await getUsageBalanceForClient({ walletId: wallet.id });
-        intentContext.wallet_balance = balance?.balance ?? null;
-      }
-      const { count: practiceCount } = await supabase
-        .from("support_owner_practices")
-        .select("*", { count: "exact", head: true })
-        .eq("owner_type", "anonymous_case")
-        .eq("owner_id", owner.ownerId)
-        .eq("status", "active");
-      intentContext.practice_count = practiceCount || 0;
-    } catch (ctxError) {
-      // Non-blocking â€” continue without context
-    }
-
-    const intentResult = detectIntent(trimmed, config, intentContext);
-    if (intentResult) {
-      // Save deterministic response
-      await supabase.from("support_ai_chat").insert({
-        owner_type: "anonymous_case",
-        owner_id: owner.ownerId,
-        role: "assistant",
-        message_text: intentResult.answer,
-        ai_response: intentResult,
-        source_session_id: owner.sessionId,
-        model_used: "deterministic",
-        created_at: new Date().toISOString(),
-      });
-      return res.status(200).json({ ok: true, response: intentResult });
-    }
-
-    // Build context for AI
-    const context = await buildSupportChatContext(supabase, owner.ownerId);
-
-    // Read prompt
-    const { readModulePrompt, readCorePrompt } = await import("../lib/prompts.js");
-    const chatPrompt = readModulePrompt("support", "ai-chat.md");
-    const conversationStyle = readCorePrompt("conversation-style.md");
-    const medicationSafety = context.patient_medication_context
-      ? `\n\nĞŸÑ€Ğ°Ğ²Ğ¸Ğ»Ğ¾ Ğ±ĞµĞ·Ğ¾Ğ¿Ğ°ÑĞ½Ğ¾ÑÑ‚Ğ¸ Ğ¿Ğ¾ Ğ»ĞµĞºĞ°Ñ€ÑÑ‚Ğ²Ğ°Ğ¼:\n${PATIENT_MEDICATION_SAFETY_INSTRUCTION}`
-      : "";
-    const systemPrompt = `${chatPrompt}\n\n${conversationStyle}${medicationSafety}\n\nĞšĞ¾Ğ½Ñ‚ĞµĞºÑÑ‚ Ğ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ĞµĞ»Ñ:\n${JSON.stringify(context, null, 2)}`;
-
-    // Call AI
-    const { runTask, TASK_TYPES } = await import("../lib/modelRouter.js");
-    const model = process.env.AI_MODEL_TRIAGE || "gpt-5.5";
-    const fallbackModel = process.env.AI_MODEL_FALLBACK || "gpt-4.1-mini";
-    const reasoningEffort = process.env.AI_REASONING_EFFORT || "medium";
-
-    let aiResult;
-    try {
-      aiResult = await runTask(TASK_TYPES.PATIENT_DIALOG, {
-        systemPrompt,
-        userPrompt: trimmed,
-        model,
-        fallbackModel,
-        reasoningEffort,
-      });
-    } catch (aiError) {
-      console.error("[sendSupportMessage] AI error:", aiError.message);
-      const errorType = aiError.message?.includes("timeout") ? "timeout" :
-                         aiError.message?.includes("network") ? "network_error" : "ai_error";
-      const errorResponse = buildFallbackResponse(errorType, config);
-      await supabase.from("support_ai_chat").insert({
-        owner_type: "anonymous_case",
-        owner_id: owner.ownerId,
-        role: "assistant",
-        message_text: errorResponse.answer,
-        ai_response: errorResponse,
-        source_session_id: owner.sessionId,
-        model_used: "error",
-        created_at: new Date().toISOString(),
-      });
-      return res.status(200).json({ ok: true, response: errorResponse });
-    }
-
-    // Parse AI response
-    let parsed;
-    try {
-      const raw = aiResult.raw || "";
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { answer: raw.slice(0, 2000), safety_note: null, confidence: "low", suggest_followup: false };
-    } catch {
-      parsed = { answer: (aiResult.raw || "").slice(0, 2000), safety_note: null, confidence: "low", suggest_followup: false };
-    }
-
-    // Safety check: if safety_note exists, log it
-    if (parsed.safety_note) {
-      console.log("[sendSupportMessage] safety_note detected:", parsed.safety_note.slice(0, 100));
-    }
-
-    // Save assistant message
-    const requestId = `chat-${owner.sessionId || "no-session"}-${Date.now()}`;
-    await supabase.from("support_ai_chat").insert({
-      owner_type: "anonymous_case",
-      owner_id: owner.ownerId,
-      role: "assistant",
-      message_text: parsed.answer || "",
-      ai_response: parsed,
-      source_session_id: owner.sessionId,
-      request_id: requestId,
-      model_used: aiResult.model_used || model,
-      created_at: new Date().toISOString(),
-    });
-
-    return res.status(200).json({ ok: true, response: parsed });
-  } catch (error) {
-    console.error("handleSendSupportMessage error:", error.message);
-    return res.status(500).json({ ok: false, error: "ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²ĞºĞ¸." });
-  }
-}
-
-// Build context for Support quick chat AI
-async function buildSupportChatContext(supabase, ownerId) {
-  const context = {};
-
-  // Display name
-  const { data: profile } = await supabase
-    .from("support_owner_profiles")
-    .select("display_name")
-    .eq("owner_type", "anonymous_case")
-    .eq("owner_id", ownerId)
-    .maybeSingle();
-  context.display_name = profile?.display_name || null;
-
-  // Latest session summary
-  const { data: latestSession } = await supabase
-    .from("sessions")
-    .select("user_report, support_plan, care_recommendation, patient_text, created_at")
-    .eq("anonymous_owner_id", ownerId)
-    .eq("module", "support")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (latestSession) {
-    context.latest_report_summary = (latestSession.user_report || "").slice(0, 800);
-    context.care_recommendation = latestSession.care_recommendation || null;
-    context.support_plan = latestSession.support_plan || null;
-    context.latest_session_date = latestSession.created_at;
-  }
-
-  // Recent check-ins (last 14 days)
-  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const { data: checkins } = await supabase
-    .from("support_daily_checkins")
-    .select("checkin_date, wellbeing_score, anxiety_score, comment")
-    .eq("owner_type", "anonymous_case")
-    .eq("owner_id", ownerId)
-    .gte("checkin_date", since)
-    .order("checkin_date", { ascending: true });
-  context.recent_checkins = checkins || [];
-
-  // Active practices
-  const { data: practices } = await supabase
-    .from("support_owner_practices")
-    .select("practice_key, title, user_status, helpfulness")
-    .eq("owner_type", "anonymous_case")
-    .eq("owner_id", ownerId)
-    .eq("status", "active")
-    .limit(10);
-  context.active_practices = practices || [];
-
-  // Recent chat messages (last 5)
-  const { data: recentChat } = await supabase
-    .from("support_ai_chat")
-    .select("role, message_text")
-    .eq("owner_type", "anonymous_case")
-    .eq("owner_id", ownerId)
-    .order("created_at", { ascending: false })
-    .limit(5);
-  context.recent_chat = (recentChat || []).reverse();
-
-  const medicationContext = await loadPatientMedicationContext(supabase, "anonymous_case", ownerId, "support");
-  if (medicationContext) context.patient_medication_context = medicationContext;
-
-  // UI capabilities â€” what the user can access
-  context.available_sections = [
-    "report", "history", "checkins", "practices",
-    "specialist_request", "profile", "access",
-  ];
-  context.practice_count = (practices || []).length;
-  context.has_report = !!latestSession?.user_report;
-  context.has_specialist = false; // resolved separately if needed
-  context.service_request_available = true;
-
-  return context;
-}
-
-async function loadPatientMedicationContext(supabase, ownerType, ownerId, sourceModule) {
-  try {
-    const { data: medicationOrders } = await supabase
-      .from("patient_medication_orders")
-      .select("id, item_type, name, active_ingredient, strength, single_dose, dose_unit, route, frequency_type, times_per_day, scheduled_times, instructions, start_date, end_date, patient_comment, status, reported_as_doctor_order, medication_concept_id, reference_status, reference_confidence, reference_matched_by, reference_matched_at, reference_match_method, reference_source_provider, reference_source_snapshot_id")
-      .eq("owner_type", ownerType).eq("owner_id", ownerId)
-      .eq("source_module", sourceModule).eq("status", "active")
-      .order("start_date", { ascending: false });
-    const orders = medicationOrders || [];
-    if (!orders.length) return null;
-
-    const recentSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const orderIds = orders.map((order) => order.id);
-    const [{ data: intakeLogs }, { data: orderEvents }] = await Promise.all([
-      supabase.from("medication_intake_logs")
-        .select("medication_order_id, scheduled_date, status, actual_time, actual_dose, actual_dose_unit, patient_note")
-        .eq("owner_type", ownerType).eq("owner_id", ownerId)
-        .gte("scheduled_date", recentSince.slice(0, 10)).order("scheduled_date", { ascending: false }).limit(40),
-      supabase.from("patient_medication_order_events")
-        .select("event_type, changed_fields, previous_status, new_status, created_at")
-        .eq("owner_type", ownerType).eq("owner_id", ownerId)
-        .in("medication_order_id", orderIds).gte("created_at", recentSince)
-        .order("created_at", { ascending: false }).limit(20),
-    ]);
-    let referenceViews = new Map();
-    try {
-      referenceViews = await loadMedicationReferenceViews(supabase, orders);
-    } catch (referenceError) {
-      console.warn(`[${sourceModule}-context] verified medication reference unavailable:`, referenceError.code || "query_failed");
-    }
-    return buildPatientMedicationContext(orders, intakeLogs || [], orderEvents || [], referenceViews);
-  } catch (error) {
-    console.warn(`[${sourceModule}-context] patient medication context unavailable:`, error.code || "query_failed");
-    return null;
-  }
-}
-
-export { syncPracticesFromReport };
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíïŞ¹Õ:-jZ.¶›­–)Ş³V–×÷'B²7&VFTÆ—fT†æFÆW"Òg&öÒrââöÆ–"÷fö–6Rö†VÇF‚ÖÆ—fRæ§2s°¦–×÷'B²FWÆ÷–ÖVçD÷&væ—¦F–öä–BÒg&öÒ"ââöÆ–"÷6V7W&—G’öFWÆ÷–ÖVçB×66÷Ræ§2#°¦–×÷'B7'—Fòg&öÒ&7'—Fò#°¦–×÷'B²vWE7W&6RÒg&öÒ"ââöÆ–"÷7W&6Ræ§2#°¦–×÷'B²Ö6µFW‡BÂÖ6µ6Vç6—F—fTFFÂvWE&—f7•6fTÖöFRÒg&öÒ"ââöÆ–"÷6æ—F—¦Ræ§2#°¦–×÷'B²Ç”6÷'2Â†æFÆT÷F–öç2Òg&öÒ"ââöÆ–"÷6V7W&—G’ö6÷'2æ§2#°¦–×÷'B²&FTÆ–Ö—BÒg&öÒ"ââöÆ–"÷6V7W&—G’÷&FRÖÆ–Ö—Bæ§2#°¦–×÷'B²fÆ–FFU6W76–öä66W72ÂvVæW&FU6W76–öä66W75Fö¶VâÒg&öÒ"ââöÆ–"÷6V7W&—G’ö66W72×Fö¶Vâæ§2#°¦–×÷'B°¢'6T6öçF–çVF–öä7&VFVçF–ÂÀ¢fW&–g”6öçF–çVF–öå6V7&WBÀ¢vWD÷væW%G—RÀ¢vWD6öçF–çVF–öäGFV×D¶W’À¢—4ÆVv7•6†÷'D6öFRÀ¢6öçF–çVF–öä6öæf–tW'&÷"À¢5Uõ%DTEôÔôETÄU2À§Òg&öÒ"ââöÆ–"÷6W76–öâö6öçF–çVF–öâÖ7&VFVçF–Âæ§2#°¦–×÷'B°¢vWD÷$7&VFT6öçF–çVF–öä7&VFVçF–ÂÀ¢&÷FFT6öçF–çVF–öä7&VFVçF–ÂÀ¢f–ævW'&–çBÀ§Òg&öÒ"ââöÆ–"÷6W76–öâö6öçF–çVF–öâ×7F÷&Ræ§2#°¦–×÷'B²7&VFU&W÷'D'F–f7G2Â$Uõ%Eõ5DEU2Òg&öÒ"ââöÆ–"÷&W÷'Böf–æÆ—¦Ræ§2#°¦–×÷'B²'VåF6²ÂD4µõE•U2Òg&öÒ"ââöÆ–"öÖöFVÅ&÷WFW"æ§2#°¦–×÷'B²vWD–çf—FUW&ÂÒg&öÒ"ââöÆ–"ö6öæf–r÷6—FR×W&Âæ§2#°¦–×÷'B²&V6÷&D6Æ–æ–6ÄWfVçBÒg&öÒ"ââöÆ–"ö6Æ–æ–6Â÷&ö¦V7F–öâæ§2#°¦–×÷'B²'V–ÆE7W÷'D6†V6¶–äÆöv–6Å6÷W&6T–BÂ'V–ÆE7W÷'D6†V6¶–äö'6W'fF–öå6æ6†÷BÒg&öÒ"ââöÆ–"ö6Æ–æ–6Âöö'6W'fF–öâÖÖ–æw2æ§2#°¦–×÷'B²&V6÷&D6Æ–æ–6Äö'6W'fF–öâÒg&öÒ"ââöÆ–"ö6Æ–æ–6Â÷&ö¦V7F–öâæ§2#°¦–×÷'B²vWDÖVF–6F–öä6&G4f÷$÷væW"Â—4ÖVF–6F–öå6W76–öäVÆ–v–&ÆRÒg&öÒ"ââöÆ–"ö6Æ–æ–6ÂöÖVF–6F–öâæ§2#°¦–×÷'B°¢D”TåEôÔTD”4D”ôåõ$TdU$Tä4Uõ$õd”DU"À¢6äW‡Æ–6—FÇ•6VÆV7DÖVF–6F–öä6öæ6WBÀ¢f–æDW†7DÖVF–6F–öä6öæ6WD6æF–FFW2À¢ÆöDÖVF–6F–öå&VfW&Væ6Tf÷$÷&FW"À¢ÆöDÖVF–6F–öå&VfW&Væ6Uf–Ww2À§Òg&öÒ"ââöÆ–"ö6Æ–æ–6ÂöÖVF–6F–öâ×&VfW&Væ6Ræ§2#°¦–×÷'B°¢'V–ÆEF–VçDÖVF–6F–öä6öçFW‡BÀ¢'V–ÆE66†VGVÆVDÖVF–6F–öä–çF¶W2À¢—4ÖVF–6F–öäFFRÀ¢—5F–VçDÖVF–6F–öä÷&FW%7FGW2À¢F–VçDÖVF–6F–öä÷væW$ÖF6†W2À¢&ö¦V7DÖVF–6F–öä–çF¶W2À¢fÆ–FFTÖVF–6F–öä–çF¶RÀ¢fÆ–FFUF–VçDÖVF–6F–öä÷&FW"À¢D”TåEôÔTD”4D”ôåõ4dUE•ô”å5E%T5D”ôâÀ§Òg&öÒ"ââöÆ–"ö6Æ–æ–6Â÷F–VçB×&W÷'FVBÖÖVF–6F–öâæ§2#°¦–×÷'B²ÄTt5•ô4ôåD”åTD”ôåô4ôDUôÔU54tRÂÖ¶U6W76–öå7VÖÖ'’27&VFU6W76–öå7VÖÖ'’Âæ÷&ÖÆ—¦T–çf—FF–öå7FGW6W2Òg&öÒ"ââöÆ–"÷6W76–öâö6&–æWB×&W6VçFW'2æ§2#°¦–×÷'B²vWE–Æ÷D–BÂ†4&öG•6W76–öå&VfW&Væ6RÂ—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçBÂ—5–Æ÷E6W76–öäÖF6‚Â&V¦V7EVæf–Æ&ÆTÖöGVÆRÒg&öÒ"ââöÆ–"÷6V7W&—G’öÖöGVÆRÖf–Æ&–Æ—G’æ§2#° ¦6öç7B$ôE•õ4U54”ôåô5D”ôå2ÒæWr6WB…°¢&Æ—7D&öG”F–Ç”Æöw2"À¢&vWD&öG”6&–æWB"À¢&vWD&öG”öæ&ö&F–ær"À¢'6fT&öG”öæ&ö&F–ær"À¢'WFFT&öG”F—7Æ”æÖR"À¢&vWD&öG”F–'”F’"À¢'6fUÆFT†—7F÷'’"À¢&vWD&öG•ÆFT†—7F÷'’"À¢&vWD&öG”–ç6–v‡G2"À¢&F—6Ö—74&öG”–ç6–v‡B"À¢&vWD&öG•vVV¶Ç•7VÖÖ'’"À¢&vVæW&FT&öG•vVV¶Ç•7VÖÖ'’"À¢&vWD&öG””6†B"À¢'6VæD&öG””ÖW76vR"À¢&vWD&öG”†VÇF„6öçFW‡B"À¢'6fT&öG”†VÇF„6öçFW‡B"À¢&7&VFT&öG•6W'f–6U&WVW7B"À¢&7&VFTÆVv7”&öG•6W'f–6U&WVW7B"À¢&vWD&öG•6W'f–6U&WVW7G2"À¢&vWD&öG•6W'f–6U&WVW7B"À¢&6æ6VÄ&öG•6W'f–6U&WVW7B"À¥Ò“° ¦gVæ7F–öâ†6…Fö¶Vâ‡Fö¶Vâ’°¢&WGW&â7'—Fòæ7&VFT†6‚‚'6†#Sb"’çWFFR‡Fö¶Vâ’æF–vW7B‚&†W‚"“°§Ğ ¦gVæ7F–öâvWD6Æ–VçD—‡&W’°¢&WGW&â&Wæ†VFW'5²'‚Öf÷'v&FVBÖf÷"%Óòç7Æ—B‚"Â"•³ÓòçG&–Ò‚¢ÇÂ&Wæ†VFW'5²'‚×&VÂÖ—%Ğ¢ÇÂ&Wç6ö6¶WCòç&VÖ÷FTFG&W70¢ÇÂ'Væ¶æ÷vâ#°§Ğ ¢òò&W6öÇfR7W÷'B÷væW"g&öÒ6W76–öåö–B²66W75÷Fö¶Vâà¢òò&WGW&ç2²÷væW$–BÂ6W76–öä–BÂV&Æ–46öFRÒ÷"çVÆÂà¦7–æ2gVæ7F–öâ&W6öÇfU7W÷'D÷væW"‡6W76–öä–BÂ66W75Fö¶Vâ’°¢–b‚6W76–öä–BÇÂ66W75Fö¶Vâ’&WGW&âçVÆÃ°¢6öç7BfÆ–BÒv—BfÆ–FFU6W76–öä66W72‡6W76–öä–BÂ66W75Fö¶Vâ“°¢–b‚fÆ–B’&WGW&âçVÆÃ°¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢6W76–öâÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'6W76–öåö–BÂV&Æ–5ö6öFRÂæöç–Ö÷W5ö÷væW%ö–BÂÖöGVÆRÂ§6öåöFF"¢æW‚'6W76–öåö–B"Â6W76–öä–B¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æÖ–&U6–ævÆR‚“°¢–b†W'&÷"ÇÂ6W76–öâÇÂ6W76–öâææöç–Ö÷W5ö÷væW%ö–BÇÂ—5–Æ÷E6W76–öäÖF6‚‡6W76–öâæ§6öåöFF’’&WGW&âçVÆÃ°¢&WGW&â²÷væW$–C¢6W76–öâææöç–Ö÷W5ö÷væW%ö–BÂ6W76–öä–C¢6W76–öâç6W76–öåö–BÂV&Æ–46öFS¢6W76–öâçV&Æ–5ö6öFRÓ°§Ğ ¢òòÖVF–6F–öâ6&G2&WV—&RæöâÖÆVv7’6W76–öâFö¶VââÆVv7’66W72&VÖ–ç0¢òòf–Æ&ÆRFòVç&VÆFVB†—7F÷&–6Â6&–æWBfÆ÷w2Â'WB6ææ÷BW‡÷6R3"FFà¦7–æ2gVæ7F–öâ&W6öÇfTÖVF–6F–öå7W÷'D÷væW"‡6W76–öä–BÂ66W75Fö¶Vâ’°¢–b‚6W76–öä–BÇÂ66W75Fö¶Vâ’&WGW&âçVÆÃ°¢6öç7BfÆ–BÒv—BfÆ–FFU6W76–öä66W72‡6W76–öä–BÂ66W75Fö¶Vâ“°¢–b‚fÆ–B’&WGW&âçVÆÃ°¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢6W76–öâÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'6W76–öåö–BÂV&Æ–5ö6öFRÂæöç–Ö÷W5ö÷væW%ö–BÂÖöGVÆRÂÆVv7•ö66W72Â§6öåöFF"¢æW‚'6W76–öåö–B"Â6W76–öä–B¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æÖ–&U6–ævÆR‚“°¢–b†W'&÷"ÇÂ—4ÖVF–6F–öå6W76–öäVÆ–v–&ÆR‡6W76–öâ’ÇÂ6W76–öâææöç–Ö÷W5ö÷væW%ö–BÇÂ—5–Æ÷E6W76–öäÖF6‚‡6W76–öâæ§6öåöFF’’&WGW&âçVÆÃ°¢&WGW&â²÷væW$–C¢6W76–öâææöç–Ö÷W5ö÷væW%ö–BÂ6W76–öä–C¢6W76–öâç6W76–öåö–BÂV&Æ–46öFS¢6W76–öâçV&Æ–5ö6öFRÓ°§Ğ ¢òò&W6öÇfR7V6–Æ—7B&VÆF–öâf÷"7W÷'B÷væW"à¢òò&WGW&ç2²W‡W'D–BÂW‡W'DæÖRÂW‡W'E&öÆRÂW‡W'E7V6–ÇG’Â÷&væ—¦F–öä–BÂ÷&væ—¦F–öäæÖRÒ÷"çVÆÂà¦7–æ2gVæ7F–öâ&W6öÇfU7W÷'E7V6–Æ—7E&VÆF–öâ†÷væW$–B’°¢6öç7B7W&6RÒvWE7W&6R‚“° ¢òòf–æBV&Æ–5ö6öFRf÷"F†—2÷væW"w26W76–öç0¢6öç7B²FF¢÷væW%6W76–öç2ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'V&Æ–5ö6öFRÂ&–Ö'•öW‡W'Eö–BÂ÷&væ—¦F–öåö–B"¢æW‚&æöç–Ö÷W5ö÷væW%ö–B"Â÷væW$–B¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ¢æÆ–Ö—Bƒ“° ¢–b‚÷væW%6W76–öç2ÇÂ÷væW%6W76–öç2æÆVæwF‚ÓÓÒ’&WGW&âçVÆÃ° ¢6öç7BÆFW7BÒ÷væW%6W76–öç5³Ó°¢ÆWBW‡W'D–BÒÆFW7Bç&–Ö'•öW‡W'Eö–C°¢ÆWB÷&t–BÒÆFW7Bæ÷&væ—¦F–öåö–C° ¢òò–b6W76–öâFöW6âwB†fRW‡W'BÂ6†V6²F–VçEö76–væÖVçG0¢–b‚W‡W'D–BbbÆFW7BçV&Æ–5ö6öFR’°¢6öç7B²FF¢76–væÖVçBÒÒv—B7W&6P¢æg&öÒ‚'F–VçEö76–væÖVçG2"¢ç6VÆV7B‚'&–Ö'•öW‡W'Eö–BÂ÷&væ—¦F–öåö–B"¢æW‚'V&Æ–5ö6öFR"ÂÆFW7BçV&Æ–5ö6öFR¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æW‚'7FGW2"Â&7F—fR"¢æÖ–&U6–ævÆR‚“°¢–b†76–væÖVçB’°¢W‡W'D–BÒ76–væÖVçBç&–Ö'•öW‡W'Eö–C°¢÷&t–BÒ÷&t–BÇÂ76–væÖVçBæ÷&væ—¦F–öåö–C°¢Ğ¢Ğ ¢–b‚W‡W'D–B’&WGW&âçVÆÃ° ¢òòvWBW‡W'BFWF–Ç0¢6öç7B²FF¢W‡W'BÒÒv—B7W&6P¢æg&öÒ‚&W‡W'G2"¢ç6VÆV7B‚&–BÂæÖRÂ&öÆRÂ7V6–ÇG’"¢æW‚&–B"ÂW‡W'D–B¢æÖ–&U6–ævÆR‚“° ¢–b‚W‡W'B’&WGW&âçVÆÃ° ¢ÆWB÷&tæÖRÒçVÆÃ°¢–b†÷&t–B’°¢6öç7B²FF¢÷&rÒÒv—B7W&6P¢æg&öÒ‚&÷&væ—¦F–öç2"¢ç6VÆV7B‚&–BÂæÖR"¢æW‚&–B"Â÷&t–B¢æÖ–&U6–ævÆR‚“°¢÷&tæÖRÒ÷&sòææÖRÇÂçVÆÃ°¢Ğ ¢&WGW&â°¢W‡W'D–C¢W‡W'Bæ–BÀ¢W‡W'DæÖS¢W‡W'BææÖRÀ¢W‡W'E&öÆS¢W‡W'Bç&öÆRÀ¢W‡W'E7V6–ÇG“¢W‡W'Bç7V6–ÇG’À¢÷&væ—¦F–öä–C¢÷&t–BÀ¢÷&væ—¦F–öäæÖS¢÷&tæÖRÀ¢Ó°§Ğ ¢òò&W6öÇfR&öG’÷væW"g&öÒ6W76–öåö–B²66W75÷Fö¶Vâà¢òò&WGW&ç2²÷væW$–BÂ6W76–öä–BÒ÷"F‡&÷w2v—F‚&÷&–FR…EE7FGW2à¦7–æ2gVæ7F–öâ&W6öÇfT&öG”÷væW"‡6W76–öä–BÂ66W75Fö¶Vâ’°¢–b‚6W76–öä–BÇÂ66W75Fö¶Vâ’°¢&WGW&âçVÆÃ°¢Ğ¢6öç7BfÆ–BÒv—BfÆ–FFU6W76–öä66W72‡6W76–öä–BÂ66W75Fö¶Vâ“°¢–b‚fÆ–B’°¢&WGW&âçVÆÃ°¢Ğ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢6Æ–VçBÂW'&÷#¢6Æ–VçDW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚&&öG•ö6Æ–VçG2"¢ç6VÆV7B‚&æöç–Ö÷W5ö÷væW%ö–B"¢æW‚'6W76–öåö–B"Â6W76–öä–B¢æÖ–&U6–ævÆR‚“°¢–b†6Æ–VçDW'&÷"ÇÂ6Æ–VçB’°¢&WGW&âçVÆÃ°¢Ğ¢òò–bæöç–Ö÷W5ö÷væW%ö–B—2Ö—76–ær†ÆVv7’&÷r’ÂvVæW&FRæBW'6—7BöæP¢–b‚6Æ–VçBææöç–Ö÷W5ö÷væW%ö–B’°¢6öç7B²&æFöÕUT”BÒÒv—B–×÷'B‚&æöFS¦7'—Fò"“°¢6öç7BæWt÷væW$–BÒ&æFöÕUT”B‚“°¢6öç7B²W'&÷#¢WFFTW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚&&öG•ö6Æ–VçG2"¢çWFFR‡²æöç–Ö÷W5ö÷væW%ö–C¢æWt÷væW$–BÒ¢æW‚'6W76–öåö–B"Â6W76–öä–B“°¢–b‡WFFTW'&÷"’°¢6öç6öÆRæW'&÷"‚%·&W6öÇfT&öG”÷væW%Òf–ÆVBFò76–vâ÷væW#¢"ÂWFFTW'&÷"æ6öFR“°¢&WGW&âçVÆÃ°¢Ğ¢&WGW&â²÷væW$–C¢æWt÷væW$–BÂ6W76–öä–BÓ°¢Ğ¢&WGW&â²÷væW$–C¢6Æ–VçBææöç–Ö÷W5ö÷væW%ö–BÂ6W76–öä–BÓ°§Ğ ¢òòæöç–Ö÷W26öçF–çVF–öâ7&VFVçF–Â72†VÇW'0¦7–æ2gVæ7F–öâ'V–ÆD6&–æWE6W76–öç2‡²ÖöGVÆRÂ÷væW$–BÂ7W&6RÒ’°¢6öç7BF&ÆRÒÖöGVÆRÓÓÒ&&öG’"ò&&öG•ö6Æ–VçG2"¢'6W76–öç2#°¢6öç7B—4&öG’ÒÖöGVÆRÓÓÒ&&öG’#° ¢6öç7B6VÆV7D6öÇ2Ò—4&öG¢ò'6W76–öåö–BÂF—7Æ•öæÖRÂ7&VFVEöB ¢¢'6W76–öåö–BÂV&Æ–5ö6öFRÂÖöGVÆRÂF–VçE÷FW‡BÂ7&VFVEöBÂ§6öåöFF#° ¢ÆWBVW'’Ò7W&6P¢æg&öÒ‡F&ÆR¢ç6VÆV7B‡6VÆV7D6öÇ2¢æW‚&æöç–Ö÷W5ö÷væW%ö–B"Â÷væW$–B“° ¢–b‚—4&öG’’°¢VW'’ÒVW'’æW‚&ÖöGVÆR"ÂÖöGVÆR“°¢Ğ ¢6öç7B²FFÂW'&÷"ÒÒv—BVW'’æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚&'V–ÆD6&–æWE6W76–öç2W'&÷""ÂW'&÷"“°¢&WGW&âµÓ°¢Ğ ¢&WGW&â†FFÇÂµÒ’æÖ‚‡2Â–G‚’Óâ°¢–b†—4&öG’’°¢&WGW&â°¢6W76–öä–C¢2ç6W76–öåö–BÀ¢V&Æ–46öFS¢2ç6W76–öåö–BÀ¢7&VFVDC¢2æ7&VFVEöBÀ¢7VÖÖ'“¢2æF—7Æ•öæÖRò	İ­]-}Míí-Íó¢G·2æF—7Æ•öæÖWÖ¢-	İ­]-}Míí-Íò"À¢7FGW3¢&f—'7Eö6öçF7B"À¢÷&FW#¢–G‚²À¢Ó°¢Ğ¢6öç7B§6öâÒ2æ§6öåöFFÇÂ·Ó°¢6öç7B–çWBÒ‡2çF–VçE÷FW‡BÇÂ""’çG&–Ò‚“°¢6öç7B7VÖÖ'’Ò—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚¢ò7&VFU6W76–öå7VÖÖ'’‡2¢¢–çW@¢òG¶–çWBç7Æ—B‚õ²âõÆåÒò•³ÒçG&–Ò‚’ç6Æ–6RƒÂ—ÒG¶–çWBç7Æ—B‚õ²âõÆåÒò•³ÒçG&–Ò‚’æÆVæwF‚âò.(
+b"¢"'Ö ¢¢-	í]İR]r-]­-í-í=âíıİòâ#°¢&WGW&â°¢6W76–öä–C¢2ç6W76–öåö–BÀ¢V&Æ–46öFS¢2çV&Æ–5ö6öFRÀ¢7&VFVDC¢2æ7&VFVEöBÀ¢7VÖÖ'’À¢7FGW3¢§6öâæ—46öçF–çVF–öâÇÂ§6öâç&Wf–÷W5F–VçE&W÷'Bò&föÆÆ÷wW"¢&f—'7Eö6öçF7B"À¢÷&FW#¢–G‚²À¢Ó°¢Ò“°§Ğ ¦7–æ2gVæ7F–öâ'V–ÆD6&–æWDFF‡²ÖöGVÆRÂ÷væW$–BÂ7W&6RÒ’°¢6öç7B6W76–öç2Òv—B'V–ÆD6&–æWE6W76–öç2‡²ÖöGVÆRÂ÷væW$–BÂ7W&6RÒ“°¢6öç7BÆFW7E6W76–öâÒ6W76–öç5³Ó°¢ÆWBÆFW7E&W÷'BÒçVÆÃ° ¢–b†ÆFW7E6W76–öãòç6W76–öä–B’°¢6öç7B—4&öG’ÒÖöGVÆRÓÓÒ&&öG’#°¢6öç7BF&ÆRÒ—4&öG’ò&&öG•ö–çF¶Uöf÷&×2"¢'6W76–öç2#°¢6öç7B6VÆV7D6öÇ2Ò—4&öG¢ò'6W76–öåö–BÂç7vW'2Â6&U÷&V6öÖÖVæFF–öâÂ&Ö’Â7&VFVEöB ¢¢'6W76–öåö–BÂV&Æ–5ö6öFRÂF–VçE÷FW‡BÂW6W%÷&W÷'BÂFö7F÷%÷&W÷'BÂ7W÷'E÷ÆâÂ§6öåöFFÂ7&VFVEöB#°¢6öç7B²FFÒÒv—B7W&6P¢æg&öÒ‡F&ÆR¢ç6VÆV7B‡6VÆV7D6öÇ2¢æW‚'6W76–öåö–B"ÂÆFW7E6W76–öâç6W76–öä–B¢æÖ–&U6–ævÆR‚“°¢–b†FF’°¢–b†—4&öG’’°¢6öç7Bç7vW'2ÒFFæç7vW'2ÇÂ·Ó°¢ÆFW7E&W÷'BÒ°¢6W76–öä–C¢FFç6W76–öåö–BÀ¢V&Æ–46öFS¢FFç6W76–öåö–BÀ¢W6W%&W÷'C¢	İ­]-}Míí-Íò}ıí½İ]İâ		Í
+#¢G¶FFæ&Ö’óò.(	B'Òâ
+m]½Ã¢G¶ç7vW'2ævöÂÇÂ.(	B'ÒæÀ¢Fö7F÷%&W÷'C¢""À¢7W÷'EÆã¢FFæ6&U÷&V6öÖÖVæFF–öâÇÂçVÆÂÀ¢†öÖUF6·3¢""À¢&W6÷W&6Tf7F÷'3¢""À¢&Wf–÷W5F–VçE&W÷'C¢""À¢&Wf–÷W4Fö7F÷%&W÷'C¢""À¢F–ÆötFWFƒ¢À¢6öçfW'6F–öä†—7F÷'“¢µÒÀ¢Ó°¢ÒVÇ6R°¢6öç7B§6öâÒFFæ§6öåöFFÇÂ·Ó°¢ÆFW7E&W÷'BÒ°¢6W76–öä–C¢FFç6W76–öåö–BÀ¢V&Æ–46öFS¢FFçV&Æ–5ö6öFRÀ¢W6W%&W÷'C¢FFçW6W%÷&W÷'BÇÂ""À¢Fö7F÷%&W÷'C¢FFæFö7F÷%÷&W÷'BÇÂ""À¢7W÷'EÆã¢FFç7W÷'E÷ÆâÇÂçVÆÂÀ¢†öÖUF6·3¢§6öâæ†öÖUF6·2ÇÂ""À¢&W6÷W&6Tf7F÷'3¢§6öâç&W6÷W&6Tf7F÷'2ÇÂ""À¢&Wf–÷W5F–VçE&W÷'C¢§6öâç&Wf–÷W5F–VçE&W÷'BÇÂ""À¢&Wf–÷W4Fö7F÷%&W÷'C¢§6öâç&Wf–÷W4Fö7F÷%&W÷'BÇÂ""À¢F–ÆötFWFƒ¢§6öâæF–ÆötFWF‚óòÀ¢6öçfW'6F–öä†—7F÷'“¢FFæ6öçfW'6F–öåö†—7F÷'’ÇÂµÒÀ¢7&—6—4&Æö6³¢—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚’ò§6öâæ7&—6—5ö&Æö6²ÇÂçVÆÂ¢çVÆÂÀ¢Ó°¢Ğ¢Ğ¢Ğ ¢&WGW&â²6W76–öç2ÂÆFW7E&W÷'BÓ°§Ğ ¦7–æ2gVæ7F–öâvWEW6vT&Ææ6Tf÷$÷væW"‡²ÖöGVÆRÂ÷væW$–BÒ’°¢6öç7B²vWEvÆÆWBÂvWEW6vT&Ææ6Tf÷$6Æ–VçBÒÒv—B–×÷'B‚"ââöÆ–"÷W6vR÷vÆÆWBæ§2"“°¢6öç7B÷væW%G—RÒvWD÷væW%G—R†ÖöGVÆR“°¢6öç7BvÆÆWBÒv—BvWEvÆÆWB‡²÷væW%G—RÂ÷væW$–BÂÖöGVÆRÒ“°¢–b‚vÆÆWB’&WGW&â²ö³¢G'VRÂf—6–&ÆS¢fÇ6RÓ°¢&WGW&âv—BvWEW6vT&Ææ6Tf÷$6Æ–VçB‡²vÆÆWD–C¢vÆÆWBæ–BÒ“°§Ğ ¦gVæ7F–öâ—5fÆ–E6W76–öä–B†–B’°¢–b‚–BÇÂG—Vöb–BÓÒ'7G&–ær"’&WGW&âfÇ6S°¢&WGW&âõå¶×¤Õ£Ó•òÕ×³‚ÃcGÒBòçFW7B†–B“°§Ğ ¦W‡÷'BFVfVÇB7–æ2gVæ7F–öâ†æFÆW"‡&WÂ&W2’°¢–b††æFÆT÷F–öç2‡&WÂ&W2’’&WGW&ã° ¢Ç”6÷'2‡&WÂ&W2“° ¢–b‡&WæÖWF†öBÓÒ%õ5B"’°¢&WGW&â&W2ç7FGW2ƒCR’æ§6öâ‡²W'&÷#¢$ÖWF†öBæ÷BÆÆ÷vVB"Ò“°¢Ğ ¢–b…²v†VÇF„Æ—fRrÂw7W÷'DÆ—fRuÒæ–æ6ÇVFW2‡&Wæ&öG“òæ7F–öâ’’°¢6öç7BÆ—fTÖöGVÆRÒ&Wæ&öG’æ7F–öâÓÓÒw7W÷'DÆ—fRròw7W÷'Br¢v&öG’s°¢&WGW&â7&VFTÆ—fT†æFÆW"‡°¢ÖöGVÆS¢Æ—fTÖöGVÆRÀ¢&W6öÇfT÷væW#¢Æ—fTÖöGVÆRÓÓÒw7W÷'Brò&W6öÇfU7W÷'D÷væW"¢&W6öÇfT&öG”÷væW"À¢'V–ÆD6öçFW‡C¢÷væW"ÓâÆ—fTÖöGVÆRÓÓÒw7W÷'Bp¢ò'V–ÆE7W÷'D6†D6öçFW‡B†vWE7W&6R‚’Â÷væW"æ÷væW$–B¢¢'V–ÆD”6†D6öçFW‡B‡²7W&6S¢vWE7W&6R‚’Â÷væW$–C¢÷væW"æ÷væW$–BÒ’À¢Ò’‡&WÂ&W2“°¢Ğ ¢6öç7BÆ–Ö—BÒ&FTÆ–Ö—B‡²v–æF÷t×3¢¢c¢ÂÖƒ¢cÂ&Vf—ƒ¢'6W76–öã¢"Ò“°¢6öç7BÆ–Ö—FVBÒv—BÆ–Ö—B‡&WÂ&W2“°¢–b†Æ–Ö—FVB’&WGW&ã° ¢6öç7B²7F–öâÂÖöGVÆRÒÒ&Wæ&öG’ÇÂ·Ó°¢–b‡&V¦V7EVæf–Æ&ÆTÖöGVÆR‡&W2ÂÖöGVÆR’’&WGW&ã°¢–b†—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚’bb„$ôE•õ4U54”ôåô5D”ôå2æ†2†7F–öâ’ÇÂ†4&öG•6W76–öå&VfW&Væ6R‡&Wæ&öG’’’’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	ÍíM=½Âİ]Mí-=ı]Ò"İ-í’í­R"Ò“°¢Ğ ¢G'’°¢7v—F6‚†7F–öâ’°¢66R'6fR# ¢&WGW&âv—B†æFÆU6fR‡&WÂ&W2“°¢66R&ÆöB# ¢&WGW&âv—B†æFÆTÆöB‡&WÂ&W2“°¢66R&vWD6&–æWB# ¢&WGW&âv—B†æFÆTvWD6&–æWB‡&WÂ&W2“°¢66R&vWDÖVF–6F–öä6&B# ¢&WGW&âv—B†æFÆTvWDÖVF–6F–öä6&B‡&WÂ&W2“°¢66R&vWE&W÷'B# ¢&WGW&âv—B†æFÆTvWE&W÷'B‡&WÂ&W2“°¢66R'WFFU7W÷'EÆâ# ¢&WGW&âv—B†æFÆUWFFU7W÷'EÆâ‡&WÂ&W2“°¢66R'6fUö6öçfW'6F–öå÷—'2# ¢&WGW&âv—B†æFÆU6fT6öçfW'6F–öå—'2‡&WÂ&W2“°¢66R'fÆ–FFT–çf—FUFö¶Vâ# ¢&WGW&âv—B†æFÆUfÆ–FFT–çf—FUFö¶Vâ‡&WÂ&W2“°¢66R&Æ—7D&öG”F–Ç”Æöw2# ¢&WGW&âv—B†æFÆTÆ—7D&öG”F–Ç”Æöw2‡&WÂ&W2“°¢66R&vVæW&FT66W75Fö¶Vâ# ¢&WGW&âv—B†æFÆTvVæW&FT66W75Fö¶Vâ‡&WÂ&W2“°¢66R&7&VFTföÆÆ÷uW6W76–öâ# ¢&WGW&âv—B†æFÆT7&VFTföÆÆ÷uW6W76–öâ‡&WÂ&W2“°¢66R&W†6†ævT6öçF–çVF–öä7&VFVçF–Â# ¢&WGW&âv—B†æFÆTW†6†ævT6öçF–çVF–öä7&VFVçF–Â‡&WÂ&W2“°¢66R'&VvVæW&FT6öçF–çVF–öä7&VFVçF–Â# ¢&WGW&âv—B†æFÆU&VvVæW&FT6öçF–çVF–öä7&VFVçF–Â‡&WÂ&W2“°¢66R&vWE&W÷'E7FGW2# ¢&WGW&âv—B†æFÆTvWE&W÷'E7FGW2‡&WÂ&W2“°¢66R&vWD&öG”6&–æWB# ¢&WGW&âv—B†æFÆTvWD&öG”6&–æWB‡&WÂ&W2“°¢66R&vWD&öG”öæ&ö&F–ær# ¢&WGW&âv—B†æFÆTvWD&öG”öæ&ö&F–ær‡&WÂ&W2“°¢66R'6fT&öG”öæ&ö&F–ær# ¢&WGW&âv—B†æFÆU6fT&öG”öæ&ö&F–ær‡&WÂ&W2“°¢66R'WFFT&öG”F—7Æ”æÖR# ¢&WGW&âv—B†æFÆUWFFT&öG”F—7Æ”æÖR‡&WÂ&W2“°¢66R&vWD&öG”F–'”F’# ¢&WGW&âv—B†æFÆTvWD&öG”F–'”F’‡&WÂ&W2“°¢66R'6fUÆFT†—7F÷'’# ¢&WGW&âv—B†æFÆU6fUÆFT†—7F÷'’‡&WÂ&W2“°¢66R&vWD&öG•ÆFT†—7F÷'’# ¢&WGW&âv—B†æFÆTvWD&öG•ÆFT†—7F÷'’‡&WÂ&W2“°¢66R&vWD&öG”–ç6–v‡G2# ¢&WGW&âv—B†æFÆTvWD&öG”–ç6–v‡G2‡&WÂ&W2“°¢66R&F—6Ö—74&öG”–ç6–v‡B# ¢&WGW&âv—B†æFÆTF—6Ö—74&öG”–ç6–v‡B‡&WÂ&W2“°¢66R&vWD&öG•vVV¶Ç•7VÖÖ'’# ¢&WGW&âv—B†æFÆTvWD&öG•vVV¶Ç•7VÖÖ'’‡&WÂ&W2“°¢66R&vVæW&FT&öG•vVV¶Ç•7VÖÖ'’# ¢&WGW&âv—B†æFÆTvVæW&FT&öG•vVV¶Ç•7VÖÖ'’‡&WÂ&W2“°¢66R&vWD&öG””6†B# ¢&WGW&âv—B†æFÆTvWD&öG””6†B‡&WÂ&W2“°¢66R'6VæD&öG””ÖW76vR# ¢&WGW&âv—B†æFÆU6VæD&öG””ÖW76vR‡&WÂ&W2“°¢66R&vWD&öG”†VÇF„6öçFW‡B# ¢&WGW&âv—B†æFÆTvWD&öG”†VÇF„6öçFW‡B‡&WÂ&W2“°¢66R'6fT&öG”†VÇF„6öçFW‡B# ¢&WGW&âv—B†æFÆU6fT&öG”†VÇF„6öçFW‡B‡&WÂ&W2“°¢66R&Æ—7EF–VçDÖVF–6F–öä÷&FW'2# ¢&WGW&âv—B†æFÆTÆ—7EF–VçDÖVF–6F–öä÷&FW'2‡&WÂ&W2“°¢66R'6fUF–VçDÖVF–6F–öä÷&FW"# ¢&WGW&âv—B†æFÆU6fUF–VçDÖVF–6F–öä÷&FW"‡&WÂ&W2“°¢66R'WFFUF–VçDÖVF–6F–öä÷&FW%7FGW2# ¢&WGW&âv—B†æFÆUWFFUF–VçDÖVF–6F–öä÷&FW%7FGW2‡&WÂ&W2“°¢66R'&V6÷&DÖVF–6F–öä–çF¶R# ¢&WGW&âv—B†æFÆU&V6÷&DÖVF–6F–öä–çF¶R‡&WÂ&W2“°¢66R&f–æEF–VçDÖVF–6F–öå&VfW&Væ6T6æF–FFW2# ¢&WGW&âv—B†æFÆTf–æEF–VçDÖVF–6F–öå&VfW&Væ6T6æF–FFW2‡&WÂ&W2“°¢66R&6öæf—&ÕF–VçDÖVF–6F–öå&VfW&Væ6TÖF6‚# ¢&WGW&âv—B†æFÆT6öæf—&ÕF–VçDÖVF–6F–öå&VfW&Væ6TÖF6‚‡&WÂ&W2“°¢66R&7&VFT&öG•6W'f–6U&WVW7B# ¢&WGW&âv—B†æFÆT7&VFT&öG•6W'f–6U&WVW7B‡&WÂ&W2Â²ÆVv7“¢fÇ6RÒ“°¢66R&7&VFTÆVv7”&öG•6W'f–6U&WVW7B# ¢&WGW&âv—B†æFÆT7&VFT&öG•6W'f–6U&WVW7B‡&WÂ&W2Â²ÆVv7“¢G'VRÒ“°¢66R&vWD&öG•6W'f–6U&WVW7G2# ¢&WGW&âv—B†æFÆTvWD&öG•6W'f–6U&WVW7G2‡&WÂ&W2“°¢66R&vWD&öG•6W'f–6U&WVW7B# ¢&WGW&âv—B†æFÆTvWD&öG•6W'f–6U&WVW7B‡&WÂ&W2“°¢66R&6æ6VÄ&öG•6W'f–6U&WVW7B# ¢&WGW&âv—B†æFÆT6æ6VÄ&öG•6W'f–6U&WVW7B‡&WÂ&W2“°¢66R&vWE6W'f–6U&–6–ær# ¢&WGW&âv—B†æFÆTvWE6W'f–6U&–6–ær‡&WÂ&W2“°¢66R&7&VFU7W÷'E6W'f–6U&WVW7B# ¢&WGW&âv—B†æFÆT7&VFU7W÷'E6W'f–6U&WVW7B‡&WÂ&W2“°¢66R&Æ—7E7W÷'E6W'f–6U&WVW7G2# ¢&WGW&âv—B†æFÆTÆ—7E7W÷'E6W'f–6U&WVW7G2‡&WÂ&W2“°¢66R&vWE7W÷'E6W'f–6U&WVW7B# ¢&WGW&âv—B†æFÆTvWE7W÷'E6W'f–6U&WVW7B‡&WÂ&W2“°¢66R&6æ6VÅ7W÷'E6W'f–6U&WVW7B# ¢&WGW&âv—B†æFÆT6æ6VÅ7W÷'E6W'f–6U&WVW7B‡&WÂ&W2“°¢66R&vWE7W÷'D6†V6¶–ç2# ¢&WGW&âv—B†æFÆTvWE7W÷'D6†V6¶–ç2‡&WÂ&W2“°¢66R'6fU7W÷'D6†V6¶–â# ¢&WGW&âv—B†æFÆU6fU7W÷'D6†V6¶–â‡&WÂ&W2“°¢66R&vWE7W÷'E&7F–6W2# ¢&WGW&âv—B†æFÆTvWE7W÷'E&7F–6W2‡&WÂ&W2“°¢66R'6fU7W÷'E&7F–6R# ¢&WGW&âv—B†æFÆU6fU7W÷'E&7F–6R‡&WÂ&W2“°¢66R'WFFU7W÷'E&7F–6U7FGW2# ¢&WGW&âv—B†æFÆUWFFU7W÷'E&7F–6U7FGW2‡&WÂ&W2“°¢66R&vWE7W÷'E&öf–ÆR# ¢&WGW&âv—B†æFÆTvWE7W÷'E&öf–ÆR‡&WÂ&W2“°¢66R'6fU7W÷'E&öf–ÆR# ¢&WGW&âv—B†æFÆU6fU7W÷'E&öf–ÆR‡&WÂ&W2“°¢66R&vWE7W÷'D6†B# ¢&WGW&âv—B†æFÆTvWE7W÷'D6†B‡&WÂ&W2“°¢66R'6VæE7W÷'DÖW76vR# ¢&WGW&âv—B†æFÆU6VæE7W÷'DÖW76vR‡&WÂ&W2“°¢66R&66WE7V6–Æ—7D–çf—FF–öâ# ¢&WGW&âv—B†æFÆT66WE7V6–Æ—7D–çf—FF–öâ‡&WÂ&W2“°¢66R&FV6Æ–æU7V6–Æ—7D–çf—FF–öâ# ¢&WGW&âv—B†æFÆTFV6Æ–æU7V6–Æ—7D–çf—FF–öâ‡&WÂ&W2“°¢66R&66WEF–VçD–çf—FF–öä'”–B# ¢&WGW&âv—B†æFÆT66WEF–VçD–çf—FF–öä'”–B‡&WÂ&W2“°¢66R&FV6Æ–æUF–VçD–çf—FF–öä'”–B# ¢&WGW&âv—B†æFÆTFV6Æ–æUF–VçD–çf—FF–öä'”–B‡&WÂ&W2“°¢66R&7&VFUF–VçD–çf—FF–öâ# ¢&WGW&âv—B†æFÆT7&VFUF–VçD–çf—FF–öâ‡&WÂ&W2“°¢66R&Æ—7EF–VçD–çf—FF–öç2# ¢&WGW&âv—B†æFÆTÆ—7EF–VçD–çf—FF–öç2‡&WÂ&W2“°¢66R&7&VFTÖF6…&WVW7B# ¢&WGW&âv—B†æFÆT7&VFTÖF6…&WVW7B‡&WÂ&W2“°¢66R'7V&Ö—Döæ&ö&F–æu&WVW7B# ¢&WGW&âv—B†æFÆU7V&Ö—Döæ&ö&F–æu&WVW7B‡&WÂ&W2“°¢FVfVÇC ¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢Væ¶æ÷vâ7F–öã¢G¶7F–öçÖÒ“°¢Ğ¢Ò6F6‚†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢W'&÷"æÖW76vRÇÂ$–çFW&æÂW'&÷""Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆU6fR‡&WÂ&W2’°¢G'’°¢6öç7B°¢6W76–öä–BÂF–VçE÷FW‡BÂ6öçfW'6F–öä†—7F÷'’À¢W6W%÷&W÷'BÂFö7F÷%÷&W÷'BÂ&—6´ÆWfVÂÂ7W÷'EÆâÀ¢F–ÆötFWF‚Â&Wf–÷W5F–VçE&W÷'BÂ&Wf–÷W4Fö7F÷%&W÷'BÀ¢†öÖUF6·2Â&W6÷W&6Tf7F÷'2ÂVW7F–öç2Âç7vW'2À¢fö–6Tö'6W'fF–öç2ÂöFV'VrÂ6&U÷&V6öÖÖVæFF–öâÀ¢–çf—FU÷Fö¶VâÂÖöGVÆS¢6W76–öäÖöGVÆRÀ¢ÒÒ&Wæ&öG’ÇÂ·Ó° ¢–b‚6W76–öä–B’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$Ö—76–ær6W76–öä–B"Ò“°¢Ğ¢–b‚—5fÆ–E6W76–öä–B‡6W76–öä–B’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$–çfÆ–B6W76–öä–Bf÷&ÖB"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“° ¢6öç7B&—f7’ÒvWE&—f7•6fTÖöFR‚“°¢6öç7BÖ6¶VEF–VçEFW‡BÒ&—f7’òÖ6µFW‡B‡F–VçE÷FW‡BÇÂ""’¢F–VçE÷FW‡C°¢6öç7BÖ6¶VEW6W%&W÷'BÒ&—f7’òÖ6µ6Vç6—F—fTFF‡W6W%÷&W÷'BÇÂ""’¢W6W%÷&W÷'C°¢6öç7BÖ6¶VDFö7F÷%&W÷'BÒ&—f7’òÖ6µ6Vç6—F—fTFF†Fö7F÷%÷&W÷'BÇÂ""’¢Fö7F÷%÷&W÷'C°¢6öç7BÖ6¶VD6öçfW'6F–öâÒ&—f7’òÖ6µ6Vç6—F—fTFF†6öçfW'6F–öä†—7F÷'’ÇÂµÒ’¢6öçfW'6F–öä†—7F÷'“° ¢6öç7B²vVæW&FUV&Æ–46öFRÒÒv—B–×÷'B‚"ââöÆ–"÷V&Æ–46öFRæ§2"“°¢6öç7B²fÆ–FFT–çf—FUFö¶VâÂW6T–çf—FUFö¶VâÒÒv—B–×÷'B‚"âöW‡W'G2æ§2"“°¢6öç7B²Vç7W&UvÆÆWBÂ6WEvÆÆWEf—6–&ÆRÒÒv—B–×÷'B‚"ââöÆ–"÷W6vR÷vÆÆWBæ§2"“° ¢6öç7BW†—7F–ærÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'V&Æ–5ö6öFRÂ÷&væ—¦F–öåö–BÂ&–Ö'•öW‡W'Eö–BÂ66W75÷Fö¶Våö†6‚ÂÆVv7•ö66W72Âæöç–Ö÷W5ö÷væW%ö–B"¢æW‚'6W76–öåö–B"Â6W76–öä–B¢æÖ–&U6–ævÆR‚“° ¢–b†W†—7F–æræW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆU6fS¢4TÄT5BW'&÷""ÂW†—7F–æræW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}Mİİ½R-]Í]İİâİ]Mí-=ıİâ	ıíıí=-Rıí}mRâ"Ò“°¢Ğ ¢–b†FWÆ÷–ÖVçD÷&væ—¦F–öä–B‚’bbW†—7F–æsòæFF’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİ]Mí-=ıİ"Ò“°¢Ğ¢ÆWBV&Æ–46öFRÒW†—7F–æsòæFFòçV&Æ–5ö6öFS°¢ÆWB÷&væ—¦F–öä–BÒW†—7F–æsòæFFòæ÷&væ—¦F–öåö–BÇÂçVÆÃ°¢ÆWB&–Ö'”W‡W'D–BÒW†—7F–æsòæFFòç&–Ö'•öW‡W'Eö–BÇÂçVÆÃ°¢ÆWB–çf—FUFö¶VâÒW†—7F–æsòæFFòæ–çf—FU÷Fö¶VâÇÂçVÆÃ°¢6öç7B—4æWu6W76–öâÒW†—7F–æsòæFF°¢6öç7BÇ&VG”†5Fö¶VâÒW†—7F–æsòæFFòæ66W75÷Fö¶Våö†6‚ÒçVÆÃ° ¢òòVç7W&Ræöç–Ö÷W5ö÷væW%ö–BW†—7G2†7&VFVB6W'fW"×6–FRÂæWfW"g&öÒg&öçFVæB¢ÆWBæöç–Ö÷W4÷væW$–BÒW†—7F–æsòæFFòææöç–Ö÷W5ö÷væW%ö–BÇÂçVÆÃ°¢6öç7B6öFT§W7D7&VFVBÒV&Æ–46öFS° ¢–b‡V&Æ–46öFRbb†÷&væ—¦F–öä–BÇÂ&–Ö'”W‡W'D–B’’°¢òò¶VW ¢ÒVÇ6R–b‡V&Æ–46öFRbb÷&væ—¦F–öä–Bbb&–Ö'”W‡W'D–B’°¢6öç7B²FF¢76–væÖVçBÒÒv—B7W&6P¢æg&öÒ‚'F–VçEö76–væÖVçG2"¢ç6VÆV7B‚&÷&væ—¦F–öåö–BÂ&–Ö'•öW‡W'Eö–B"¢æW‚'V&Æ–5ö6öFR"ÂV&Æ–46öFR¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æW‚'7FGW2"Â&7F—fR"¢æÖ–&U6–ævÆR‚“°¢–b†76–væÖVçB’°¢÷&væ—¦F–öä–BÒ76–væÖVçBæ÷&væ—¦F–öåö–C°¢&–Ö'”W‡W'D–BÒ76–væÖVçBç&–Ö'•öW‡W'Eö–C°¢Ğ¢Ğ ¢òòvVæW&FRæöç–Ö÷W5ö÷væW%ö–Bf÷"æWr6W76–öç0¢–b‚æöç–Ö÷W4÷væW$–B’°¢6öç7B²&æFöÕUT”BÒÒv—B–×÷'B‚&æöFS¦7'—Fò"“°¢æöç–Ö÷W4÷væW$–BÒ&æFöÕUT”B‚“°¢Ğ ¢ÆWBæWuvÆÆWD–BÒçVÆÃ°¢–b‚V&Æ–46öFR’°¢V&Æ–46öFRÒvVæW&FUV&Æ–46öFR‚“° ¢òò7&VFRvÆÆWB††–FFVâ’öæ6R6öFR—2vVæW&FVBà¢òòf—6–&–Æ—G’6WBöæÇ’gFW"D"6fR6öæf—&×26öFRW'6—7FVæ6Rà¢6öç7BvÆÆWBÒv—BVç7W&UvÆÆWB‡²÷væW%G—S¢&æöç–Ö÷W5ö66R"Â÷væW$–C¢æöç–Ö÷W4÷væW$–BÂÖöGVÆS¢'7W÷'B"Ò“°¢æWuvÆÆWD–BÒvÆÆWCòæ–BÇÂçVÆÃ° ¢–b†–çf—FU÷Fö¶Vâ’°¢6öç7B–çf—FRÒv—BfÆ–FFT–çf—FUFö¶Vâ†–çf—FU÷Fö¶Vâ“°¢–b†–çf—FR’°¢÷&væ—¦F–öä–BÒ–çf—FRæ÷&væ—¦F–öåö–C°¢&–Ö'”W‡W'D–BÒ–çf—FRæW‡W'Eö–C°¢–çf—FUFö¶VâÒ–çf—FU÷Fö¶Vã° ¢6öç7B²FF¢W†—7F–æt76–væÖVçBÒÒv—B7W&6P¢æg&öÒ‚'F–VçEö76–væÖVçG2"¢ç6VÆV7B‚&–B"¢æW‚'V&Æ–5ö6öFR"ÂV&Æ–46öFR¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æÖ–&U6–ævÆR‚“° ¢–b‚W†—7F–æt76–væÖVçB’°¢v—B7W&6Ræg&öÒ‚'F–VçEö76–væÖVçG2"’æ–ç6W'B‡°¢V&Æ–5ö6öFS¢V&Æ–46öFRÀ¢÷&væ—¦F–öåö–C¢÷&væ—¦F–öä–BÀ¢&–Ö'•öW‡W'Eö–C¢&–Ö'”W‡W'D–BÀ¢76–væVEö'•öW‡W'Eö–C¢&–Ö'”W‡W'D–BÀ¢76–væVEö'•öW‡W'EöæÖS¢&WFò"À¢6÷W&6S¢&–çf—FUöÆ–æ²"À¢7FGW3¢&7F—fR"À¢ÖöGVÆS¢'7W÷'B"À¢Ò“° ¢v—B7W&6Ræg&öÒ‚'F–VçEö66W72"’æ–ç6W'B‡°¢V&Æ–5ö6öFS¢V&Æ–46öFRÀ¢÷&væ—¦F–öåö–C¢÷&væ—¦F–öä–BÀ¢W‡W'Eö–C¢&–Ö'”W‡W'D–BÀ¢66W75÷&öÆS¢&÷væW""À¢w&çFVEö'•öW‡W'Eö–C¢&–Ö'”W‡W'D–BÀ¢w&çFVEö'•öW‡W'EöæÖS¢&WFò"À¢ÖöGVÆS¢'7W÷'B"À¢Ò“°¢Ğ ¢v—BW6T–çf—FUFö¶Vâ†–çf—FU÷Fö¶Vâ“°¢Ğ¢Ğ¢Ğ ¢6öç7B²FF¢W†—7F–æu&÷rÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚&–BÂ§6öåöFF"¢æW‚'6W76–öåö–B"Â6W76–öä–B¢æÖ–&U6–ævÆR‚“° ¢6öç7BW†—7F–æu—'2ÒW†—7F–æu&÷sòæ§6öåöFFòæ6öçfW'6F–öå÷—'2ÇÂµÓ° ¢6öç7B–ÆöBÒ°¢6W76–öåö–C¢6W76–öä–BÀ¢ÖöGVÆS¢6W76–öäÖöGVÆRÇÂw7W÷'BrÀ¢æöç–Ö÷W5ö÷væW%ö–C¢æöç–Ö÷W4÷væW$–BÀ¢F–VçE÷FW‡C¢Ö6¶VEF–VçEFW‡BÀ¢6öçfW'6F–öåö†—7F÷'“¢Ö6¶VD6öçfW'6F–öâÀ¢W6W%÷&W÷'C¢Ö6¶VEW6W%&W÷'BÀ¢Fö7F÷%÷&W÷'C¢Ö6¶VDFö7F÷%&W÷'BÀ¢&—6µöÆWfVÃ¢&—6´ÆWfVÂÇÂçVÆÂÀ¢7W÷'E÷Æã¢7W÷'EÆâÇÂçVÆÂÀ¢V&Æ–5ö6öFS¢V&Æ–46öFRÀ¢÷&væ—¦F–öåö–C¢÷&væ—¦F–öä–BÀ¢&–Ö'•öW‡W'Eö–C¢&–Ö'”W‡W'D–BÀ¢–çf—FU÷Fö¶Vã¢–çf—FUFö¶VâÀ¢§6öåöFF¢°¢âââ†W†—7F–æu&÷sòæ§6öåöFFòç–Æ÷Eö–BÇÂvWE–Æ÷D–B‚¢ò²–Æ÷Eö–C¢vWE–Æ÷D–B‚’ÇÂW†—7F–æu&÷ræ§6öåöFFç–Æ÷Eö–BĞ¢¢·Ò’À¢F–ÆötFWFƒ¢F–ÆötFWF‚óòÀ¢&Wf–÷W5F–VçE&W÷'C¢&Wf–÷W5F–VçE&W÷'BÇÂ""À¢&Wf–÷W4Fö7F÷%&W÷'C¢&Wf–÷W4Fö7F÷%&W÷'BÇÂ""À¢†öÖUF6·3¢†öÖUF6·2ÇÂ""À¢&W6÷W&6Tf7F÷'3¢&W6÷W&6Tf7F÷'2ÇÂ""À¢VW7F–öç3¢VW7F–öç2ÇÂçVÆÂÀ¢ç7vW'3¢ç7vW'2ÇÂ·ÒÀ¢fö–6Tö'6W'fF–öç3¢fö–6Tö'6W'fF–öç2ÇÂçVÆÂÀ¢öFV'Vs¢öFV'VrÇÂçVÆÂÀ¢6&U÷&V6öÖÖVæFF–öã¢6&U÷&V6öÖÖVæFF–öâÇÂçVÆÂÀ¢âââ†W†—7F–æu—'2æÆVæwF‚âò²6öçfW'6F–öå÷—'3¢W†—7F–æu—'2Ò¢·Ò’À¢ÒÀ¢Ó° ¢ÆWBW'&÷#°¢–b†W†—7F–æu&÷r’°¢‡²W'&÷"ÒÒv—B7W&6Ræg&öÒ‚'6W76–öç2"’çWFFR‡–ÆöB’æW‚'6W76–öåö–B"Â6W76–öä–B’“°¢ÒVÇ6R°¢‡²W'&÷"ÒÒv—B7W&6Ræg&öÒ‚'6W76–öç2"’æ–ç6W'B‡–ÆöB’“°¢Ğ ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚'6fR×6W76–öâ7W&6RW'&÷""ÂW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡°¢ö³¢fÇ6RÀ¢W'&÷#¢-	İR=M½íÂí]İ-Â]ââ	ıíıí=-Rıí}mRâ"À¢FWF–Ç3¢&ö6W72æVçbådU$4TÂòVæFVf–æVB¢W'&÷"æÖW76vRÀ¢Ò“°¢Ğ ¢òòöæÇ’Ö¶RvÆÆWBf—6–&ÆRgFW"6öFRW'6—7FVæ6R—26öæf—&ÖV@¢–b†æWuvÆÆWD–B’°¢6öç7B²6WEvÆÆWEf—6–&ÆRÒÒv—B–×÷'B‚"ââöÆ–"÷W6vR÷vÆÆWBæ§2"“°¢6WEvÆÆWEf—6–&ÆR‡²vÆÆWD–C¢æWuvÆÆWD–BÒ“°¢Ğ ¢òòvVæW&FR66W75÷Fö¶Vâf÷"6W76–öç2F†BFöâwB†fRöæR–W@¢ÆWB66W75Fö¶VâÒçVÆÃ°¢–b†—4æWu6W76–öâÇÂÇ&VG”†5Fö¶Vâ’°¢66W75Fö¶VâÒv—BvVæW&FU6W76–öä66W75Fö¶Vâ‡6W76–öä–B“°¢–b‚66W75Fö¶Vâ’°¢6öç6öÆRæW'&÷"‚&†æFÆU6fS¢f–ÆVBFòvVæW&FR÷7F÷&R66W72Fö¶Vâf÷""Â6W76–öä–B“°¢òòFöâwBf–ÂF†R6fR(	BFö¶Vâ6â&R&VvVæW&FVBÆFW"à¢òòÆVv7’66W727F–ÆÂv÷&·2VçF–ÂÖ–w&F–öç2&RÆ–VBà¢Ğ¢Ğ ¢òò7&VFR÷væW"ÖÆWfVÂ6öçF–çVF–öâ7&VFVçF–Âöâf—'7B6ö×ÆWFVB&W÷'B†7&÷72ÖFWf–6R66W72¢ÆWB6öçF–çVF–öä6öFRÒçVÆÃ°¢6öç7BÖöGVÆTf÷$7&VFVçF–ÂÒ6W76–öäÖöGVÆRÇÂ'7W÷'B#°¢–b†ÖöGVÆTf÷$7&VFVçF–ÂÓÓÒ'7W÷'B"bbæöç–Ö÷W4÷væW$–B’°¢G'’°¢6öç7B²7&VFVçF–ÂÂ6V7&WBÂ—4æWrÒÒv—BvWD÷$7&VFT6öçF–çVF–öä7&VFVçF–Â‡°¢ÖöGVÆS¢ÖöGVÆTf÷$7&VFVçF–ÂÀ¢÷væW$–C¢æöç–Ö÷W4÷væW$–BÀ¢7W&6RÀ¢Ò“°¢–b†7&VFVçF–Âbb†—4æWrÇÂ6V7&WB’’°¢6öçF–çVF–öä6öFRÒ—4æWrbb6V7&WBòG¶7&VFVçF–ÂæÆöö·Wö6öFWÒÒG·6V7&WGÖ¢çVÆÃ°¢Ğ¢Ò6F6‚†7&VDW'"’°¢–b†7&VDW'"–ç7Fæ6Vöb6öçF–çVF–öä6öæf–tW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆU6fS¢6öçF–çVF–öâ7&VFVçF–Â6öæf–rW'&÷""Â7&VDW'"æÖW76vR“°¢ÒVÇ6R°¢6öç6öÆRæW'&÷"‚&†æFÆU6fS¢f–ÆVBFòvWBö7&VFR6öçF–çVF–öâ7&VFVçF–Â"Â7&VDW'"“°¢Ğ¢òòFöâwBf–ÂF†R6fS²7&VFVçF–Â6â&R&VvVæW&FVBÆFW"à¢Ğ¢Ğ ¢òò&WGW&âvÆÆWB&Ææ6R–bf—6–&ÆP¢ÆWBW6vT&Ææ6RÒçVÆÃ°¢G'’°¢6öç7BvÆÆWBÒv—BVç7W&UvÆÆWB‡²÷væW%G—S¢&æöç–Ö÷W5ö66R"Â÷væW$–C¢æöç–Ö÷W4÷væW$–BÂÖöGVÆS¢'7W÷'B"Ò“°¢–b‡vÆÆWB’°¢6öç7B²vWEW6vT&Ææ6Tf÷$6Æ–VçBÒÒv—B–×÷'B‚"ââöÆ–"÷W6vR÷vÆÆWBæ§2"“°¢W6vT&Ææ6RÒv—BvWEW6vT&Ææ6Tf÷$6Æ–VçB‡²vÆÆWD–C¢vÆÆWBæ–BÒ“°¢Ğ¢Ò6F6‚…ò’²ò¢æöâÖ&Æö6¶–ær¢òĞ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡°¢ö³¢G'VRÀ¢ÖW76vS¢-
+]òí]İ]İâ	-²Íím]-RıíMí½m-Âıí}mRâ"À¢6W76–öä–BÀ¢V&Æ–46öFRÀ¢6öçF–çVF–öåö6öFS¢6öçF–çVF–öä6öFRÀ¢÷&væ—¦F–öåö–C¢÷&væ—¦F–öä–BÀ¢&–Ö'•öW‡W'Eö–C¢&–Ö'”W‡W'D–BÀ¢66W75÷Fö¶Vã¢66W75Fö¶VâÀ¢W6vUö&Ææ6S¢W6vT&Ææ6RÀ¢Ò“°¢Ò6F6‚†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡°¢ö³¢fÇ6RÀ¢W'&÷#¢W'&÷"æÖW76vRÇÂ-	í­í]İ]İò]‚"À¢Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆTÆöB‡&WÂ&W2’°¢G'’°¢6öç7B²V&Æ–46öFRÂ66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó° ¢–b‚V&Æ–46öFRÇÂG—VöbV&Æ–46öFRÓÒ'7G&–ær"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²W'&÷#¢-	--]M-R­íBM½í="Ò“°¢Ğ ¢6öç7Bæ÷&ÖÆ—¦VBÒV&Æ–46öFRçG&–Ò‚’çFõWW$66R‚“° ¢6öç7B—57W÷'D6öFRÒõí
+-	í
+}	­	Õ´Õ£Ó•×³GÒÕ´Õ£Ó•×³GÒBòçFW7B†æ÷&ÖÆ—¦VB“°¢6öç7B—4†VÇF„6öFRÒõä„TÅD‚Õ´Õ£Ó•×³GÒÕ´Õ£Ó•×³7ÒBòçFW7B†æ÷&ÖÆ—¦VB“°¢–b‚—57W÷'D6öFRbb—4†VÇF„6öFR’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡°¢ö³¢fÇ6RÀ¢W'&÷#¢-	İ]-]İ½’MíÍ"­íMâ	ímM]-ò
+-	í
+}	­	Õ………‚Õ………‚½‚„TÅD‚Õ………‚Õ……‚â"À¢Ò“°¢Ğ ¢6öç7B²FFÂW'&÷"ÒÒv—BvWE7W&6R‚¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚""°¢'6W76–öåö–BÂÖöGVÆRÂV&Æ–5ö6öFRÂF–VçE÷FW‡BÂ6öçfW'6F–öåö†—7F÷'’Â"°¢'W6W%÷&W÷'BÂFö7F÷%÷&W÷'BÂ7W÷'E÷ÆâÂ&—6µöÆWfVÂÂ§6öåöFFÂ"°¢&÷&væ—¦F–öåö–BÂ&–Ö'•öW‡W'Eö–BÂ–çf—FU÷Fö¶VâÂÆVv7•ö66W72Â7&VFVEöBÂæöç–Ö÷W5ö÷væW%ö–B ¢¢æW‚'V&Æ–5ö6öFR"Âæ÷&ÖÆ—¦VB¢æÖ–&U6–ævÆR‚“° ¢–b†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡°¢ö³¢fÇ6RÀ¢W'&÷#¢-	}Mİİ½R-]Í]İİâİ]Mí-=ıİâ	ıíıí=-Rıí}mRâ"À¢Ò“°¢Ğ ¢–b‚FF’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡°¢ö³¢fÇ6RÀ¢W'&÷#¢-	­íBİRİM]Òâ	ıí-]Í-Rı-½Íİí-Â--íMâ"À¢Ò“°¢Ğ ¢–b†—4†VÇF„6öFRbbFFæÖöGVÆRÓÒ&&öG’"’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	­íBİRİM]Òâ"Ò“°¢Ğ¢–b†—57W÷'D6öFRbbFFæÖöGVÆRÓÒ'7W÷'B"bbFFæÖöGVÆRÓÒ&&öG’"’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	­íBİRİM]Òâ"Ò“°¢Ğ ¢òò66W72Fö¶VâfÆ–FF–öà¢–b‚FFæÆVv7•ö66W72’°¢–b‚66W75÷Fö¶Vâ’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò­íBMí-=ı¢]‚â"Ò“°¢Ğ¢6öç7BfÆ–BÒv—BfÆ–FFU6W76–öä66W72†FFç6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚fÆ–B’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]-]İ½’­íBMí-=ıâ"Ò“°¢Ğ¢Ğ ¢6öç7B§6öäFFÒFFæ§6öåöFFÇÂ·Ó°¢6öç7B—'2Ò§6öäFFæ6öçfW'6F–öå÷—'2ÇÂµÓ°¢6öç7B6W76–öâÒ°¢6W76–öä–C¢FFç6W76–öåö–BÀ¢ÖöGVÆS¢FFæÖöGVÆRÇÂw7W÷'BrÀ¢V&Æ–46öFS¢FFçV&Æ–5ö6öFRÀ¢F–VçEö–çWC¢FFçF–VçE÷FW‡BÀ¢6öçfW'6F–öä†—7F÷'“¢FFæ6öçfW'6F–öåö†—7F÷'’À¢6öçfW'6F–öå—'3¢'&’æ—4'&’‡—'2’ò—'2¢µÒÀ¢W6W%÷&W÷'C¢FFçW6W%÷&W÷'BÀ¢Fö7F÷%÷&W÷'C¢FFæFö7F÷%÷&W÷'BÀ¢7W÷'EÆã¢FFç7W÷'E÷ÆâÀ¢&—6´ÆWfVÃ¢FFç&—6µöÆWfVÂÀ¢F–ÆötFWFƒ¢§6öäFFæF–ÆötFWF‚óòÀ¢&Wf–÷W5F–VçE&W÷'C¢§6öäFFç&Wf–÷W5F–VçE&W÷'BÇÂ""À¢&Wf–÷W4Fö7F÷%&W÷'C¢§6öäFFç&Wf–÷W4Fö7F÷%&W÷'BÇÂ""À¢†öÖUF6·3¢§6öäFFæ†öÖUF6·2ÇÂ""À¢&W6÷W&6Tf7F÷'3¢§6öäFFç&W6÷W&6Tf7F÷'2ÇÂ""À¢VW7F–öç3¢§6öäFFçVW7F–öç2ÇÂçVÆÂÀ¢ç7vW'3¢§6öäFFæç7vW'2ÇÂ·ÒÀ¢òòÆVv7’fÆr6òg&öçFVæB¶æ÷w2–b66W75÷Fö¶Vâ—2æVVFVBf÷"w&—FW0¢ÆVv7”66W73¢FFæÆVv7•ö66W72ÓÓÒG'VRÀ¢Ó° ¢òò&WGW&âvÆÆWB&Ææ6R–bf—6–&ÆP¢ÆWBW6vT&Ææ6RÒçVÆÃ°¢–b†FFææöç–Ö÷W5ö÷væW%ö–B’°¢G'’°¢6öç7B²Vç7W&UvÆÆWBÂvWEW6vT&Ææ6Tf÷$6Æ–VçBÒÒv—B–×÷'B‚"ââöÆ–"÷W6vR÷vÆÆWBæ§2"“°¢6öç7BvÆÆWBÒv—BVç7W&UvÆÆWB‡²÷væW%G—S¢&æöç–Ö÷W5ö66R"Â÷væW$–C¢FFææöç–Ö÷W5ö÷væW%ö–BÂÖöGVÆS¢'7W÷'B"Ò“°¢–b‡vÆÆWB’°¢W6vT&Ææ6RÒv—BvWEW6vT&Ææ6Tf÷$6Æ–VçB‡²vÆÆWD–C¢vÆÆWBæ–BÒ“°¢Ğ¢Ò6F6‚…ò’²ò¢æöâÖ&Æö6¶–ær¢òĞ¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡°¢ö³¢G'VRÀ¢ÖW76vS¢-
+]ò}==m]İâ"À¢6W76–öâÀ¢W6vUö&Ææ6S¢W6vT&Ææ6RÀ¢Ò“°¢Ò6F6‚†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡°¢ö³¢fÇ6RÀ¢W'&÷#¢W'&÷"æÖW76vRÇÂ-	í­ı‚ıí­R]‚"À¢Ò“°¢Ğ§Ğ ¦gVæ7F–öâÖ¶U6W76–öå7VÖÖ'’‡6W76–öâ’°¢òò&—f7’×6fRöæR×6VçFVæ6R7VÖÖ'’g&öÒW6W"w2÷vâv÷&G2à¢òòfö–G2F–væ÷6W2æBÖVF–6Â6öæ6ÇW6–öç2à¢6öç7B–çWBÒ‡6W76–öâçF–VçE÷FW‡BÇÂ""’çG&–Ò‚“°¢–b‚–çWB’&WGW&â-	í]İR]r-]­-í-í=âíıİòâ#°¢òòf—'7B6VçFVæ6S¢WFòf—'7B6VçFVæ6RFW&Ö–æF÷"à¢6öç7Bf—'7E6VçFVæ6RÒ–çWBç7Æ—B‚õ²âõÆåÒò•³ÒçG&–Ò‚“°¢6öç7BÆ–Ö—FVBÒf—'7E6VçFVæ6Rç6Æ–6RƒÂ“°¢6öç7B7Vff—‚Òf—'7E6VçFVæ6RæÆVæwF‚âò.(
+b"¢"#°¢&WGW&âG¶Æ–Ö—FVGÒG·7Vff—‡Ö°§Ğ ¦7–æ2gVæ7F–öâ†æFÆTvWD6&–æWB‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öä–BÂV&Æ–46öFRÂ66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó° ¢–b‚66W75÷Fö¶Vâ’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò­íBMí-=ıâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢ÆWBVffV7F—fU6W76–öä–BÒ6W76–öä–C° ¢–b‡V&Æ–46öFR’°¢6öç7Bæ÷&ÖÆ—¦VBÒV&Æ–46öFRçG&–Ò‚’çFõWW$66R‚“°¢6öç7B²FF¢&W6öÇfVBÂW'&÷#¢&W6öÇfVDW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'6W76–öåö–BÂÖöGVÆR"¢æW‚'V&Æ–5ö6öFR"Âæ÷&ÖÆ—¦VB¢æÖ–&U6–ævÆR‚“°¢–b‡&W6öÇfVDW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWD6&–æWC¢&W6öÇfRV&Æ–46öFRW'&÷""Â&W6öÇfVDW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}Mİİ½R-]Í]İİâİ]Mí-=ıİâ"Ò“°¢Ğ¢–b‚&W6öÇfVB’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİRİM]İâ"Ò“°¢Ğ¢–b‡&W6öÇfVBæÖöGVÆRÓÒ'7W÷'B"bb&W6öÇfVBæÖöGVÆRÓÒ&&öG’"’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİRİM]İâ"Ò“°¢Ğ¢VffV7F—fU6W76–öä–BÒ&W6öÇfVBç6W76–öåö–C°¢Ğ ¢–b‚VffV7F—fU6W76–öä–BÇÂG—VöbVffV7F—fU6W76–öä–BÓÒ'7G&–ær"ÇÂ—5fÆ–E6W76–öä–B†VffV7F—fU6W76–öä–B’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$Ö—76–ær6W76–öä–B÷"V&Æ–46öFR"Ò“°¢Ğ ¢6öç7BfÆ–BÒv—BfÆ–FFU6W76–öä66W72†VffV7F—fU6W76–öä–BÂ66W75÷Fö¶Vâ“°¢–b‚fÆ–B’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]-]İ½’­íBMí-=ıâ"Ò“°¢Ğ ¢6öç7B²FF¢7W'&VçE6W76–öâÂW'&÷#¢7W'&VçDW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'6W76–öåö–BÂV&Æ–5ö6öFRÂæöç–Ö÷W5ö÷væW%ö–BÂÖöGVÆRÂÆVv7•ö66W72Â7&VFVEöBÂ§6öåöFF"¢æW‚'6W76–öåö–B"ÂVffV7F—fU6W76–öä–B¢æÖ–&U6–ævÆR‚“° ¢–b†7W'&VçDW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWD6&–æWC¢4TÄT5BW'&÷""Â7W'&VçDW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}Mİİ½R-]Í]İİâİ]Mí-=ıİâ"Ò“°¢Ğ¢–b‚7W'&VçE6W76–öâ’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİRİM]İâ"Ò“°¢Ğ ¢6öç7B÷væW$–BÒ7W'&VçE6W76–öâææöç–Ö÷W5ö÷væW%ö–C°¢–b‚÷væW$–B’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİRİM]İâ"Ò“°¢Ğ ¢òòÆÂ6W76–öç2f÷"F†—2÷væW"†6&–æWBf–WrÂ6‡&öæöÆöv–6ÂFW62’à¢6öç7B²FF¢6W76–öç2ÂW'&÷#¢6W76–öç4W'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B†—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚¢ò'6W76–öåö–BÂV&Æ–5ö6öFRÂÖöGVÆRÂF–VçE÷FW‡BÂW6W%÷&W÷'BÂ7W÷'E÷ÆâÂ6&U÷&V6öÖÖVæFF–öâÂ6öçfW'6F–öåö†—7F÷'’Â7&VFVEöBÂ§6öåöFF ¢¢'6W76–öåö–BÂV&Æ–5ö6öFRÂÖöGVÆRÂF–VçE÷FW‡BÂ7&VFVEöBÂ§6öåöFF"¢æW‚&æöç–Ö÷W5ö÷væW%ö–B"Â÷væW$–B¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ“° ¢–b‡6W76–öç4W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWD6&–æWC¢6W76–öç2Æ—7BW'&÷""Â6W76–öç4W'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}Mİİ½R-]Í]İİâİ]Mí-=ıİâ"Ò“°¢Ğ ¢6öç7B6W76–öäÆ—7BÒ‡6W76–öç2ÇÂµÒ’æÖ‚‡2Â–G‚’Óâ°¢6öç7B§6öâÒ2æ§6öåöFFÇÂ·Ó°¢6öç7B—46öçF–çVF–öâÒ†§6öâç&Wf–÷W5F–VçE&W÷'BÇÂ§6öâæ—46öçF–çVF–öâ“°¢&WGW&â°¢6W76–öä–C¢2ç6W76–öåö–BÀ¢V&Æ–46öFS¢2çV&Æ–5ö6öFRÀ¢7&VFVDC¢2æ7&VFVEöBÀ¢7VÖÖ'“¢—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚’ò7&VFU6W76–öå7VÖÖ'’‡2’¢Ö¶U6W76–öå7VÖÖ'’‡2’À¢7FGW3¢—46öçF–çVF–öâò&föÆÆ÷wW"¢&f—'7Eö6öçF7B"À¢÷&FW#¢–G‚²À¢Ó°¢Ò“° ¢òòÆFW7B6W76–öâ6öçFW‡BæVVFVBf÷"föÆÆ÷r×W†6Æ–VçB×6fS¢æòFö7F÷%÷&W÷'B¢6öç7BÆFW7BÒ6W76–öç3òå³Ó°¢6öç7BÆFW7D§6öâÒÆFW7Còæ§6öåöFFÇÂ·Ó°¢6öç7BÆFW7E&W÷'BÒÆFW7Bò°¢W6W%÷&W÷'C¢ÆFW7BçW6W%÷&W÷'BÇÂ""À¢&Wf–÷W5F–VçE&W÷'C¢ÆFW7D§6öâç&Wf–÷W5F–VçE&W÷'BÇÂ""À¢†öÖUF6·3¢ÆFW7D§6öâæ†öÖUF6·2ÇÂ""À¢&W6÷W&6Tf7F÷'3¢ÆFW7D§6öâç&W6÷W&6Tf7F÷'2ÇÂ""À¢7W÷'EÆã¢ÆFW7Bç7W÷'E÷ÆâÇÂçVÆÂÀ¢6&U&V6öÖÖVæFF–öã¢ÆFW7Bæ6&U÷&V6öÖÖVæFF–öâÇÂçVÆÂÀ¢7&—6—4&Æö6³¢—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚’òÆFW7D§6öâæ7&—6—5ö&Æö6²ÇÂçVÆÂ¢çVÆÂÀ¢F–ÆötFWFƒ¢ÆFW7D§6öâæF–ÆötFWF‚óòÀ¢6öçfW'6F–öä†—7F÷'“¢ÆFW7Bæ6öçfW'6F–öåö†—7F÷'’ÇÂµÒÀ¢7&VFVDC¢ÆFW7Bæ7&VFVEöBÀ¢Ò¢çVÆÃ° ¢òòvÆÆWB&Ææ6R†7&—F–6Â(	B'WBFVw&FRw&6VgVÆÇ’¢ÆWB&Ææ6RÒçVÆÃ°¢G'’°¢6öç7B²vWEvÆÆWBÂvWEW6vT&Ææ6Tf÷$6Æ–VçBÒÒv—B–×÷'B‚"ââöÆ–"÷W6vR÷vÆÆWBæ§2"“°¢6öç7BvÆÆWBÒv—BvWEvÆÆWB‡²÷væW%G—S¢&æöç–Ö÷W5ö66R"Â÷væW$–BÂÖöGVÆS¢'7W÷'B"Ò“°¢–b‡vÆÆWB’°¢&Ææ6RÒv—BvWEW6vT&Ææ6Tf÷$6Æ–VçB‡²vÆÆWD–C¢vÆÆWBæ–BÒ“°¢Ğ¢Ò6F6‚‡vÆÆWDW'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWD6&–æWEÒvÆÆWBW'&÷"†æöâÖ&Æö6¶–ær“¢"ÂvÆÆWDW'&÷"æÖW76vR“°¢Ğ ¢òò7V6–Æ—7B&VÆF–öâ†÷F–öæÂ¢ÆWB7V6–Æ—7BÒçVÆÃ°¢G'’°¢7V6–Æ—7BÒv—B&W6öÇfU7W÷'E7V6–Æ—7E&VÆF–öâ†÷væW$–B“°¢Ò6F6‚‡7V4W'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWD6&–æWEÒ7V6–Æ—7BW'&÷"†æöâÖ&Æö6¶–ær“¢"Â7V4W'&÷"æÖW76vR“°¢Ğ ¢òò6W'f–6R&WVW7G2†÷F–öæÂ¢ÆWB6W'f–6U&WVW7G2ÒµÓ°¢G'’°¢6öç7B²FF¢7"ÒÒv—B7W&6P¢æg&öÒ‚'6W'f–6U÷&WVW7G2"¢ç6VÆV7B†—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚¢ò&–BÂ&WVW7E÷G—RÂÖVWF–æuöf÷&ÖBÂF—FÆRÂÖW76vRÂ7FGW2Â7V6–Æ—7EöæÖRÂ7V6–Æ—7E÷&W7öç6RÂ66†VGVÆVEöBÂ66†VGVÆVEö6öÖÖVçBÂç7vW&VEöBÂ7&VFVEöB ¢¢&–BÂ&WVW7E÷G—RÂÖVWF–æuöf÷&ÖBÂF—FÆRÂÖW76vRÂ7FGW2Â7V6–Æ—7EöæÖRÂ66†VGVÆVEöBÂ7&VFVEöB"¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW$–B¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ¢æÆ–Ö—Bƒ#“°¢6W'f–6U&WVW7G2Ò7"ÇÂµÓ°¢Ò6F6‚‡7$W'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWD6&–æWEÒ6W'f–6U÷&WVW7G2W'&÷"†æöâÖ&Æö6¶–ær“¢"Â7$W'&÷"æÖW76vR“°¢Ğ ¢ÆWBÖF6…&WVW7G2ÒµÓ°¢–b†—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚’’°¢G'’°¢6öç7B²FF¢ÖF6†W2ÒÒv—B7W&6P¢æg&öÒ‚'7V6–Æ—7EöÖF6…÷&WVW7G2"¢ç6VÆV7B‚&–BÂ6W76–öåö–BÂ7FGW2Â76–væVEöW‡W'Eö–BÂ7&VFVEöBÂ76–væVEöB"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW$–B¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ¢æÆ–Ö—Bƒ“°¢ÖF6…&WVW7G2ÒÖF6†W2ÇÂµÓ°¢6öç7B76–væVD–G2Ò²ââææWr6WB†ÖF6…&WVW7G2æÖ‚‡&WVW7B’Óâ&WVW7Bæ76–væVEöW‡W'Eö–B’æf–ÇFW"„&ööÆVâ’•Ó°¢–b†76–væVD–G2æÆVæwF‚â’°¢6öç7B²FF¢W‡W'G2ÒÒv—B7W&6Ræg&öÒ‚&W‡W'G2"’ç6VÆV7B‚&–BÂæÖR"’æ–â‚&–B"Â76–væVD–G2“°¢6öç7BæÖW2ÒæWrÖ‚†W‡W'G2ÇÂµÒ’æÖ‚†W‡W'B’Óâ¶W‡W'Bæ–BÂW‡W'BææÖUÒ’“°¢ÖF6…&WVW7G2ÒÖF6…&WVW7G2æÖ‚‡&WVW7B’Óâ‡²ââç&WVW7BÂ76–væVEöW‡W'EöæÖS¢æÖW2ævWB‡&WVW7Bæ76–væVEöW‡W'Eö–B’ÇÂçVÆÂÒ’“°¢Ğ¢Ò6F6‚†ÖF6„W'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWD6&–æWEÒäÖVB7V6–Æ—7EöÖF6…÷&WVW7G2W'&÷"†æöâÖ&Æö6¶–ær“¢"ÂÖF6„W'&÷"æÖW76vR“°¢Ğ¢Ğ ¢òò÷væW"F—7Æ•öæÖR†÷F–öæÂ¢ÆWB÷væW$F—7Æ”æÖRÒçVÆÃ°¢G'’°¢6öç7B²FF¢÷væW%&öf–ÆRÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&öf–ÆW2"¢ç6VÆV7B‚&F—7Æ•öæÖR"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW$–B¢æÖ–&U6–ævÆR‚“°¢÷væW$F—7Æ”æÖRÒ÷væW%&öf–ÆSòæF—7Æ•öæÖRÇÂçVÆÃ°¢Ò6F6‚‡&öf–ÆTW'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWD6&–æWEÒ&öf–ÆRW'&÷"†æöâÖ&Æö6¶–ær“¢"Â&öf–ÆTW'&÷"æÖW76vR“°¢Ğ ¢ÆWBÖVF–6F–öä6&G2ÒµÓ°¢–b†—4ÖVF–6F–öå6W76–öäVÆ–v–&ÆR†7W'&VçE6W76–öâ’’°¢G'’°¢ÖVF–6F–öä6&G2Òv—BvWDÖVF–6F–öä6&G4f÷$÷væW"‡°¢7W&6RÀ¢÷væW%G—S¢&æöç–Ö÷W5ö66R"À¢÷væW$–BÀ¢ÖöGVÆS¢'7W÷'B"À¢Ò“°¢Ò6F6‚†ÖVF–6F–öäW'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWD6&–æWEÒÖVF–6F–öâ6&BW'&÷"†æöâÖ&Æö6¶–ær“¢"ÂÖVF–6F–öäW'&÷"æ6öFRÇÂÖVF–6F–öäW'&÷"æÖW76vR“°¢Ğ¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡°¢ö³¢G'VRÀ¢V&Æ–5ö6öFS¢7W'&VçE6W76–öâçV&Æ–5ö6öFRÀ¢6W76–öåö–C¢7W'&VçE6W76–öâç6W76–öåö–BÀ¢6W76–öç3¢6W76–öäÆ—7BÀ¢ÆFW7E÷&W÷'C¢ÆFW7E&W÷'BÀ¢vÆÆWC¢&Ææ6RÀ¢7V6–Æ—7C¢7V6–Æ—7Bò°¢W‡W'D–C¢7V6–Æ—7BæW‡W'D–BÀ¢W‡W'DæÖS¢7V6–Æ—7BæW‡W'DæÖRÀ¢W‡W'E&öÆS¢7V6–Æ—7BæW‡W'E&öÆRÀ¢W‡W'E7V6–ÇG“¢7V6–Æ—7BæW‡W'E7V6–ÇG’À¢÷&væ—¦F–öäæÖS¢7V6–Æ—7Bæ÷&væ—¦F–öäæÖRÀ¢Ò¢çVÆÂÀ¢6W'f–6U÷&WVW7G3¢6W'f–6U&WVW7G2À¢ÖF6…÷&WVW7G3¢ÖF6…&WVW7G2À¢Vç&VEöÖW76vUö6÷VçC¢À¢F—7Æ•öæÖS¢÷væW$F—7Æ”æÖRÀ¢ÖVF–6F–öåö6&G3¢ÖVF–6F–öä6&G2À¢Ò“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWD6&–æWBW'&÷""ÂW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢W'&÷"æÖW76vRÇÂ-	í­­İ]-"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆTvWDÖVF–6F–öä6&B‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfTÖVF–6F–öå7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B6&G2Òv—BvWDÖVF–6F–öä6&G4f÷$÷væW"‡°¢7W&6RÀ¢÷væW%G—S¢&æöç–Ö÷W5ö66R"À¢÷væW$–C¢÷væW"æ÷væW$–BÀ¢ÖöGVÆS¢'7W÷'B"À¢Ò“°¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ6&G2ÂF–VçEöÖVF–6F–öåö•öVæ&ÆVC¢fÇ6RÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWDÖVF–6F–öä6&BW'&÷#¢"ÂW'&÷"æ6öFRÇÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂ}==}-Âİ}İ}]İòâ"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆTvWE&W÷'B‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öä–BÂV&Æ–46öFRÂ66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó° ¢–b‚66W75÷Fö¶Vâ’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò­íBMí-=ıâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢ÆWBVffV7F—fU6W76–öä–BÒ6W76–öä–C° ¢–b‡V&Æ–46öFR’°¢6öç7Bæ÷&ÖÆ—¦VBÒV&Æ–46öFRçG&–Ò‚’çFõWW$66R‚“°¢6öç7B²FF¢&W6öÇfVBÂW'&÷#¢&W6öÇfVDW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'6W76–öåö–BÂÖöGVÆR"¢æW‚'V&Æ–5ö6öFR"Âæ÷&ÖÆ—¦VB¢æÖ–&U6–ævÆR‚“°¢–b‡&W6öÇfVDW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWE&W÷'C¢&W6öÇfRV&Æ–46öFRW'&÷""Â&W6öÇfVDW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}Mİİ½R-]Í]İİâİ]Mí-=ıİâ"Ò“°¢Ğ¢–b‚&W6öÇfVB’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİRİM]İâ"Ò“°¢Ğ¢–b‡&W6öÇfVBæÖöGVÆRÓÒ'7W÷'B"bb&W6öÇfVBæÖöGVÆRÓÒ&&öG’"’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİRİM]İâ"Ò“°¢Ğ¢VffV7F—fU6W76–öä–BÒ&W6öÇfVBç6W76–öåö–C°¢Ğ ¢–b‚VffV7F—fU6W76–öä–BÇÂG—VöbVffV7F—fU6W76–öä–BÓÒ'7G&–ær"ÇÂ—5fÆ–E6W76–öä–B†VffV7F—fU6W76–öä–B’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$Ö—76–ær6W76–öä–B÷"V&Æ–46öFR"Ò“°¢Ğ ¢ÆWBfÆ–BÒv—BfÆ–FFU6W76–öä66W72†VffV7F—fU6W76–öä–BÂ66W75÷Fö¶Vâ“°¢–b‚fÆ–B’°¢òò÷væW"Ö&6VBfÆÆ&6³¢Fö¶VâÖ’&VÆöærFòæ÷F†W"6W76–öâöbF†R6ÖR÷væW"†6&–æWB66W72’à¢6öç7B²FF¢F&vWBÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚&æöç–Ö÷W5ö÷væW%ö–B"¢æW‚'6W76–öåö–B"ÂVffV7F—fU6W76–öä–B¢æÖ–&U6–ævÆR‚“°¢–b‚F&vWCòææöç–Ö÷W5ö÷væW%ö–B’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİRİM]İâ"Ò“°¢Ğ¢6öç7B²FF¢Fö¶Vå6W76–öâÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'6W76–öåö–BÂæöç–Ö÷W5ö÷væW%ö–BÂ66W75÷Fö¶Våö†6‚ÂÆVv7•ö66W72"¢æW‚&66W75÷Fö¶Våö†6‚"Â†6…Fö¶Vâ†66W75÷Fö¶Vâ’¢æÖ–&U6–ævÆR‚“°¢fÆ–BÒFö¶Vå6W76–öâbbFö¶Vå6W76–öâææöç–Ö÷W5ö÷væW%ö–BÓÓÒF&vWBææöç–Ö÷W5ö÷væW%ö–C°¢Ğ¢–b‚fÆ–B’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]-]İ½’­íBMí-=ıâ"Ò“°¢Ğ ¢6öç7B²FFÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B€¢'6W76–öåö–BÂÖöGVÆRÂV&Æ–5ö6öFRÂF–VçE÷FW‡BÂ6öçfW'6F–öåö†—7F÷'’Â"°¢'W6W%÷&W÷'BÂFö7F÷%÷&W÷'BÂ7W÷'E÷ÆâÂ&—6µöÆWfVÂÂ§6öåöFFÂ"°¢&÷&væ—¦F–öåö–BÂ&–Ö'•öW‡W'Eö–BÂ7&VFVEöB ¢¢æW‚'6W76–öåö–B"ÂVffV7F—fU6W76–öä–B¢æÖ–&U6–ævÆR‚“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWE&W÷'C¢4TÄT5BW'&÷""ÂW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}Mİİ½R-]Í]İİâİ]Mí-=ıİâ"Ò“°¢Ğ¢–b‚FF’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİRİM]İâ"Ò“°¢Ğ ¢6öç7B§6öäFFÒFFæ§6öåöFFÇÂ·Ó°¢6öç7B—'2Ò§6öäFFæ6öçfW'6F–öå÷—'2ÇÂµÓ°¢òò6Æ–VçB×6fR&W7öç6S¢æòFö7F÷%÷&W÷'BÂæòW‡W'Bf–VÆG0¢6öç7B6W76–öâÒ°¢6W76–öä–C¢FFç6W76–öåö–BÀ¢ÖöGVÆS¢FFæÖöGVÆRÇÂ'7W÷'B"À¢V&Æ–46öFS¢FFçV&Æ–5ö6öFRÀ¢F–VçEö–çWC¢FFçF–VçE÷FW‡BÀ¢6öçfW'6F–öä†—7F÷'“¢FFæ6öçfW'6F–öåö†—7F÷'’À¢6öçfW'6F–öå—'3¢'&’æ—4'&’‡—'2’ò—'2¢µÒÀ¢W6W%÷&W÷'C¢FFçW6W%÷&W÷'BÀ¢7W÷'EÆã¢FFç7W÷'E÷ÆâÀ¢6&U&V6öÖÖVæFF–öã¢FFæ6&U÷&V6öÖÖVæFF–öâÇÂçVÆÂÀ¢&—6´ÆWfVÃ¢FFç&—6µöÆWfVÂÀ¢F–ÆötFWFƒ¢§6öäFFæF–ÆötFWF‚óòÀ¢&Wf–÷W5F–VçE&W÷'C¢§6öäFFç&Wf–÷W5F–VçE&W÷'BÇÂ""À¢†öÖUF6·3¢§6öäFFæ†öÖUF6·2ÇÂ""À¢&W6÷W&6Tf7F÷'3¢§6öäFFç&W6÷W&6Tf7F÷'2ÇÂ""À¢VW7F–öç3¢§6öäFFçVW7F–öç2ÇÂçVÆÂÀ¢ç7vW'3¢§6öäFFæç7vW'2ÇÂ·ÒÀ¢7&—6—4&Æö6³¢—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚’ò§6öäFFæ7&—6—5ö&Æö6²ÇÂçVÆÂ¢çVÆÂÀ¢7&VFVDC¢FFæ7&VFVEöBÀ¢Ó° ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡°¢ö³¢G'VRÀ¢6W76–öâÀ¢Ò“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWE&W÷'BW'&÷""ÂW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢W'&÷"æÖW76vRÇÂ-	í­}==}­‚í-}-"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆT7&VFTföÆÆ÷uW6W76–öâ‡&WÂ&W2’°¢G'’°¢6öç7B²&Wf–÷W56W76–öä–BÂ66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó° ¢–b‚&Wf–÷W56W76–öä–BÇÂG—Vöb&Wf–÷W56W76–öä–BÓÒ'7G&–ær"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$Ö—76–ær&Wf–÷W56W76–öä–B"Ò“°¢Ğ¢–b‚—5fÆ–E6W76–öä–B‡&Wf–÷W56W76–öä–B’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$–çfÆ–B&Wf–÷W56W76–öä–Bf÷&ÖB"Ò“°¢Ğ¢–b‚66W75÷Fö¶Vâ’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò­íBMí-=ıâ"Ò“°¢Ğ ¢6öç7BfÆ–BÒv—BfÆ–FFU6W76–öä66W72‡&Wf–÷W56W76–öä–BÂ66W75÷Fö¶Vâ“°¢–b‚fÆ–B’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]-]İ½’­íBMí-=ıâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢&VçBÂW'&÷#¢&VçDW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚&æöç–Ö÷W5ö÷væW%ö–BÂÖöGVÆRÂV&Æ–5ö6öFRÂ§6öåöFF"¢æW‚'6W76–öåö–B"Â&Wf–÷W56W76–öä–B¢æÖ–&U6–ævÆR‚“° ¢–b‡&VçDW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆT7&VFTföÆÆ÷uW6W76–öã¢4TÄT5BW'&÷""Â&VçDW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}Mİİ½R-]Í]İİâİ]Mí-=ıİâ"Ò“°¢Ğ¢–b‚&VçBÇÂ&VçBææöç–Ö÷W5ö÷væW%ö–B’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİRİM]İâ"Ò“°¢Ğ¢–b‚—5–Æ÷E6W76–öäÖF6‚‡&VçBæ§6öåöFF’’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİ]Mí-=ıİ"İ-íÂ]-Râ"Ò“°¢Ğ ¢6öç7B²vVæW&FUV&Æ–46öFRÒÒv—B–×÷'B‚"ââöÆ–"÷V&Æ–46öFRæ§2"“°¢6öç7B²&æFöÕUT”BÒÒv—B–×÷'B‚&æöFS¦7'—Fò"“° ¢6öç7BæWu6W76–öä–BÒ&æFöÕUT”B‚“°¢6öç7BæWuV&Æ–46öFRÒvVæW&FUV&Æ–46öFR‚“° ¢6öç7B²W'&÷#¢–ç6W'DW'&÷"ÒÒv—B7W&6Ræg&öÒ‚'6W76–öç2"’æ–ç6W'B‡°¢6W76–öåö–C¢æWu6W76–öä–BÀ¢ÖöGVÆS¢&VçBæÖöGVÆRÇÂ'7W÷'B"À¢æöç–Ö÷W5ö÷væW%ö–C¢&VçBææöç–Ö÷W5ö÷væW%ö–BÀ¢V&Æ–5ö6öFS¢æWuV&Æ–46öFRÀ¢F–VçE÷FW‡C¢""À¢6öçfW'6F–öåö†—7F÷'“¢µÒÀ¢§6öåöFF¢°¢âââ†vWE–Æ÷D–B‚’ÇÂ&VçBæ§6öåöFFòç–Æ÷Eö–@¢ò²–Æ÷Eö–C¢vWE–Æ÷D–B‚’ÇÂ&VçBæ§6öåöFFç–Æ÷Eö–BĞ¢¢·Ò’À¢&Wf–÷W5V&Æ–46öFS¢&VçBçV&Æ–5ö6öFRÀ¢—46öçF–çVF–öã¢G'VRÀ¢ÒÀ¢Ò“° ¢–b†–ç6W'DW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆT7&VFTföÆÆ÷uW6W76–öã¢”å4U%BW'&÷""Â–ç6W'DW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí}M-Â]âıíMí½m]İòâ"Ò“°¢Ğ ¢6öç7BæWt66W75Fö¶VâÒv—BvVæW&FU6W76–öä66W75Fö¶Vâ†æWu6W76–öä–B“°¢–b‚æWt66W75Fö¶Vâ’°¢6öç6öÆRæW'&÷"‚&†æFÆT7&VFTföÆÆ÷uW6W76–öã¢f–ÆVBFòvVæW&FRFö¶Vâf÷""ÂæWu6W76–öä–B“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí}M-Â­íBMí-=ıâ"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡°¢ö³¢G'VRÀ¢6W76–öä–C¢æWu6W76–öä–BÀ¢66W75÷Fö¶Vã¢æWt66W75Fö¶VâÀ¢V&Æ–5ö6öFS¢æWuV&Æ–46öFRÀ¢&Wf–÷W5÷6W76–öåö–C¢&Wf–÷W56W76–öä–BÀ¢Ò“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆT7&VFTföÆÆ÷uW6W76–öâW'&÷""ÂW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢W'&÷"æÖW76vRÇÂ-	í­í}Mİò]‚ıíMí½m]İò"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆTvVæW&FT66W75Fö¶Vâ‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öä–BÂV&Æ–46öFRÂ66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó° ¢–b‚6W76–öä–BbbV&Æ–46öFR’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$Ö—76–ær6W76–öä–B÷"V&Æ–46öFR"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢ÆWBVW'’Ò7W&6Ræg&öÒ‚'6W76–öç2"’ç6VÆV7B‚'6W76–öåö–BÂÆVv7•ö66W72"’æÖ–&U6–ævÆR‚“° ¢–b‡6W76–öä–B’°¢VW'’ÒVW'’æW‚'6W76–öåö–B"Â6W76–öä–B“°¢ÒVÇ6R°¢VW'’ÒVW'’æW‚'V&Æ–5ö6öFR"ÂV&Æ–46öFR“°¢Ğ ¢6öç7B²FFÂW'&÷"ÒÒv—BVW'“°¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvVæW&FT66W75Fö¶Vã¢4TÄT5BW'&÷""ÂW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}Mİİ½R-]Í]İİâİ]Mí-=ıİâ	ıíıí=-Rıí}mRâ"Ò“°¢Ğ¢–b‚FF’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİRİM]İ"Ò“°¢Ğ¢–b†FFæÆVv7•ö66W72ÓÓÒG'VR’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	M½òİ-í’]‚-]=]-ò}İİ½’-]íBıâ­íM2ıíMí½m]İòâ"Ò“°¢Ğ¢–b‚66W75÷Fö¶VâÇÂ†v—BfÆ–FFU6W76–öä66W72†FFç6W76–öåö–BÂ66W75÷Fö¶Vâ’’’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]-]İ½’­íBMí-=ıâ"Ò“°¢Ğ ¢6öç7B&uFö¶VâÒv—BvVæW&FU6W76–öä66W75Fö¶Vâ†FFç6W76–öåö–B“°¢–b‚&uFö¶Vâ’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂ=]İ]í--Â-í­]Ò"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ66W75÷Fö¶Vã¢&uFö¶VâÒ“°¢Ò6F6‚†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢W'&÷"æÖW76vRÇÂ$W'&÷""Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆUWFFU7W÷'EÆâ‡&WÂ&W2’°¢G'’°¢6öç7B²V&Æ–5ö6öFRÂ6W76–öåö–BÂ7W÷'E÷ÆâÂ66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó° ¢–b‚V&Æ–5ö6öFRbb6W76–öåö–B’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$Ö—76–ærV&Æ–5ö6öFR÷"6W76–öåö–B"Ò“°¢Ğ ¢6öç7BVffV7F—fU6W76–öä–BÒ6W76–öåö–BÇÂV&Æ–5ö6öFS° ¢òò6†V6²66W72–bæöâÖÆVv7¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢6W76–öäFFÂW'&÷#¢6W76–öäW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'6W76–öåö–BÂÆVv7•ö66W72"¢æW‡6W76–öåö–Bò'6W76–öåö–B"¢'V&Æ–5ö6öFR"ÂVffV7F—fU6W76–öä–B¢æÖ–&U6–ævÆR‚“° ¢–b‡6W76–öäW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆUWFFU7W÷'EÆã¢4TÄT5BW'&÷""Â6W76–öäW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}Mİİ½R-]Í]İİâİ]Mí-=ıİâ	ıíıí=-Rıí}mRâ"Ò“°¢Ğ ¢–b‡6W76–öäFFbb6W76–öäFFæÆVv7•ö66W72’°¢–b‚66W75÷Fö¶Vâ’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò­íBMí-=ıâ"Ò“°¢Ğ¢6öç7BfÆ–BÒv—BfÆ–FFU6W76–öä66W72‡6W76–öäFFç6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚fÆ–B’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]-]İ½’­íBMí-=ıâ"Ò“°¢Ğ¢Ğ ¢ÆWBVW'’Ò7W&6Ræg&öÒ‚'6W76–öç2"’çWFFR‡²7W÷'E÷ÆâÂWFFVEöC¢æWrFFR‚’çFô•4õ7G&–ær‚’Ò“° ¢–b‡V&Æ–5ö6öFR’°¢VW'’ÒVW'’æW‚'V&Æ–5ö6öFR"ÂV&Æ–5ö6öFR“°¢ÒVÇ6R°¢VW'’ÒVW'’æW‚'6W76–öåö–B"Â6W76–öåö–B“°¢Ğ ¢6öç7B²W'&÷#¢WFFTW'&÷"ÒÒv—BVW'“° ¢–b‡WFFTW'&÷"’°¢6öç6öÆRæW'&÷"‚'WFFU7W÷'EÆâW'&÷#¢"ÂWFFTW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$f–ÆVBFòWFFR7W÷'BÆâ"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂÖW76vS¢-	ı½ÒıíMM]m­‚íİí-½Ò"Ò“°¢Ò6F6‚†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢W'&÷"æÖW76vRÇÂ$W'&÷"WFF–ær7W÷'BÆâ"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆU6fT6öçfW'6F–öå—'2‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öä–BÂ—'2Â66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó° ¢–b‚6W76–öä–B’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$Ö—76–ær6W76–öä–B"Ò“°¢Ğ¢–b‚—5fÆ–E6W76–öä–B‡6W76–öä–B’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$–çfÆ–B6W76–öä–Bf÷&ÖB"Ò“°¢Ğ ¢–b‚'&’æ—4'&’‡—'2’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢'—'2×W7B&Râ'&’"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“° ¢òò6†V6²66W70¢6öç7B²FF¢6W76–öäFFÂW'&÷#¢6W76–öäW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚&ÆVv7•ö66W72"¢æW‚'6W76–öåö–B"Â6W76–öä–B¢æÖ–&U6–ævÆR‚“° ¢–b‡6W76–öäW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆU6fT6öçfW'6F–öå—'3¢4TÄT5BW'&÷""Â6W76–öäW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}Mİİ½R-]Í]İİâİ]Mí-=ıİâ	ıíıí=-Rıí}mRâ"Ò“°¢Ğ ¢–b‡6W76–öäFFbb6W76–öäFFæÆVv7•ö66W72’°¢–b‚66W75÷Fö¶Vâ’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò­íBMí-=ıâ"Ò“°¢Ğ¢6öç7BfÆ–BÒv—BfÆ–FFU6W76–öä66W72‡6W76–öä–BÂ66W75÷Fö¶Vâ“°¢–b‚fÆ–B’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]-]İ½’­íBMí-=ıâ"Ò“°¢Ğ¢Ğ ¢6öç7B²FF¢W†—7F–æu&÷rÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚&–BÂ§6öåöFF"¢æW‚'6W76–öåö–B"Â6W76–öä–B¢æÖ–&U6–ævÆR‚“° ¢6öç7BW†—7F–æt§6öâÒW†—7F–æu&÷sòæ§6öåöFFÇÂ·Ó°¢6öç7BW†—7F–æu—'2Ò'&’æ—4'&’†W†—7F–æt§6öâæ6öçfW'6F–öå÷—'2’òW†—7F–æt§6öâæ6öçfW'6F–öå÷—'2¢µÓ°¢6öç7BÖW&vVBÒÖW&vU—'2†W†—7F–æu—'2Â—'2“° ¢6öç7B–ÆöBÒ°¢§6öåöFF¢²ââæW†—7F–æt§6öâÂ6öçfW'6F–öå÷—'3¢ÖW&vVBÒÀ¢WFFVEöC¢æWrFFR‚’çFô•4õ7G&–ær‚’À¢Ó° ¢ÆWBW'&÷#°¢–b†W†—7F–æu&÷r’°¢‡²W'&÷"ÒÒv—B7W&6Ræg&öÒ‚'6W76–öç2"’çWFFR‡–ÆöB’æW‚'6W76–öåö–B"Â6W76–öä–B’“°¢ÒVÇ6R°¢–ÆöBç6W76–öåö–BÒ6W76–öä–C°¢‡²W'&÷"ÒÒv—B7W&6Ræg&öÒ‚'6W76–öç2"’æ–ç6W'B‡–ÆöB’“°¢Ğ ¢–b†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢W'&÷"æÖW76vRÒ“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÒ“°¢Ò6F6‚†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢W'&÷"æÖW76vRÇÂ$W'&÷"6f–ær6öçfW'6F–öâ—'2"Ò“°¢Ğ§Ğ ¦gVæ7F–öâÖW&vU—'2†W†—7F–ærÂ–æ6öÖ–ær’°¢6öç7B6VVâÒæWr6WB‚“°¢6öç7BÖW&vVBÒµÓ°¢f÷"†6öç7BöbW†—7F–ær’°¢–b‡ç&÷VæBÓÒVæFVf–æVBbb6VVâæ†2‡ç&÷VæB’’°¢6VVâæFB‡ç&÷VæB“°¢ÖW&vVBçW6‚‡“°¢Ğ¢Ğ¢f÷"†6öç7Böb–æ6öÖ–ær’°¢–b‡ç&÷VæBÓÒVæFVf–æVBbb6VVâæ†2‡ç&÷VæB’’°¢6VVâæFB‡ç&÷VæB“°¢ÖW&vVBçW6‚‡“°¢Ğ¢Ğ¢ÖW&vVBç6÷'B‚†Â"’Óâ†ç&÷VæBÇÂ’Ò†"ç&÷VæBÇÂ’“°¢&WGW&âÖW&vVC°§Ğ ¦7–æ2gVæ7F–öâ†æFÆTÆ—7D&öG”F–Ç”Æöw2‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó° ¢–b‚6W76–öåö–B’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$Ö—76–ær6W76–öåö–B"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“° ¢òò6†V6²66W72–bæöâÖÆVv7¢6öç7B²FF¢6W76–öäFFÂW'&÷#¢6W76–öäW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚&ÆVv7•ö66W72"¢æW‚'6W76–öåö–B"Â6W76–öåö–B¢æÖ–&U6–ævÆR‚“° ¢–b‡6W76–öäW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTÆ—7D&öG”F–Ç”Æöw3¢4TÄT5BW'&÷""Â6W76–öäW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}Mİİ½R-]Í]İİâİ]Mí-=ıİâ	ıíıí=-Rıí}mRâ"Ò“°¢Ğ ¢–b‡6W76–öäFFbb6W76–öäFFæÆVv7•ö66W72’°¢–b‚66W75÷Fö¶Vâ’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò­íBMí-=ıâ"Ò“°¢Ğ¢6öç7BfÆ–BÒv—BfÆ–FFU6W76–öä66W72‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚fÆ–B’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]-]İ½’­íBMí-=ıâ"Ò“°¢Ğ¢Ğ ¢6öç7B²FFÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚&&öG•öF–Ç•öÆöw2"¢ç6VÆV7B‚"¢"¢æW‚'6W76–öåö–B"Â6W76–öåö–B¢æ÷&FW"‚&ÆöuöFFR"Â²66VæF–æs¢fÇ6RÒ¢æÆ–Ö—Bƒ3“° ¢–b†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢W'&÷"æÖW76vRÒ“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂÆöw3¢FFÇÂµÒÒ“°¢Ò6F6‚†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢W'&÷"æÖW76vRÇÂ$W'&÷"Æ—7F–ærF–'’Æöw2"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆUfÆ–FFT–çf—FUFö¶Vâ‡&WÂ&W2’°¢G'’°¢6öç7B²Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó°¢–b‚Fö¶Vâ’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+=­m-RFö¶Vâ"Ò“°¢Ğ ¢6öç7B²fÆ–FFT–çf—FUFö¶VâÒÒv—B–×÷'B‚"âöW‡W'G2æ§2"“°¢6öç7B–çf—FRÒv—BfÆ–FFT–çf—FUFö¶Vâ‡Fö¶Vâ“° ¢–b‚–çf—FR’°¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡°¢ö³¢fÇ6RÀ¢fÆ–C¢fÇ6RÀ¢W'&÷#¢-
+½½­İ]M]---]½Íİ½‚=-]½"À¢Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡°¢ö³¢G'VRÀ¢fÆ–C¢G'VRÀ¢–çf—FS¢°¢–çf—FF–öåö–C¢–çf—FRæ–BÇÂçVÆÂÀ¢–çf—FUö¶–æC¢–çf—FRæ–çf—FUö¶–æBÀ¢F—&V7F–öã¢–çf—FRæF—&V7F–öâÇÂçVÆÂÀ¢ÖöGVÆS¢–çf—FRæÖöGVÆRÇÂçVÆÂÀ¢7FGW3¢–çf—FRç7FGW2ÇÂçVÆÂÀ¢W‡—&W5öC¢–çf—FRæW‡—&W5öBÇÂçVÆÂÀ¢W‡W'EöæÖS¢–çf—FRæW‡W'EöæÖRÇÂçVÆÂÀ¢÷&væ—¦F–öåö–C¢–çf—FRæ÷&væ—¦F–öåö–BÇÂçVÆÂÀ¢ÒÀ¢Ò“°¢Ò6F6‚†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢W'&÷"æÖW76vRÇÂ-	í­ıí-]­‚-í­]İ"Ò“°¢Ğ§Ğ ¦6öç7BU„4„ätUõ$DUôÄ”Ô•EôU%$õ"Ò-	İR=M½íÂí-­½-Â}ıÂâ	ıí-]Í-R­íBıíMí½m]İòâ#°¦6öç7BÄTt5•ô4ôDUôU%$õ"Ò-
+İ-í"­íB½²í}MÒ"-í’-]-í-í’-]‚â
+í}M-Rİí-½’­íB½‚í--]Â¢ı]m½-2â#° ¦7–æ2gVæ7F–öâ†æFÆTW†6†ævT6öçF–çVF–öä7&VFVçF–Â‡&WÂ&W2’°¢G'’°¢6öç7B²ÖöGVÆS¢&WÖöGVÆRÂ6öçF–çVF–öåö6öFRÒÒ&Wæ&öG’ÇÂ·Ó° ¢–b‚5Uõ%DTEôÔôETÄU2æ–æ6ÇVFW2‡&WÖöGVÆR’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$–çfÆ–BÖöGVÆR"Ò“°¢Ğ ¢6öç7B'6VBÒ'6T6öçF–çVF–öä7&VFVçF–Â†6öçF–çVF–öåö6öFR“°¢–b‚'6VB’°¢òòÆVv7’6†÷'B6öFW2
+-	í
+}	­	Õ………‚Õ………‚÷"„TÅD‚Õ………‚Õ……‚’&RæWfW"fÆ–BÆöæRà¢–b†—4ÆVv7•6†÷'D6öFR†6öçF–çVF–öåö6öFR’’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚’òÄTt5•ô4ôåD”åTD”ôåô4ôDUôÔU54tR¢ÄTt5•ô4ôDUôU%$õ"Ò“°¢Ğ¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢U„4„ätUõ$DUôÄ”Ô•EôU%$õ"Ò“°¢Ğ ¢–b‡'6VBæÖöGVÆRÓÒ&WÖöGVÆR’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢U„4„ätUõ$DUôÄ”Ô•EôU%$õ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“° ¢òòçF’Ö'W6S¢†–v‚F‡&W6†öÆBW"•Â–æFWVæFVçBöb7&VFVçF–ÂÆö6²à¢6öç7B'W6TÆ–Ö—BÒ&FTÆ–Ö—B‡²v–æF÷t×3¢R¢c¢ÂÖƒ¢Â&Vf—ƒ¢&6öçF–çVF–öåö'W6S¢"Ò“°¢6öç7B'W6TÆ–Ö—FVBÒv—B'W6TÆ–Ö—B‡&WÂ&W2“°¢–b†'W6TÆ–Ö—FVB’&WGW&ã° ¢òòVæ–f–VBf–ÇW&RÆ–Ö—FW"¶W–VB'’•²„Ô2†Æöö·Wö6öFR’â—Bv÷&·2–FVçF–6ÆÇ¢òòv†WF†W"F†RÆöö·Wö6öFRW†—7G2–â6öçF–çVF–öåö7&VFVçF–Ç2÷"æ÷BÂ&WfVçF–æp¢òòVçVÖW&F–öâöbW†—7F–ær7&VFVçF–Ç2à¢6öç7B6Æ–VçD—ÒvWD6Æ–VçD—‡&W“°¢ÆWBGFV×D¶W“°¢G'’°¢GFV×D¶W’ÒvWD6öçF–çVF–öäGFV×D¶W’†6Æ–VçD—Â'6VBæÆöö·W6öFR“°¢Ò6F6‚‡WW$W'&÷"’°¢–b‡WW$W'&÷"–ç7Fæ6Vöb6öçF–çVF–öä6öæf–tW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTW†6†ævT6öçF–çVF–öä7&VFVçF–Ã¢6öæf–rW'&÷""ÂWW$W'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢%6W'fW"6öæf–wW&F–öâW'&÷""Ò“°¢Ğ¢F‡&÷rWW$W'&÷#°¢Ğ ¢6öç7Bæ÷rÒæWrFFR‚’çFô•4õ7G&–ær‚“°¢6öç7B6öÖÖöäW'&÷"Ò²7FGW3¢CÂFF¢²ö³¢fÇ6RÂW'&÷#¢U„4„ätUõ$DUôÄ”Ô•EôU%$õ"ÒÓ° ¢òò6†V6²W†—7F–ærÆö6²f—'7B†&Vf÷&RF÷V6†–ærF†R7&VFVçF–Â&÷r’à¢6öç7B²FF¢W†—7F–ætGFV×G2ÒÒv—B7W&6P¢æg&öÒ‚&6öçF–çVF–öåöf–ÆVEöGFV×G2"¢ç6VÆV7B‚&f–ÆVEöGFV×Eö6÷VçBÂÆö6¶VE÷VçF–Â"¢æW‚&GFV×Eö¶W’"ÂGFV×D¶W’¢æÖ–&U6–ævÆR‚“° ¢–b†W†—7F–ætGFV×G3òæÆö6¶VE÷VçF–ÂbbW†—7F–ætGFV×G2æÆö6¶VE÷VçF–Ââæ÷r’°¢&WGW&â&W2ç7FGW2ƒC#’’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢U„4„ätUõ$DUôÄ”Ô•EôU%$õ"Ò“°¢Ğ ¢6öç7B²FF¢7&VFVçF–ÂÒÒv—B7W&6P¢æg&öÒ‚&6öçF–çVF–öåö7&VFVçF–Ç2"¢ç6VÆV7B‚&–BÂÖöGVÆRÂ÷væW%÷G—RÂ÷væW%ö–BÂÆöö·Wö6öFRÂ6V7&WEö†6‚Â6V7&WE÷fW'6–öâÂ&Wfö¶VEöBÂ7&VFVEöB"¢æW‚&Æöö·Wö6öFR"Â'6VBæÆöö·W6öFR¢æÖ–&U6–ævÆR‚“° ¢6öç7B7&VFVçF–Äf÷VæBÒ7&VFVçF–Ã°¢6öç7B—5&Wfö¶VBÒ7&VFVçF–Âbb7&VFVçF–Âç&Wfö¶VEöC°¢6öç7B6V7&WEfÆ–BÒ7&VFVçF–À¢bb7&VFVçF–ÂæÖöGVÆRÓÓÒ&WÖöGVÆP¢bb7&VFVçF–Âç&Wfö¶VEö@¢bbfW&–g”6öçF–çVF–öå6V7&WB‡'6VBç6V7&WBÂ7&VFVçF–Âç6V7&WEö†6‚“° ¢–b‚6V7&WEfÆ–B’°¢òò7V6–f–2W'&÷"f÷"&Wfö¶VB7&VFVçF–Ç0¢–b†7&VFVçF–Äf÷VæBbb—5&Wfö¶VB’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+İ-í"­íB½²}Í]İÒİí-½Ââ	ıí½Í}=-R­-=½Íİ½’­íBıíMí½m]İòâ"Ò“°¢Ğ ¢6öç6öÆRæÆör‚%¶W†6†ævUÒ"Â¥4ôâç7G&–æv–g’‡°¢7F–öã¢&W†6†ævR"À¢Æöö·Wöf–ævW'&–çC¢f–ævW'&–çB‡'6VBæÆöö·W6öFR’À¢7&VFVçF–Åö–Eöf–ævW'&–çC¢7&VFVçF–Âòf–ævW'&–çB†7&VFVçF–Âæ–B’¢&æöæR"À¢7&VFVçF–Åöf÷VæC¢7&VFVçF–Äf÷VæBÀ¢6V7&WE÷fÆ–C¢fÇ6RÀ¢&W7öç6U÷7FGW3¢CÀ¢Ò’“° ¢òòFöÖ–6ÆÇ’–æ7&VÖVçBf–ÇW&W2f÷"F†—2•²Æöö·W—"âF†R6ÖR%2—2W6V@¢òò&Vv&FÆW72öbv†WF†W"F†R7&VFVçF–ÂW†—7G2Â6òF†R&W7öç6W2&R–FVçF–6Âà¢6öç7B²FF¢–æ7&VÖVçFVBÂW'&÷#¢–æ7&VÖVçDW'&÷"ÒÒv—B7W&6Rç'2€¢&–æ7&VÖVçEö6öçF–çVF–öåöf–ÆVEöGFV×G2"À¢²öGFV×Eö¶W“¢GFV×D¶W’Ğ¢“° ¢–b†–æ7&VÖVçDW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTW†6†ævT6öçF–çVF–öä7&VFVçF–Ã¢–æ7&VÖVçBf–ÆVB"Â–æ7&VÖVçDW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂıí-]-ÂMİİ½Râ	ıíıí=-R]râ"Ò“°¢Ğ ¢–b†–æ7&VÖVçFVCòå³ÓòæÆö6¶VE÷VçF–Âbb–æ7&VÖVçFVE³ÒæÆö6¶VE÷VçF–Ââæ÷r’°¢&WGW&â&W2ç7FGW2ƒC#’’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢U„4„ätUõ$DUôÄ”Ô•EôU%$õ"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2†6öÖÖöäW'&÷"ç7FGW2’æ§6öâ†6öÖÖöäW'&÷"æFF“°¢Ğ ¢òò7V66W73¢6ÆV"f–ÇW&W2f÷"F†—2•²Æöö·W—"Â—77VRæWr66W72Fö¶Vâà¢v—B7W&6Rç'2‚&6ÆV%ö6öçF–çVF–öåöf–ÆVEöGFV×G2"Â²öGFV×Eö¶W“¢GFV×D¶W’Ò“° ¢6öç6öÆRæÆör‚%¶W†6†ævUÒ7F'BÖöGVÆSÒ"²&WÖöGVÆR²"Æöö·W÷&Vf—ƒÒ"²'6VBæÆöö·W6öFRç6Æ–6RƒÂ‚’“° ¢òò7FW¢f–æBF&vWB6W76–öà¢6öç7BF&vWEF&ÆRÒ&WÖöGVÆRÓÓÒ&&öG’"ò&&öG•ö6Æ–VçG2"¢'6W76–öç2#°¢ÆWBF&vWEVW'’Ò7W&6P¢æg&öÒ‡F&vWEF&ÆR¢ç6VÆV7B‡&WÖöGVÆRÓÓÒ&&öG’"ò'6W76–öåö–B"¢'6W76–öåö–BÂ§6öåöFF"¢æW‚&æöç–Ö÷W5ö÷væW%ö–B"Â7&VFVçF–Âæ÷væW%ö–B“° ¢–b‡&WÖöGVÆRÓÒ&&öG’"’°¢F&vWEVW'’ÒF&vWEVW'’æW‚&ÖöGVÆR"Â&WÖöGVÆR“°¢Ğ ¢6öç7B²FF¢F&vWE6W76–öâÂW'&÷#¢F&vWDW'&÷"ÒÒv—BF&vWEVW'¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ¢æÆ–Ö—Bƒ¢æÖ–&U6–ævÆR‚“° ¢–b‡F&vWDW'&÷"’°¢6öç6öÆRæW'&÷"‚%¶W†6†ævUÒF&vWBVW'’W'&÷#¢"ÂF&vWDW'&÷"æ6öFRÂF&vWDW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí-­½-ÂıíM½Ââ	ıíıí=-Rıí}mRâ"Ò“°¢Ğ¢–b‚F&vWE6W76–öãòç6W76–öåö–B’°¢6öç6öÆRæÆör‚%¶W†6†ævUÒæòF&vWB6W76–öâf÷"÷væW""“°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂİ-‚}ıÂM½òİ-í=â­íMâ	í--]Â¢ı]m½-2â"Ò“°¢Ğ ¢–b‚—5–Æ÷E6W76–öäÖF6‚‡F&vWE6W76–öâæ§6öåöFF’’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	­íBıíMí½m]İòİRıİM½]m"İ-íÍ2]-2â"Ò“°¢Ğ ¢6öç6öÆRæÆör‚%¶W†6†ævUÒF&vWB6W76–öâf÷VæB"“° ¢òò7FW#¢'V–ÆB6&–æW@¢ÆWB6&–æWC°¢G'’°¢6&–æWBÒv—B'V–ÆD6&–æWDFF‡²ÖöGVÆS¢&WÖöGVÆRÂ÷væW$–C¢7&VFVçF–Âæ÷væW%ö–BÂ7W&6RÒ“°¢6öç6öÆRæÆör‚%¶W†6†ævUÒ6&–æWB'V–ÇB6W76–öç3Ò"²†6&–æWBç6W76–öç3òæÆVæwF‚ÇÂ’“°¢Ò6F6‚†6&–æWDW'&÷"’°¢6öç6öÆRæW'&÷"‚%¶W†6†ævUÒ6&–æWB'V–ÆBW'&÷#¢"Â6&–æWDW'&÷"æÖW76vR“°¢F‡&÷r6&–æWDW'&÷#°¢Ğ ¢òò7FW3¢vWB&Ææ6P¢ÆWBW6vT&Ææ6S°¢G'’°¢W6vT&Ææ6RÒv—BvWEW6vT&Ææ6Tf÷$÷væW"‡²ÖöGVÆS¢&WÖöGVÆRÂ÷væW$–C¢7&VFVçF–Âæ÷væW%ö–BÒ“°¢6öç6öÆRæÆör‚%¶W†6†ævUÒ&Ææ6Rö³Ò"²W6vT&Ææ6Ræö²“°¢Ò6F6‚†&Ææ6TW'&÷"’°¢6öç6öÆRæW'&÷"‚%¶W†6†ævUÒ&Ææ6RW'&÷#¢"Â&Ææ6TW'&÷"æÖW76vR“°¢F‡&÷r&Ææ6TW'&÷#°¢Ğ ¢òò7FWC¢vVæW&FR66W72Fö¶Và¢6öç7BæWt66W75Fö¶VâÒv—BvVæW&FU6W76–öä66W75Fö¶Vâ‡F&vWE6W76–öâç6W76–öåö–BÂ°¢ÖöGVÆS¢&WÖöGVÆRÀ¢æöç–Ö÷W4÷væW$–C¢7&VFVçF–Âæ÷væW%ö–BÀ¢V&Æ–46öFS¢6&–æWBç6W76–öç3òå³ÓòçV&Æ–46öFRÇÂçVÆÂÀ¢Ò“°¢–b‚æWt66W75Fö¶Vâ’°¢6öç6öÆRæW'&÷"‚%¶W†6†ævUÒFö¶VâvVæW&F–öâ&WGW&æVBçVÆÂÂ&WG'––ærv—F‚F—&V7B–ç6W'B"“°¢òòfÆÆ&6³¢Vç7W&R6W76–öç2&÷rW†—7G2F—&V7FÇ¢6öç7B7'—FòÒv—B–×÷'B‚&7'—Fò"“°¢6öç7BfÆÆ&6µFö¶VâÒ7'—Fòç&æFöÔ'—FW2ƒ3"’çFõ7G&–ær‚&†W‚"“°¢6öç7BfÆÆ&6´†6‚Ò7'—Fòæ7&VFT†6‚‚'6†#Sb"’çWFFR†fÆÆ&6µFö¶Vâ’æF–vW7B‚&†W‚"“°¢6öç7B²W'&÷#¢fÆÆ&6´W'"ÒÒv—B7W&6Ræg&öÒ‚'6W76–öç2"’çW6W'B‡°¢6W76–öåö–C¢F&vWE6W76–öâç6W76–öåö–BÀ¢ÖöGVÆS¢&WÖöGVÆRÀ¢æöç–Ö÷W5ö÷væW%ö–C¢7&VFVçF–Âæ÷væW%ö–BÀ¢V&Æ–5ö6öFS¢6&–æWBç6W76–öç3òå³ÓòçV&Æ–46öFRÇÂçVÆÂÀ¢F–VçE÷FW‡C¢""À¢6öçfW'6F–öåö†—7F÷'“¢µÒÀ¢§6öåöFF¢vWE–Æ÷D–B‚’ò²–Æ÷Eö–C¢vWE–Æ÷D–B‚’Ò¢·ÒÀ¢66W75÷Fö¶Våö†6ƒ¢fÆÆ&6´†6‚À¢66W75÷Fö¶VåövVæW&FVEöC¢æWrFFR‚’çFô•4õ7G&–ær‚’À¢ÆVv7•ö66W73¢fÇ6RÀ¢ÒÂ²öä6öæfÆ–7C¢'6W76–öåö–B"Ò“°¢–b†fÆÆ&6´W'"’°¢6öç6öÆRæW'&÷"‚%¶W†6†ævUÒfÆÆ&6²–ç6W'Bf–ÆVC¢"ÂfÆÆ&6´W'"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí}M-Â­íBMí-=ıâ	ıíıí=-Rıí}mRâ"Ò“°¢Ğ¢òòfW&–g’F†R&÷rv27&VFV@¢6öç7B²FF¢fW&–g•&÷rÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'6W76–öåö–B"¢æW‚'6W76–öåö–B"ÂF&vWE6W76–öâç6W76–öåö–B¢æÖ–&U6–ævÆR‚“°¢–b‚fW&–g•&÷r’°¢6öç6öÆRæW'&÷"‚%¶W†6†ævUÒfW&–f–6F–öâf–ÆVBgFW"fÆÆ&6²–ç6W'B"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí}M-Â­íBMí-=ıâ	ıíıí=-Rıí}mRâ"Ò“°¢Ğ¢6öç6öÆRæÆör‚%¶W†6†ævUÒfÆÆ&6²Fö¶Vâ7&VFVB7V66W76gVÆÇ’"“°¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡°¢ö³¢G'VRÀ¢6W76–öåö–C¢F&vWE6W76–öâç6W76–öåö–BÀ¢66W75÷Fö¶Vã¢fÆÆ&6µFö¶VâÀ¢ÖöGVÆS¢&WÖöGVÆRÀ¢V&Æ–5ö6öFS¢6&–æWBç6W76–öç3òå³ÓòçV&Æ–46öFRÇÂçVÆÂÀ¢6&–æWBÀ¢W6vUö&Ææ6S¢W6vT&Ææ6RÀ¢Ò“°¢Ğ ¢òòfW&–g’6W76–öç2&÷rW†—7G2gFW"Fö¶VâvVæW&F–öà¢6öç7B²FF¢fW&–g•6W76–öâÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'6W76–öåö–BÂ66W75÷Fö¶Våö†6‚"¢æW‚'6W76–öåö–B"ÂF&vWE6W76–öâç6W76–öåö–B¢æÖ–&U6–ævÆR‚“°¢–b‚fW&–g•6W76–öâÇÂfW&–g•6W76–öâæ66W75÷Fö¶Våö†6‚’°¢6öç6öÆRæW'&÷"‚%¶W†6†ævUÒ6W76–öç2&÷rfW&–f–6F–öâf–ÆVBgFW"Fö¶VâvVæW&F–öâ"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂıíM--]M-Â]ââ	ıíıí=-Rıí}mRâ"Ò“°¢Ğ ¢6öç6öÆRæÆör‚%¶W†6†ævUÒ7V66W72"“° ¢6öç6öÆRæÆör‚%¶W†6†ævUÒ"Â¥4ôâç7G&–æv–g’‡°¢7F–öã¢&W†6†ævR"À¢Æöö·Wöf–ævW'&–çC¢f–ævW'&–çB‡'6VBæÆöö·W6öFR’À¢7&VFVçF–Åö–Eöf–ævW'&–çC¢f–ævW'&–çB†7&VFVçF–Âæ–B’À¢÷væW%öf–ævW'&–çC¢f–ævW'&–çB†7&VFVçF–Âæ÷væW%ö–B’À¢F&vWE÷6W76–öåöf–ævW'&–çC¢f–ævW'&–çB‡F&vWE6W76–öâç6W76–öåö–B’À¢6V7&WE÷fW'6–öã¢7&VFVçF–Âç6V7&WE÷fW'6–öâÀ¢7&VFVçF–Åöf÷VæC¢G'VRÀ¢6V7&WE÷fÆ–C¢G'VRÀ¢&W7öç6U÷7FGW3¢#À¢Ò’“° ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡°¢ö³¢G'VRÀ¢6W76–öåö–C¢F&vWE6W76–öâç6W76–öåö–BÀ¢66W75÷Fö¶Vã¢æWt66W75Fö¶VâÀ¢ÖöGVÆS¢&WÖöGVÆRÀ¢V&Æ–5ö6öFS¢6&–æWBç6W76–öç3òå³ÓòçV&Æ–46öFRÇÂçVÆÂÀ¢6&–æWBÀ¢W6vUö&Ææ6S¢W6vT&Ææ6RÀ¢Ò“°¢Ò6F6‚†W'&÷"’°¢–b†W'&÷"–ç7Fæ6Vöb6öçF–çVF–öä6öæf–tW'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTW†6†ævT6öçF–çVF–öä7&VFVçF–Ã¢6öæf–rW'&÷""ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢%6W'fW"6öæf–wW&F–öâW'&÷""Ò“°¢Ğ¢6öç6öÆRæW'&÷"‚&†æFÆTW†6†ævT6öçF–çVF–öä7&VFVçF–ÂW'&÷""ÂW'&÷"“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂıí-]-ÂMİİ½Râ	ıíıí=-R]râ"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆU&VvVæW&FT6öçF–çVF–öä7&VFVçF–Â‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂÖöGVÆS¢&WÖöGVÆRÒÒ&Wæ&öG’ÇÂ·Ó° ¢–b‚6W76–öåö–BÇÂ66W75÷Fö¶Vâ’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò­íBMí-=ıâ"Ò“°¢Ğ ¢6öç7BfÆ–BÒv—BfÆ–FFU6W76–öä66W72‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚fÆ–B’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]-]İ½’­íBMí-=ıâ"Ò“°¢Ğ ¢6öç7BÖöGVÆRÒ&WÖöGVÆRÇÂ'7W÷'B#°¢–b‚5Uõ%DTEôÔôETÄU2æ–æ6ÇVFW2†ÖöGVÆR’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$–çfÆ–BÖöGVÆR"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7BF&ÆRÒÖöGVÆRÓÓÒ&&öG’"ò&&öG•ö6Æ–VçG2"¢'6W76–öç2#°¢6öç7B²FF¢6W76–öâÂW'&÷#¢6W76–öäW'&÷"ÒÒv—B7W&6P¢æg&öÒ‡F&ÆR¢ç6VÆV7B‚&æöç–Ö÷W5ö÷væW%ö–B"¢æW‚'6W76–öåö–B"Â6W76–öåö–B¢æÖ–&U6–ævÆR‚“° ¢–b‡6W76–öäW'&÷"’°¢6öç6öÆRæW'&÷"‚%¶†æFÆU&VvVæW&FT6öçF–çVF–öä7&VFVçF–ÅÒ6W76–öâÆöö·Wf–ÆVC¢"Â6W76–öäW'&÷"æ6öFRÂ&ÖöGVÆS¢"ÂÖöGVÆR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂıí-]-Â]ââ	ıíıí=-Rıí}mRâ"Ò“°¢Ğ¢–b‚6W76–öãòææöç–Ö÷W5ö÷væW%ö–B’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+]òİRİM]İâ"Ò“°¢Ğ ¢6öç7B&÷FF–öå&W7VÇBÒv—B&÷FFT6öçF–çVF–öä7&VFVçF–Â‡°¢ÖöGVÆRÀ¢÷væW$–C¢6W76–öâææöç–Ö÷W5ö÷væW%ö–BÀ¢7W&6RÀ¢Ò“° ¢6öç6öÆRæÆör‚%·&÷FFUÒ"Â¥4ôâç7G&–æv–g’‡°¢7F–öã¢'&÷FFR"À¢7&VFVçF–Åö–Eöf–ævW'&–çC¢&÷FF–öå&W7VÇBæ7&VFVçF–Ä–Df–ævW'&–çBÀ¢÷væW%öf–ævW'&–çC¢f–ævW'&–çB‡6W76–öâææöç–Ö÷W5ö÷væW%ö–B’À¢öÆEöÆöö·Wöf–ævW'&–çC¢&÷FF–öå&W7VÇBæöÆDÆöö·Wf–ævW'&–çBÀ¢æWuöÆöö·Wöf–ævW'&–çC¢&÷FF–öå&W7VÇBææWtÆöö·Wf–ævW'&–çBÀ¢öÆE÷6V7&WE÷fW'6–öã¢‡&÷FF–öå&W7VÇBç6V7&WEfW'6–öâÇÂ’ÒÀ¢æWu÷6V7&WE÷fW'6–öã¢&÷FF–öå&W7VÇBç6V7&WEfW'6–öâÀ¢öÆEöÍ½ëm¢G§²ÚîÆ­yÒ&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂ}==}-Â}ıí²â"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&WVW7G3¢&WVW7G2ÇÂµÒÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWD&öG•6W'f–6U&WVW7G2W'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­}==}­‚}ıíí"â"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆTvWD&öG•6W'f–6U&WVW7B‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂ&WVW7Eö–BÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfT&öG”÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢–b‚&WVW7Eö–B’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$Ö—76–ær&WVW7Eö–Bâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢&WVW7BÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W'f–6U÷&WVW7G2"¢ç6VÆV7B‚"¢"¢æW‚&–B"Â&WVW7Eö–B¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5÷&öf–ÆR"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æÖ–&U6–ævÆR‚“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWD&öG•6W'f–6U&WVW7EÒVW'’W'&÷#¢"ÂW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂ}==}-Â}ıíâ"Ò“°¢Ğ¢–b‚&WVW7B’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}ıíİRİM]Òâ"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&WVW7BÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWD&öG•6W'f–6U&WVW7BW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­}==}­‚}ıíâ"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆT6æ6VÄ&öG•6W'f–6U&WVW7B‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂ&WVW7Eö–BÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfT&öG”÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢–b‚&WVW7Eö–B’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$Ö—76–ær&WVW7Eö–Bâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢&WVW7BÂW'&÷#¢f–æDW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W'f–6U÷&WVW7G2"¢ç6VÆV7B‚&–BÂ7FGW2Â÷væW%÷G—RÂ÷væW%ö–B"¢æW‚&–B"Â&WVW7Eö–B¢æW‚&ÖöGVÆR"Â&&öG’"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5÷&öf–ÆR"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æÖ–&U6–ævÆR‚“° ¢–b†f–æDW'&÷"ÇÂ&WVW7B’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}ıíİRİM]Òâ"Ò“°¢Ğ ¢6öç7B6æ6VÆÆ&ÆRÒ²'7V&Ö—GFVB"Â&66WFVB"Â&æVVG5ö6Æ&–f–6F–öâ"Â'66†VGVÆVB%Ó°¢–b‚6æ6VÆÆ&ÆRæ–æ6ÇVFW2‡&WVW7Bç7FGW2’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]-í}Íímİâí-Í]İ-Â}ıí"-]­=]Â--=Râ"Ò“°¢Ğ ¢6öç7B²FF¢&W7VÇBÂW'&÷#¢G&ç6—F–öäW'&÷"ÒÒv—B7W&6Rç'2‚'G&ç6—F–öå÷6W'f–6U÷&WVW7B"Â°¢÷&WVW7Eö–C¢&WVW7Eö–BÀ¢÷G&ç6—F–öã¢&6æ6VÂ"À¢Ò“°¢–b‡G&ç6—F–öäW'&÷"’°¢6öç6öÆRæW'&÷"‚%¶6æ6VÄ&öG•6W'f–6U&WVW7EÒG&ç6—F–öâW'&÷#¢"ÂG&ç6—F–öäW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí-Í]İ-Â}ıíâ"Ò“°¢Ğ¢–b‚&W7VÇCòæö²’&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢&W7VÇBæW'&÷"ÇÂ-	İR=M½íÂí-Í]İ-Â}ıíâ"Â6öFS¢&W7VÇBæ6öFRÇÂ%E$å4•D”ôåôd”ÄTB"Ò“°¢–b‚&W7VÇBæ–FV×÷FVçE÷&WÆ’’°¢v—B&V6÷&D6Æ–æ–6ÄWfVçB‡°¢ÖöGVÆS¢&&öG’"À¢÷væW%G—S¢&WVW7Bæ÷væW%÷G—RÀ¢÷væW$–C¢&WVW7Bæ÷væW%ö–BÀ¢WfVçEG—S¢'6W'f–6U÷&WVW7E÷7FGW5ö6†ævVB"À¢6÷W&6UG—S¢'6W'f–6U÷&WVW7B"À¢6÷W&6T–C¢&WVW7Eö–BÀ¢6÷W&6TWfVçD¶W“¢G·&WVW7Bç7FGW7ÒÓâG·&W7VÇBç7FGW7ÖÀ¢&÷fVææ6S¢'7—7FVÕövVæW&FVB"À¢–ÆöC¢²g&öÕ÷7FGW3¢&WVW7Bç7FGW2ÂFõ÷7FGW3¢&W7VÇBç7FGW2ÒÀ¢Ò“°¢Ğ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡&W7VÇB“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆT6æ6VÄ&öG•6W'f–6U&WVW7BW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­í-Í]İ²}ıíâ"Ò“°¢Ğ§Ğ ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ¢òò6W'f–6R&–6–ær‡V&Æ–2VæGö–çB¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ ¦7–æ2gVæ7F–öâ†æFÆTvWE6W'f–6U&–6–ær‡&WÂ&W2’°¢G'’°¢6öç7B²ÖöGVÆS¢&WÖöGVÆRÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B7W&6RÒvWE7W&6R‚“° ¢ÆWBVW'’Ò7W&6P¢æg&öÒ‚'6W'f–6U÷&–6–ær"¢ç6VÆV7B‚'6W'f–6Uö6öFRÂÖöGVÆRÂÆ&VÂÂ6W'f–6U÷F÷–2ÂÖVWF–æuöf÷&ÖBÂ7&VF—G2Â7F—fR"¢æW‚&7F—fR"ÂG'VR¢æ÷&FW"‚&7&VF—G2"Â²66VæF–æs¢G'VRÒ“° ¢–b‡&WÖöGVÆR’°¢VW'’ÒVW'’æW‚&ÖöGVÆR"Â&WÖöGVÆR“°¢Ğ ¢6öç7B²FF¢&–6–ærÂW'&÷"ÒÒv—BVW'“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWE6W'f–6U&–6–æuÒVW'’W'&÷#¢"ÂW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂ}==}-Â-M²â"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&–6–æs¢&–6–ærÇÂµÒÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWE6W'f–6U&–6–ærW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­}==}­‚-Mí"â"Ò“°¢Ğ§Ğ ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ¢òòF–VçB(iB7V6–Æ—7BÆ–æ¶–æp¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ ¢òò66WB7V6–Æ—7Bw2–çf—FF–öâ‡F–VçB6–FR¢òòW6W2FöÖ–2%2FòwV&çFVR–çf—FF–öâ7FGW2æBF–VçEö76–væÖVçB6öç6—7FVæ7’à¦7–æ2gVæ7F–öâ†æFÆT66WE7V6–Æ—7D–çf—FF–öâ‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂ–çf—FF–öå÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢–b‚–çf—FF–öå÷Fö¶VâÇÂG—Vöb–çf—FF–öå÷Fö¶VâÓÒ'7G&–ær"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+=­m-R–çf—FF–öå÷Fö¶Vâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7BFö¶Vä†6‚Ò†6…Fö¶Vâ†–çf—FF–öå÷Fö¶Vâ“°¢&WGW&â6VæD–çf—FF–öä66WE&W7VÇB‡&W2Âv—BW†V7WFT–çf—FF–öä66WB‡²7W&6RÂFö¶Vä†6‚Â÷væW"Ò’“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆT66WE7V6–Æ—7D–çf—FF–öâW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­]-]"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆT66WEF–VçD–çf—FF–öä'”–B‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂ–çf—FF–öåö–BÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢–b‚–çf—FF–öåö–BÇÂG—Vöb–çf—FF–öåö–BÓÒ'7G&–ær"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+=­m-R–çf—FF–öåö–B"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢–çf—FF–öâÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'F–VçE÷7V6–Æ—7Eö–çf—FF–öç2"¢ç6VÆV7B‚&–BÂFö¶Våö†6‚ÂF—&V7F–öâÂÖöGVÆRÂ7FGW2ÂW‡—&W5öBÂF&vWEö÷væW%ö–B"¢æW‚&–B"Â–çf—FF–öåö–B¢æÖ–&U6–ævÆR‚“° ¢–b†W'&÷"ÇÂ–çf—FF–öâ’&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	ı=½]İRİRİM]İâ"Ò“°¢–b†–çf—FF–öâæF—&V7F–öâÓÒ'7V6–Æ—7E÷Fõ÷F–VçB"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]­í]­-İíRı=½]İR"Ò“°¢Ğ¢–b†–çf—FF–öâçF&vWEö÷væW%ö–BÓÒ÷væW"æ÷væW$–B’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	Mí-=ò}ı]Ò"Ò“°¢Ğ ¢&WGW&â6VæD–çf—FF–öä66WE&W7VÇB‡&W2Âv—BW†V7WFT–çf—FF–öä66WB‡°¢7W&6RÀ¢Fö¶Vä†6ƒ¢–çf—FF–öâçFö¶Våö†6‚À¢÷væW"À¢Ò’“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆT66WEF–VçD–çf—FF–öä'”–BW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­]-]"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâW†V7WFT–çf—FF–öä66WB‡²7W&6RÂFö¶Vä†6‚Â÷væW"Ò’°¢6öç7B²FF¢&W7VÇBÂW'&÷#¢'4W'&÷"ÒÒv—B7W&6P¢ç'2‚&66WE÷7V6–Æ—7Eö–çf—FF–öâ"Â°¢÷Fö¶Våö†6ƒ¢Fö¶Vä†6‚À¢ö÷væW%ö–C¢÷væW"æ÷væW$–BÀ¢÷V&Æ–5ö6öFS¢÷væW"çV&Æ–46öFRÀ¢Ò“° ¢–b‡'4W'&÷"’°¢6öç6öÆRæW'&÷"‚%¶66WE7V6–Æ—7D–çf—FF–öåÒ%2W'&÷#¢"Â'4W'&÷"æ6öFRÂ'4W'&÷"æÖW76vR“°¢&WGW&â²7FGW3¢SÂ&öG“¢²ö³¢fÇ6RÂW'&÷#¢-	í­]-]"ÒÓ°¢Ğ ¢–b‚&W7VÇBÇÂ&W7VÇBæö²’°¢6öç7B7FGW4ÖÒ°¢äõEôdõTäC¢CBÀ¢”ådÄ”EôD•$T5D”ôã¢CÀ¢Å$TE•õ$ô4U54TC¢CÀ¢U…•$TC¢CÀ¢ÔôETÄUôÔ•4ÔD4ƒ¢CÀ¢dõ$$”DDTã¢C2À¢U…U%EõTäd”Ä$ÄS¢CÀ¢äõôÔôETÄUôTåD•DÄTÔTåC¢CÀ¢54”täÔTåEô4ôädÄ”5C¢C’À¢õtäU%ôÔ•4ÔD4ƒ¢C2À¢Ó°¢&WGW&â°¢7FGW3¢7FGW4Ö·&W7VÇCòæ6öFUÒÇÂCÀ¢&öG“¢²ö³¢fÇ6RÂW'&÷#¢&W7VÇCòæW'&÷"ÇÂ-	í­"Â6öFS¢&W7VÇCòæ6öFRÇÂ%Tä´äõtâ"ÒÀ¢Ó°¢Ğ ¢&WGW&â²7FGW3¢#Â&öG“¢²ö³¢G'VRÂÖW76vS¢&W7VÇBæÖW76vRÇÂ-
+ı]m½"İ}İ}]Ò"ÒÓ°§Ğ ¦gVæ7F–öâ6VæD–çf—FF–öä66WE&W7VÇB‡&W2Â&W7VÇB’°¢&WGW&â&W2ç7FGW2‡&W7VÇBç7FGW2’æ§6öâ‡&W7VÇBæ&öG’“°§Ğ ¢òòFV6Æ–æR7V6–Æ—7Bw2–çf—FF–öâ‡F–VçB6–FR¦7–æ2gVæ7F–öâ†æFÆTFV6Æ–æU7V6–Æ—7D–çf—FF–öâ‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂ–çf—FF–öå÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢–b‚–çf—FF–öå÷Fö¶Vâ’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+=­m-R–çf—FF–öå÷Fö¶Vâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7BFö¶Vä†6‚Ò†6…Fö¶Vâ†–çf—FF–öå÷Fö¶Vâ“° ¢6öç7B²FF¢–çf—FF–öâÂW'&÷#¢f–æDW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'F–VçE÷7V6–Æ—7Eö–çf—FF–öç2"¢ç6VÆV7B‚&–BÂF—&V7F–öâÂ7FGW2ÂW‡—&W5öBÂF&vWEö÷væW%ö–B"¢æW‚'Fö¶Våö†6‚"ÂFö¶Vä†6‚¢æÖ–&U6–ævÆR‚“° ¢–b†f–æDW'&÷"ÇÂ–çf—FF–öâ’&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	ı=½]İRİRİM]İâ"Ò“°¢–b†–çf—FF–öâæF—&V7F–öâÓÒ'7V6–Æ—7E÷Fõ÷F–VçB"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]­í]­-İíRı=½]İR"Ò“°¢Ğ¢–b†–çf—FF–öâç7FGW2ÓÒ'VæF–ær"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	ı=½]İR=mRíí-İâ"Ò“°¢Ğ¢–b†–çf—FF–öâæW‡—&W5öBbbæWrFFR†–çf—FF–öâæW‡—&W5öB’ÂæWrFFR‚’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	ı=½]İR-]­½â"Ò“°¢Ğ¢–b†–çf—FF–öâçF&vWEö÷væW%ö–Bbb–çf—FF–öâçF&vWEö÷væW%ö–BÓÒ÷væW"æ÷væW$–B’°¢&WGW&â&W2ç7FGW2ƒC2’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	Mí-=ò}ı]Ò"Ò“°¢Ğ ¢òòFöÖ–26öæF—F–öæÂG&ç6—F–öã¢VæF–ær(i"FV6Æ–æV@¢6öç7Bæ÷rÒæWrFFR‚’çFô•4õ7G&–ær‚“°¢6öç7B²FF¢WFFVBÂW'&÷#¢WFFTW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'F–VçE÷7V6–Æ—7Eö–çf—FF–öç2"¢çWFFR‡°¢7FGW3¢&FV6Æ–æVB"À¢FV6Æ–æVEöC¢æ÷rÀ¢F&vWEö÷væW%ö–C¢÷væW"æ÷væW$–BÀ¢F&vWEö÷væW%÷G—S¢&æöç–Ö÷W5ö66R"À¢WFFVEöC¢æ÷rÀ¢Ò¢æW‚&–B"Â–çf—FF–öâæ–B¢æW‚'7FGW2"Â'VæF–ær"¢ç6VÆV7B‚&–B"¢æÖ–&U6–ævÆR‚“° ¢–b‡WFFTW'&÷"’°¢6öç6öÆRæW'&÷"‚%¶FV6Æ–æU7V6–Æ—7D–çf—FF–öåÒWFFRW'&÷#¢"ÂWFFTW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂíí--Âı=½]İR"Ò“°¢Ğ ¢–b‚WFFVB’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	ı=½]İRİRİM]İâ½‚=mRíí-İâ"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTFV6Æ–æU7V6–Æ—7D–çf—FF–öâW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­]-]"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆTFV6Æ–æUF–VçD–çf—FF–öä'”–B‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂ–çf—FF–öåö–BÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢–b‚–çf—FF–öåö–BÇÂG—Vöb–çf—FF–öåö–BÓÒ'7G&–ær"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+=­m-R–çf—FF–öåö–B"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7Bæ÷rÒæWrFFR‚’çFô•4õ7G&–ær‚“°¢6öç7B²FF¢WFFVBÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'F–VçE÷7V6–Æ—7Eö–çf—FF–öç2"¢çWFFR‡²7FGW3¢&FV6Æ–æVB"ÂFV6Æ–æVEöC¢æ÷rÂWFFVEöC¢æ÷rÒ¢æW‚&–B"Â–çf—FF–öåö–B¢æW‚&F—&V7F–öâ"Â'7V6–Æ—7E÷Fõ÷F–VçB"¢æW‚'F&vWEö÷væW%ö–B"Â÷væW"æ÷væW$–B¢æW‚'7FGW2"Â'VæF–ær"¢æwB‚&W‡—&W5öB"Âæ÷r¢ç6VÆV7B‚&–B"¢æÖ–&U6–ævÆR‚“° ¢–b†W'&÷"’&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂíí--Âı=½]İR"Ò“°¢–b‚WFFVB’&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	ı=½]İRİRİM]İâ½‚=mRíí-İâ"Ò“°¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTFV6Æ–æUF–VçD–çf—FF–öä'”–BW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­]-]"Ò“°¢Ğ§Ğ ¢òò7&VFRF–VçB–çf—FF–öâ‡F–VçB(i"7V6–Æ—7B¦7–æ2gVæ7F–öâ†æFÆT7&VFUF–VçD–çf—FF–öâ‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂÖW76vRÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“° ¢6öç7B&uFö¶VâÒ7'—Fòç&æFöÔ'—FW2ƒ3"’çFõ7G&–ær‚&†W‚"“°¢6öç7BFö¶Vä†6‚Ò†6…Fö¶Vâ‡&uFö¶Vâ“°¢6öç7BW‡—&W4BÒæWrFFR„FFRææ÷r‚’²B¢#B¢c¢c¢’çFô•4õ7G&–ær‚“²òòBF—0 ¢6öç7B²FF¢–çf—FF–öâÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'F–VçE÷7V6–Æ—7Eö–çf—FF–öç2"¢æ–ç6W'B‡°¢Fö¶Våö†6ƒ¢Fö¶Vä†6‚À¢F—&V7F–öã¢'F–VçE÷Fõ÷7V6–Æ—7B"À¢ÖöGVÆS¢'7W÷'B"À¢–çf—FW%ö÷væW%÷G—S¢&æöç–Ö÷W5ö66R"À¢–çf—FW%ö÷væW%ö–C¢÷væW"æ÷væW$–BÀ¢òòF&vWEö÷væW%ö–BöW‡W'Eö–BÆVgBçVÆÂ(	BFö7F÷"—2Væ¶æ÷vâB7&VF–öâF–ÖP¢7FGW3¢'VæF–ær"À¢W‡—&W5öC¢W‡—&W4BÀ¢Ò¢ç6VÆV7B‚&–BÂF—&V7F–öâÂÖöGVÆRÂ7FGW2ÂW‡—&W5öBÂ7&VFVEöB"¢ç6–ævÆR‚“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚%¶7&VFUF–VçD–çf—FF–öåÒ–ç6W'BW'&÷#¢"ÂW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí}M-Âı=½]İR"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡°¢ö³¢G'VRÀ¢–çf—FF–öã¢°¢ââæ–çf—FF–öâÀ¢Fö¶Vã¢&uFö¶VâÀ¢W&Ã¢vWD–çf—FUW&Â‡&uFö¶Vâ’À¢ÒÀ¢Ò“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆT7&VFUF–VçD–çf—FF–öâW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­]-]"Ò“°¢Ğ§Ğ ¢òòÆ—7BF–VçB–çf—FF–öç0¦7–æ2gVæ7F–öâ†æFÆTÆ—7EF–VçD–çf—FF–öç2‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢–çf—FF–öç2ÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'F–VçE÷7V6–Æ—7Eö–çf—FF–öç2"¢ç6VÆV7B‚&–BÂF—&V7F–öâÂÖöGVÆRÂ7FGW2ÂW‡—&W5öBÂ7&VFVEöBÂ66WFVEöBÂFV6Æ–æVEöBÂ&Wfö¶VEöB"¢æ÷"†F&vWEö÷væW%ö–BæWâG¶÷væW"æ÷væW$–GÒÆ–çf—FW%ö÷væW%ö–BæWâG¶÷væW"æ÷væW$–GÖ¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ¢æÆ–Ö—Bƒ#“° ¢–b†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂ}==}-Âı=½]İò"Ò“°¢Ğ ¢6öç7B7W'&VçD–çf—FF–öç2Ò—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚’òæ÷&ÖÆ—¦T–çf—FF–öå7FGW6W2†–çf—FF–öç2ÇÂµÒ’¢†–çf—FF–öç2ÇÂµÒ“°¢6öç7BW‡—&VD–G2Ò7W'&VçD–çf—FF–öç2æf–ÇFW"‚†–çf—FF–öâÂ–æFW‚’Óâ–çf—FF–öâç7FGW2ÓÓÒ&W‡—&VB"bb–çf—FF–öç3òå¶–æFW…Óòç7FGW2ÓÓÒ'VæF–ær"’æÖ‚†–çf—FF–öâ’Óâ–çf—FF–öâæ–B“°¢–b†—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚’bbW‡—&VD–G2æÆVæwF‚â’°¢v—B7W&6Ræg&öÒ‚'F–VçE÷7V6–Æ—7Eö–çf—FF–öç2"¢çWFFR‡²7FGW3¢&W‡—&VB"ÂWFFVEöC¢æWrFFR‚’çFô•4õ7G&–ær‚’Ò¢æ–â‚&–B"ÂW‡—&VD–G2¢æW‚'7FGW2"Â'VæF–ær"“°¢Ğ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ–çf—FF–öç3¢7W'&VçD–çf—FF–öç2Ò“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTÆ—7EF–VçD–çf—FF–öç2W'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­]-]"Ò“°¢Ğ§Ğ ¢òò7&VFRÖF6‚&WVW7B‡F–VçB6·2ÆFf÷&ÒFò76–vâ7V6–Æ—7B¦7–æ2gVæ7F–öâ†æFÆT7&VFTÖF6…&WVW7B‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂÖW76vRÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“° ¢òò6†V6²æò7F—fR76–væÖVçBW†—7G0¢6öç7B²FF¢W†—7F–ærÒÒv—B7W&6P¢æg&öÒ‚'F–VçEö76–væÖVçG2"¢ç6VÆV7B‚&–B"¢æW‚'V&Æ–5ö6öFR"Â÷væW"çV&Æ–46öFR¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æW‚'7FGW2"Â&7F—fR"¢æÖ–&U6–ævÆR‚“° ¢–b†W†—7F–ær’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+2-=mR]-Â}­]ı½İİ½’ı]m½""Ò“°¢Ğ ¢–b†—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚’’°¢6öç7B²FF¢7F—fU&WVW7BÒÒv—B7W&6P¢æg&öÒ‚'7V6–Æ—7EöÖF6…÷&WVW7G2"¢ç6VÆV7B‚&–BÂ6W76–öåö–BÂ7FGW2Â7&VFVEöB"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æW‚'7FGW2"Â'7V&Ö—GFVB"¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ¢æÆ–Ö—Bƒ¢æÖ–&U6–ævÆR‚“°¢–b†7F—fU&WVW7B’&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&WVW7C¢7F—fU&WVW7BÂÖW76vS¢-	}ıí=mRí-ı-½]Ò"Ò“°¢Ğ ¢6öç7B&WVW7Df–VÆG2Ò°¢÷væW%÷G—S¢&æöç–Ö÷W5ö66R"À¢÷væW%ö–C¢÷væW"æ÷væW$–BÀ¢ÖöGVÆS¢'7W÷'B"À¢ÖW76vS¢ÖW76vRÇÂçVÆÂÀ¢7FGW3¢'7V&Ö—GFVB"À¢Ó°¢–b†—4äÖVE7W÷'DöæÇ”FWÆ÷–ÖVçB‚’’&WVW7Df–VÆG2ç6W76–öåö–BÒ÷væW"ç6W76–öä–C° ¢6öç7B²FF¢&WVW7BÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'7V6–Æ—7EöÖF6…÷&WVW7G2"¢æ–ç6W'B‡&WVW7Df–VÆG2¢ç6VÆV7B‚&–BÂ7FGW2Â7&VFVEöB"¢ç6–ævÆR‚“° ¢–b†W'&÷"’°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí}M-Â}ı-­2"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&WVW7BÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆT7&VFTÖF6…&WVW7BW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­]-]"Ò“°¢Ğ§Ğ ¢òò7V&Ö—Böæ&ö&F–ær&WVW7B‡Væ¶æ÷vâFö7F÷"÷Vç2F–VçN(i'7V6–Æ—7B–çf—FF–öâ¢òòF†—2—2V&Æ–2÷VæWF†VçF–6FVB(	BF†RFö¶Vâ—2F†RöæÇ’7&VFVçF–Âà¢òòFö7F÷"FöW2äõB&V6V—fRç’F–VçB6Æ–æ–6ÂFFà¦7–æ2gVæ7F–öâ†æFÆU7V&Ö—Döæ&ö&F–æu&WVW7B‡&WÂ&W2’°¢G'’°¢6öç7B²–çf—FF–öå÷Fö¶VâÂæÖRÂ6öçF7EöVÖ–ÂÂ6öçF7E÷†öæRÂ6öÖÖVçBÒÒ&Wæ&öG’ÇÂ·Ó° ¢–b‚–çf—FF–öå÷Fö¶VâÇÂG—Vöb–çf—FF–öå÷Fö¶VâÓÒ'7G&–ær"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+=­m-R–çf—FF–öå÷Fö¶Vâ"Ò“°¢Ğ¢–b‚æÖRÇÂG—VöbæÖRÓÒ'7G&–ær"ÇÂæÖRçG&–Ò‚’æÆVæwF‚Â"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+=­m-RÍòÍİÍ=Â"Í-í½’"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7BFö¶Vä†6‚Ò†6…Fö¶Vâ†–çf—FF–öå÷Fö¶Vâ“° ¢òòf–æB–çf—FF–öâ'’Fö¶Vâ†6€¢6öç7B²FF¢–çf—FF–öâÂW'&÷#¢f–æDW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'F–VçE÷7V6–Æ—7Eö–çf—FF–öç2"¢ç6VÆV7B‚&–BÂF—&V7F–öâÂÖöGVÆRÂ÷&væ—¦F–öåö–BÂ7FGW2ÂW‡—&W5öB"¢æW‚'Fö¶Våö†6‚"ÂFö¶Vä†6‚¢æÖ–&U6–ævÆR‚“° ¢–b†f–æDW'&÷"ÇÂ–çf—FF–öâ’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	ı=½]İRİRİM]İâ"Ò“°¢Ğ ¢òòfÆ–FFR–çf—FF–öà¢–b†–çf—FF–öâæF—&V7F–öâÓÒ'F–VçE÷Fõ÷7V6–Æ—7B"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]­í]­-İíRı=½]İR"Ò“°¢Ğ¢–b†–çf—FF–öâç7FGW2ÓÒ'VæF–ær"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	ı=½]İR=mRíí-İâ"Ò“°¢Ğ¢–b†æWrFFR†–çf—FF–öâæW‡—&W5öB’ÂæWrFFR‚’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	ı=½]İR-]­½â"Ò“°¢Ğ ¢òò6†V6²f÷"W†—7F–æröæ&ö&F–ær&WVW7Bf÷"F†—2–çf—FF–öâ‡&WfVçB7Ò¢6öç7B²FF¢W†—7F–æu&WVW7BÒÒv—B7W&6P¢æg&öÒ‚'7V6–Æ—7Eööæ&ö&F–æu÷&WVW7G2"¢ç6VÆV7B‚&–BÂ7FGW2"¢æW‚&–çf—FF–öåö–B"Â–çf—FF–öâæ–B¢æÖ–&U6–ævÆR‚“° ¢–b†W†—7F–æu&WVW7B’°¢–b†W†—7F–æu&WVW7Bç7FGW2ÓÓÒ'7V&Ö—GFVB"’°¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂÖW76vS¢-	}ı-­=mRí-ı-½]İ"Â7FGW3¢'7V&Ö—GFVB"Ò“°¢Ğ¢–b†W†—7F–æu&WVW7Bç7FGW2ÓÓÒ&&÷fVB"’°¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂÖW76vS¢-	}ı-­=mRíMí]İ"Â7FGW3¢&&÷fVB"Ò“°¢Ğ¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}ı-­ıâİ-íÍ2ı=½]İâ=mRíí-İ"Ò“°¢Ğ ¢òò7&VFRöæ&ö&F–ær&WVW7B†æòF–VçBFFW‡÷6VB¢6öç7B²FF¢&WVW7BÂW'&÷#¢–ç6W'DW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'7V6–Æ—7Eööæ&ö&F–æu÷&WVW7G2"¢æ–ç6W'B‡°¢–çf—FF–öåö–C¢–çf—FF–öâæ–BÀ¢ÖöGVÆS¢–çf—FF–öâæÖöGVÆRÀ¢÷&væ—¦F–öåö–C¢–çf—FF–öâæ÷&væ—¦F–öåö–BÇÂçVÆÂÀ¢æÖS¢æÖRçG&–Ò‚’À¢6öçF7EöVÖ–Ã¢6öçF7EöVÖ–ÂÇÂçVÆÂÀ¢6öçF7E÷†öæS¢6öçF7E÷†öæRÇÂçVÆÂÀ¢6öÖÖVçC¢6öÖÖVçBÇÂçVÆÂÀ¢7FGW3¢'7V&Ö—GFVB"À¢Ò¢ç6VÆV7B‚&–BÂ7FGW2Â7&VFVEöB"¢ç6–ævÆR‚“° ¢–b†–ç6W'DW'&÷"’°¢6öç6öÆRæW'&÷"‚%·7V&Ö—Döæ&ö&F–æu&WVW7EÒ–ç6W'BW'&÷#¢"Â–ç6W'DW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí-ı--Â}ı-­2"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&WVW7BÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆU7V&Ö—Döæ&ö&F–æu&WVW7BW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­]-]"Ò“°¢Ğ§Ğ ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ¢òò7W÷'B6W'f–6R&WVW7G0¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ ¦6öç7B5Uõ%Eõ$UTU5EõE•Uô4ôäd”rÒ°¢VW7F–öã¢²Æ&VÃ¢-	íİ½Òİ-íıí"ÂÖVWF–æuöf÷&ÖC¢'FW‡B"Â6Æö†÷W'3¢#BÒÀ¢†öæS¢²Æ&VÃ¢-
+-]½]Míİİ½’}-íİí¢"ÂÖVWF–æuöf÷&ÖC¢'†öæR"Â6Æö†÷W'3¢#BÒÀ¢W&vVçC¢²Æ&VÃ¢-
+í}İò-ı}Â"ÂÖVWF–æuöf÷&ÖC¢'†öæR"Â6Æö†÷W'3¢BÒÀ¢f–FVó¢²Æ&VÃ¢-	-M]í­íİ=½Í-mò"ÂÖVWF–æuöf÷&ÖC¢'f–FVò"Â6Æö†÷W'3¢C‚ÒÀ¢öffÆ–æS¢²Æ&VÃ¢-	í}İò--]}"ÂÖVWF–æuöf÷&ÖC¢&öffÆ–æR"Â6Æö†÷W'3¢C‚ÒÀ§Ó° ¢òò6æöæ–6Â6W'f–6Uö6öFR(i"&WVW7E÷G—RÖ–ær‡fÆ–FFVB6W'fW"×6–FR¦6öç7B4U%d”4Uô4ôDUôÔÒ°¢6†÷'EöföÆÆ÷wW¢²&WVW7E÷G—S¢'VW7F–öâ"ÂÖVWF–æuöf÷&ÖC¢'FW‡B"ÒÀ¢F†W&•÷&Wf–Ws¢²&WVW7E÷G—S¢'VW7F–öâ"ÂÖVWF–æuöf÷&ÖC¢'FW‡B"ÒÀ¢w&—GFVåö6öç7VÇFF–öã¢²&WVW7E÷G—S¢'VW7F–öâ"ÂÖVWF–æuöf÷&ÖC¢'FW‡B"ÒÀ¢†öæUö6öç7VÇFF–öã¢²&WVW7E÷G—S¢'†öæR"ÂÖVWF–æuöf÷&ÖC¢'†öæR"ÒÀ¢W&vVçEö6öçF7C¢²&WVW7E÷G—S¢'W&vVçB"ÂÖVWF–æuöf÷&ÖC¢'†öæR"ÒÀ¢öæÆ–æUö6öç7VÇFF–öã¢²&WVW7E÷G—S¢'f–FVò"ÂÖVWF–æuöf÷&ÖC¢'f–FVò"ÒÀ¢öffÆ–æUö6öç7VÇFF–öã¢²&WVW7E÷G—S¢&öffÆ–æR"ÂÖVWF–æuöf÷&ÖC¢&öffÆ–æR"ÒÀ§Ó° ¦6öç7B5Uõ%Eõ$T4ôåôÄ$TÅ2Ò°¢F—67W75÷&W÷'C¢-	í=mM]İRí-}-"À¢föÆÆ÷u÷W¢-	ıíMí½m]İRİ½íM]İò"À¢æWuö6öæ6W&ã¢-	İí-òıí½]Í"À¢÷F†W#¢-	M==íR"À§Ó° ¦7–æ2gVæ7F–öâ†æFÆT7&VFU7W÷'E6W'f–6U&WVW7B‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂ6W'f–6Uö6öFS¢6Æ–VçE6W'f–6T6öFRÂ&WVW7E÷G—S¢6Æ–VçE&WVW7EG—RÂ&V6öâÂÖW76vRÂ&VfW'&VEöFFRÂF–ÖUög&öÒÂF–ÖU÷FòÂ6öÖÖVçBÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢–b‚ÖW76vRÇÂG—VöbÖW76vRÓÒ'7G&–ær"ÇÂÖW76vRçG&–Ò‚’æÆVæwF‚Â"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+=­m-Ríí]İRâ"Ò“°¢Ğ¢–b†ÖW76vRæÆVæwF‚â3’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+½­íÂM½İİíRíí]İRÍ­Í=Â3Í-í½í"’â"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“° ¢òò)H)H&W6öÇfR6W'f–6Uö6öFRæBfÆ–FFR)H)H)H)H)H)H)H)H)H)H)H)H)H)H)H)H)H)H ¢ÆWB6W'f–6T6öFRÒG—Vöb6Æ–VçE6W'f–6T6öFRÓÓÒ'7G&–ær"bb6Æ–VçE6W'f–6T6öFRçG&–Ò‚¢ò6Æ–VçE6W'f–6T6öFRçG&–Ò‚¢¢çVÆÃ°¢ÆWB&WVW7EG—RÒ6Æ–VçE&WVW7EG—S°¢ÆWBÖVWF–ætf÷&ÖC°¢ÆWB&–6U6æ6†÷BÒçVÆÃ° ¢–b‡6W'f–6T6öFR’°¢òòfÆ–FFR6W'f–6Uö6öFRv–ç7B6æöæ–6Â&–6–æp¢6öç7B²FF¢&–6–ærÂW'&÷#¢&–6–ætW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W'f–6U÷&–6–ær"¢ç6VÆV7B‚'6W'f–6Uö6öFRÂÖöGVÆRÂÆ&VÂÂ7&VF—G2Â7F—fR"¢æW‚'6W'f–6Uö6öFR"Â6W'f–6T6öFR¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æÖ–&U6–ævÆR‚“° ¢–b‡&–6–ætW'&÷"ÇÂ&–6–ær’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]}-]-İ½’-ò=½==‚â"Ò“°¢Ğ¢–b‚&–6–æræ7F—fR’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	Mİİò=½==-]Í]İİâİ]Mí-=ıİâ"Ò“°¢Ğ¢–b‡&–6–æræÖöGVÆRÓÒ'7W÷'B"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	Mİİò=½==İRMí-=ıİ"ÍíM=½R7W÷'Bâ"Ò“°¢Ğ ¢òòFW&—fR&WVW7E÷G—Rg&öÒ6æöæ–6ÂÖ–æp¢6öç7BÖ–ærÒ4U%d”4Uô4ôDUôÔ·6W'f–6T6öFUÓ°¢–b‚Ö–ær’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]}-]-İ½’-ò=½==‚â"Ò“°¢Ğ¢&WVW7EG—RÒÖ–ærç&WVW7E÷G—S°¢ÖVWF–ætf÷&ÖBÒÖ–æræÖVWF–æuöf÷&ÖC°¢&–6U6æ6†÷BÒ&–6–æræ7&VF—G3°¢ÒVÇ6R°¢òòÆVv7“¢W6R&WVW7E÷G—RF—&V7FÇ’†&6·v&B6ö×B¢6öç7B6öæf–rÒ5Uõ%Eõ$UTU5EõE•Uô4ôäd”u¶6Æ–VçE&WVW7EG—UÓ°¢–b‚6öæf–r’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+=­m-R-ò=½==‚â"Ò“°¢Ğ¢&WVW7EG—RÒ6Æ–VçE&WVW7EG—S°¢ÖVWF–ætf÷&ÖBÒ6öæf–ræÖVWF–æuöf÷&ÖC°¢Ğ ¢6öç7B6öæf–rÒ5Uõ%Eõ$UTU5EõE•Uô4ôäd”u·&WVW7EG—UÓ°¢–b‚6öæf–r’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]-]İ½’-ò}ıíâ"Ò“°¢Ğ ¢òò)H)H&W6öÇfR7V6–Æ—7Bg&öÒ&VÆF–öâ)H)H)H)H)H)H)H)H)H)H)H)H)H)H)H)H)H)H)H ¢6öç7B7V6–Æ—7BÒv—B&W6öÇfU7W÷'E7V6–Æ—7E&VÆF–öâ†÷væW"æ÷væW$–B“° ¢6öç7B&V6öäÆ&VÂÒ5Uõ%Eõ$T4ôåôÄ$TÅ5·&V6öåÒÇÂ&V6öâÇÂ"#°¢6öç7BF—FÆRÒG¶6öæf–ræÆ&VÇÒG·&V6öäÆ&VÂò"(	B"²&V6öäÆ&VÂ¢"'Ö° ¢6öç7Bæ÷rÒæWrFFR‚’çFô•4õ7G&–ær‚“°¢6öç7BGVTBÒ6öæf–rç6Æö†÷W'0¢òæWrFFR„FFRææ÷r‚’²6öæf–rç6Æö†÷W'2¢c¢c¢’çFô•4õ7G&–ær‚¢¢çVÆÃ° ¢6öç7B²FF¢–ç6W'FVBÂW'&÷#¢–ç6W'DW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W'f–6U÷&WVW7G2"¢æ–ç6W'B‡°¢ÖöGVÆS¢'7W÷'B"À¢÷væW%÷G—S¢&æöç–Ö÷W5ö66R"À¢÷væW%ö–C¢÷væW"æ÷væW$–BÀ¢6W76–öåö–C¢÷væW"ç6W76–öä–BÀ¢7V6–Æ—7Eö–C¢7V6–Æ—7CòæW‡W'D–BÇÂçVÆÂÀ¢7V6–Æ—7EöæÖS¢7V6–Æ—7CòæW‡W'DæÖRÇÂçVÆÂÀ¢&WVW7E÷G—S¢&WVW7EG—RÀ¢ÖVWF–æuöf÷&ÖC¢ÖVWF–ætf÷&ÖBÀ¢F—FÆRÀ¢ÖW76vS¢ÖW76vRçG&–Ò‚’À¢7FGW3¢'7V&Ö—GFVB"À¢&–÷&—G“¢&æ÷&ÖÂ"À¢6Æö†÷W'3¢6öæf–rç6Æö†÷W'2À¢GVUöC¢GVTBÀ¢&W6W'fVEö7&VF—G3¢À¢6W'f–6Uö6öFS¢6W'f–6T6öFRÀ¢&–6Uö7&VF—G3¢&–6U6æ6†÷BÀ¢6öçFW‡E÷6æ6†÷C¢°¢&V6öã¢&V6öâÇÂçVÆÂÀ¢&VfW'&VEöFFS¢&VfW'&VEöFFRÇÂçVÆÂÀ¢F–ÖUög&öÓ¢F–ÖUög&öÒÇÂçVÆÂÀ¢F–ÖU÷Fó¢F–ÖU÷FòÇÂçVÆÂÀ¢6öÖÖVçC¢6öÖÖVçBÇÂçVÆÂÀ¢6W76–öå÷7VÖÖ'“¢÷væW"çV&Æ–46öFRÀ¢ÒÀ¢7&VFVEöC¢æ÷rÀ¢WFFVEöC¢æ÷rÀ¢Ò¢ç6VÆV7B‚&–BÂ&WVW7E÷G—RÂÖVWF–æuöf÷&ÖBÂF—FÆRÂ7FGW2Â7V6–Æ—7EöæÖRÂGVUöBÂ6W'f–6Uö6öFRÂ&–6Uö7&VF—G2Â7&VFVEöB"¢ç6–ævÆR‚“° ¢–b†–ç6W'DW'&÷"’°¢6öç6öÆRæW'&÷"‚%¶7&VFU7W÷'E6W'f–6U&WVW7EÒ–ç6W'BW'&÷#¢"Â–ç6W'DW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí-ı--Â}ıíâ"Ò“°¢Ğ ¢v—B&V6÷&D6Æ–æ–6ÄWfVçB‡°¢ÖöGVÆS¢'7W÷'B"À¢÷væW%G—S¢&æöç–Ö÷W5ö66R"À¢÷væW$–C¢÷væW"æ÷væW$–BÀ¢WfVçEG—S¢'6W'f–6U÷&WVW7Eö7&VFVB"À¢ö67W'&VDC¢–ç6W'FVBæ7&VFVEöBÇÂæ÷rÀ¢6÷W&6UG—S¢'6W'f–6U÷&WVW7B"À¢6÷W&6T–C¢–ç6W'FVBæ–BÀ¢6÷W&6TWfVçD¶W“¢&7&VFVB"À¢&÷fVææ6S¢'F–VçE÷&W÷'FVB"À¢–ÆöC¢°¢&WVW7E÷G—S¢&WVW7EG—RÀ¢6W'f–6Uö6öFS¢6W'f–6T6öFRÀ¢ÖVWF–æuöf÷&ÖC¢ÖVWF–ætf÷&ÖBÀ¢ÒÀ¢Ò“° ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&WVW7C¢–ç6W'FVBÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆT7&VFU7W÷'E6W'f–6U&WVW7BW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­í-ı-­‚}ıíâ"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆTÆ—7E7W÷'E6W'f–6U&WVW7G2‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢&WVW7G2ÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W'f–6U÷&WVW7G2"¢ç6VÆV7B‚&–BÂ&WVW7E÷G—RÂÖVWF–æuöf÷&ÖBÂF—FÆRÂÖW76vRÂ7FGW2Â&–÷&—G’Â6Æö†÷W'2ÂGVUöBÂ7V6–Æ—7EöæÖRÂ7V6–Æ—7E÷&W7öç6RÂ66†VGVÆVEöBÂ66†VGVÆVEö6öÖÖVçBÂ7&VFVEöBÂç7vW&VEöBÂ6ö×ÆWFVEöBÂ6æ6VÆÆVEöB"¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ¢æÆ–Ö—BƒS“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚%¶Æ—7E7W÷'E6W'f–6U&WVW7G5ÒVW'’W'&÷#¢"ÂW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂ}==}-Â}ıí²â"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&WVW7G3¢&WVW7G2ÇÂµÒÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTÆ—7E7W÷'E6W'f–6U&WVW7G2W'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­}==}­‚}ıíí"â"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆTvWE7W÷'E6W'f–6U&WVW7B‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂ&WVW7Eö–BÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢–b‚&WVW7Eö–B’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$Ö—76–ær&WVW7Eö–Bâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢&WVW7BÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W'f–6U÷&WVW7G2"¢ç6VÆV7B‚"¢"¢æW‚&–B"Â&WVW7Eö–B¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æÖ–&U6–ævÆR‚“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWE7W÷'E6W'f–6U&WVW7EÒVW'’W'&÷#¢"ÂW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂ}==}-Â}ıíâ"Ò“°¢Ğ¢–b‚&WVW7B’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}ıíİRİM]Òâ"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&WVW7BÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWE7W÷'E6W'f–6U&WVW7BW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­}==}­‚}ıíâ"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆT6æ6VÅ7W÷'E6W'f–6U&WVW7B‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂ&WVW7Eö–BÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢–b‚&WVW7Eö–B’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢$Ö—76–ær&WVW7Eö–Bâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢&WVW7BÂW'&÷#¢f–æDW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'6W'f–6U÷&WVW7G2"¢ç6VÆV7B‚&–BÂ7FGW2Â÷væW%÷G—RÂ÷væW%ö–B"¢æW‚&–B"Â&WVW7Eö–B¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æÖ–&U6–ævÆR‚“° ¢–b†f–æDW'&÷"ÇÂ&WVW7B’°¢&WGW&â&W2ç7FGW2ƒCB’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	}ıíİRİM]Òâ"Ò“°¢Ğ ¢6öç7B6æ6VÆÆ&ÆRÒ²'7V&Ö—GFVB"Â&66WFVB"Â&æVVG5ö6Æ&–f–6F–öâ"Â'66†VGVÆVB%Ó°¢–b‚6æ6VÆÆ&ÆRæ–æ6ÇVFW2‡&WVW7Bç7FGW2’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]-í}Íímİâí-Í]İ-Â}ıí"-]­=]Â--=Râ"Ò“°¢Ğ ¢6öç7B²FF¢&W7VÇBÂW'&÷#¢G&ç6—F–öäW'&÷"ÒÒv—B7W&6Rç'2‚'G&ç6—F–öå÷6W'f–6U÷&WVW7B"Â°¢÷&WVW7Eö–C¢&WVW7Eö–BÀ¢÷G&ç6—F–öã¢&6æ6VÂ"À¢Ò“°¢–b‡G&ç6—F–öäW'&÷"’°¢6öç6öÆRæW'&÷"‚%¶6æ6VÅ7W÷'E6W'f–6U&WVW7EÒG&ç6—F–öâW'&÷#¢"ÂG&ç6—F–öäW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí-Í]İ-Â}ıíâ"Ò“°¢Ğ¢–b‚&W7VÇCòæö²’&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢&W7VÇBæW'&÷"ÇÂ-	İR=M½íÂí-Í]İ-Â}ıíâ"Â6öFS¢&W7VÇBæ6öFRÇÂ%E$å4•D”ôåôd”ÄTB"Ò“°¢–b‚&W7VÇBæ–FV×÷FVçE÷&WÆ’’°¢v—B&V6÷&D6Æ–æ–6ÄWfVçB‡°¢ÖöGVÆS¢'7W÷'B"À¢÷væW%G—S¢&WVW7Bæ÷væW%÷G—RÀ¢÷væW$–C¢&WVW7Bæ÷væW%ö–BÀ¢WfVçEG—S¢'6W'f–6U÷&WVW7E÷7FGW5ö6†ævVB"À¢6÷W&6UG—S¢'6W'f–6U÷&WVW7B"À¢6÷W&6T–C¢&WVW7Eö–BÀ¢6÷W&6TWfVçD¶W“¢G·&WVW7Bç7FGW7ÒÓâG·&W7VÇBç7FGW7ÖÀ¢&÷fVææ6S¢'7—7FVÕövVæW&FVB"À¢–ÆöC¢²g&öÕ÷7FGW3¢&WVW7Bç7FGW2ÂFõ÷7FGW3¢&W7VÇBç7FGW2ÒÀ¢Ò“°¢Ğ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡&W7VÇB“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆT6æ6VÅ7W÷'E6W'f–6U&WVW7BW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­í-Í]İ²}ıíâ"Ò“°¢Ğ§Ğ ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ¢òò7W÷'BF–Ç’6†V6²Ö–ç0¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ ¦7–æ2gVæ7F–öâ†æFÆTvWE7W÷'D6†V6¶–ç2‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂF—2ÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢6öç7BÆöö¶&6´F—2ÒÖF‚æÖ–â„ÖF‚æÖ‚‡'6T–çB†F—2’ÇÂ“Â’Â3cR“°¢6öç7B6–æ6RÒæWrFFR„FFRææ÷r‚’ÒÆöö¶&6´F—2¢#B¢c¢c¢’çFô•4õ7G&–ær‚’ç6Æ–6RƒÂ“° ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢6†V6¶–ç2ÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'7W÷'EöF–Ç•ö6†V6¶–ç2"¢ç6VÆV7B‚&–BÂ6†V6¶–åöFFRÂvVÆÆ&V–æu÷66÷&RÂç†–WG•÷66÷&RÂ6öÖÖVçBÂ7&VFVEöB"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æwFR‚&6†V6¶–åöFFR"Â6–æ6R¢æ÷&FW"‚&6†V6¶–åöFFR"Â²66VæF–æs¢G'VRÒ“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWE7W÷'D6†V6¶–ç5ÒVW'’W'&÷#¢"ÂW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂ}==}-ÂMİİ½Râ"Ò“°¢Ğ ¢6öç7BFöF’ÒæWrFFR‚’çFô•4õ7G&–ær‚’ç6Æ–6RƒÂ“°¢6öç7BFöF”6†V6¶–âÒ†6†V6¶–ç2ÇÂµÒ’æf–æB†2Óâ2æ6†V6¶–åöFFRÓÓÒFöF’’ÇÂçVÆÃ° ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡°¢ö³¢G'VRÀ¢FöF“¢FöF”6†V6¶–âÀ¢†—7F÷'“¢6†V6¶–ç2ÇÂµÒÀ¢Ò“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWE7W÷'D6†V6¶–ç2W'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­}==}­‚Mİİ½Râ"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆU6fU7W÷'D6†V6¶–â‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂvVÆÆ&V–æu÷66÷&RÂç†–WG•÷66÷&RÂ6öÖÖVçBÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢–b‡vVÆÆ&V–æu÷66÷&RÓÓÒVæFVf–æVBÇÂvVÆÆ&V–æu÷66÷&RÓÓÒçVÆÂÇÂçVÖ&W"æ—4–çFVvW"‡vVÆÆ&V–æu÷66÷&R’ÇÂvVÆÆ&V–æu÷66÷&RÂÓRÇÂvVÆÆ&V–æu÷66÷&RâR’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	ím]İ­í-íıİòMí½mİ½-Âí"ÓRMâ³Râ"Ò“°¢Ğ¢–b†ç†–WG•÷66÷&RÓÒVæFVf–æVBbbç†–WG•÷66÷&RÓÒçVÆÂbb‚çVÖ&W"æ—4–çFVvW"†ç†–WG•÷66÷&R’ÇÂç†–WG•÷66÷&RÂÇÂç†–WG•÷66÷&Râ’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	ím]İ­İıım]İòMí½mİ½-Âí"Mââ"Ò“°¢Ğ¢–b†6öÖÖVçBbbG—Vöb6öÖÖVçBÓÓÒ'7G&–ær"bb6öÖÖVçBæÆVæwF‚â’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	­íÍÍ]İ-’½­íÂM½İİ½’Í­Í=ÂÍ-í½í"’â"Ò“°¢Ğ ¢6öç7BFöF’ÒæWrFFR‚’çFô•4õ7G&–ær‚’ç6Æ–6RƒÂ“°¢6öç7Bæ÷rÒæWrFFR‚’çFô•4õ7G&–ær‚“°¢6öç7B7W&6RÒvWE7W&6R‚“° ¢6öç7B&÷rÒ°¢÷væW%÷G—S¢&æöç–Ö÷W5ö66R"À¢÷væW%ö–C¢÷væW"æ÷væW$–BÀ¢6†V6¶–åöFFS¢FöF’À¢vVÆÆ&V–æu÷66÷&RÀ¢ç†–WG•÷66÷&S¢ç†–WG•÷66÷&RóòçVÆÂÀ¢6öÖÖVçC¢6öÖÖVçCòçG&–Ò‚’ÇÂçVÆÂÀ¢6÷W&6S¢&6Æ–VçEö6&–æWB"À¢WFFVEöC¢æ÷rÀ¢Ó° ¢6öç7B²FF¢6fVBÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'7W÷'EöF–Ç•ö6†V6¶–ç2"¢çW6W'B‡&÷rÂ²öä6öæfÆ–7C¢&÷væW%÷G—RÆ÷væW%ö–BÆ6†V6¶–åöFFR"Ò¢ç6VÆV7B‚&–BÂ6†V6¶–åöFFRÂvVÆÆ&V–æu÷66÷&RÂç†–WG•÷66÷&RÂ6öÖÖVçB"¢ç6–ævÆR‚“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚%·6fU7W÷'D6†V6¶–åÒW6W'BW'&÷#¢"ÂW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí]İ-Ââ"Ò“°¢Ğ ¢6öç7Bö'6W'fF–öå6WBÒ'V–ÆE7W÷'D6†V6¶–äö'6W'fF–öå6æ6†÷B‡6fVB“°¢6öç7BÆöv–6Å6÷W&6T–BÒ'V–ÆE7W÷'D6†V6¶–äÆöv–6Å6÷W&6T–B‚&æöç–Ö÷W5ö66R"Â÷væW"æ÷væW$–BÂ6fVBæ6†V6¶–åöFFR“°¢6öç7B6†V6¶–äWfVçD–BÒv—B&V6÷&D6Æ–æ–6ÄWfVçB‡°¢ÖöGVÆS¢'7W÷'B"À¢÷væW%G—S¢&æöç–Ö÷W5ö66R"À¢÷væW$–C¢÷væW"æ÷væW$–BÀ¢WfVçEG—S¢&6†V6¶–å÷&V6÷&FVB"À¢ö67W'&VDC¢G·6fVBæ6†V6¶–åöFFWÕC££ã¦À¢6÷W&6UG—S¢'7W÷'EöF–Ç•ö6†V6¶–â"À¢6÷W&6T–C¢Æöv–6Å6÷W&6T–BÀ¢6÷W&6TWfVçD¶W“¢ö'6W'fF–öå6WBç6÷W&6TWfVçD¶W’À¢&÷fVææ6S¢'F–VçE÷&W÷'FVB"À¢–ÆöC¢²6†V6¶–åöFFS¢6fVBæ6†V6¶–åöFFRÂ&Wf—6–öåö†6ƒ¢ö'6W'fF–öå6WBç&Wf—6–öä†6‚ÒÀ¢Ò“°¢–b†6†V6¶–äWfVçD–B’°¢f÷"†6öç7Bö'6W'fF–öâöbö'6W'fF–öå6WBæö'6W'fF–öç2’°¢v—B&V6÷&D6Æ–æ–6Äö'6W'fF–öâ‡°¢6Æ–æ–6ÄWfVçD–C¢6†V6¶–äWfVçD–BÀ¢ÖöGVÆS¢'7W÷'B"À¢÷væW%G—S¢&æöç–Ö÷W5ö66R"À¢÷væW$–C¢÷væW"æ÷væW$–BÀ¢6öæ6WC¢ö'6W'fF–öâæ6öæ6WBÀ¢fÇVTçVÖW&–3¢ö'6W'fF–öâçfÇVTçVÖW&–2À¢Væ—C¢ö'6W'fF–öâçVæ—BÀ¢ÖWFFF¢ö'6W'fF–öâæÖWFFFÀ¢ö'6W'fVDC¢G·6fVBæ6†V6¶–åöFFWÕC££ã¦À¢6÷W&6UG—S¢'7W÷'EöF–Ç•ö6†V6¶–â"À¢6÷W&6T–C¢Æöv–6Å6÷W&6T–BÀ¢6÷W&6TWfVçD¶W“¢ö'6W'fF–öå6WBç6÷W&6TWfVçD¶W’À¢&÷fVææ6S¢'F–VçE÷&W÷'FVB"À¢fÆ–FF–öå7FGW3¢'Vç&Wf–WvVB"À¢VÆ—G”ÆWfVÃ¢À¢Ò“°¢Ğ¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ6†V6¶–ã¢6fVBÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆU6fU7W÷'D6†V6¶–âW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­í]İ]İòâ"Ò“°¢Ğ§Ğ ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ¢òò7W÷'B÷væW"&7F–6W0¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ ¢òò¶æ÷vâ&7F–6RFVf–æ—F–öç2†Ö—'&÷"öb$5D”4U26öç7FçB–âæ§7‚¦6öç7B$5D”4UôDTe2Ò°¢'&VF†–æs¢°¢F—FÆS¢-	M½]İRN(	3bÍİ="ı‚-]-í=R"À¢FW67&—F–öã¢-	Í]M½]İİíRM½]İRí½]RM½İİ½Â-½Mí]íÂÂ}-í²İ]Íİí=âİ}-Â-]½]İíRİıım]İRâ"À¢–ç7G'V7F–öç3¢·²7FW¢ÂFW‡C¢-
+ıMÍ-R=Míİâ½‚½ı=-Râ"ÒÂ²7FW¢"ÂFW‡C¢-	Í]M½]İİâ-Mí]İ-RİB}-â"ÒÂ²7FW¢2ÂFW‡C¢-	-½Mí]İ-Rİn(	3‚}-í"â"ÒÂ²7FW¢BÂFW‡C¢-	ıí--íı-R^(	3Íİ="â"ÕÒÀ¢GW&F–öåöÖ–çWFW3¢RÀ¢v†Vå÷Fõ÷W6S¢-	ı‚-]-í=RÂıİ­RÂİıım]İ‚ı]]BİíÂâ"À¢6fWG•öæ÷FS¢çVÆÂÀ¢6FVv÷'“¢&'&VF†–ær"À¢ÒÀ¢w&÷VæF–æs¢°¢F—FÆS¢-	}}]Í½]İR^(	3N(	3>(	3.(	3"À¢FW67&—F–öã¢-
+-]]İ­}}]Í½]İò}]]rí=İ²}=--"M½ò-í}-]İò"İ-íı’ÍíÍ]İ"â"À¢–ç7G'V7F–öç3¢·²7FW¢ÂFW‡C¢-	İ}í--RR-]]’Â­í-í½R-M-Râ"ÒÂ²7FW¢"ÂFW‡C¢#B-]‚Â­í-í½RÍím]-Rıí-í=-Ââ"ÒÂ²7FW¢2ÂFW‡C¢#2}-=­Â­í-í½R½½-Râ"ÒÂ²7FW¢BÂFW‡C¢#"}ı]â"ÒÂ²7FW¢RÂFW‡C¢#-­=â"ÕÒÀ¢GW&F–öåöÖ–çWFW3¢RÀ¢v†Vå÷Fõ÷W6S¢-	ı‚Mímm‚Âİ-ı}}-½RÍ½½ıRÂıİ­Râ"À¢6fWG•öæ÷FS¢çVÆÂÀ¢6FVv÷'“¢&w&÷VæF–ær"À¢ÒÀ¢¦u÷&VÆ†F–öã¢°¢F—FÆS¢-	Íı=­íR½½]İR½m‚}]½í-‚"À¢FW67&—F–öã¢-
+İı-Rİıım]İò½mÂ}]½í-‚‚]‚â"À¢–ç7G'V7F–öç3¢·²7FW¢ÂFW‡C¢-	Íı=­âıí-­í-Rí"â"ÒÂ²7FW¢"ÂFW‡C¢-	Í=-R}]½í-Â­==í-½Í‚M-m]İıÍ‚â"ÒÂ²7FW¢2ÂFW‡C¢-	ıí-ıİ-R]â"-ííİ²â"ÒÂ²7FW¢BÂFW‡C¢-	ıí­--Rı½]}Í‚â"ÕÒÀ¢GW&F–öåöÖ–çWFW3¢RÀ¢v†Vå÷Fõ÷W6S¢-	ı‚m-‚}]½í-‚Â=í½í-İí’í½‚İıım]İòâ"À¢6fWG•öæ÷FS¢çVÆÂÀ¢6FVv÷'“¢&w&÷VæF–ær"À¢ÒÀ¢6ÆVW÷&W¢°¢F—FÆS¢-	ı­-­ı]]BİíÂ"À¢FW67&—F–öã¢-	Íı=­òıíM=í-í-­­âİ2ı‚-]-í=R½‚]íİİmRâ"À¢–ç7G'V7F–öç3¢·²7FW¢ÂFW‡C¢-	}}Mâİ=]-Rİ­İ²â"ÒÂ²7FW¢"ÂFW‡C¢-
+M]½-RM½]İRN(	3bâ"ÒÂ²7FW¢2ÂFW‡C¢-	}ı-R2-]‚}M]İÂâ"ÒÂ²7FW¢BÂFW‡C¢-	½ı=-R"-Íİí’ıí]½Mİí’­íÍİ-Râ"ÕÒÀ¢GW&F–öåöÖ–çWFW3¢RÀ¢v†Vå÷Fõ÷W6S¢-	ı‚]íİİmRÂ-]-í=Rı]]BİíÂâ"À¢6fWG•öæ÷FS¢çVÆÂÀ¢6FVv÷'“¢'6ÆVW"À¢ÒÀ¢æV6µ÷6†÷VÆFW'5÷7G&WF6ƒ¢°¢F—FÆS¢-	Íı=­ò-ım­]‚‚ı½]r"À¢FW67&—F–öã¢-
+İı-RÍ½]}İí=âİıım]İò"-]]İ]’}-‚-]½â"À¢–ç7G'V7F–öç3¢·²7FW¢ÂFW‡C¢-	İ­½íİ-R=í½í-2-ı-âÂ}M]m-RR]¢â"ÒÂ²7FW¢"ÂFW‡C¢-	ıí--í-R-½]-ââ"ÒÂ²7FW¢2ÂFW‡C¢-	­==í-½RM-m]İòı½]}Í‚â"ÒÂ²7FW¢BÂFW‡C¢-
+m]ı-R=­‚}ıİí’‚ıí-ıİ-Râ"ÕÒÀ¢GW&F–öåöÖ–çWFW3¢RÀ¢v†Vå÷Fõ÷W6S¢-	ı‚Í½]}İíÂİıım]İ‚ÂMı}]’í-Râ"À¢6fWG•öæ÷FS¢çVÆÂÀ¢6FVv÷'“¢&7F—f—G’"À¢ÒÀ¢F–'“¢°¢F—FÆS¢-	Mİ]-İ¢í-íıİòİ2Mİò"À¢FW67&—F–öã¢-	­-­R]m]Mİ]-İ½R}ı‚M½òí-½]m-İò}Í]İ]İ’â"À¢–ç7G'V7F–öç3¢·²7FW¢ÂFW‡C¢-
+=-íÃ¢­¢ı½‚Âí]Rí-íıİRâ"ÒÂ²7FW¢"ÂFW‡C¢-	-]}]íÃ¢}-âıíÍí=½âÂ}-â½½â-=Mİââ"ÒÂ²7FW¢2ÂFW‡C¢-	}Í]}-Rı--]İ²]rím]İ­‚â"ÕÒÀ¢GW&F–öåöÖ–çWFW3¢RÀ¢v†Vå÷Fõ÷W6S¢-	M½òıíİÍİòMİÍ­‚ÂıíM=í-í-­‚¢­íİ=½Í-m‚â"À¢6fWG•öæ÷FS¢çVÆÂÀ¢6FVv÷'“¢&¦÷W&æÆ–ær"À¢ÒÀ¢##F…÷Æâ#¢°¢F—FÆS¢-	ı½Ò#B}]r=]=M]İò"À¢FW67&—F–öã¢-	ıí=í-½’ı½Òİ½mR=-­‚â"À¢–ç7G'V7F–öç3¢·²7FW¢ÂFW‡C¢-	íı]M]½-RíMÒ=½-İ½’ıí-]"İM]İÂâ"ÒÂ²7FW¢"ÂFW‡C¢-	}ı½İ=-RíMÒıı-İ½’Í½]İÍ­’2â"ÒÂ²7FW¢2ÂFW‡C¢-	íı]M]½-R-]ÍòM½òí-M½]â"ÒÂ²7FW¢BÂFW‡C¢-	í-Í]-Í-R-]}]íÂ}-âıí½=}½íÂâ"ÕÒÀ¢GW&F–öåöÖ–çWFW3¢çVÆÂÀ¢v†Vå÷Fõ÷W6S¢-	ı‚}=---Rı]]==m]İİí-‚Âİ]ıİí-‚}]=âİ}-Ââ"À¢6fWG•öæ÷FS¢çVÆÂÀ¢6FVv÷'“¢'&÷WF–æR"À¢ÒÀ¢6†÷'E÷vÆ³¢°¢F—FÆS¢-	­íí-­òıí==½­"À¢FW67&—F–öã¢-	ıí==½­İ-]m]Â-í}M=]RM½òÍ]İ²í-İí-­‚‚½=­í’M}}]­í’­--İí-‚â"À¢–ç7G'V7F–öç3¢·²7FW¢ÂFW‡C¢-	-½M-Rİ^(	33Íİ="â"ÒÂ²7FW¢"ÂFW‡C¢-	M-R]rm]½‚Âıí-â}Í]}-Rí­=m]İRâ"ÒÂ²7FW¢2ÂFW‡C¢-	]½‚z}zyB(	B]í-ò²Mâ½m]’­Í]­‚â"ÕÒÀ¢GW&F–öåöÖ–çWFW3¢#À¢v†Vå÷Fõ÷W6S¢-	ı‚-]-í=RÂİ}­í’Íí--m‚Âıí-]İí-‚"Í]İRí-İí-­‚â"À¢6fWG•öæ÷FS¢çVÆÂÀ¢6FVv÷'“¢&7F—f—G’"À¢ÒÀ§Ó° ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ¢òò&7F–6RÖF6†–ærb7–æ0¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ ¢òò6æöæ–6ÂÆ–2Ö–ærf÷"FWFW&Ö–æ—7F–2&7F–6RFWFV7F–öà¦6öç7B$5D”4UôÄ”4U2Ò°¢'&VF†–æs¢²ıM½]İUÇ2£EµÂÕÇ>(	5Ò£bö’ÂıÍ]M½]İÕÇrµÇ2­M½]Òö’Âı=M½Õ½]İİÕÇrµÇ2­-½MíRö’Âı=½=í¥ÇrµÇ2­M½]Òö’ÂıM½]-]½ÍÕÇrµÇ2­=ımİ]Òö•ÒÀ¢w&÷VæF–æs¢²ı}}]Í½]Òö’ÂóUµÂÕÇ5Ò£EµÂÕÇ5Ò£5µÂÕÇ5Ò£%µÂÕÇ5Ò£ö’ÂóUÇ2£EÇ2£5Ç2£%Ç2£ö’Âıí=İµÇ2­}=--"ö•ÒÀ¢¦u÷&VÆ†F–öã¢²ı½½]ÕÇrµÇ2¢½gÍ}]½í"’ö’Âı½e½åÕÇ2­}]½í"ö’Âıİıım]ÕÇrµÇ2¢½gÍ}]½í"’ö•ÒÀ¢6ÆVW÷&W¢²ııíM=í-í-¥ÇrµÇ2­­åÇ2­İ2ö’Âı-=µÇr¥Ç2­ı]]EÇ2­İíÂö’Âııí­íÕÇrµÇ2­-]}]ö’Âı]mÅÇr¥Ç2­İö•ÒÀ¢æV6µ÷6†÷VÆFW'5÷7G&WF6ƒ¢²ı-ım¥ÇrµÇ2¢WÍı½]r’ö’ÂıU½ıåÕÇ2­…Ç2­ı½]rö’ÂıÍ½]}ÕÇrµÇ2­İıım]Òö•ÒÀ¢F–'“¢²ıMİ]-İ¢ö’Âı}ıÇrµÇ2­í-íıÒö’Âıí-½]m-Òö•ÒÀ¢##F…÷Æâ#¢²ıı½ÕÇr¥Ç2£#Bö’Âó#EÇ2­}ö’Âııí=í"ö•ÒÀ¢6†÷'E÷vÆ³¢²ııí==½¢ö’Âııí-Âö’Âı-]eÇrµÇ2­-í}M=Rö’Âı-½-…Ç2­İö•ÒÀ§Ó° ¢òòÖF6‚FW‡BFò&7F–6R¶W—0¦gVæ7F–öâÖF6…&7F–6W2‡FW‡B’°¢–b‚FW‡BÇÂG—VöbFW‡BÓÒ'7G&–ær"’&WGW&âµÓ°¢6öç7BÖF6†W2ÒµÓ°¢f÷"†6öç7B¶¶W’ÂGFW&ç5Òöbö&¦V7BæVçG&–W2…$5D”4UôÄ”4U2’’°¢f÷"†6öç7BBöbGFW&ç2’°¢–b‡BçFW7B‡FW‡B’’°¢ÖF6†W2çW6‚†¶W’“°¢'&V³°¢Ğ¢Ğ¢Ğ¢&WGW&âÖF6†W3°§Ğ ¢òò7–æ2&7F–6W2g&öÒ&W÷'BFò÷væW"ÖÆWfVÂ7F÷&vP¦7–æ2gVæ7F–öâ7–æ5&7F–6W4g&öÕ&W÷'B‡²7W&6RÂ÷væW$–BÂ6W76–öä–BÂW6W%&W÷'BÂ6&U&V6öÖÖVæFF–öâÂ7W÷'EÆâÒ’°¢G'’°¢òò6öÆÆV7B&V6öÖÖVæFF–öâFW‡Bg&öÒ×VÇF—ÆR6÷W&6W0¢6öç7BFW‡G2ÒµÓ°¢–b‡W6W%&W÷'B’FW‡G2çW6‚‡W6W%&W÷'B“°¢–b†6&U&V6öÖÖVæFF–öãòæ–çFW&–Õ÷7W÷'B’FW‡G2çW6‚†6&U&V6öÖÖVæFF–öâæ–çFW&–Õ÷7W÷'Bæ¦ö–â‚""’“°¢–b‡7W÷'EÆãòç6VÆV7FVE÷&7F–6W2’°¢f÷"†6öç7Böb7W÷'EÆâç6VÆV7FVE÷&7F–6W2’°¢–b‡æ–B’°¢òòF—&V7B&7F–6R”Bg&öÒW6W"6VÆV7F–öà¢v—BW6W'E&7F–6R‡7W&6RÂ÷væW$–BÂ6W76–öä–BÂæ–B“°¢Ğ¢Ğ¢Ğ ¢òòFWFW&Ö–æ—7F–2ÖF6‚g&öÒ&W÷'BFW‡@¢6öç7B6öÖ&–æVEFW‡BÒFW‡G2æ¦ö–â‚""“°¢6öç7BÖF6†VD¶W—2ÒÖF6…&7F–6W2†6öÖ&–æVEFW‡B“° ¢f÷"†6öç7B¶W’öbÖF6†VD¶W—2’°¢v—BW6W'E&7F–6R‡7W&6RÂ÷væW$–BÂ6W76–öä–BÂ¶W’“°¢Ğ¢Ò6F6‚‡7–æ4W'&÷"’°¢6öç6öÆRæW'&÷"‚%·7–æ5&7F–6W4g&öÕ&W÷'EÒæöâÖ&Æö6¶–ærW'&÷#¢"Â7–æ4W'&÷"æÖW76vR“°¢òòFöâwBF‡&÷r(	B&W÷'B6fR×W7Bæ÷Bf–Â&V6W6Röb&7F–6R7–æ0¢Ğ§Ğ ¢òòW6W'B6–ævÆR&7F–6P¦7–æ2gVæ7F–öâW6W'E&7F–6R‡7W&6RÂ÷væW$–BÂ6W76–öä–BÂ&7F–6T¶W’’°¢6öç7BFVbÒ$5D”4UôDTe5·&7F–6T¶W•Ó°¢–b‚FVb’&WGW&ã° ¢6öç7Bæ÷rÒæWrFFR‚’çFô•4õ7G&–ær‚“° ¢6öç7B²FF¢W†—7F–ærÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&7F–6W2"¢ç6VÆV7B‚&–BÂ&V6öÖÖVæFF–öåö6÷VçBÂ6÷W&6U÷6W76–öåö–G2"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW$–B¢æW‚'&7F–6Uö¶W’"Â&7F–6T¶W’¢æÖ–&U6–ævÆR‚“° ¢–b†W†—7F–ær’°¢òòWFFRW†—7F–ær(	B&W6W'fRW6W"7FGW0¢6öç7B6÷W&6T–G2ÒW†—7F–ærç6÷W&6U÷6W76–öåö–G2ÇÂµÓ°¢6öç7BæWu6÷W&6T–G2Ò6W76–öä–Bbb6÷W&6T–G2æ–æ6ÇVFW2‡6W76–öä–B¢ò²ââç6÷W&6T–G2Â6W76–öä–EĞ¢¢6÷W&6T–G3° ¢v—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&7F–6W2"¢çWFFR‡°¢Æ7E÷&V6öÖÖVæFVEöC¢æ÷rÀ¢&V6öÖÖVæFF–öåö6÷VçC¢†W†—7F–ærç&V6öÖÖVæFF–öåö6÷VçBÇÂ’²À¢6÷W&6U÷6W76–öåö–G3¢æWu6÷W&6T–G2À¢–ç7G'V7F–öç3¢FVbæ–ç7G'V7F–öç2ÇÂçVÆÂÀ¢GW&F–öåöÖ–çWFW3¢FVbæGW&F–öåöÖ–çWFW2ÇÂçVÆÂÀ¢v†Vå÷Fõ÷W6S¢FVbçv†Vå÷Fõ÷W6RÇÂçVÆÂÀ¢6fWG•öæ÷FS¢FVbç6fWG•öæ÷FRÇÂçVÆÂÀ¢6FVv÷'“¢FVbæ6FVv÷'’ÇÂçVÆÂÀ¢WFFVEöC¢æ÷rÀ¢Ò¢æW‚&–B"ÂW†—7F–æræ–B“°¢ÒVÇ6R°¢òò–ç6W'BæWp¢v—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&7F–6W2"¢æ–ç6W'B‡°¢÷væW%÷G—S¢&æöç–Ö÷W5ö66R"À¢÷væW%ö–C¢÷væW$–BÀ¢&7F–6Uö¶W“¢&7F–6T¶W’À¢F—FÆS¢FVbçF—FÆRÀ¢FW67&—F–öã¢FVbæFW67&—F–öâÀ¢–ç7G'V7F–öç3¢FVbæ–ç7G'V7F–öç2ÇÂçVÆÂÀ¢GW&F–öåöÖ–çWFW3¢FVbæGW&F–öåöÖ–çWFW2ÇÂçVÆÂÀ¢v†Vå÷Fõ÷W6S¢FVbçv†Vå÷Fõ÷W6RÇÂçVÆÂÀ¢6fWG•öæ÷FS¢FVbç6fWG•öæ÷FRÇÂçVÆÂÀ¢6FVv÷'“¢FVbæ6FVv÷'’ÇÂçVÆÂÀ¢f—'7E÷&V6öÖÖVæFVEöC¢æ÷rÀ¢Æ7E÷&V6öÖÖVæFVEöC¢æ÷rÀ¢&V6öÖÖVæFF–öåö6÷VçC¢À¢6÷W&6U÷6W76–öåö–G3¢6W76–öä–Bò·6W76–öä–EÒ¢µÒÀ¢7FGW3¢&7F—fR"À¢†VÇgVÆæW73¢'Væ¶æ÷vâ"À¢W6W%÷7FGW3¢&æ÷E÷G&–VB"À¢Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆTvWE7W÷'E&7F–6W2‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢ÆWB²FF¢&7F–6W2ÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&7F–6W2"¢ç6VÆV7B‚&–BÂ&7F–6Uö¶W’ÂF—FÆRÂFW67&—F–öâÂ–ç7G'V7F–öç2ÂGW&F–öåöÖ–çWFW2Âv†Vå÷Fõ÷W6RÂ6fWG•öæ÷FRÂ6FVv÷'’Âf—'7E÷&V6öÖÖVæFVEöBÂÆ7E÷&V6öÖÖVæFVEöBÂ&V6öÖÖVæFF–öåö6÷VçBÂ7FGW2Â†VÇgVÆæW72ÂW6W%÷7FGW2Â6÷W&6U÷6W76–öåö–G2"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æ÷&FW"‚&Æ7E÷&V6öÖÖVæFVEöB"Â²66VæF–æs¢fÇ6RÒ“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWE7W÷'E&7F–6W5ÒVW'’W'&÷#¢"ÂW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂ}==}-Âı­-­‚â"Ò“°¢Ğ ¢òòÆ§’&6¶f–ÆÃ¢–bæò&7F–6W2W†—7BÂ66âW†—7F–ær&W÷'G0¢–b‚&7F–6W2ÇÂ&7F–6W2æÆVæwF‚ÓÓÒ’°¢G'’°¢6öç7B²FF¢6W76–öç2ÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'6W76–öåö–BÂW6W%÷&W÷'BÂ7W÷'E÷Æâ"¢æW‚&æöç–Ö÷W5ö÷væW%ö–B"Â÷væW"æ÷væW$–B¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ¢æÆ–Ö—Bƒ“° ¢–b‡6W76–öç2bb6W76–öç2æÆVæwF‚â’°¢f÷"†6öç7B6W72öb6W76–öç2’°¢–b‡6W72çW6W%÷&W÷'B’°¢v—B7–æ5&7F–6W4g&öÕ&W÷'B‡°¢7W&6RÀ¢÷væW$–C¢÷væW"æ÷væW$–BÀ¢6W76–öä–C¢6W72ç6W76–öåö–BÀ¢W6W%&W÷'C¢6W72çW6W%÷&W÷'BÀ¢7W÷'EÆã¢6W72ç7W÷'E÷ÆâÇÂçVÆÂÀ¢Ò“°¢Ğ¢Ğ ¢òò&R×VW'’gFW"&6¶f–ÆÀ¢6öç7B²FF¢&Vg&W6†VBÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&7F–6W2"¢ç6VÆV7B‚&–BÂ&7F–6Uö¶W’ÂF—FÆRÂFW67&—F–öâÂ–ç7G'V7F–öç2ÂGW&F–öåöÖ–çWFW2Âv†Vå÷Fõ÷W6RÂ6fWG•öæ÷FRÂ6FVv÷'’Âf—'7E÷&V6öÖÖVæFVEöBÂÆ7E÷&V6öÖÖVæFVEöBÂ&V6öÖÖVæFF–öåö6÷VçBÂ7FGW2Â†VÇgVÆæW72ÂW6W%÷7FGW2Â6÷W&6U÷6W76–öåö–G2"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æ÷&FW"‚&Æ7E÷&V6öÖÖVæFVEöB"Â²66VæF–æs¢fÇ6RÒ“°¢&7F–6W2Ò&Vg&W6†VBÇÂµÓ°¢Ğ¢Ò6F6‚†&6¶f–ÆÄW'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWE7W÷'E&7F–6W5ÒÆ§’&6¶f–ÆÂæöâÖ&Æö6¶–ærW'&÷#¢"Â&6¶f–ÆÄW'&÷"æÖW76vR“°¢òò6öçF–çVRv—F‚V×G’&7F–6W2(	BFöâwBf–ÂF†R&WVW7@¢Ğ¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&7F–6W3¢&7F–6W2ÇÂµÒÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWE7W÷'E&7F–6W2W'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­}==}­‚ı­-¢â"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆU6fU7W÷'E&7F–6R‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂ&7F–6Uö¶W’Â7FGW3¢æWu7FGW2Â†VÇgVÆæW73¢æWt†VÇgVÆæW72ÂW6W%÷7FGW3¢æWuW6W%7FGW2ÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢–b‚&7F–6Uö¶W’ÇÂG—Vöb&7F–6Uö¶W’ÓÒ'7G&–ær"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+=­m-Rı­-­2â"Ò“°¢Ğ ¢6öç7BFVbÒ$5D”4UôDTe5·&7F–6Uö¶W•Ó°¢–b‚FVb’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İ]}-]-İòı­-­â"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7Bæ÷rÒæWrFFR‚’çFô•4õ7G&–ær‚“° ¢òòG'’Fòf–æBW†—7F–ær&7F–6P¢6öç7B²FF¢W†—7F–ærÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&7F–6W2"¢ç6VÆV7B‚&–BÂ&V6öÖÖVæFF–öåö6÷VçBÂ6÷W&6U÷6W76–öåö–G2"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æW‚'&7F–6Uö¶W’"Â&7F–6Uö¶W’¢æÖ–&U6–ævÆR‚“° ¢–b†W†—7F–ær’°¢òòWFFRW†—7F–æp¢6öç7BWFFTf–VÆG2Ò²Æ7E÷&V6öÖÖVæFVEöC¢æ÷rÂWFFVEöC¢æ÷rÓ°¢–b†æWu7FGW2’WFFTf–VÆG2ç7FGW2ÒæWu7FGW3°¢–b†æWt†VÇgVÆæW72’WFFTf–VÆG2æ†VÇgVÆæW72ÒæWt†VÇgVÆæW73°¢–b†æWuW6W%7FGW2’WFFTf–VÆG2çW6W%÷7FGW2ÒæWuW6W%7FGW3° ¢6öç7B²W'&÷#¢WFFTW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&7F–6W2"¢çWFFR‡WFFTf–VÆG2¢æW‚&–B"ÂW†—7F–æræ–B“° ¢–b‡WFFTW'&÷"’°¢6öç6öÆRæW'&÷"‚%·6fU7W÷'E&7F–6UÒWFFRW'&÷#¢"ÂWFFTW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂíİí--Âı­-­2â"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&7F–6S¢²ââæW†—7F–ærÂââçWFFTf–VÆG2ÒÒ“°¢Ğ ¢òò–ç6W'BæWp¢6öç7B²FF¢–ç6W'FVBÂW'&÷#¢–ç6W'DW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&7F–6W2"¢æ–ç6W'B‡°¢÷væW%÷G—S¢&æöç–Ö÷W5ö66R"À¢÷væW%ö–C¢÷væW"æ÷væW$–BÀ¢&7F–6Uö¶W’À¢F—FÆS¢FVbçF—FÆRÀ¢FW67&—F–öã¢FVbæFW67&—F–öâÀ¢–ç7G'V7F–öç3¢FVbæ–ç7G'V7F–öç2ÇÂçVÆÂÀ¢GW&F–öåöÖ–çWFW3¢FVbæGW&F–öåöÖ–çWFW2ÇÂçVÆÂÀ¢v†Vå÷Fõ÷W6S¢FVbçv†Vå÷Fõ÷W6RÇÂçVÆÂÀ¢6fWG•öæ÷FS¢FVbç6fWG•öæ÷FRÇÂçVÆÂÀ¢6FVv÷'“¢FVbæ6FVv÷'’ÇÂçVÆÂÀ¢f—'7E÷&V6öÖÖVæFVEöC¢æ÷rÀ¢Æ7E÷&V6öÖÖVæFVEöC¢æ÷rÀ¢&V6öÖÖVæFF–öåö6÷VçC¢À¢6÷W&6U÷6W76–öåö–G3¢¶÷væW"ç6W76–öä–EÒÀ¢7FGW3¢æWu7FGW2ÇÂ&7F—fR"À¢†VÇgVÆæW73¢æWt†VÇgVÆæW72ÇÂ'Væ¶æ÷vâ"À¢W6W%÷7FGW3¢æWuW6W%7FGW2ÇÂ&æ÷E÷G&–VB"À¢Ò¢ç6VÆV7B‚&–BÂ&7F–6Uö¶W’ÂF—FÆRÂFW67&—F–öâÂ–ç7G'V7F–öç2ÂGW&F–öåöÖ–çWFW2Âv†Vå÷Fõ÷W6RÂ6fWG•öæ÷FRÂ6FVv÷'’Âf—'7E÷&V6öÖÖVæFVEöBÂÆ7E÷&V6öÖÖVæFVEöBÂ&V6öÖÖVæFF–öåö6÷VçBÂ7FGW2Â†VÇgVÆæW72ÂW6W%÷7FGW2"¢ç6–ævÆR‚“° ¢–b†–ç6W'DW'&÷"’°¢6öç6öÆRæW'&÷"‚%·6fU7W÷'E&7F–6UÒ–ç6W'BW'&÷#¢"Â–ç6W'DW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí]İ-Âı­-­2â"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&7F–6S¢–ç6W'FVBÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆU6fU7W÷'E&7F–6RW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­í]İ]İòı­-­‚â"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆUWFFU7W÷'E&7F–6U7FGW2‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂ&7F–6Uö¶W’ÂW6W%÷7FGW3¢æWuW6W%7FGW2Â†VÇgVÆæW73¢æWt†VÇgVÆæW72ÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢–b‚&7F–6Uö¶W’’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+=­m-Rı­-­2â"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7BWFFTf–VÆG2Ò²WFFVEöC¢æWrFFR‚’çFô•4õ7G&–ær‚’Ó°¢–b†æWuW6W%7FGW2’WFFTf–VÆG2çW6W%÷7FGW2ÒæWuW6W%7FGW3°¢–b†æWt†VÇgVÆæW72’WFFTf–VÆG2æ†VÇgVÆæW72ÒæWt†VÇgVÆæW73° ¢6öç7B²FF¢WFFVBÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&7F–6W2"¢çWFFR‡WFFTf–VÆG2¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æW‚'&7F–6Uö¶W’"Â&7F–6Uö¶W’¢ç6VÆV7B‚&–BÂ&7F–6Uö¶W’ÂW6W%÷7FGW2Â†VÇgVÆæW72"¢ç6–ævÆR‚“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚%·WFFU7W÷'E&7F–6U7FGW5ÒW'&÷#¢"ÂW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂíİí--Â--=â"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&7F–6S¢WFFVBÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆUWFFU7W÷'E&7F–6U7FGW2W'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­íİí-½]İòâ"Ò“°¢Ğ§Ğ ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ¢òò7W÷'B÷væW"&öf–ÆR†F—7Æ•öæÖR¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ ¦7–æ2gVæ7F–öâ†æFÆTvWE7W÷'E&öf–ÆR‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7B²FF¢&öf–ÆRÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&öf–ÆW2"¢ç6VÆV7B‚&F—7Æ•öæÖRÂ7&VFVEöB"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æÖ–&U6–ævÆR‚“° ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂF—7Æ•öæÖS¢&öf–ÆSòæF—7Æ•öæÖRÇÂçVÆÂÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWE7W÷'E&öf–ÆRW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­}==}­‚ıíM½òâ"Ò“°¢Ğ§Ğ ¦7–æ2gVæ7F–öâ†æFÆU6fU7W÷'E&öf–ÆR‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂF—7Æ•öæÖRÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢6öç7B6ÆVäæÖRÒG—VöbF—7Æ•öæÖRÓÓÒ'7G&–ær"òF—7Æ•öæÖRçG&–Ò‚’ç6Æ–6RƒÂS’¢"#° ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7Bæ÷rÒæWrFFR‚’çFô•4õ7G&–ær‚“° ¢6öç7B²W'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&öf–ÆW2"¢çW6W'B‡°¢÷væW%÷G—S¢&æöç–Ö÷W5ö66R"À¢÷væW%ö–C¢÷væW"æ÷væW$–BÀ¢F—7Æ•öæÖS¢6ÆVäæÖRÇÂçVÆÂÀ¢WFFVEöC¢æ÷rÀ¢ÒÂ²öä6öæfÆ–7C¢&÷væW%÷G—RÆ÷væW%ö–B"Ò“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚%·6fU7W÷'E&öf–ÆUÒW6W'BW'&÷#¢"ÂW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂí]İ-ÂÍòâ"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂF—7Æ•öæÖS¢6ÆVäæÖRÇÂçVÆÂÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆU6fU7W÷'E&öf–ÆRW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­í]İ]İòâ"Ò“°¢Ğ§Ğ ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ¢òò7W÷'BV–6²6†@¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ ¦7–æ2gVæ7F–öâ†æFÆTvWE7W÷'D6†B‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂÆ–Ö—C¢×6tÆ–Ö—BÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7BÆ–ÒÒÖF‚æÖ–â„ÖF‚æÖ‚‡'6T–çB†×6tÆ–Ö—B’ÇÂ#Â’ÂS“° ¢6öç7B²FF¢ÖW76vW2ÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö•ö6†B"¢ç6VÆV7B‚&–BÂ&öÆRÂÖW76vU÷FW‡BÂ•÷&W7öç6RÂ7&VFVEöB"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ¢æÆ–Ö—B†Æ–Ò“° ¢–b†W'&÷"’°¢6öç6öÆRæW'&÷"‚%¶vWE7W÷'D6†EÒVW'’W'&÷#¢"ÂW'&÷"æ6öFR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	İR=M½íÂ}==}-Â}"â"Ò“°¢Ğ ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂÖW76vW3¢†ÖW76vW2ÇÂµÒ’ç&WfW'6R‚’Ò“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆTvWE7W÷'D6†BW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­}==}­‚}-â"Ò“°¢Ğ§Ğ ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ¢òò6†&VB–çFVçB&÷WFW ¢òòÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓÓĞ ¦–×÷'B²FWFV7D–çFVçBÂ'V–ÆDfÆÆ&6µ&W7öç6RÒg&öÒ"ââöÆ–"ö–çFVçB×&÷WFW"æ§2#°¦–×÷'B²7W÷'D6öæf–rÒg&öÒ"ââöÆ–"ö–çFVçBÖ6öæf–w2÷7W÷'Bæ§2#°¦–×÷'B²&öG”6öæf–rÒg&öÒ"ââöÆ–"ö–çFVçBÖ6öæf–w2ö&öG’æ§2#° ¦6öç7BÔôETÄUô4ôäd”u2Ò°¢7W÷'C¢7W÷'D6öæf–rÀ¢&öG“¢&öG”6öæf–rÀ§Ó° ¦gVæ7F–öâvWDÖöGVÆT6öæf–r†ÖöGVÆR’°¢&WGW&âÔôETÄUô4ôäd”u5¶ÖöGVÆUÒÇÂ7W÷'D6öæf–s²òòfÆÆ&6²Fò7W÷'@§Ğ ¦7–æ2gVæ7F–öâ†æFÆU6VæE7W÷'DÖW76vR‡&WÂ&W2’°¢G'’°¢6öç7B²6W76–öåö–BÂ66W75÷Fö¶VâÂÖW76vRÒÒ&Wæ&öG’ÇÂ·Ó°¢6öç7B÷væW"Òv—B&W6öÇfU7W÷'D÷væW"‡6W76–öåö–BÂ66W75÷Fö¶Vâ“°¢–b‚÷væW"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+-]=]-ò--í}mòâ"Ò“°¢Ğ ¢6öç7BG&–ÖÖVBÒG—VöbÖW76vRÓÓÒ'7G&–ær"òÖW76vRçG&–Ò‚’¢"#°¢–b‚G&–ÖÖVBÇÂG&–ÖÖVBæÆVæwF‚Â"’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+íí]İR½­íÂ­íí-­íRâ"Ò“°¢Ğ¢–b‡G&–ÖÖVBæÆVæwF‚â3’°¢&WGW&â&W2ç7FGW2ƒC’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-
+íí]İR½­íÂM½İİíRÍ­Í=Â3’â"Ò“°¢Ğ ¢6öç7B7W&6RÒvWE7W&6R‚“°¢6öç7Bæ÷rÒæWrFFR‚’çFô•4õ7G&–ær‚“° ¢òò6fRW6W"ÖW76vP¢v—B7W&6Ræg&öÒ‚'7W÷'Eö•ö6†B"’æ–ç6W'B‡°¢÷væW%÷G—S¢&æöç–Ö÷W5ö66R"À¢÷væW%ö–C¢÷væW"æ÷væW$–BÀ¢&öÆS¢'W6W""À¢ÖW76vU÷FW‡C¢G&–ÖÖVBÀ¢6÷W&6U÷6W76–öåö–C¢÷væW"ç6W76–öä–BÀ¢7&VFVEöC¢æ÷rÀ¢Ò“° ¢òòÓÓÒDUDU$Ô”ä•5D”2”åDTåB$õUD”är†&Vf÷&R’’ÓÓĞ¢6öç7B6öæf–rÒvWDÖöGVÆT6öæf–r‚'7W÷'B"“° ¢òò'V–ÆB6öçFW‡Bf÷"G–æÖ–2dç7vW'0¢6öç7B–çFVçD6öçFW‡BÒ·Ó°¢G'’°¢6öç7B²vWEvÆÆWBÒÒv—B–×÷'B‚"ââöÆ–"÷W6vR÷vÆÆWBæ§2"“°¢6öç7BvÆÆWBÒv—BvWEvÆÆWB‡²÷væW%G—S¢&æöç–Ö÷W5ö66R"Â÷væW$–C¢÷væW"æ÷væW$–BÂÖöGVÆS¢'7W÷'B"Ò“°¢–b‡vÆÆWB’°¢6öç7B²vWEW6vT&Ææ6Tf÷$6Æ–VçBÒÒv—B–×÷'B‚"ââöÆ–"÷W6vR÷vÆÆWBæ§2"“°¢6öç7B&Ææ6RÒv—BvWEW6vT&Ææ6Tf÷$6Æ–VçB‡²vÆÆWD–C¢vÆÆWBæ–BÒ“°¢–çFVçD6öçFW‡BçvÆÆWEö&Ææ6RÒ&Ææ6Sòæ&Ææ6RóòçVÆÃ°¢Ğ¢6öç7B²6÷VçC¢&7F–6T6÷VçBÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&7F–6W2"¢ç6VÆV7B‚"¢"Â²6÷VçC¢&W†7B"Â†VC¢G'VRÒ¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW"æ÷væW$–B¢æW‚'7FGW2"Â&7F—fR"“°¢–çFVçD6öçFW‡Bç&7F–6Uö6÷VçBÒ&7F–6T6÷VçBÇÂ°¢Ò6F6‚†7G„W'&÷"’°¢òòæöâÖ&Æö6¶–ær(	B6öçF–çVRv—F†÷WB6öçFW‡@¢Ğ ¢6öç7B–çFVçE&W7VÇBÒFWFV7D–çFVçB‡G&–ÖÖVBÂ6öæf–rÂ–çFVçD6öçFW‡B“°¢–b†–çFVçE&W7VÇB’°¢òò6fRFWFW&Ö–æ—7F–2&W7öç6P¢v—B7W&6Ræg&öÒ‚'7W÷'Eö•ö6†B"’æ–ç6W'B‡°¢÷væW%÷G—S¢&æöç–Ö÷W5ö66R"À¢÷væW%ö–C¢÷væW"æ÷væW$–BÀ¢&öÆS¢&76—7FçB"À¢ÖW76vU÷FW‡C¢–çFVçE&W7VÇBæç7vW"À¢•÷&W7öç6S¢–çFVçE&W7VÇBÀ¢6÷W&6U÷6W76–öåö–C¢÷væW"ç6W76–öä–BÀ¢ÖöFVÅ÷W6VC¢&FWFW&Ö–æ—7F–2"À¢7&VFVEöC¢æWrFFR‚’çFô•4õ7G&–ær‚’À¢Ò“°¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&W7öç6S¢–çFVçE&W7VÇBÒ“°¢Ğ ¢òò'V–ÆB6öçFW‡Bf÷"¢6öç7B6öçFW‡BÒv—B'V–ÆE7W÷'D6†D6öçFW‡B‡7W&6RÂ÷væW"æ÷væW$–B“° ¢òò&VB&ö×@¢6öç7B²&VDÖöGVÆU&ö×BÂ&VD6÷&U&ö×BÒÒv—B–×÷'B‚"ââöÆ–"÷&ö×G2æ§2"“°¢6öç7B6†E&ö×BÒ&VDÖöGVÆU&ö×B‚'7W÷'B"Â&’Ö6†BæÖB"“°¢6öç7B6öçfW'6F–öå7G–ÆRÒ&VD6÷&U&ö×B‚&6öçfW'6F–öâ×7G–ÆRæÖB"“°¢6öç7BÖVF–6F–öå6fWG’Ò6öçFW‡BçF–VçEöÖVF–6F–öåö6öçFW‡@¢òÆåÆí	ı-½â]}íıİí-‚ıâ½]­--Ã¥ÆâGµD”TåEôÔTD”4D”ôåõ4dUE•ô”å5E%T5D”ôçÖ ¢¢"#°¢6öç7B7—7FVÕ&ö×BÒG¶6†E&ö×GÕÆåÆâG¶6öçfW'6F–öå7G–ÆWÒG¶ÖVF–6F–öå6fWG—ÕÆåÆí	­íİ-]­"ıí½Í}í--]½ó¥ÆâG´¥4ôâç7G&–æv–g’†6öçFW‡BÂçVÆÂÂ"—Ö° ¢òò6ÆÂ¢6öç7B²'VåF6²ÂD4µõE•U2ÒÒv—B–×÷'B‚"ââöÆ–"öÖöFVÅ&÷WFW"æ§2"“°¢6öç7BÖöFVÂÒ&ö6W72æVçbä•ôÔôDTÅõE$”tRÇÂ&wBÓRãR#°¢6öç7BfÆÆ&6´ÖöFVÂÒ&ö6W72æVçbä•ôÔôDTÅôdÄÄ$4²ÇÂ&wBÓBãÖÖ–æ’#°¢6öç7B&V6öæ–ætVff÷'BÒ&ö6W72æVçbä•õ$T4ôä”äuôTddõ%BÇÂ&ÖVF—VÒ#° ¢ÆWB•&W7VÇC°¢G'’°¢•&W7VÇBÒv—B'VåF6²…D4µõE•U2åD”TåEôD”ÄôrÂ°¢7—7FVÕ&ö×BÀ¢W6W%&ö×C¢G&–ÖÖVBÀ¢ÖöFVÂÀ¢fÆÆ&6´ÖöFVÂÀ¢&V6öæ–ætVff÷'BÀ¢Ò“°¢Ò6F6‚†”W'&÷"’°¢6öç6öÆRæW'&÷"‚%·6VæE7W÷'DÖW76vUÒ’W'&÷#¢"Â”W'&÷"æÖW76vR“°¢6öç7BW'&÷%G—RÒ”W'&÷"æÖW76vSòæ–æ6ÇVFW2‚'F–ÖV÷WB"’ò'F–ÖV÷WB" ¢”W'&÷"æÖW76vSòæ–æ6ÇVFW2‚&æWGv÷&²"’ò&æWGv÷&µöW'&÷""¢&•öW'&÷"#°¢6öç7BW'&÷%&W7öç6RÒ'V–ÆDfÆÆ&6µ&W7öç6R†W'&÷%G—RÂ6öæf–r“°¢v—B7W&6Ræg&öÒ‚'7W÷'Eö•ö6†B"’æ–ç6W'B‡°¢÷væW%÷G—S¢&æöç–Ö÷W5ö66R"À¢÷væW%ö–C¢÷væW"æ÷væW$–BÀ¢&öÆS¢&76—7FçB"À¢ÖW76vU÷FW‡C¢W'&÷%&W7öç6Ræç7vW"À¢•÷&W7öç6S¢W'&÷%&W7öç6RÀ¢6÷W&6U÷6W76–öåö–C¢÷væW"ç6W76–öä–BÀ¢ÖöFVÅ÷W6VC¢&W'&÷""À¢7&VFVEöC¢æWrFFR‚’çFô•4õ7G&–ær‚’À¢Ò“°¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&W7öç6S¢W'&÷%&W7öç6RÒ“°¢Ğ ¢òò'6R’&W7öç6P¢ÆWB'6VC°¢G'’°¢6öç7B&rÒ•&W7VÇBç&rÇÂ"#°¢6öç7B§6öäÖF6‚Ò&ræÖF6‚‚õÇµµÇ5Å5Ò¥ÇÒò“°¢'6VBÒ§6öäÖF6‚ò¥4ôâç'6R†§6öäÖF6…³Ò’¢²ç7vW#¢&rç6Æ–6RƒÂ#’Â6fWG•öæ÷FS¢çVÆÂÂ6öæf–FVæ6S¢&Æ÷r"Â7VvvW7EöföÆÆ÷wW¢fÇ6RÓ°¢Ò6F6‚°¢'6VBÒ²ç7vW#¢†•&W7VÇBç&rÇÂ""’ç6Æ–6RƒÂ#’Â6fWG•öæ÷FS¢çVÆÂÂ6öæf–FVæ6S¢&Æ÷r"Â7VvvW7EöföÆÆ÷wW¢fÇ6RÓ°¢Ğ ¢òò6fWG’6†V6³¢–b6fWG•öæ÷FRW†—7G2ÂÆör—@¢–b‡'6VBç6fWG•öæ÷FR’°¢6öç6öÆRæÆör‚%·6VæE7W÷'DÖW76vUÒ6fWG•öæ÷FRFWFV7FVC¢"Â'6VBç6fWG•öæ÷FRç6Æ–6RƒÂ’“°¢Ğ ¢òò6fR76—7FçBÖW76vP¢6öç7B&WVW7D–BÒ6†BÒG¶÷væW"ç6W76–öä–BÇÂ&æò×6W76–öâ'ÒÒG´FFRææ÷r‚—Ö°¢v—B7W&6Ræg&öÒ‚'7W÷'Eö•ö6†B"’æ–ç6W'B‡°¢÷væW%÷G—S¢&æöç–Ö÷W5ö66R"À¢÷væW%ö–C¢÷væW"æ÷væW$–BÀ¢&öÆS¢&76—7FçB"À¢ÖW76vU÷FW‡C¢'6VBæç7vW"ÇÂ""À¢•÷&W7öç6S¢'6VBÀ¢6÷W&6U÷6W76–öåö–C¢÷væW"ç6W76–öä–BÀ¢&WVW7Eö–C¢&WVW7D–BÀ¢ÖöFVÅ÷W6VC¢•&W7VÇBæÖöFVÅ÷W6VBÇÂÖöFVÂÀ¢7&VFVEöC¢æWrFFR‚’çFô•4õ7G&–ær‚’À¢Ò“° ¢&WGW&â&W2ç7FGW2ƒ#’æ§6öâ‡²ö³¢G'VRÂ&W7öç6S¢'6VBÒ“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRæW'&÷"‚&†æFÆU6VæE7W÷'DÖW76vRW'&÷#¢"ÂW'&÷"æÖW76vR“°¢&WGW&â&W2ç7FGW2ƒS’æ§6öâ‡²ö³¢fÇ6RÂW'&÷#¢-	í­í-ı-­‚â"Ò“°¢Ğ§Ğ ¢òò'V–ÆB6öçFW‡Bf÷"7W÷'BV–6²6†B¦7–æ2gVæ7F–öâ'V–ÆE7W÷'D6†D6öçFW‡B‡7W&6RÂ÷væW$–B’°¢6öç7B6öçFW‡BÒ·Ó° ¢òòF—7Æ’æÖP¢6öç7B²FF¢&öf–ÆRÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&öf–ÆW2"¢ç6VÆV7B‚&F—7Æ•öæÖR"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW$–B¢æÖ–&U6–ævÆR‚“°¢6öçFW‡BæF—7Æ•öæÖRÒ&öf–ÆSòæF—7Æ•öæÖRÇÂçVÆÃ° ¢òòÆFW7B6W76–öâ7VÖÖ'¢6öç7B²FF¢ÆFW7E6W76–öâÒÒv—B7W&6P¢æg&öÒ‚'6W76–öç2"¢ç6VÆV7B‚'W6W%÷&W÷'BÂ7W÷'E÷ÆâÂ6&U÷&V6öÖÖVæFF–öâÂF–VçE÷FW‡BÂ7&VFVEöB"¢æW‚&æöç–Ö÷W5ö÷væW%ö–B"Â÷væW$–B¢æW‚&ÖöGVÆR"Â'7W÷'B"¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ¢æÆ–Ö—Bƒ¢æÖ–&U6–ævÆR‚“° ¢–b†ÆFW7E6W76–öâ’°¢6öçFW‡BæÆFW7E÷&W÷'E÷7VÖÖ'’Ò†ÆFW7E6W76–öâçW6W%÷&W÷'BÇÂ""’ç6Æ–6RƒÂƒ“°¢6öçFW‡Bæ6&U÷&V6öÖÖVæFF–öâÒÆFW7E6W76–öâæ6&U÷&V6öÖÖVæFF–öâÇÂçVÆÃ°¢6öçFW‡Bç7W÷'E÷ÆâÒÆFW7E6W76–öâç7W÷'E÷ÆâÇÂçVÆÃ°¢6öçFW‡BæÆFW7E÷6W76–öåöFFRÒÆFW7E6W76–öâæ7&VFVEöC°¢Ğ ¢òò&V6VçB6†V6²Ö–ç2†Æ7BBF—2¢6öç7B6–æ6RÒæWrFFR„FFRææ÷r‚’ÒB¢#B¢c¢c¢’çFô•4õ7G&–ær‚’ç6Æ–6RƒÂ“°¢6öç7B²FF¢6†V6¶–ç2ÒÒv—B7W&6P¢æg&öÒ‚'7W÷'EöF–Ç•ö6†V6¶–ç2"¢ç6VÆV7B‚&6†V6¶–åöFFRÂvVÆÆ&V–æu÷66÷&RÂç†–WG•÷66÷&RÂ6öÖÖVçB"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW$–B¢æwFR‚&6†V6¶–åöFFR"Â6–æ6R¢æ÷&FW"‚&6†V6¶–åöFFR"Â²66VæF–æs¢G'VRÒ“°¢6öçFW‡Bç&V6VçEö6†V6¶–ç2Ò6†V6¶–ç2ÇÂµÓ° ¢òò7F—fR&7F–6W0¢6öç7B²FF¢&7F–6W2ÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö÷væW%÷&7F–6W2"¢ç6VÆV7B‚'&7F–6Uö¶W’ÂF—FÆRÂW6W%÷7FGW2Â†VÇgVÆæW72"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW$–B¢æW‚'7FGW2"Â&7F—fR"¢æÆ–Ö—Bƒ“°¢6öçFW‡Bæ7F—fU÷&7F–6W2Ò&7F–6W2ÇÂµÓ° ¢òò&V6VçB6†BÖW76vW2†Æ7BR¢6öç7B²FF¢&V6VçD6†BÒÒv—B7W&6P¢æg&öÒ‚'7W÷'Eö•ö6†B"¢ç6VÆV7B‚'&öÆRÂÖW76vU÷FW‡B"¢æW‚&÷væW%÷G—R"Â&æöç–Ö÷W5ö66R"¢æW‚&÷væW%ö–B"Â÷væW$–B¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ¢æÆ–Ö—BƒR“°¢6öçFW‡Bç&V6VçEö6†BÒ‡&V6VçD6†BÇÂµÒ’ç&WfW'6R‚“° ¢6öç7BÖVF–6F–öä6öçFW‡BÒv—BÆöEF–VçDÖVF–6F–öä6öçFW‡B‡7W&6RÂ&æöç–Ö÷W5ö66R"Â÷væW$–BÂ'7W÷'B"“°¢–b†ÖVF–6F–öä6öçFW‡B’6öçFW‡BçF–VçEöÖVF–6F–öåö6öçFW‡BÒÖVF–6F–öä6öçFW‡C° ¢òòT’6&–Æ—F–W2(	Bv†BF†RW6W"6â66W70¢6öçFW‡Bæf–Æ&ÆU÷6V7F–öç2Ò°¢'&W÷'B"Â&†—7F÷'’"Â&6†V6¶–ç2"Â'&7F–6W2"À¢'7V6–Æ—7E÷&WVW7B"Â'&öf–ÆR"Â&66W72"À¢Ó°¢6öçFW‡Bç&7F–6Uö6÷VçBÒ‡&7F–6W2ÇÂµÒ’æÆVæwFƒ°¢6öçFW‡Bæ†5÷&W÷'BÒÆFW7E6W76–öãòçW6W%÷&W÷'C°¢6öçFW‡Bæ†5÷7V6–Æ—7BÒfÇ6S²òò&W6öÇfVB6W&FVÇ’–bæVVFV@¢6öçFW‡Bç6W'f–6U÷&WVW7Eöf–Æ&ÆRÒG'VS° ¢&WGW&â6öçFW‡C°§Ğ ¦7–æ2gVæ7F–öâÆöEF–VçDÖVF–6F–öä6öçFW‡B‡7W&6RÂ÷væW%G—RÂ÷væW$–BÂ6÷W&6TÖöGVÆR’°¢G'’°¢6öç7B²FF¢ÖVF–6F–öä÷&FW'2ÒÒv—B7W&6P¢æg&öÒ‚'F–VçEöÖVF–6F–öåö÷&FW'2"¢ç6VÆV7B‚&–BÂ—FVÕ÷G—RÂæÖRÂ7F—fUö–æw&VF–VçBÂ7G&VæwF‚Â6–ævÆUöF÷6RÂF÷6U÷Væ—BÂ&÷WFRÂg&WVVæ7•÷G—RÂF–ÖW5÷W%öF’Â66†VGVÆVE÷F–ÖW2Â–ç7G'V7F–öç2Â7F'EöFFRÂVæEöFFRÂF–VçEö6öÖÖVçBÂ7FGW2Â&W÷'FVEö5öFö7F÷%ö÷&FW"ÂÖVF–6F–öåö6öæ6WEö–BÂ&VfW&Væ6U÷7FGW2Â&VfW&Væ6Uö6öæf–FVæ6RÂ&VfW&Væ6UöÖF6†VEö'’Â&VfW&Væ6UöÖF6†VEöBÂ&VfW&Væ6UöÖF6…öÖWF†öBÂ&VfW&Væ6U÷6÷W&6U÷&÷f–FW"Â&VfW&Væ6U÷6÷W&6U÷6æ6†÷Eö–B"¢æW‚&÷væW%÷G—R"Â÷væW%G—R’æW‚&÷væW%ö–B"Â÷væW$–B¢æW‚'6÷W&6UöÖöGVÆR"Â6÷W&6TÖöGVÆR’æW‚'7FGW2"Â&7F—fR"¢æ÷&FW"‚'7F'EöFFR"Â²66VæF–æs¢fÇ6RÒ“°¢6öç7B÷&FW'2ÒÖVF–6F–öä÷&FW'2ÇÂµÓ°¢–b‚÷&FW'2æÆVæwF‚’&WGW&âçVÆÃ° ¢6öç7B&V6VçE6–æ6RÒæWrFFR„FFRææ÷r‚’Ò3¢#B¢c¢c¢’çFô•4õ7G&–ær‚“°¢6öç7B÷&FW$–G2Ò÷&FW'2æÖ‚†÷&FW"’Óâ÷&FW"æ–B“°¢6öç7B·²FF¢–çF¶TÆöw2ÒÂ²FF¢÷&FW$WfVçG2ÕÒÒv—B&öÖ—6RæÆÂ…°¢7W&6Ræg&öÒ‚&ÖVF–6F–öåö–çF¶UöÆöw2"¢ç6VÆV7B‚&ÖVF–6F–öåö÷&FW%ö–BÂ66†VGVÆVEöFFRÂ7FGW2Â7GVÅ÷F–ÖRÂ7GVÅöF÷6RÂ7GVÅöF÷6U÷Væ—BÂF–VçEöæ÷FR"¢æW‚&÷væW%÷G—R"Â÷væW%G—R’æW‚&÷væW%ö–B"Â÷væW$–B¢æwFR‚'66†VGVÆVEöFFR"Â&V6VçE6–æ6Rç6Æ–6RƒÂ’’æ÷&FW"‚'66†VGVÆVEöFFR"Â²66VæF–æs¢fÇ6RÒ’æÆ–Ö—BƒC’À¢7W&6Ræg&öÒ‚'F–VçEöÖVF–6F–öåö÷&FW%öWfVçG2"¢ç6VÆV7B‚&WfVçE÷G—RÂ6†ævVEöf–VÆG2Â&Wf–÷W5÷7FGW2ÂæWu÷7FGW2Â7&VFVEöB"¢æW‚&÷væW%÷G—R"Â÷væW%G—R’æW‚&÷væW%ö–B"Â÷væW$–B¢æ–â‚&ÖVF–6F–öåö÷&FW%ö–B"Â÷&FW$–G2’æwFR‚&7&VFVEöB"Â&V6VçE6–æ6R¢æ÷&FW"‚&7&VFVEöB"Â²66VæF–æs¢fÇ6RÒ’æÆ–Ö—Bƒ#’À¢Ò“°¢ÆWB&VfW&Væ6Uf–Ww2ÒæWrÖ‚“°¢G'’°¢&VfW&Væ6Uf–Ww2Òv—BÆöDÖVF–6F–öå&VfW&Væ6Uf–Ww2‡7W&6RÂ÷&FW'2“°¢Ò6F6‚‡&VfW&Væ6TW'&÷"’°¢6öç6öÆRçv&â†²G·6÷W&6TÖöGVÆWÒÖ6öçFW‡EÒfW&–f–VBÖVF–6F–öâ&VfW&Væ6RVæf–Æ&ÆS¦Â&VfW&Væ6TW'&÷"æ6öFRÇÂ'VW'•öf–ÆVB"“°¢Ğ¢&WGW&â'V–ÆEF–VçDÖVF–6F–öä6öçFW‡B†÷&FW'2Â–çF¶TÆöw2ÇÂµÒÂ÷&FW$WfVçG2ÇÂµÒÂ&VfW&Væ6Uf–Ww2“°¢Ò6F6‚†W'&÷"’°¢6öç6öÆRçv&â†²G·6÷W&6TÖöGVÆWÒÖ6öçFW‡EÒF–VçBÖVF–6F–öâ6öçFW‡BVæf–Æ&ÆS¦ÂW'&÷"æ6öFRÇÂ'VW'•öf–ÆVB"“°¢&WGW&âçVÆÃ°¢Ğ§Ğ ¦W‡÷'B²7–æ5&7F–6W4g&öÕ&W÷'BÓ°

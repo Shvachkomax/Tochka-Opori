@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:api": "node --env-file=.env.local local-api-server.js",
     "dev:all": "concurrently \"npm run dev:api\" \"npm run dev\"",
-    "build": "node scripts/check-database-architecture.js && vite build",
+    "build": "npm run test:my-practice && npm run test:health-live && npm run test:ai-telemetry && node scripts/check-database-architecture.js && vite build && node scripts/langfuse-preview-smoke.js",
     "preview": "vite preview",
     "e2e:phase11c1": "node scripts/e2e-phase11c1-browser.mjs",
     "e2e:service-requests": "node scripts/e2e-service-requests-browser.mjs",
@@ -51,9 +51,18 @@
     "test:clinical-knowledge": "node scripts/test-clinical-knowledge.js",
     "test:clinical-medication-rpc-routing": "node scripts/test-clinical-medication-rpc-routing.js",
     "check:database-architecture": "node scripts/check-database-architecture.js",
-    "test:database-architecture": "node scripts/test-database-architecture.js"
+    "test:database-architecture": "node scripts/test-database-architecture.js",
+    "test:my-practice": "node scripts/test-my-practice-pilot.js && node scripts/test-my-practice-catalog.js",
+    "e2e:service-request-finance": "node scripts/e2e-service-request-finance-browser.mjs",
+    "test:health-live": "node scripts/test-health-live.js",
+    "e2e:health-live": "node scripts/e2e-health-live.mjs",
+    "test:ai-telemetry": "node scripts/test-ai-telemetry.js && node scripts/test-ai-usage-flow.js && node scripts/test-openai-usage-path.js && node scripts/test-langfuse-preview-smoke.js"
   },
   "dependencies": {
+    "@langfuse/otel": "6.1.1",
+    "@langfuse/tracing": "6.1.1",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/sdk-trace-node": "2.12.0",
     "@supabase/supabase-js": "^2.107.0",
     "@vitejs/plugin-react": "latest",
     "dotenv": "^17.4.2",

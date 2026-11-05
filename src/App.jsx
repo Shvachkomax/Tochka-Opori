@@ -1,11905 +1,743 @@
-import InformationFlow from "./InformationFlow.jsx";
-import React, { useRef, useState, useEffect, Component } from "react";
-import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
-import { appendVoiceText } from "./supportVoice.js";
-import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback, buildConversationPairs } from "../lib/conversation.js";
-import BodyIntake from "./BodyIntake.jsx";
-import BodyDiary from "./BodyDiary.jsx";
-import HealthCabinet from "./HealthCabinet.jsx";
-import BodyOnboarding from "./BodyOnboarding.jsx";
-import BodyDayView from "./BodyDayView.jsx";
-import BodyHealthContext from "./BodyHealthContext.jsx";
-import BodyServiceRequests from "./BodyServiceRequests.jsx";
-import MedicationCard from "./MedicationCard.jsx";
-import PatientMedicationOrders from "./PatientMedicationOrders.jsx";
-import { fetchWithClientToken, getClientToken } from "./lib/clientToken.js";
-import { saveBodySession, saveBodyDisplayResult, saveSupportSession, getBodySession, getSupportSession, clearBodySession, clearSupportSession, withAccessToken, withSessionAccess } from "./lib/sessionAccess.js";
-import ClinicalCouncilAdmin from "./pages/admin/ClinicalCouncilAdmin.jsx";
-import ExpertInvitePage from "./pages/expert/ExpertInvitePage.jsx";
-import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
-import SpecialistCabinet from "./pages/specialist/SpecialistCabinet.jsx";
-import { APP_BRAND } from "./lib/appBrand.js";
-
-class AdminErrorBoundary extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { error: null, errorInfo: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { error };
-  }
-  componentDidCatch(error, errorInfo) {
-    this.setState({ errorInfo });
-    console.error("AdminErrorBoundary caught:", error, errorInfo);
-  }
-  render() {
-    if (this.state.error) {
-      return (
-        <div style={{ padding: 40, fontFamily: "monospace", minHeight: "100vh", background: "#050817", color: "#fecaca" }}>
-          <h2 style={{ color: "#fca5a5", marginBottom: 16 }}>–û—à–∏–±–∫–∞ –≤ –∞–¥–º–∏–Ω-–ø–∞–Ω–µ–ª–∏</h2>
-          <div style={{ background: "rgba(239,68,68,.1)", padding: 16, borderRadius: 12, marginBottom: 16, border: "1px solid rgba(239,68,68,.3)" }}>
-            <strong style={{ color: "#fca5a5" }}>{this.state.error?.message || "–ù–µ–∏–∑–≤–µ—Å—Ç–Ω–∞—è –æ—à–∏–±–∫–∞"}</strong>
-          </div>
-          <pre style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "pre-wrap", maxHeight: 400, overflow: "auto", background: "rgba(0,0,0,.3)", padding: 16, borderRadius: 8 }}>
-            {this.state.error?.stack || ""}
-          </pre>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-export default function App() {
-  const [mode, setMode] = useState("text");
-  const [text, setText] = useState("");
-  const [questions, setQuestions] = useState(null);
-  const [answers, setAnswers] = useState({});
-  const [crisisMode, setCrisisMode] = useState(false);
-  const [crisisBlock, setCrisisBlock] = useState(null);
-  const [result, setResult] = useState(null);
-  const [phase, setPhase] = useState("input");
-  const [supportScreen, setSupportScreen] = useState("landing");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("user");
-  const [crisisOpen, setCrisisOpen] = useState(false);
-  const [aboutProjectOpen, setAboutProjectOpen] = useState(false);
-  const [crisisText, setCrisisText] = useState("");
-  const [crisisContact, setCrisisContact] = useState("");
-  const [crisisSubmitting, setCrisisSubmitting] = useState(false);
-
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const timerRef = useRef(null);
-
-  const quickChatContainerRef = useRef(null);
-  const quickChatInputRef = useRef(null);
-
-  const [recording, setRecording] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const [voiceError, setVoiceError] = useState("");
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [voiceObservations, setVoiceObservations] = useState([]);
-  const voiceMsgCounterRef = useRef(0);
-  const sessionRef = useRef(null);
-  const startSessionPromiseRef = useRef(null);
-
-  // Support cabinet speech-to-text input uses the same transcribe endpoint,
-  // but keeps its recorder state separate from intake/question/crisis flows.
-  const cabinetVoiceRecorderRef = useRef(null);
-  const cabinetVoiceStreamRef = useRef(null);
-  const cabinetVoiceChunksRef = useRef([]);
-  const cabinetVoiceTimerRef = useRef(null);
-  const cabinetVoiceIgnoreStopRef = useRef(false);
-  const [cabinetVoiceRecording, setCabinetVoiceRecording] = useState(false);
-  const [cabinetVoiceTranscribing, setCabinetVoiceTranscribing] = useState(false);
-  const [cabinetVoiceTarget, setCabinetVoiceTarget] = useState(null);
-  const [cabinetVoiceTime, setCabinetVoiceTime] = useState(0);
-  const [cabinetVoiceError, setCabinetVoiceError] = useState("");
-
-  useEffect(() => () => {
-    cabinetVoiceIgnoreStopRef.current = true;
-    if (cabinetVoiceTimerRef.current) clearInterval(cabinetVoiceTimerRef.current);
-    cabinetVoiceStreamRef.current?.getTracks().forEach((track) => track.stop());
-    if (cabinetVoiceRecorderRef.current?.state === "recording") {
-      cabinetVoiceRecorderRef.current.stop();
-    }
-  }, []);
-
-  const [sessionReviewOpen, setSessionReviewOpen] = useState(false);
-  const [patientRating, setPatientRating] = useState(0);
-  const [patientUseful, setPatientUseful] = useState("");
-  const [patientUnclear, setPatientUnclear] = useState("");
-  const [doctorFeedback, setDoctorFeedback] = useState({
-    wrongQuestions: "",
-    missingQuestions: "",
-    badQuestionWording: "",
-    correctedUserReport: "",
-    correctedDoctorReport: "",
-    protocolUpdate: "",
-    generalComment: "",
-  });
-
-  const [conversationHistory, setConversationHistory] = useState([]);
-  const [dialogDepth, setDialogDepth] = useState(0);
-
-  const [sessionModalOpen, setSessionModalOpen] = useState(false);
-  const [loadingSession, setLoadingSession] = useState(false);
-
-  // Anonymous Continuation Credential Pass
-  const [continuationCode, setContinuationCode] = useState(null);
-  const [continuationCodeInput, setContinuationCodeInput] = useState("");
-  const [continuationCodeError, setContinuationCodeError] = useState("");
-  const [regeneratedCode, setRegeneratedCode] = useState(null);
-  const [sessionData, setSessionData] = useState(null);
-  const [sessionId, setSessionId] = useState(null);
-  const [publicCode, setPublicCode] = useState(null);
-  const [isContinuation, setIsContinuation] = useState(false);
-  const [previousPatientReport, setPreviousPatientReport] = useState("");
-  const [previousDoctorReport, setPreviousDoctorReport] = useState("");
-  const [homeTasks, setHomeTasks] = useState("");
-  const [resourceFactors, setResourceFactors] = useState("");
-  const [debugInfo, setDebugInfo] = useState(null);
-  const [careRecommendation, setCareRecommendation] = useState(null);
-  const [showConsultPrep, setShowConsultPrep] = useState(false);
-
-
-  // Support Cabinet MVP
-  const [supportCabinet, setSupportCabinet] = useState(null);
-  const [patientInvitations, setPatientInvitations] = useState([]);
-  const [patientInvitationsLoading, setPatientInvitationsLoading] = useState(false);
-  const [patientInviteModalOpen, setPatientInviteModalOpen] = useState(false);
-  const [patientInviteCreated, setPatientInviteCreated] = useState(null);
-  const [matchRequestSending, setMatchRequestSending] = useState(false);
-  const [cabinetLoading, setCabinetLoading] = useState(false);
-  const [followUpAnswers, setFollowUpAnswers] = useState({});
-  const [reportSource, setReportSource] = useState(null); // "generated" | "cabinet"
-  const [justFinishedSession, setJustFinishedSession] = useState(false);
-  // Support Cabinet expanded features
-  const [supportViewingSession, setSupportViewingSession] = useState(null);
-  const [supportViewingSessionData, setSupportViewingSessionData] = useState(null);
-  const [supportSessionLoading, setSupportSessionLoading] = useState(false);
-  const [supportNewRequestOpen, setSupportNewRequestOpen] = useState(false);
-  const [supportRequestSessionId, setSupportRequestSessionId] = useState(null);
-  const [supportNewRequest, setSupportNewRequest] = useState({ service_code: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
-  const [supportRequestSubmitting, setSupportRequestSubmitting] = useState(false);
-  const [accessExpanded, setAccessExpanded] = useState(false);
-  const [profileExpanded, setProfileExpanded] = useState(false);
-  // Daily check-in state
-  const [checkinToday, setCheckinToday] = useState(null);
-  const [checkinHistory, setCheckinHistory] = useState([]);
-  const [checkinWellbeing, setCheckinWellbeing] = useState(null);
-  const [checkinAnxiety, setCheckinAnxiety] = useState(null);
-  const [checkinComment, setCheckinComment] = useState("");
-  const [checkinSaving, setCheckinSaving] = useState(false);
-  // Practices state
-  const [supportPractices, setSupportPractices] = useState([]);
-  const [practiceDetailKey, setPracticeDetailKey] = useState(null);
-  // Quick chat state
-  const [quickChatMessages, setQuickChatMessages] = useState([]);
-  const [quickChatInput, setQuickChatInput] = useState("");
-  const [quickChatLoading, setQuickChatLoading] = useState(false);
-  const [quickChatExpanded, setQuickChatExpanded] = useState(false);
-  const [quickChatShowHistory, setQuickChatShowHistory] = useState(false);
-  const [quickChatScrolledUp, setQuickChatScrolledUp] = useState(false);
-  const [quickChatHasNewResponse, setQuickChatHasNewResponse] = useState(false);
-  // Follow-up answered topics for AI dedup
-  const [followupAnsweredTopics, setFollowupAnsweredTopics] = useState(null);
-  // Display name
-  const [supportDisplayName, setSupportDisplayName] = useState(null);
-  const [displayNameInput, setDisplayNameInput] = useState("");
-
-  const [activeModule, setActiveModule] = useState(() => {
-    if (!APP_BRAND.isSupportPilot && typeof window !== "undefined") {
-      const host = window.location.hostname;
-      if (host === "health.tochka-opori.online" || host.startsWith("health.")) return "body";
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("module") === "body") return "body";
-    }
-    return "support";
-  });
-  const [usageBalance, setUsageBalance] = useState(null);
-
-  // Body intake state
-  const [bodyIntakeStage, setBodyIntakeStage] = useState("idle"); // idle | filling | analyzing | result
-  const [bodyIntakeResult, setBodyIntakeResult] = useState(null);
-  const [bodyIntakeStep, setBodyIntakeStep] = useState(0); // 0=summary, 1=code, 2=plan, 3=cta
-
-  // Body screen state machine
-  const [bodyScreen, setBodyScreen] = useState("landing"); // landing | intake | result | cabinet | diary_edit | diary_result
-  const [bodyCabinetData, setBodyCabinetData] = useState(null);
-  const [bodyCabinetLoading, setBodyCabinetLoading] = useState(false);
-
-  // Support Toolkit state
-  const [supportPlan, setSupportPlan] = useState(null);
-  const [showSelfAssessment, setShowSelfAssessment] = useState(false);
-  const [canManageWithoutSpecialist, setCanManageWithoutSpecialist] = useState(null);
-  const [showSupportToolkit, setShowSupportToolkit] = useState(false);
-  const [showSpecialistIntent, setShowSpecialistIntent] = useState(false);
-  const [specialistIntentDone, setSpecialistIntentDone] = useState(false);
-
-  const PRACTICES = [
-    { id: "breathing", title: "–î—ã—Ö–∞–Ω–∏–µ 4‚Äì6 –º–∏–Ω—É—Ç –ø—Ä–∏ —Ç—Ä–µ–≤–æ–≥–µ", file: "01-breathing.md", description: "–ú–µ–¥–ª–µ–Ω–Ω–æ–µ –¥—ã—Ö–∞–Ω–∏–µ —Å –±–æ–ª–µ–µ –¥–ª–∏–Ω–Ω—ã–º –≤—ã–¥–æ—Ö–æ–º, —á—Ç–æ–±—ã –Ω–µ–º–Ω–æ–≥–æ —Å–Ω–∏–∑–∏—Ç—å —Ç–µ–ª–µ—Å–Ω–æ–µ –Ω–∞–ø—Ä—è–∂–µ–Ω–∏–µ.", duration: "3‚Äì5 –º–∏–Ω—É—Ç", category: "breathing" },
-    { id: "grounding", title: "–ó–∞–∑–µ–º–ª–µ–Ω–∏–µ 5‚Äì4‚Äì3‚Äì2‚Äì1", file: "02-grounding.md", description: "–¢–µ—Ö–Ω–∏–∫–∞ –∑–∞–∑–µ–º–ª–µ–Ω–∏—è —á–µ—Ä–µ–∑ –æ—Ä–≥–∞–Ω—ã —á—É–≤—Å—Ç–≤ –¥–ª—è –≤–æ–∑–≤—Ä–∞—â–µ–Ω–∏—è –≤ –Ω–∞—Å—Ç–æ—è—â–∏–π –º–æ–º–µ–Ω—Ç.", duration: "5 –º–∏–Ω—É—Ç", category: "grounding" },
-    { id: "jaw_relaxation", title: "–ú—è–≥–∫–æ–µ —Ä–∞—Å—Å–ª–∞–±–ª–µ–Ω–∏–µ –ª–∏—Ü–∞ –∏ —á–µ–ª—é—Å—Ç–∏", file: "03-jaw-relaxation.md", description: "–°–Ω—è—Ç–∏–µ –Ω–∞–ø—Ä—è–∂–µ–Ω–∏—è —Å –ª–∏—Ü–∞, —á–µ–ª—é—Å—Ç–∏ –∏ —à–µ–∏.", duration: "3‚Äì5 –º–∏–Ω—É—Ç", category: "grounding" },
-    { id: "sleep_prep", title: "–ü—Ä–∞–∫—Ç–∏–∫–∞ –ø–µ—Ä–µ–¥ —Å–Ω–æ–º", file: "04-sleep-prep.md", description: "–ú—è–≥–∫–∞—è –ø–æ–¥–≥–æ—Ç–æ–≤–∫–∞ –∫–æ —Å–Ω—É –ø—Ä–∏ —Ç—Ä–µ–≤–æ–≥–µ –∏–ª–∏ –±–µ—Å—Å–æ–Ω–Ω–∏—Ü–µ.", duration: "10‚Äì15 –º–∏–Ω—É—Ç", category: "sleep" },
-    { id: "neck_shoulders_stretch", title: "–ú—è–≥–∫–∞—è —Ä–∞—Å—Ç—è–∂–∫–∞ —à–µ–∏ –∏ –ø–ª–µ—á", file: "05-neck-shoulders-stretch.md", description: "–°–Ω—è—Ç–∏–µ –º—ã—à–µ—á–Ω–æ–≥–æ –Ω–∞–ø—Ä—è–∂–µ–Ω–∏—è –≤ –≤–µ—Ä—Ö–Ω–µ–π —á–∞—Å—Ç–∏ —Ç–µ–ª–∞.", duration: "5 –º–∏–Ω—É—Ç", category: "activity" },
-    { id: "diary", title: "–î–Ω–µ–≤–Ω–∏–∫ —Å–æ—Å—Ç–æ—è–Ω–∏—è –Ω–∞ 3 –¥–Ω—è", file: "06-diary.md", description: "–ö—Ä–∞—Ç–∫–∏–µ –µ–∂–µ–¥–Ω–µ–≤–Ω—ã–µ –∑–∞–ø–∏—Å–∏ –¥–ª—è –æ—Ç—Å–ª–µ–∂–∏–≤–∞–Ω–∏—è –∏–∑–º–µ–Ω–µ–Ω–∏–π.", duration: "5 –º–∏–Ω—É—Ç –≤ –¥–µ–Ω—å", category: "journaling" },
-    { id: "24h_plan", title: "–ü–ª–∞–Ω 24 —á–∞—Å–∞ –±–µ–∑ —É—Ö—É–¥—à–µ–Ω–∏—è", file: "07-24h-plan.md", description: "–ü–æ—à–∞–≥–æ–≤—ã–π –ø–ª–∞–Ω –Ω–∞ –±–ª–∏–∂–∞–π—à–∏–µ —Å—É—Ç–∫–∏.", duration: "‚Äî", category: "routine" },
-    { id: "short_walk", title: "–ö–æ—Ä–æ—Ç–∫–∞—è –ø—Ä–æ–≥—É–ª–∫–∞", file: null, description: "–ü—Ä–æ–≥—É–ª–∫–∞ –Ω–∞ —Å–≤–µ–∂–µ–º –≤–æ–∑–¥—É—Ö–µ –¥–ª—è —Å–º–µ–Ω—ã –æ–±—Å—Ç–∞–Ω–æ–≤–∫–∏ –∏ –ª—ë–≥–∫–æ–π —Ñ–∏–∑–∏—á–µ—Å–∫–æ–π –∞–∫—Ç–∏–≤–Ω–æ—Å—Ç–∏.", duration: "15‚Äì30 –º–∏–Ω—É—Ç", category: "activity" },
-  ];
-
-  function downloadPracticeFile(file) {
-    const anchor = document.createElement("a");
-    anchor.href = `/support-practices/${file}`;
-    anchor.download = file;
-    anchor.click();
-  }
-
-  function downloadBodyIntakeJSON() {
-    if (!bodyIntakeResult) return;
-    const data = {
-      timestamp: new Date().toISOString(),
-      session_id: bodyIntakeResult.session_id || null,
-      intake: bodyIntakeResult.intake_answers || null,
-      bmi: bodyIntakeResult.bmi,
-      care_recommendation: bodyIntakeResult.care_recommendation,
-      triggered_red_flags: bodyIntakeResult.triggered_red_flags || [],
-      red_flag_care_level: bodyIntakeResult.red_flag_care_level || null,
-      user_report: bodyIntakeResult.user_report,
-      body_plan: bodyIntakeResult.body_plan,
-      used_fallback: bodyIntakeResult.used_fallback || false,
-      model_used: bodyIntakeResult.model_used || null,
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `body-intake-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function downloadReportPDF() {
-    const { default: jsPDF } = await import("jspdf");
-    const doc = new jsPDF();
-    const user = userPart || "‚Äî";
-    const doctor = doctorPart || "‚Äî";
-    let y = 20;
-    doc.setFontSize(14);
-    doc.text("–û—Ç—á—ë—Ç –¥–ª—è –≤–∞—Å", 20, y);
-    y += 8;
-    doc.setFontSize(10);
-    const userLines = doc.splitTextToSize(user.replace(/===USER_REPORT===/g, "").trim(), 170);
-    userLines.forEach((line) => {
-      if (y > 275) { doc.addPage(); y = 20; }
-      doc.text(line, 20, y);
-      y += 5;
-    });
-    y += 10;
-    doc.setFontSize(14);
-    doc.text("–û—Ç—á—ë—Ç –¥–ª—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞", 20, y);
-    y += 8;
-    doc.setFontSize(10);
-    const doctorLines = doc.splitTextToSize(doctor.replace(/===DOCTOR_REPORT===/g, "").trim(), 170);
-    doctorLines.forEach((line) => {
-      if (y > 275) { doc.addPage(); y = 20; }
-      doc.text(line, 20, y);
-      y += 5;
-    });
-    doc.save(`otchet-${publicCode || "tochka-opori"}.pdf`);
-  }
-
-  function downloadReportDOCX() {
-    const user = userPart || "‚Äî";
-    const doctor = doctorPart || "‚Äî";
-    const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>–û—Ç—á—ë—Ç –¢–æ—á–∫–∞ –û–ø–æ—Ä–∞</title></head>
-<body style="font-family:'PT Serif',Georgia,serif;max-width:700px;margin:40px auto;line-height:1.7">
-<h1>–û—Ç—á—ë—Ç –¥–ª—è –≤–∞—Å</h1>
-${user.replace(/===USER_REPORT===/g, "").trim().split("\n").map(l => `<p>${l}</p>`).join("\n")}
-<hr style="margin:30px 0">
-<h1>–û—Ç—á—ë—Ç –¥–ª—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞</h1>
-${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l}</p>`).join("\n")}
-</body></html>`;
-    const blob = new Blob([html], { type: "application/msword" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `otchet-${publicCode || "tochka-opori"}.doc`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function addPracticeToPlan(practiceId) {
-    const practice = PRACTICES.find(p => p.id === practiceId);
-    if (!practice) return;
-    const current = supportPlan?.selected_practices || [];
-    if (current.some(p => p.id === practiceId)) return;
-    const updated = [...current, { id: practice.id, title: practice.title, selected_at: new Date().toISOString(), downloaded: false }];
-    const newPlan = { ...(supportPlan || {}), selected_practices: updated };
-    setSupportPlan(newPlan);
-    saveSupportPlan(newPlan);
-    saveSupportPractice(practiceId);
-    showToast("–î–æ–±–∞–≤–ª–µ–Ω–æ –≤ –ø–ª–∞–Ω. –ü—Ä–∏ —Å–ª–µ–¥—É—é—â–µ–º —Ä–∞–∑–≥–æ–≤–æ—Ä–µ –º—ã —Å–ø—Ä–æ—Å–∏–º, —É–¥–∞–ª–æ—Å—å –ª–∏ –ø–æ–ø—Ä–æ–±–æ–≤–∞—Ç—å.");
-  }
-
-  function saveSupportPlan(plan) {
-    const sp = plan || supportPlan;
-    if (!sp) return;
-    if (publicCode) {
-      const updateBody = withAccessToken({
-        action: "updateSupportPlan", public_code: publicCode, session_id: sessionId, support_plan: sp,
-      }, sessionId);
-      fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updateBody),
-      }).catch(() => {});
-    }
-    localStorage.setItem("tochka_support_plan", JSON.stringify(sp));
-  }
-
-  const [toast, setToast] = useState({ message: "", type: "", key: 0 });
-  const toastTimerRef = useRef(null);
-
-  // Auto-dismiss toast after 3 seconds
-  useEffect(() => {
-    if (toast.message) {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => {
-        setToast({ message: "", type: "", key: 0 });
-      }, 3000);
-    }
-    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
-  }, [toast.key]);
-
-  function clearToast() {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ message: "", type: "", key: 0 });
-  }
-
-  // Navigate to body cabinet from any workspace screen
-  function goToBodyCabinet() {
-    if (activeModule !== "body") return;
-    if (bodyScreen === "cabinet") return; // Already there
-    // Confirm if in diary_edit with unsaved changes
-    if (bodyScreen === "diary_edit") {
-      if (!window.confirm("–í–µ—Ä–Ω—É—Ç—å—Å—è –≤ –∫–∞–±–∏–Ω–µ—Ç? –ù–µ—Å–æ—Ö—Ä–∞–Ω—ë–Ω–Ω—ã–µ –∏–∑–º–µ–Ω–µ–Ω–∏—è –º–æ–≥—É—Ç –ø–æ—Ç–µ—Ä—è—Ç—å—Å—è.")) return;
-    }
-    clearToast();
-    setBodyDiaryDayData(null);
-    setBodyScreen("cabinet");
-  }
-
-  // Support navigation: go to landing (no logout)
-  function goToSupportLanding() {
-    setSupportScreen("landing");
-    setPhase("input");
-    setSupportNewRequestOpen(false);
-    setSupportViewingSession(null);
-    setSupportViewingSessionData(null);
-  }
-
-  // Support navigation: go to cabinet
-  function goToSupportCabinet() {
-    setSupportScreen("cabinet");
-    setPhase("cabinet");
-    setSupportNewRequestOpen(false);
-    setSupportViewingSession(null);
-    setSupportViewingSessionData(null);
-  }
-
-  // Admin panel state
-  const [adminPassword, setAdminPassword] = useState("");
-  const [adminAuthed, setAdminAuthed] = useState(false);
-  const [adminReviews, setAdminReviews] = useState([]);
-  const [adminTotal, setAdminTotal] = useState(0);
-  const [adminFilter, setAdminFilter] = useState("all");
-  const [adminEnv, setAdminEnv] = useState("all");
-  const [adminExpertFilter, setAdminExpertFilter] = useState("all");
-  const [adminLoading, setAdminLoading] = useState(false);
-  const [adminActionLoading, setAdminActionLoading] = useState(null);
-  const [editingReview, setEditingReview] = useState(null);
-  const [correctionForm, setCorrectionForm] = useState({
-    wrong_questions: "", missing_questions: "", bad_question_wording: "",
-    corrected_user_report: "", corrected_doctor_report: "",
-    protocol_update: "", correction_comment: "",
-    voice_accuracy: "", voice_usefulness: "", voice_influenced: "",
-    voice_confirmed: [], voice_comment: "",
-  });
-
-  // Expert state
-  const [expertData, setExpertData] = useState(() => {
-    try {
-      const saved = localStorage.getItem("tochka_expert");
-      const sessionCode = sessionStorage.getItem("tochka_expert_access_code");
-      return saved && sessionCode ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
-  const [expertModalOpen, setExpertModalOpen] = useState(false);
-  const [expertCodeInput, setExpertCodeInput] = useState("");
-  const [expertLoggingIn, setExpertLoggingIn] = useState(false);
-  const [showRegisterForm, setShowRegisterForm] = useState(false);
-  const [registerForm, setRegisterForm] = useState({
-    name: "", email: "", telegram: "", role: "psychologist", specialty: "", city: "", organization: "",
-  });
-  const [registerSending, setRegisterSending] = useState(false);
-  const [registrationResult, setRegistrationResult] = useState(null); // { access_code, expert }
-
-  // Organization state
-  const [organizations, setOrganizations] = useState([]);
-  const [orgFormOpen, setOrgFormOpen] = useState(false);
-  const [orgForm, setOrgForm] = useState({ name: "", slug: "", type: "private_clinic", city: "", comment: "" });
-
-  const orgTypeLabels = {
-    private_clinic: "–ß–∞—Å—Ç–Ω–∞—è –∫–ª–∏–Ω–∏–∫–∞",
-    state_clinic: "–ì–æ—Å—É–¥–∞—Ä—Å—Ç–≤–µ–Ω–Ω–∞—è –∫–ª–∏–Ω–∏–∫–∞",
-    research_institution: "–ù–∞—É—á–Ω–æ–µ —É—á—Ä–µ–∂–¥–µ–Ω–∏–µ",
-    test: "–¢–µ—Å—Ç",
-  };
-  const [orgFormEditId, setOrgFormEditId] = useState(null);
-  const [orgDetail, setOrgDetail] = useState(null);
-  const [orgExperts, setOrgExperts] = useState([]);
-  const [orgAddExpertOpen, setOrgAddExpertOpen] = useState(false);
-  const [orgAddExpertId, setOrgAddExpertId] = useState("");
-  const [orgAddExpertRole, setOrgAddExpertRole] = useState("doctor");
-
-  // My patients state (expert panel)
-  const [myPatients, setMyPatients] = useState([]);
-  const [myPatientsLoading, setMyPatientsLoading] = useState(false);
-  const [patientModalOpen, setPatientModalOpen] = useState(false);
-  const [patientModalCode, setPatientModalCode] = useState("");
-
-  // Invite link state
-  const [inviteLinks, setInviteLinks] = useState([]);
-  const [inviteLinkModalOpen, setInviteLinkModalOpen] = useState(false);
-  const [inviteLinkLabel, setInviteLinkLabel] = useState("");
-  const [inviteLinkCreated, setInviteLinkCreated] = useState(null);
-
-  // Invite token from URL
-  const [inviteToken, setInviteToken] = useState(() => {
-    try {
-      const m = window.location.pathname.match(/^\/(?:start|invite)\/([a-z0-9]+)/i);
-      return m ? m[1] : (localStorage.getItem("tochka_invite_token") || null);
-    } catch { return null; }
-  });
-  const [inviteInfo, setInviteInfo] = useState(null);
-  const [inviteChecking, setInviteChecking] = useState(false);
-  const [inviteSpecialistAuth, setInviteSpecialistAuth] = useState({ loading: false, authenticated: false, error: null });
-  const [onboardingForm, setOnboardingForm] = useState({ name: "", contact_email: "", contact_phone: "", comment: "" });
-  const [onboardingSubmitting, setOnboardingSubmitting] = useState(false);
-
-  // Validate invite token on mount
-  React.useEffect(() => {
-    if (inviteToken) {
-      localStorage.setItem("tochka_invite_token", inviteToken);
-      setInviteChecking(true);
-      fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "validateInviteToken", token: inviteToken }),
-      })
-        .then((r) => r.json())
-        .then((d) => {
-          if (d.valid && d.invite) {
-            setInviteInfo({ valid: true, ...d.invite });
-            if (d.invite.direction === "patient_to_specialist") {
-              setInviteSpecialistAuth({ loading: true, authenticated: false, error: null });
-              fetch("/api/specialist", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "same-origin",
-                body: JSON.stringify({ action: "me" }),
-              })
-                .then(async (response) => ({ response, data: await response.json() }))
-                .then(({ response, data }) => {
-                  if (data.ok) {
-                    setInviteSpecialistAuth({ loading: false, authenticated: true, error: null });
-                  } else if (response.status === 401 || response.status === 403) {
-                    setInviteSpecialistAuth({ loading: false, authenticated: false, error: null });
-                  } else {
-                    setInviteSpecialistAuth({ loading: false, authenticated: false, error: "–ù–µ —É–¥–∞–ª–æ—Å—å –ø—Ä–æ–≤–µ—Ä–∏—Ç—å –≤—Ö–æ–¥ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞." });
-                  }
-                })
-                .catch(() => setInviteSpecialistAuth({ loading: false, authenticated: false, error: "–ù–µ —É–¥–∞–ª–æ—Å—å –ø—Ä–æ–≤–µ—Ä–∏—Ç—å –≤—Ö–æ–¥ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞." }));
-            }
-          } else {
-            setInviteInfo({ valid: false, error: d.error || "–°—Å—ã–ª–∫–∞ –Ω–µ–¥–µ–π—Å—Ç–≤–∏—Ç–µ–ª—å–Ω–∞" });
-          }
-        })
-        .catch(() => setInviteInfo({ valid: false, error: "–û—à–∏–±–∫–∞ –ø—Ä–æ–≤–µ—Ä–∫–∏ —Å—Å—ã–ª–∫–∏" }))
-        .finally(() => setInviteChecking(false));
-    }
-  }, []);
-
-  // Handle ?ref=alena / ?source=alena query params
-  React.useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const ref = params.get("ref");
-      const source = params.get("source");
-      if (ref === "alena" || source === "alena") {
-        localStorage.setItem("body_referral_source", "alena_client");
-        localStorage.setItem("body_specialist_id", "alena_zhukova");
-        localStorage.setItem("body_specialist_name", "–ê–ª–µ–Ω–∞ –ñ—É–∫–æ–≤–∞");
-      }
-    } catch (e) {}
-  }, []);
-
-  // Auto-load body cabinet if session exists on mount
-  React.useEffect(() => {
-    if (activeModule === "body" && bodyScreen === "landing") {
-      const saved = getBodySession();
-      if (saved.sessionId && saved.accessToken) {
-        loadBodyCabinet();
-      }
-    }
-  }, []);
-
-  // Clear body continuation error when screen changes
-  React.useEffect(() => {
-    setBodyContinuationError("");
-  }, [bodyScreen]);
-
-  const [adminReqTab, setAdminReqTab] = useState("reviews");
-  const [adminRequests, setAdminRequests] = useState([]);
-  const [adminReqFilter, setAdminReqFilter] = useState("pending");
-
-  // Admin crisis requests state
-  const [adminCrisisRequests, setAdminCrisisRequests] = useState([]);
-  const [adminCrisisFilter, setAdminCrisisFilter] = useState("new");
-  const [adminCrisisLoading, setAdminCrisisLoading] = useState(false);
-  const [adminCrisisActionLoading, setAdminCrisisActionLoading] = useState(null);
-  const [adminDarkMode, setAdminDarkMode] = useState(true);
-  const [adminReviewShowTrash, setAdminReviewShowTrash] = useState(false);
-  const [deleteConfirmReviewId, setDeleteConfirmReviewId] = useState(null);
-  const [deleteConfirmCode, setDeleteConfirmCode] = useState("");
-  const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
-  const [deleteConfirmType, setDeleteConfirmType] = useState("soft");
-
-  // Admin role (super / support / body)
-  const [adminRole, setAdminRole] = useState(null);
-  // Admin sub-page for SPA navigation (null = derive from URL)
-  const [adminSubPage, setAdminSubPage] = useState(null);
-
-  // Body intake admin state
-  const [bodyIntakeRecords, setBodyIntakeRecords] = useState([]);
-  const [bodyIntakeTotal, setBodyIntakeTotal] = useState(0);
-  const [bodyIntakeLoading, setBodyIntakeLoading] = useState(false);
-  const [bodyIntakeDetail, setBodyIntakeDetail] = useState(null);
-  const [bodyIntakeDetailOpen, setBodyIntakeDetailOpen] = useState(false);
-  const [bodyIntakeShowDeleted, setBodyIntakeShowDeleted] = useState(false);
-  const [bodyIntakeDeleteConfirm, setBodyIntakeDeleteConfirm] = useState(null);
-  const [bodyIntakeSourceFilter, setBodyIntakeSourceFilter] = useState("all");
-
-  const [bodyCodeCopied, setBodyCodeCopied] = useState(false);
-
-  // Body diary state
-  const [bodyDiarySessionId, setBodyDiarySessionId] = useState(null);
-  const [bodyContinuationInput, setBodyContinuationInput] = useState("");
-  const [bodyContinuationError, setBodyContinuationError] = useState("");
-  const [bodyDiaryOpen, setBodyDiaryOpen] = useState(false);
-  const [bodyDiaryResult, setBodyDiaryResult] = useState(null);
-  const [bodyDiaryDayData, setBodyDiaryDayData] = useState(null);
-  const [bodyDiaryHistory, setBodyDiaryHistory] = useState(null);
-  const [bodyDiaryHistoryOpen, setBodyDiaryHistoryOpen] = useState(false);
-  const [bodyDiaryHistoryLoading, setBodyDiaryHistoryLoading] = useState(false);
-  const [bodyDiaryHistoryDetail, setBodyDiaryHistoryDetail] = useState(null);
-  const [bodyDiaryRecords, setBodyDiaryRecords] = useState([]);
-  const [bodyDiaryLoading, setBodyDiaryLoading] = useState(false);
-  const [bodyDiaryDetail, setBodyDiaryDetail] = useState(null);
-  const [bodyDiaryDetailOpen, setBodyDiaryDetailOpen] = useState(false);
-  const [bodyDiarySessionFilter, setBodyDiarySessionFilter] = useState("");
-  const [bodyAdminTab, setBodyAdminTab] = useState("intake"); // intake | diary | trash | reviews
-  const [bodyExpertReviews, setBodyExpertReviews] = useState([]);
-  const [bodyExpertReviewsLoading, setBodyExpertReviewsLoading] = useState(false);
-  const [bodyExpertReviewFormOpen, setBodyExpertReviewFormOpen] = useState(false);
-  const [bodyExpertReviewForm, setBodyExpertReviewForm] = useState(null);
-  const [bodyExpertReviewSaving, setBodyExpertReviewSaving] = useState(false);
-
-  // Admin specialist onboarding/match state
-  const [onboardingRequests, setOnboardingRequests] = useState([]);
-  const [onboardingLoading, setOnboardingLoading] = useState(false);
-  const [matchRequests, setMatchRequests] = useState([]);
-  const [matchLoading, setMatchLoading] = useState(false);
-  const [matchExpertSelector, setMatchExpertSelector] = useState(null); // request id being assigned
-  const [matchExpertList, setMatchExpertList] = useState([]);
-  const [matchAssigning, setMatchAssigning] = useState(false);
-  const [bodyExportingCases, setBodyExportingCases] = useState(false);
-  // Body client assignment
-  const [bodyAssignments, setBodyAssignments] = useState([]);
-  const [bodyAssignmentsLoading, setBodyAssignmentsLoading] = useState(false);
-  const [bodyExperts, setBodyExperts] = useState([]);
-  const [bodyAssignTarget, setBodyAssignTarget] = useState(null); // body_client_ref being assigned
-  const [bodyAssignExpertId, setBodyAssignExpertId] = useState("");
-  const [bodyAssignOrgId, setBodyAssignOrgId] = useState(null);
-  const [bodyAssignSaving, setBodyAssignSaving] = useState(false);
-  const [bodyAssignIsReassign, setBodyAssignIsReassign] = useState(false);
-  const [bodyAssignExpertOrgs, setBodyAssignExpertOrgs] = useState([]);
-
-  // Restore body intake result from localStorage
-  const [savedBodyResult, setSavedBodyResult] = useState(() => {
-    try {
-      const raw = localStorage.getItem("body_last_result");
-      if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return null;
-  });
-
-  // Training table state
-  const [trainingSessions, setTrainingSessions] = useState([]);
-  const [trainingLoading, setTrainingLoading] = useState(false);
-  const [trainingFilter, setTrainingFilter] = useState({ status: "all", expected_case_type: "all", ai_detected_case_type: "all", session_kind: "all", model_used: "all", public_code: "" });
-  const [trainingEditId, setTrainingEditId] = useState(null);
-  const [trainingEditData, setTrainingEditData] = useState({});
-  const [trainingNewRow, setTrainingNewRow] = useState(null);
-  const [trainingSessionsError, setTrainingSessionsError] = useState(null);
-
-  // Create training from review state
-  const [trainingFormReviewId, setTrainingFormReviewId] = useState(null);
-  const [trainingFormData, setTrainingFormData] = useState({ scenario_played: "", expected_case_type: "", session_kind: "initial", expert_comment: "", public_code: "" });
-  const [trainingFormPublicCodeAuto, setTrainingFormPublicCodeAuto] = useState(false);
-
-  // Trash / soft-delete state
-  const [trainingShowTrash, setTrainingShowTrash] = useState(false);
-  const [trainingSelection, setTrainingSelection] = useState(new Set());
-  const [trainingTrashConfirm, setTrainingTrashConfirm] = useState(null);
-  const [trainingPermanentConfirm, setTrainingPermanentConfirm] = useState(null);
-  const [trainingDeletionReason, setTrainingDeletionReason] = useState("");
-  const [trainingDeletionReasonCustom, setTrainingDeletionReasonCustom] = useState("");
-  const [trainingBulkConfirm, setTrainingBulkConfirm] = useState(null);
-
-  // Expandable review sections state
-  const [expandedSections, setExpandedSections] = useState({});
-  const [modalData, setModalData] = useState(null);
-
-  // Quality insight state
-  const [qualityInsights, setQualityInsights] = useState([]);
-  const [qualityStats, setQualityStats] = useState({ new_approved_count: 0, last_analysis_at: null, recommended_to_analyze: false });
-  const [qualityLoading, setQualityLoading] = useState(false);
-  const [qualityGenerating, setQualityGenerating] = useState(false);
-  const [qualitySelectedReviewIds, setQualitySelectedReviewIds] = useState([]);
-  const [qualityConfirmOpen, setQualityConfirmOpen] = useState(false);
-  const [qualityDetailInsight, setQualityDetailInsight] = useState(null);
-
-  // Session timeline state
-  const [timelineData, setTimelineData] = useState(null);
-  const [timelineLoading, setTimelineLoading] = useState(false);
-  const [timelineCode, setTimelineCode] = useState(null);
-  const [timelineCache, setTimelineCache] = useState({});
-  const [timelineView, setTimelineView] = useState("list"); // "list" | "detail"
-  const [timelineLargeSection, setTimelineLargeSection] = useState(null);
-  const [sessionDetailsData, setSessionDetailsData] = useState(null);
-  const [sessionDetailsLoading, setSessionDetailsLoading] = useState(false);
-  const [sessionDetailsCache, setSessionDetailsCache] = useState({});
-  const [sessionDetailsError, setSessionDetailsError] = useState(null);
-
-  const QUALITY_STATUS_LABELS = {
-    new: "–ù–æ–≤—ã–π",
-    under_review: "–†–∞—Å—Å–º–∞—Ç—Ä–∏–≤–∞–µ—Ç—Å—è",
-    accepted: "–ü—Ä–∏–Ω—è—Ç –∫ —Ä–∞–±–æ—Ç–µ",
-    partially_accepted: "–ü—Ä–∏–Ω—è—Ç —á–∞—Å—Ç–∏—á–Ω–æ",
-    rejected: "–û—Ç–∫–ª–æ–Ω—ë–Ω",
-    archived: "–ê—Ä—Ö–∏–≤",
-  };
-
-  const QUALITY_SEVERITY_LABELS = {
-    low: "–ù–∏–∑–∫–∏–π",
-    medium: "–°—Ä–µ–¥–Ω–∏–π",
-    high: "–í—ã—Å–æ–∫–∏–π",
-    critical: "–ö—Ä–∏—Ç–∏—á–µ—Å–∫–∏–π",
-  };
-
-  const SESSION_KIND_LABELS = {
-    initial: "–ü–µ—Ä–≤–∏—á–Ω–∞—è —Å–µ—Å—Å–∏—è",
-    follow_up: "–ü–æ–≤—Ç–æ—Ä–Ω–∞—è —Å–µ—Å—Å–∏—è",
-    diary_check: "–ü—Ä–æ–≤–µ—Ä–∫–∞ –¥–Ω–µ–≤–Ω–∏–∫–∞",
-    support_toolkit_check: "–ü—Ä–æ–≤–µ—Ä–∫–∞ –ø—Ä–∞–∫—Ç–∏–∫",
-    crisis_check: "–°—Ä–æ—á–Ω–æ–µ –æ–±—Ä–∞—â–µ–Ω–∏–µ",
-    doctor_review: "–í—Ä–∞—á–µ–±–Ω—ã–π —Ä–∞–∑–±–æ—Ä",
-    other: "–î—Ä—É–≥–æ–µ",
-  };
-
-  const CASE_TYPE_LABELS = {
-    anxiety: "–¢—Ä–µ–≤–æ–≥–∞",
-    sleep: "–°–æ–Ω",
-    depression_like: "–î–µ–ø—Ä–µ—Å—Å–∏–≤–Ω—ã–µ –ø—Ä–∏–∑–Ω–∞–∫–∏",
-    grief: "–£—Ç—Ä–∞—Ç–∞ / –≥–æ—Ä–µ",
-    trauma: "–¢—Ä–∞–≤–º–∞—Ç–∏—á–µ—Å–∫–∏–π –æ–ø—ã—Ç",
-    body_tension: "–¢–µ–ª–µ—Å–Ω–æ–µ –Ω–∞–ø—Ä—è–∂–µ–Ω–∏–µ",
-    adhd_like: "–ù–∞—Ä—É—à–µ–Ω–∏–µ –≤–Ω–∏–º–∞–Ω–∏—è / –∏—Å–ø–æ–ª–Ω–∏—Ç–µ–ª—å–Ω—ã–µ —Ñ—É–Ω–∫—Ü–∏–∏",
-    substance: "–ü–ê–í / –≤–µ—â–µ—Å—Ç–≤–∞",
-    alcohol: "–ê–ª–∫–æ–≥–æ–ª—å",
-    bipolar_red_flags: "–ë–∏–ø–æ–ª—è—Ä–Ω—ã–µ –∫—Ä–∞—Å–Ω—ã–µ —Ñ–ª–∞–≥–∏",
-    psychosis_red_flags: "–ü—Å–∏—Ö–æ—Ç–∏—á–µ—Å–∫–∏–µ –∫—Ä–∞—Å–Ω—ã–µ —Ñ–ª–∞–≥–∏",
-    acute_psychosis: "–û—Å—Ç—Ä—ã–π –ø—Å–∏—Ö–æ–∑",
-    suicide_risk: "–°—É–∏—Ü–∏–¥–∞–ª—å–Ω—ã–π —Ä–∏—Å–∫",
-    self_harm_risk: "–†–∏—Å–∫ —Å–∞–º–æ–ø–æ–≤—Ä–µ–∂–¥–µ–Ω–∏—è",
-    medication_issue: "–í–æ–ø—Ä–æ—Å—ã –ª–µ–∫–∞—Ä—Å—Ç–≤",
-    mixed: "–°–º–µ—à–∞–Ω–Ω—ã–π —Å–ª—É—á–∞–π",
-    other: "–î—Ä—É–≥–æ–µ",
-  };
-
-  const STATUS_LABELS = {
-    new: "–ù–æ–≤—ã–π",
-    reviewed: "–ü—Ä–æ—Å–º–æ—Ç—Ä–µ–Ω",
-    needs_prompt_update: "–ù—É–∂–Ω–æ –æ–±–Ω–æ–≤–∏—Ç—å –ø—Ä–æ–º–ø—Ç",
-    approved_for_learning: "–û–¥–æ–±—Ä–µ–Ω –¥–ª—è –æ–±—É—á–µ–Ω–∏—è",
-    rejected: "–û—Ç–∫–ª–æ–Ω—ë–Ω",
-    archived: "–ê—Ä—Ö–∏–≤",
-  };
-
-  const sk = (v) => SESSION_KIND_LABELS[v] || v;
-  const ct = (v) => CASE_TYPE_LABELS[v] || v;
-  const st = (v) => STATUS_LABELS[v] || v;
-
-  function showToast(message, type = "success") {
-    setToast({ message, type, key: Date.now() });
-  }
-
-  async function handleExpertLogin() {
-    const code = expertCodeInput.trim();
-    if (!code) return;
-    setExpertLoggingIn(true);
-    try {
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "login", access_code: code }),
-      });
-      const data = await res.json();
-      if (data.ok && data.expert) {
-        try { sessionStorage.setItem("tochka_expert_access_code", code); } catch {}
-        setExpertData(data.expert);
-        localStorage.setItem("tochka_expert", JSON.stringify(data.expert));
-        setExpertModalOpen(false);
-        setExpertCodeInput("");
-        showToast(`–†–µ–∂–∏–º —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞: ${data.expert.name}`);
-      } else {
-        showToast(data.error || "–ö–æ–¥ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞ –Ω–µ –Ω–∞–π–¥–µ–Ω", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –ø–æ–¥–∫–ª—é—á–µ–Ω–∏—è", "error");
-    } finally {
-      setExpertLoggingIn(false);
-    }
-  }
-
-  function handleExpertLogout() {
-    setExpertData(null);
-    try { sessionStorage.removeItem("tochka_expert_access_code"); } catch {}
-    localStorage.removeItem("tochka_expert");
-    showToast("–†–µ–∂–∏–º —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞ –≤—ã–∫–ª—é—á–µ–Ω");
-  }
-
-  // ‚îÄ‚îÄ My Patients (expert panel) ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-
-  async function loadMyPatients() {
-    setPatientModalOpen(true);
-    setMyPatientsLoading(true);
-    try {
-      const body = { action: "listMyPatients" };
-      if (expertData) {
-        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
-      }
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setMyPatients(data.patients || []);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –ø–∞—Ü–∏–µ–Ω—Ç–æ–≤", "error");
-    } finally {
-      setMyPatientsLoading(false);
-    }
-  }
-
-  function getStoredExpertCode() {
-    try {
-      const sessionCode = sessionStorage.getItem("tochka_expert_access_code");
-      if (sessionCode) return sessionCode;
-      const expert = localStorage.getItem("tochka_expert");
-      return expert ? JSON.parse(expert)?.access_code || "" : "";
-    } catch { return ""; }
-  }
-
-  async function handleAssignPatient() {
-    const code = patientModalCode.trim().toUpperCase();
-    if (!code) return;
-    try {
-      const body = { action: "assignPatientToExpert", public_code: code };
-      if (expertData) {
-        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
-      }
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast("–ü–∞—Ü–∏–µ–Ω—Ç –Ω–∞–∑–Ω–∞—á–µ–Ω");
-        setPatientModalCode("");
-        loadMyPatients();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –Ω–∞–∑–Ω–∞—á–µ–Ω–∏—è", "error");
-    }
-  }
-
-  async function handleCreateInviteLink() {
-    try {
-      const body = { action: "createDoctorInviteLink", label: inviteLinkLabel };
-      if (expertData) {
-        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
-      }
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setInviteLinkCreated(data.invite_link);
-        showToast("–°—Å—ã–ª–∫–∞ —Å–æ–∑–¥–∞–Ω–∞");
-        setInviteLinkLabel("");
-        loadInviteLinks();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ —Å–æ–∑–¥–∞–Ω–∏—è —Å—Å—ã–ª–∫–∏", "error");
-    }
-  }
-
-  async function loadInviteLinks() {
-    try {
-      const body = { action: "listDoctorInviteLinks" };
-      if (expertData) {
-        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
-      }
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setInviteLinks(data.invite_links || []);
-      }
-    } catch {}
-  }
-
-  async function handleDisableInviteLink(linkId) {
-    try {
-      const body = { action: "disableDoctorInviteLink", link_id: linkId };
-      if (expertData) {
-        body.expert_code = expertCodeInput || (await getStoredExpertCode()) || "";
-      }
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast("–°—Å—ã–ª–∫–∞ –æ—Ç–∫–ª—é—á–µ–Ω–∞");
-        loadInviteLinks();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞", "error");
-    }
-  }
-
-  // ‚îÄ‚îÄ Admin Organizations ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-
-  async function adminLoadOrganizations() {
-    try {
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listOrganizations", admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setOrganizations(data.organizations || []);
-      }
-    } catch {}
-  }
-
-  async function handleCreateOrganization() {
-    if (!orgForm.name.trim()) { showToast("–£–∫–∞–∂–∏—Ç–µ –Ω–∞–∑–≤–∞–Ω–∏–µ", "error"); return; }
-    try {
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: orgFormEditId ? "updateOrganization" : "createOrganization",
-          admin_secret: adminPassword,
-          id: orgFormEditId,
-          ...orgForm,
-        }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast(orgFormEditId ? "–û—Ä–≥–∞–Ω–∏–∑–∞—Ü–∏—è –æ–±–Ω–æ–≤–ª–µ–Ω–∞" : "–û—Ä–≥–∞–Ω–∏–∑–∞—Ü–∏—è —Å–æ–∑–¥–∞–Ω–∞");
-        setOrgFormOpen(false);
-        setOrgFormEditId(null);
-        setOrgForm({ name: "", slug: "", type: "private_clinic", city: "", comment: "" });
-        adminLoadOrganizations();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞", "error");
-    }
-  }
-
-  async function adminLoadOrganizationExperts(orgId) {
-    try {
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listOrganizationExperts", organization_id: orgId, admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setOrgExperts(data.members || []);
-      }
-    } catch {}
-  }
-
-  async function handleAddExpertToOrg() {
-    if (!orgDetail?.id || !orgAddExpertId) return;
-    try {
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "addExpertToOrganization",
-          admin_secret: adminPassword,
-          organization_id: orgDetail.id,
-          expert_id: orgAddExpertId,
-          role: orgAddExpertRole,
-        }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast("–°–ø–µ—Ü–∏–∞–ª–∏—Å—Ç –¥–æ–±–∞–≤–ª–µ–Ω");
-        setOrgAddExpertOpen(false);
-        setOrgAddExpertId("");
-        adminLoadOrganizationExperts(orgDetail.id);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞", "error");
-    }
-  }
-
-  async function handleRemoveExpertFromOrg(expertId) {
-    if (!orgDetail?.id) return;
-    try {
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "removeExpertFromOrganization",
-          admin_secret: adminPassword,
-          organization_id: orgDetail.id,
-          expert_id: expertId,
-        }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast("–°–ø–µ—Ü–∏–∞–ª–∏—Å—Ç —É–¥–∞–ª—ë–Ω");
-        adminLoadOrganizationExperts(orgDetail.id);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞", "error");
-    }
-  }
-
-  async function adminListAllExperts() {
-    try {
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listAllExperts", admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      return data.experts || [];
-    } catch { return []; }
-  }
-
-  function resetRegisterForm() {
-    setRegisterForm({ name: "", email: "", telegram: "", role: "psychologist", specialty: "", city: "", organization: "" });
-  }
-
-  async function handleExpertRegister() {
-    const f = registerForm;
-    if (!f.name || f.name.trim().length < 2) {
-      showToast("–£–∫–∞–∂–∏—Ç–µ –∏–º—è (–º–∏–Ω–∏–º—É–º 2 —Å–∏–º–≤–æ–ª–∞)", "error");
-      return;
-    }
-
-    setRegisterSending(true);
-    try {
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "register",
-          name: f.name.trim(),
-          role: f.role,
-          specialty: f.specialty ? f.specialty.trim() : "",
-        }),
-      });
-      const text = await res.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        showToast(`–û—à–∏–±–∫–∞ —Å–µ—Ä–≤–µ—Ä–∞: ${res.status} ${res.statusText}`, "error");
-        return;
-      }
-      if (!res.ok || !data?.ok) {
-        showToast(`–û—à–∏–±–∫–∞ —Ä–µ–≥–∏—Å—Ç—Ä–∞—Ü–∏–∏: ${data?.details || data?.error || res.statusText}`, "error");
-        return;
-      }
-      setRegistrationResult(data);
-      setExpertData(data.expert);
-      localStorage.setItem("tochka_expert", JSON.stringify(data.expert));
-      showToast(`–†–µ–∂–∏–º —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞ –∞–∫—Ç–∏–≤–∏—Ä–æ–≤–∞–Ω: ${data.expert.name}`);
-    } catch (e) {
-      showToast(`–û—à–∏–±–∫–∞ –ø–æ–¥–∫–ª—é—á–µ–Ω–∏—è: ${e?.message || "–ø—Ä–æ–≤–µ—Ä—å—Ç–µ, –∑–∞–ø—É—â–µ–Ω –ª–∏ —Å–µ—Ä–≤–µ—Ä"}`, "error");
-    } finally {
-      setRegisterSending(false);
-    }
-  }
-
-  async function adminLoadRequests(filterStatus) {
-    const st = filterStatus || adminReqFilter;
-    try {
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listRequests", status: st, limit: 100 }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setAdminRequests(data.requests || []);
-      }
-    } catch {}
-  }
-
-  async function adminUpdateRequestStatus(requestId, status) {
-    try {
-      await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "updateRequestStatus", request_id: requestId, status, admin_secret: adminPassword }),
-      });
-      showToast("–°—Ç–∞—Ç—É—Å –∑–∞—è–≤–∫–∏ –æ–±–Ω–æ–≤–ª—ë–Ω");
-      adminLoadRequests(adminReqFilter);
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –æ–±–Ω–æ–≤–ª–µ–Ω–∏—è", "error");
-    }
-  }
-
-  const [recordingQuestionIndex, setRecordingQuestionIndex] = useState(null);
-  const [questionRecordingTime, setQuestionRecordingTime] = useState(0);
-  const [questionTranscribingIndex, setQuestionTranscribingIndex] = useState(null);
-
-  const questionMediaRecorderRef = useRef(null);
-  const questionAudioChunksRef = useRef([]);
-  const questionTimerRef = useRef(null);
-
-  const crisisMediaRecorderRef = useRef(null);
-  const crisisAudioChunksRef = useRef([]);
-  const crisisTimerRef = useRef(null);
-
-  const [crisisRecording, setCrisisRecording] = useState(false);
-  const [crisisRecordingTime, setCrisisRecordingTime] = useState(0);
-  const [crisisTranscribing, setCrisisTranscribing] = useState(false);
-  const [crisisVoiceError, setCrisisVoiceError] = useState("");
-  const [crisisWarning, setCrisisWarning] = useState("");
-  const [crisisConfirmation, setCrisisConfirmation] = useState("");
-  const [crisisShowHighRiskWarning, setCrisisShowHighRiskWarning] = useState(false);
-
-  const crisisKeywords = [
-    "—Ö–æ—á—É —É–º–µ—Ä–µ—Ç—å",
-    "–ø–æ–∫–æ–Ω—á–∏—Ç—å —Å —Å–æ–±–æ–π",
-    "—Å–∞–º–æ—É–±–∏–π",
-    "—Å—É–∏—Ü–∏–¥",
-    "—É–±–∏—Ç—å —Å–µ–±—è",
-    "–Ω–µ —Ö–æ—á—É –∂–∏—Ç—å",
-    "–ø—Ä–∏—á–∏–Ω–∏—Ç—å —Å–µ–±–µ –≤—Ä–µ–¥",
-    "–ø–æ—Ä–µ–∑–∞—Ç—å",
-    "—Ç–∞–±–ª–µ—Ç–∫–∏",
-    "–ø–æ–≤–µ—Å–∏—Ç—å—Å—è",
-    "–ø—Ä—ã–≥–Ω—É—Ç—å",
-    "–Ω–∞–≤—Ä–µ–¥–∏—Ç—å –∫–æ–º—É-—Ç–æ",
-    "—É–±–∏—Ç—å –∫–æ–≥–æ-—Ç–æ",
-    "—É–≥—Ä–æ–∂–∞—é—Ç",
-    "–º–µ–Ω—è —É–±—å—é—Ç",
-    "–≥–æ–ª–æ—Å–∞ –ø—Ä–∏–∫–∞–∑—ã–≤–∞—é—Ç",
-  ];
-
-  const roleMap = {
-    psychiatrist: "–ü—Å–∏—Ö–∏–∞—Ç—Ä",
-    psychologist: "–ü—Å–∏—Ö–æ–ª–æ–≥",
-    psychotherapist: "–ü—Å–∏—Ö–æ—Ç–µ—Ä–∞–ø–µ–≤—Ç",
-    clinical_psychologist: "–ö–ª–∏–Ω–∏—á–µ—Å–∫–∏–π –ø—Å–∏—Ö–æ–ª–æ–≥",
-    neurologist: "–ù–µ–≤—Ä–æ–ª–æ–≥",
-    other: "–î—Ä—É–≥–æ–µ",
-  };
-
-  function hasCrisisRisk(value) {
-    const lower = (value || "").toLowerCase();
-    return crisisKeywords.some((keyword) => lower.includes(keyword));
-  }
-
-  async function submitCrisisRequest() {
-    setCrisisWarning("");
-    setCrisisConfirmation("");
-
-    if (hasCrisisRisk(crisisText) && !crisisShowHighRiskWarning) {
-      setCrisisShowHighRiskWarning(true);
-      setCrisisWarning("–ï—Å–ª–∏ –µ—Å—Ç—å —Ä–∏—Å–∫ –ø—Ä–∏—á–∏–Ω–∏—Ç—å –≤—Ä–µ–¥ —Å–µ–±–µ –∏–ª–∏ –¥—Ä—É–≥–æ–º—É —á–µ–ª–æ–≤–µ–∫—É ‚Äî –∑–≤–æ–Ω–∏—Ç–µ 112 –∏–ª–∏ 103 –∏ –Ω–µ –æ—Å—Ç–∞–≤–∞–π—Ç–µ—Å—å –æ–¥–Ω–∏.");
-      return;
-    }
-
-    if (!crisisContact.trim() && !crisisText.trim()) {
-      setCrisisWarning("–û–ø–∏—à–∏—Ç–µ —Å–∏—Ç—É–∞—Ü–∏—é –∏–ª–∏ —É–∫–∞–∂–∏—Ç–µ –∫–æ–Ω—Ç–∞–∫—Ç –¥–ª—è —Å–≤—è–∑–∏. –ï—Å–ª–∏ –æ–ø–∞—Å–Ω–æ –ø—Ä—è–º–æ —Å–µ–π—á–∞—Å ‚Äî –∑–≤–æ–Ω–∏—Ç–µ 112 –∏–ª–∏ 103.");
-      return;
-    }
-
-    setCrisisSubmitting(true);
-    try {
-      const res = await fetch("/api/crisis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "save",
-          crisis_text: crisisText,
-          contact: crisisContact,
-          public_code: publicCode || null,
-          session_id: sessionId || null,
-          high_risk_detected: hasCrisisRisk(crisisText),
-          risk_markers: hasCrisisRisk(crisisText) ? crisisKeywords.filter(k => (crisisText || "").toLowerCase().includes(k)) : null,
-        }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setCrisisConfirmation("–û–±—Ä–∞—â–µ–Ω–∏–µ —Å–æ—Ö—Ä–∞–Ω–µ–Ω–æ. –ï—Å–ª–∏ –µ—Å—Ç—å –Ω–µ–ø–æ—Å—Ä–µ–¥—Å—Ç–≤–µ–Ω–Ω–∞—è —É–≥—Ä–æ–∑–∞ –∂–∏–∑–Ω–∏ –∏–ª–∏ –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç–∏ ‚Äî –Ω–µ –∂–¥–∏—Ç–µ –æ—Ç–≤–µ—Ç–∞ —Å–µ—Ä–≤–∏—Å–∞, –∑–≤–æ–Ω–∏—Ç–µ 112 –∏–ª–∏ 103.");
-      } else {
-        setCrisisWarning(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ—Ö—Ä–∞–Ω–∏—Ç—å –æ–±—Ä–∞—â–µ–Ω–∏–µ. –ï—Å–ª–∏ –æ–ø–∞—Å–Ω–æ –ø—Ä—è–º–æ —Å–µ–π—á–∞—Å ‚Äî –∑–≤–æ–Ω–∏—Ç–µ 112 –∏–ª–∏ 103.");
-      }
-    } catch (e) {
-      console.error("submit crisis error", e);
-      setCrisisWarning("–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ—Ö—Ä–∞–Ω–∏—Ç—å –æ–±—Ä–∞—â–µ–Ω–∏–µ. –ï—Å–ª–∏ –æ–ø–∞—Å–Ω–æ –ø—Ä—è–º–æ —Å–µ–π—á–∞—Å ‚Äî –∑–≤–æ–Ω–∏—Ç–µ 112 –∏–ª–∏ 103.");
-    } finally {
-      setCrisisSubmitting(false);
-    }
-  }
-
-  function continueFromCrisis() {
-    setCrisisConfirmation("");
-    setCrisisWarning("");
-
-    if (crisisTimerRef.current) {
-      clearInterval(crisisTimerRef.current);
-    }
-    if (crisisMediaRecorderRef.current && crisisRecording) {
-      crisisMediaRecorderRef.current.stop();
-    }
-    if (crisisText.trim()) {
-      setText(crisisText);
-      setMode("text");
-    }
-    setCrisisOpen(false);
-    setCrisisText("");
-    setCrisisContact("");
-    setCrisisRecording(false);
-    setCrisisRecordingTime(0);
-    setCrisisTranscribing(false);
-    setCrisisVoiceError("");
-    setCrisisWarning("");
-    setCrisisShowHighRiskWarning(false);
-  }
-
-  function handleCrisisClose() {
-    if (crisisTimerRef.current) {
-      clearInterval(crisisTimerRef.current);
-    }
-    if (crisisMediaRecorderRef.current && crisisRecording) {
-      crisisMediaRecorderRef.current.stop();
-    }
-    setCrisisOpen(false);
-    setCrisisSubmitting(false);
-    setCrisisText("");
-    setCrisisContact("");
-    setCrisisRecording(false);
-    setCrisisRecordingTime(0);
-    setCrisisTranscribing(false);
-    setCrisisVoiceError("");
-    setCrisisWarning("");
-    setCrisisConfirmation("");
-    setCrisisShowHighRiskWarning(false);
-  }
-
-  // Support Cabinet MVP helpers
-  async function loadSupportCabinet(enteredCode) {
-    const saved = getSupportSession();
-    const accessToken = saved.accessToken;
-
-    setCabinetLoading(true);
-    setContinuationCodeError("");
-    setError("");
-    try {
-      let cabinetData;
-      let effectiveSessionId;
-      let effectiveAccessToken;
-
-      if (accessToken && saved.sessionId && !(APP_BRAND.isSupportPilot && enteredCode)) {
-        // Same device: use stored access token.
-        const body = { action: "getCabinet", sessionId: saved.sessionId, access_token: accessToken };
-        const cabinetRes = await fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-        cabinetData = await cabinetRes.json();
-        if (!cabinetRes.ok || !cabinetData.ok) {
-          throw new Error(cabinetData.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–∫—Ä—ã—Ç—å –∫–∞–±–∏–Ω–µ—Ç");
-        }
-        effectiveSessionId = cabinetData.session_id || saved.sessionId;
-        effectiveAccessToken = accessToken;
-      } else if (enteredCode) {
-        // Cross-device: exchange continuation code for access token, then load cabinet.
-        const exchangeRes = await fetch("/api/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "exchangeContinuationCredential", module: "support", continuation_code: enteredCode }),
-        });
-        const exchangeData = await exchangeRes.json();
-        if (!exchangeRes.ok || !exchangeData.ok) {
-          throw new Error(exchangeData.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–∫—Ä—ã—Ç—å —Ä–∞–∑–≥–æ–≤–æ—Ä. –ü—Ä–æ–≤–µ—Ä—å—Ç–µ –∫–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è.");
-        }
-        effectiveSessionId = exchangeData.session_id;
-        effectiveAccessToken = exchangeData.access_token;
-        saveSupportSession(effectiveSessionId, effectiveAccessToken);
-        // Now load full cabinet with wallet/specialist/requests
-        const cabinetRes = await fetch("/api/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "getCabinet", sessionId: effectiveSessionId, access_token: effectiveAccessToken }),
-        });
-        cabinetData = await cabinetRes.json();
-        if (!cabinetRes.ok || !cabinetData.ok) {
-          // Fallback to exchange cabinet data
-          cabinetData = { ...exchangeData.cabinet, ok: true, public_code: exchangeData.public_code, session_id: exchangeData.session_id };
-        }
-      } else {
-        // No stored token and no code: show modal.
-        setSessionModalOpen(true);
-        setCabinetLoading(false);
-        return;
-      }
-
-      setSupportCabinet({
-        sessions: cabinetData.sessions || [],
-        latest_report: cabinetData.latest_report || null,
-        public_code: cabinetData.public_code || "",
-        wallet: cabinetData.wallet || null,
-        specialist: cabinetData.specialist || null,
-        service_requests: cabinetData.service_requests || [],
-        match_requests: APP_BRAND.isSupportPilot ? cabinetData.match_requests || [] : [],
-        unread_message_count: cabinetData.unread_message_count || 0,
-        display_name: cabinetData.display_name || null,
-        medication_cards: cabinetData.medication_cards || [],
-      });
-      setSupportDisplayName(cabinetData.display_name || null);
-      setSessionId(effectiveSessionId);
-      setPublicCode(cabinetData.public_code || enteredCode || saved.sessionId);
-      setPhase("cabinet");
-      setSupportScreen("cabinet");
-      // Optional loads ‚Äî non-blocking
-      loadSupportCheckins().catch(() => {});
-      loadSupportPractices().catch(() => {});
-      loadPatientInvitations().catch(() => {});
-      // Don't auto-load chat ‚Äî show fresh composer
-      setQuickChatMessages([]);
-      setQuickChatInput("");
-      setQuickChatShowHistory(false);
-      return true;
-    } catch (e) {
-      const msg = e.message || "";
-      let userMsg = "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–∫—Ä—ã—Ç—å –∫–∞–±–∏–Ω–µ—Ç. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.";
-      if (APP_BRAND.isSupportPilot && msg.includes("—Å—Ç–∞—Ä–æ–π –≤–µ—Ä—Å–∏–∏")) {
-        userMsg = msg;
-      } else if (msg.includes("–∫–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è") || msg.includes("continuation") || msg.includes("401") || msg.includes("403")) {
-        userMsg = "–ü—Ä–æ–≤–µ—Ä—å—Ç–µ –∫–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è.";
-      } else if (msg.includes("fetch") || msg.includes("NetworkError") || msg.includes("network")) {
-        userMsg = "–ù–µ —É–¥–∞–ª–æ—Å—å —Å–≤—è–∑–∞—Ç—å—Å—è —Å —Å–µ—Ä–≤–∏—Å–æ–º. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.";
-      }
-      setContinuationCodeError(userMsg);
-      if (!(APP_BRAND.isSupportPilot && msg.includes("—Å—Ç–∞—Ä–æ–π –≤–µ—Ä—Å–∏–∏"))) showToast(userMsg, "error");
-      return false;
-    } finally {
-      setCabinetLoading(false);
-    }
-  }
-
-  async function loadBodyCabinet(enteredCode, options = {}) {
-    const preferCode = options.preferCode === true;
-    const saved = getBodySession();
-    const accessToken = saved.accessToken;
-
-    setBodyCabinetLoading(true);
-    setBodyContinuationError("");
-    setError("");
-    try {
-      let cabinetData;
-      let effectiveSessionId;
-      let effectiveAccessToken;
-
-      // An explicitly user-entered continuation code is never silently
-      // overridden by a previously stored credential pair.
-      if (!(preferCode && enteredCode) && accessToken && saved.sessionId) {
-        const d = new Date();
-        const clientToday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const body = { action: "getBodyCabinet", sessionId: saved.sessionId, accessToken, clientToday };
-        const cabinetRes = await fetch("/api/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        cabinetData = await cabinetRes.json();
-        if (!cabinetRes.ok || !cabinetData.ok) {
-          throw new Error(cabinetData.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–∫—Ä—ã—Ç—å –∫–∞–±–∏–Ω–µ—Ç");
-        }
-        effectiveSessionId = saved.sessionId;
-        effectiveAccessToken = accessToken;
-      } else if (enteredCode) {
-        const exchangeRes = await fetch("/api/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "exchangeContinuationCredential", module: "body", continuation_code: enteredCode }),
-        });
-        const exchangeData = await exchangeRes.json();
-        if (!exchangeRes.ok || !exchangeData.ok) {
-          throw new Error(exchangeData.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–∫—Ä—ã—Ç—å –ø—Ä–æ—Ñ–∏–ª—å. –ü—Ä–æ–≤–µ—Ä—å—Ç–µ –∫–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è.");
-        }
-        effectiveSessionId = exchangeData.session_id;
-        effectiveAccessToken = exchangeData.access_token;
-        saveBodySession(effectiveSessionId, effectiveAccessToken);
-
-        const d2 = new Date();
-        const clientToday2 = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, "0")}-${String(d2.getDate()).padStart(2, "0")}`;
-        const cabinetRes = await fetch("/api/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "getBodyCabinet", sessionId: effectiveSessionId, accessToken: effectiveAccessToken, clientToday: clientToday2 }),
-        });
-        cabinetData = await cabinetRes.json();
-        if (!cabinetRes.ok || !cabinetData.ok) {
-          throw new Error(cabinetData.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å –∫–∞–±–∏–Ω–µ—Ç");
-        }
-      } else {
-        setBodyCabinetLoading(false);
-        return;
-      }
-
-      setBodyCabinetData(cabinetData);
-      setBodyDiarySessionId(effectiveSessionId);
-
-      // Check if onboarding is needed
-      try {
-        let token;
-        try { token = await getClientToken("body", "session"); } catch {}
-        const hdrs = { "Content-Type": "application/json" };
-        if (token) hdrs["Authorization"] = `Bearer ${token}`;
-        const onbRes = await fetch("/api/session", {
-          method: "POST",
-          headers: hdrs,
-          body: JSON.stringify({ action: "getBodyOnboarding", session_id: effectiveSessionId, access_token: effectiveAccessToken }),
-        });
-        const onbData = await onbRes.json();
-        if (onbData.ok && !onbData.onboarding?.intro_completed) {
-          setBodyScreen("onboarding");
-        } else {
-          setBodyScreen("cabinet");
-        }
-      } catch {
-        setBodyScreen("cabinet");
-      }
-    } catch (e) {
-      setBodyContinuationError(e.message || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–∫—Ä—ã—Ç—å –ø—Ä–æ—Ñ–∏–ª—å. –ü—Ä–æ–≤–µ—Ä—å—Ç–µ –∫–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è.");
-      showToast(e.message || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–∫—Ä—ã—Ç—å –ø—Ä–æ—Ñ–∏–ª—å.", "error");
-    } finally {
-      setBodyCabinetLoading(false);
-    }
-  }
-
-  async function regenerateSupportContinuationCode() {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) {
-      showToast("–ù—É–∂–µ–Ω –∫–æ–¥ –¥–æ—Å—Ç—É–ø–∞ –∫ —Ä–∞–∑–≥–æ–≤–æ—Ä—É.", "error");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "regenerateContinuationCredential", module: "support", session_id: saved.sessionId, access_token: saved.accessToken }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ–∑–¥–∞—Ç—å –Ω–æ–≤—ã–π –∫–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è");
-      }
-      setRegeneratedCode(data.continuation_code);
-      setContinuationCode(null);
-    } catch (e) {
-      showToast(e.message || "–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ–∑–¥–∞—Ç—å –Ω–æ–≤—ã–π –∫–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è", "error");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function regenerateBodyContinuationCode() {
-    const saved = getBodySession();
-    if (!saved.sessionId || !saved.accessToken) {
-      throw new Error("–ù—É–∂–µ–Ω –∫–æ–¥ –¥–æ—Å—Ç—É–ø–∞ –∫ –ø—Ä–æ—Ñ–∏–ª—é.");
-    }
-    const res = await fetch("/api/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "regenerateContinuationCredential", module: "body", session_id: saved.sessionId, access_token: saved.accessToken }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ–∑–¥–∞—Ç—å –Ω–æ–≤—ã–π –∫–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è");
-    }
-    return data.continuation_code;
-  }
-
-  async function openSupportReport(targetSessionId) {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) {
-      showToast("–ù—É–∂–µ–Ω –∫–æ–¥ –¥–æ—Å—Ç—É–ø–∞ –∫ —Ä–∞–∑–≥–æ–≤–æ—Ä—É.", "error");
-      return;
-    }
-    const sid = targetSessionId || saved.sessionId;
-    setLoading(true);
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "getReport", sessionId: sid, access_token: saved.accessToken }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–∫—Ä—ã—Ç—å –æ—Ç—á—ë—Ç");
-      }
-      const s = data.session;
-      setSessionId(s.sessionId || s.session_id);
-      setPublicCode(s.publicCode || s.public_code);
-      setText(s.patient_input || s.patient_text || "");
-      setConversationHistory(s.conversationHistory || s.conversation_history || []);
-      setDialogDepth(s.dialogDepth || 0);
-      setPreviousPatientReport(s.previousPatientReport || s.user_report || "");
-      setPreviousDoctorReport("");
-      setHomeTasks(s.homeTasks || "");
-      setResourceFactors(s.resourceFactors || "");
-      // Client-safe: only user_report, no doctor_report
-      setResult(s.user_report || "");
-      setReportSource("cabinet");
-      setJustFinishedSession(false);
-      if (supportCabinet?.wallet) {
-        setUsageBalance({ ...supportCabinet.wallet, module: "support" });
-      }
-      setActiveTab("user");
-      setPhase("report");
-      setSupportScreen("report");
-    } catch (e) {
-      showToast(e.message || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–∫—Ä—ã—Ç—å –æ—Ç—á—ë—Ç", "error");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function startSupportFollowUp() {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) {
-      showToast("–ù—É–∂–µ–Ω –∫–æ–¥ –¥–æ—Å—Ç—É–ø–∞ –∫ —Ä–∞–∑–≥–æ–≤–æ—Ä—É.", "error");
-      return;
-    }
-    const latest = supportCabinet?.sessions?.[0];
-    const latestReport = supportCabinet?.latest_report || {};
-    setSessionId(saved.sessionId);
-    setPublicCode(latest?.publicCode || supportCabinet?.public_code || saved.sessionId);
-    if (APP_BRAND.isSupportPilot && latestReport.crisisBlock?.status === "safety_check_in_progress") {
-      const safetyQuestions = latestReport.crisisBlock.questions || [
-        "–í—ã —Å–µ–π—á–∞—Å –≤ –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç–∏? –ï—Å—Ç—å –ª–∏ —Ä–∏—Å–∫, —á—Ç–æ –≤—ã –ø—Ä–∏—á–∏–Ω–∏—Ç–µ —Å–µ–±–µ –≤—Ä–µ–¥ –≤ –±–ª–∏–∂–∞–π—à–µ–µ –≤—Ä–µ–º—è?",
-        "–ï—Å—Ç—å –ª–∏ —É –≤–∞—Å —Å–µ–π—á–∞—Å –Ω–∞–º–µ—Ä–µ–Ω–∏–µ –∏–ª–∏ –∫–æ–Ω–∫—Ä–µ—Ç–Ω—ã–π –ø–ª–∞–Ω –ø—Ä–∏—á–∏–Ω–∏—Ç—å —Å–µ–±–µ –≤—Ä–µ–¥?",
-        "–í—ã —Å–µ–π—á–∞—Å –æ–¥–∏–Ω/–æ–¥–Ω–∞? –ö—Ç–æ –º–æ–∂–µ—Ç –ø–æ–±—ã—Ç—å —Ä—è–¥–æ–º –∏–ª–∏ –ø–æ–≥–æ–≤–æ—Ä–∏—Ç—å —Å –≤–∞–º–∏?",
-        "–ö–æ–º—É –≤—ã –º–æ–∂–µ—Ç–µ –ø–æ–∑–≤–æ–Ω–∏—Ç—å –∏–ª–∏ –Ω–∞–ø–∏—Å–∞—Ç—å –ø—Ä—è–º–æ —Å–µ–π—á–∞—Å?",
-      ];
-      setText(latestReport.crisisBlock.initial_message || latest?.summary || "");
-      setIsContinuation(false);
-      setPreviousPatientReport("");
-      setPreviousDoctorReport("");
-      setConversationHistory([{ role: "assistant", questions: safetyQuestions }]);
-      setDialogDepth(1);
-      setAnswers({});
-      setQuestions(safetyQuestions);
-      setResult(null);
-      setCrisisMode(true);
-      setCrisisBlock(latestReport.crisisBlock);
-      setPhase("questions");
-      setSupportScreen("questions");
-      return;
-    }
-    setIsContinuation(true);
-    setPreviousPatientReport(latestReport.user_report || "");
-    setPreviousDoctorReport("");
-    setHomeTasks(latestReport.homeTasks || "");
-    setResourceFactors(latestReport.resourceFactors || "");
-    setSupportPlan(latestReport.supportPlan || null);
-    setConversationHistory([]);
-    setDialogDepth(0);
-    setAnswers({});
-    setQuestions(null);
-    setResult(null);
-    setCrisisMode(false);
-    setCrisisBlock(null);
-    setFollowUpAnswers({});
-    setPhase("followup");
-    setSupportScreen("followup");
-    loadSupportPractices();
-  }
-
-  async function submitFollowUp() {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) {
-      showToast("–ù—É–∂–µ–Ω –∫–æ–¥ –¥–æ—Å—Ç—É–ø–∞ –∫ —Ä–∞–∑–≥–æ–≤–æ—Ä—É.", "error");
-      return;
-    }
-    const answers = followUpAnswers;
-    const hasStructured = answers.dynamics?.trim() || answers.new_concerns?.trim() || answers.tried?.trim();
-    const hasFreeText = answers.free_text?.trim();
-    if (!hasStructured && !hasFreeText) {
-      showToast("–ó–∞–ø–æ–ª–Ω–∏—Ç–µ —Ö–æ—Ç—è –±—ã –æ–¥–Ω–æ –ø–æ–ª–µ –∏–ª–∏ –Ω–∞–ø–∏—à–∏—Ç–µ —Å–≤–æ–±–æ–¥–Ω—ã–π —Ç–µ–∫—Å—Ç.", "error");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    try {
-      // Create a new session for the follow-up, linked to the same owner/wallet
-      const createRes = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "createFollowUpSession",
-          previousSessionId: saved.sessionId,
-          access_token: saved.accessToken,
-        }),
-      });
-      const createData = await createRes.json();
-      if (!createRes.ok || !createData.ok) {
-        throw new Error(createData.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –Ω–∞—á–∞—Ç—å –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏–µ");
-      }
-
-      saveSupportSession(createData.sessionId, createData.access_token);
-      setSessionId(createData.sessionId);
-      setPublicCode(createData.public_code);
-      sessionRef.current = { sessionId: createData.sessionId, accessToken: createData.access_token };
-
-      const followUpParts = [];
-      if (answers.dynamics?.trim()) followUpParts.push(`–°—Ç–∞–ª–æ –ª–µ–≥—á–µ, —Ç—è–∂–µ–ª–µ–µ –∏–ª–∏ –ø—Ä–∏–º–µ—Ä–Ω–æ —Ç–∞–∫ –∂–µ: ${answers.dynamics}`);
-      if (answers.new_concerns?.trim()) followUpParts.push(`–ü–æ—è–≤–∏–ª–æ—Å—å –ª–∏ —á—Ç–æ-—Ç–æ –Ω–æ–≤–æ–µ, —á—Ç–æ –æ—Å–æ–±–µ–Ω–Ω–æ –±–µ—Å–ø–æ–∫–æ–∏—Ç: ${answers.new_concerns}`);
-      if (answers.tried?.trim()) followUpParts.push(`–ß—Ç–æ –∏–∑ –ø—Ä–µ–¥–ª–æ–∂–µ–Ω–Ω–æ–≥–æ —Ä–∞–Ω—å—à–µ —É–¥–∞–ª–æ—Å—å –ø–æ–ø—Ä–æ–±–æ–≤–∞—Ç—å: ${answers.tried}`);
-      if (answers.free_text?.trim()) followUpParts.push(`–î–æ–ø–æ–ª–Ω–∏—Ç–µ–ª—å–Ω–æ –æ—Ç –ø–æ–ª—å–∑–æ–≤–∞—Ç–µ–ª—è:\n${answers.free_text}`);
-
-      // Add practice context for AI
-      if (supportPractices.length > 0) {
-        const practiceContext = supportPractices
-          .filter(p => p.status === "active")
-          .map(p => `- ${p.title} (—Å—Ç–∞—Ç—É—Å: ${p.user_status === "helped" ? "–ø–æ–º–æ–≥–ª–æ" : p.user_status === "not_helpful" ? "–Ω–µ –ø–æ–¥–æ—à–ª–æ" : p.user_status === "tried" ? "–ø—Ä–æ–±–æ–≤–∞–ª" : "–Ω–µ –ø—Ä–æ–±–æ–≤–∞–ª"})`)
-          .join("\n");
-        if (practiceContext) {
-          followUpParts.push(`–†–∞–Ω–µ–µ —Ä–µ–∫–æ–º–µ–Ω–¥–æ–≤–∞–Ω–Ω—ã–µ –ø—Ä–∞–∫—Ç–∏–∫–∏:\n${practiceContext}`);
-        }
-      }
-
-      const followUpText = followUpParts.join("\n\n");
-
-      // Build structured answered topics for AI dedup
-      const answeredTopics = {};
-      if (answers.dynamics?.trim()) answeredTopics.overall_change = answers.dynamics.trim();
-      if (answers.new_concerns?.trim()) answeredTopics.new_concerns = answers.new_concerns.trim();
-      if (answers.tried?.trim()) answeredTopics.tried_practices = answers.tried.trim();
-      if (answers.free_text?.trim()) answeredTopics.free_text = answers.free_text.trim();
-      // Add practice statuses
-      if (supportPractices.length > 0) {
-        answeredTopics.practice_statuses = supportPractices
-          .filter(p => p.status === "active")
-          .map(p => ({ title: p.title, status: p.user_status }));
-      }
-      setFollowupAnsweredTopics(answeredTopics);
-
-      setText(followUpText);
-      setConversationHistory([]);
-      setDialogDepth(0);
-      setAnswers({});
-      setQuestions(null);
-      setResult(null);
-      setReportSource("generated");
-      setJustFinishedSession(false);
-
-      // Continue via existing analyze flow
-      await submitRound(followUpText);
-    } catch (e) {
-      showToast(e.message || "–ù–µ —É–¥–∞–ª–æ—Å—å –Ω–∞—á–∞—Ç—å –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏–µ", "error");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Open a specific session from cabinet (session_view)
-  async function openSupportSessionView(targetSessionId) {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) {
-      showToast("–ù—É–∂–µ–Ω –∫–æ–¥ –¥–æ—Å—Ç—É–ø–∞ –∫ —Ä–∞–∑–≥–æ–≤–æ—Ä—É.", "error");
-      return;
-    }
-    setSupportSessionLoading(true);
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "getReport", sessionId: targetSessionId, access_token: saved.accessToken }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–∫—Ä—ã—Ç—å —Å–µ—Å—Å–∏—é");
-      }
-      setSupportViewingSession(targetSessionId);
-      setSupportViewingSessionData(data.session);
-      setPhase("session_view");
-      setSupportScreen("session_view");
-    } catch (e) {
-      showToast(e.message || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–∫—Ä—ã—Ç—å —Å–µ—Å—Å–∏—é", "error");
-    } finally {
-      setSupportSessionLoading(false);
-    }
-  }
-
-  // Submit a new support service request
-  function openSupportRequestForSession(targetSessionId = sessionId) {
-    setSupportRequestSessionId(targetSessionId || null);
-    setSupportNewRequestOpen(true);
-  }
-
-  async function submitSupportServiceRequest() {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) {
-      showToast("–ù—É–∂–µ–Ω –∫–æ–¥ –¥–æ—Å—Ç—É–ø–∞.", "error");
-      return;
-    }
-    if (!supportNewRequest.service_code) {
-      showToast("–í—ã–±–µ—Ä–∏—Ç–µ —É—Å–ª—É–≥—É.", "error");
-      return;
-    }
-    if (!supportNewRequest.message || supportNewRequest.message.trim().length < 2) {
-      showToast("–£–∫–∞–∂–∏—Ç–µ —Å–æ–æ–±—â–µ–Ω–∏–µ.", "error");
-      return;
-    }
-    setSupportRequestSubmitting(true);
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "createSupportServiceRequest",
-          session_id: APP_BRAND.isSupportPilot ? supportRequestSessionId || saved.sessionId : saved.sessionId,
-          access_token: saved.accessToken,
-          service_code: supportNewRequest.service_code,
-          reason: supportNewRequest.reason,
-          message: supportNewRequest.message,
-          preferred_date: supportNewRequest.preferred_date,
-          time_from: supportNewRequest.time_from,
-          time_to: supportNewRequest.time_to,
-          comment: supportNewRequest.comment,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–ø—Ä–∞–≤–∏—Ç—å –∑–∞–ø—Ä–æ—Å");
-      }
-      showToast("–ó–∞–ø—Ä–æ—Å –æ—Ç–ø—Ä–∞–≤–ª–µ–Ω —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç—É.", "success");
-      setSupportNewRequestOpen(false);
-      setSupportRequestSessionId(null);
-      setSupportNewRequest({ service_code: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
-      // Refresh cabinet to show new request
-      await refreshSupportCabinet();
-    } catch (e) {
-      showToast(e.message || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–ø—Ä–∞–≤–∏—Ç—å –∑–∞–ø—Ä–æ—Å", "error");
-    } finally {
-      setSupportRequestSubmitting(false);
-    }
-  }
-
-  // Cancel a support service request
-  async function cancelSupportServiceRequest(requestId) {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "cancelSupportServiceRequest",
-          session_id: saved.sessionId,
-          access_token: saved.accessToken,
-          request_id: requestId,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–º–µ–Ω–∏—Ç—å –∑–∞–ø—Ä–æ—Å");
-      }
-      showToast("–ó–∞–ø—Ä–æ—Å –æ—Ç–º–µ–Ω—ë–Ω.", "success");
-      await refreshSupportCabinet();
-    } catch (e) {
-      showToast(e.message || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–º–µ–Ω–∏—Ç—å –∑–∞–ø—Ä–æ—Å", "error");
-    }
-  }
-
-  // Refresh support cabinet data
-  async function refreshSupportCabinet() {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "getCabinet", sessionId: saved.sessionId, access_token: saved.accessToken }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        setSupportCabinet({
-          sessions: data.sessions || [],
-          latest_report: data.latest_report || null,
-          public_code: data.public_code || "",
-          wallet: data.wallet || null,
-          specialist: data.specialist || null,
-          service_requests: data.service_requests || [],
-          match_requests: APP_BRAND.isSupportPilot ? data.match_requests || [] : [],
-          unread_message_count: data.unread_message_count || 0,
-          display_name: data.display_name || null,
-          medication_cards: data.medication_cards || [],
-        });
-        if (data.display_name) setSupportDisplayName(data.display_name);
-      }
-    } catch { /* silent */ }
-  }
-
-  // ‚îÄ‚îÄ Patient Invitations ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-  async function loadPatientInvitations() {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    setPatientInvitationsLoading(true);
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listPatientInvitations", session_id: saved.sessionId, access_token: saved.accessToken }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) setPatientInvitations(data.invitations || []);
-    } catch {}
-    setPatientInvitationsLoading(false);
-  }
-
-  async function acceptPatientInvitationById(invitationId) {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "acceptPatientInvitationById", session_id: saved.sessionId, access_token: saved.accessToken, invitation_id: invitationId }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        showToast("–°–ø–µ—Ü–∏–∞–ª–∏—Å—Ç –Ω–∞–∑–Ω–∞—á–µ–Ω");
-        await refreshSupportCabinet();
-        await loadPatientInvitations();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch { showToast("–û—à–∏–±–∫–∞ —Å–µ—Ç–∏", "error"); }
-  }
-
-  async function declinePatientInvitationById(invitationId) {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "declinePatientInvitationById", session_id: saved.sessionId, access_token: saved.accessToken, invitation_id: invitationId }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        showToast("–ü—Ä–∏–≥–ª–∞—à–µ–Ω–∏–µ –æ—Ç–∫–ª–æ–Ω–µ–Ω–æ");
-        await loadPatientInvitations();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch { showToast("–û—à–∏–±–∫–∞ —Å–µ—Ç–∏", "error"); }
-  }
-
-  async function acceptPublicSpecialistInvitation(token) {
-    let saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) {
-      try {
-        await ensureStartSession();
-        saved = getSupportSession();
-      } catch (error) {
-        showToast(error.message || "–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ–∑–¥–∞—Ç—å –∑–∞—â–∏—â—ë–Ω–Ω—É—é —Å–µ—Å—Å–∏—é", "error");
-        return;
-      }
-    }
-    if (!saved.sessionId || !saved.accessToken) {
-      showToast("–ù–µ —É–¥–∞–ª–æ—Å—å –ø–æ–¥–≥–æ—Ç–æ–≤–∏—Ç—å –∑–∞—â–∏—â—ë–Ω–Ω—É—é —Å–µ—Å—Å–∏—é", "error");
-      return;
-    }
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "acceptSpecialistInvitation", session_id: saved.sessionId, access_token: saved.accessToken, invitation_token: token }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        showToast("–°–ø–µ—Ü–∏–∞–ª–∏—Å—Ç –Ω–∞–∑–Ω–∞—á–µ–Ω");
-        localStorage.removeItem("tochka_invite_token");
-        setInviteInfo(null);
-        await loadSupportCabinet();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch { showToast("–û—à–∏–±–∫–∞ —Å–µ—Ç–∏", "error"); }
-  }
-
-  async function declinePublicSpecialistInvitation(token) {
-    let saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) {
-      try {
-        await ensureStartSession();
-        saved = getSupportSession();
-      } catch (error) {
-        showToast(error.message || "–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ–∑–¥–∞—Ç—å –∑–∞—â–∏—â—ë–Ω–Ω—É—é —Å–µ—Å—Å–∏—é", "error");
-        return;
-      }
-    }
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "declineSpecialistInvitation", session_id: saved.sessionId, access_token: saved.accessToken, invitation_token: token }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        showToast("–ü—Ä–∏–≥–ª–∞—à–µ–Ω–∏–µ –æ—Ç–∫–ª–æ–Ω–µ–Ω–æ");
-        localStorage.removeItem("tochka_invite_token");
-        setInviteInfo(null);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch { showToast("–û—à–∏–±–∫–∞ —Å–µ—Ç–∏", "error"); }
-  }
-
-  async function declineSpecialistInvitation(token) {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "declineSpecialistInvitation", session_id: saved.sessionId, access_token: saved.accessToken, invitation_token: token }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        showToast("–ü—Ä–∏–≥–ª–∞—à–µ–Ω–∏–µ –æ—Ç–∫–ª–æ–Ω–µ–Ω–æ");
-        await loadPatientInvitations();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch { showToast("–û—à–∏–±–∫–∞ —Å–µ—Ç–∏", "error"); }
-  }
-
-  async function submitPatientSpecialistOnboarding() {
-    if (!onboardingForm.name.trim()) return;
-    setOnboardingSubmitting(true);
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "submitOnboardingRequest", invitation_token: inviteToken, ...onboardingForm, name: onboardingForm.name.trim() }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        showToast(data.message || "–ó–∞—è–≤–∫–∞ –æ—Ç–ø—Ä–∞–≤–ª–µ–Ω–∞");
-        setInviteInfo({ ...inviteInfo, status: "onboarding_submitted" });
-      } else {
-        showToast(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–ø—Ä–∞–≤–∏—Ç—å –∑–∞—è–≤–∫—É", "error");
-      }
-    } catch { showToast("–û—à–∏–±–∫–∞ —Å–µ—Ç–∏", "error"); }
-    setOnboardingSubmitting(false);
-  }
-
-  async function respondToPatientInvitationAsSpecialist(action) {
-    try {
-      const res = await fetch("/api/specialist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ action, invitation_id: inviteInfo?.invitation_id }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        showToast(action === "acceptPatientInvitation" ? "–ü–∞—Ü–∏–µ–Ω—Ç –ø–æ–¥–∫–ª—é—á—ë–Ω" : "–ü—Ä–∏–≥–ª–∞—à–µ–Ω–∏–µ –æ—Ç–∫–ª–æ–Ω–µ–Ω–æ");
-        localStorage.removeItem("tochka_invite_token");
-        setInviteInfo(null);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch { showToast("–û—à–∏–±–∫–∞ —Å–µ—Ç–∏", "error"); }
-  }
-
-  async function createPatientInvitation() {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "createPatientInvitation", session_id: saved.sessionId, access_token: saved.accessToken }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        setPatientInviteCreated(data.invitation);
-        await loadPatientInvitations();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch { showToast("–û—à–∏–±–∫–∞ —Å–µ—Ç–∏", "error"); }
-  }
-
-  async function createMatchRequest(message) {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    setMatchRequestSending(true);
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "createMatchRequest", session_id: saved.sessionId, access_token: saved.accessToken, message }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        showToast("–ó–∞—è–≤–∫–∞ –æ—Ç–ø—Ä–∞–≤–ª–µ–Ω–∞. –ê–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä –ø–æ–¥–±–µ—Ä—ë—Ç —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞.");
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch { showToast("–û—à–∏–±–∫–∞ —Å–µ—Ç–∏", "error"); }
-    setMatchRequestSending(false);
-  }
-
-  // Load daily check-ins
-  async function loadSupportCheckins() {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "getSupportCheckins", session_id: saved.sessionId, access_token: saved.accessToken, days: 90 }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        setCheckinToday(data.today);
-        setCheckinHistory(data.history || []);
-        if (data.today) {
-          setCheckinWellbeing(data.today.wellbeing_score);
-          setCheckinAnxiety(data.today.anxiety_score);
-          setCheckinComment(data.today.comment || "");
-        }
-      }
-    } catch { /* silent */ }
-  }
-
-  // Save daily check-in
-  async function saveSupportCheckin() {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    if (checkinWellbeing === null || checkinWellbeing === undefined) {
-      showToast("–û—Ç–º–µ—Ç—å—Ç–µ —Å–æ—Å—Ç–æ—è–Ω–∏–µ.", "error");
-      return;
-    }
-    setCheckinSaving(true);
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "saveSupportCheckin",
-          session_id: saved.sessionId,
-          access_token: saved.accessToken,
-          wellbeing_score: checkinWellbeing,
-          anxiety_score: checkinAnxiety,
-          comment: checkinComment,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        setCheckinToday(data.checkin);
-        showToast("–°–æ—Ö—Ä–∞–Ω–µ–Ω–æ.", "success");
-        await loadSupportCheckins();
-      } else {
-        showToast(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ—Ö—Ä–∞–Ω–∏—Ç—å", "error");
-      }
-    } catch {
-      showToast("–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ—Ö—Ä–∞–Ω–∏—Ç—å", "error");
-    } finally {
-      setCheckinSaving(false);
-    }
-  }
-
-  // Load support practices
-  async function loadSupportPractices() {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "getSupportPractices", session_id: saved.sessionId, access_token: saved.accessToken }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        setSupportPractices(data.practices || []);
-      }
-    } catch { /* silent */ }
-  }
-
-  // Save a practice (add to owner-level)
-  async function saveSupportPractice(practiceKey) {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "saveSupportPractice", session_id: saved.sessionId, access_token: saved.accessToken, practice_key: practiceKey }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        await loadSupportPractices();
-      }
-    } catch { /* silent */ }
-  }
-
-  // Update practice user_status
-  async function updatePracticeStatus(practiceKey, userStatus) {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "updateSupportPracticeStatus", session_id: saved.sessionId, access_token: saved.accessToken, practice_key: practiceKey, user_status: userStatus }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        await loadSupportPractices();
-      }
-    } catch { /* silent */ }
-  }
-
-  // Load support chat messages
-  async function loadSupportChat() {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "getSupportChat", session_id: saved.sessionId, access_token: saved.accessToken, limit: 20 }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        setQuickChatMessages(data.messages || []);
-      }
-    } catch { /* silent */ }
-  }
-
-  function handleQuickChatScroll(e) {
-    const el = e.target;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-    setQuickChatScrolledUp(!atBottom);
-  }
-
-  function scrollToQuickChatBottom(smooth = true) {
-    const el = quickChatContainerRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "instant" });
-    setQuickChatScrolledUp(false);
-    setQuickChatHasNewResponse(false);
-  }
-
-  // Send quick chat message
-  async function sendQuickChatMessage(text) {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    const trimmed = (text || quickChatInput).trim();
-    if (!trimmed) return;
-
-    // Optimistic add
-    const tempId = "temp-" + Date.now();
-    setQuickChatMessages(prev => [...prev, { id: tempId, role: "user", message_text: trimmed, created_at: new Date().toISOString() }]);
-    setQuickChatLoading(true);
-    setQuickChatHasNewResponse(false);
-
-    // Scroll to bottom after optimistic add (after React render)
-    requestAnimationFrame(() => { setTimeout(() => scrollToQuickChatBottom(false), 0); });
-
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "sendSupportMessage", session_id: saved.sessionId, access_token: saved.accessToken, message: trimmed }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        // Success: clear input and replace temp with real messages
-        setQuickChatInput("");
-        setQuickChatMessages(prev => {
-          const withoutTemp = prev.filter(m => m.id !== tempId);
-          return [...withoutTemp,
-            { id: "user-" + Date.now(), role: "user", message_text: trimmed, created_at: new Date().toISOString() },
-            { id: "ai-" + Date.now(), role: "assistant", message_text: data.response?.answer || "", ai_response: data.response, created_at: new Date().toISOString() },
-          ];
-        });
-        // Auto-scroll to new assistant message (unless user scrolled up)
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (!quickChatScrolledUp) {
-              scrollToQuickChatBottom(true);
-            } else {
-              setQuickChatHasNewResponse(true);
-            }
-          }, 0);
-        });
-      } else {
-        // API returned error ‚Äî show fallback message and restore text
-        setQuickChatMessages(prev => {
-          const withoutTemp = prev.filter(m => m.id !== tempId);
-          return [...withoutTemp,
-            { id: "user-" + Date.now(), role: "user", message_text: trimmed, created_at: new Date().toISOString() },
-            { id: "ai-" + Date.now(), role: "assistant", message_text: "–°–µ–π—á–∞—Å –Ω–µ –ø–æ–ª—É—á–∏–ª–æ—Å—å —Å—Ñ–æ—Ä–º–∏—Ä–æ–≤–∞—Ç—å –æ—Ç–≤–µ—Ç. –í—ã –º–æ–∂–µ—Ç–µ –ø–æ–ø—Ä–æ–±–æ–≤–∞—Ç—å –µ—â—ë —Ä–∞–∑ –∏–ª–∏ –ø—Ä–æ–¥–æ–ª–∂–∏—Ç—å —Ä–∞–∑–≥–æ–≤–æ—Ä –≤ –ø–æ–¥—Ä–æ–±–Ω–æ–º —Ä–µ–∂–∏–º–µ.", ai_response: { answer: "–°–µ–π—á–∞—Å –Ω–µ –ø–æ–ª—É—á–∏–ª–æ—Å—å —Å—Ñ–æ—Ä–º–∏—Ä–æ–≤–∞—Ç—å –æ—Ç–≤–µ—Ç. –í—ã –º–æ–∂–µ—Ç–µ –ø–æ–ø—Ä–æ–±–æ–≤–∞—Ç—å –µ—â—ë —Ä–∞–∑ –∏–ª–∏ –ø—Ä–æ–¥–æ–ª–∂–∏—Ç—å —Ä–∞–∑–≥–æ–≤–æ—Ä –≤ –ø–æ–¥—Ä–æ–±–Ω–æ–º —Ä–µ–∂–∏–º–µ.", safety_note: null, confidence: "low", suggest_followup: true, intent_type: "error" }, created_at: new Date().toISOString() },
-          ];
-        });
-        setQuickChatInput(trimmed);
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            quickChatInputRef.current?.focus();
-            if (!quickChatScrolledUp) scrollToQuickChatBottom(true);
-          }, 0);
-        });
-      }
-    } catch {
-      // Network error ‚Äî show fallback and restore text
-      setQuickChatMessages(prev => {
-        const withoutTemp = prev.filter(m => m.id !== tempId);
-        return [...withoutTemp,
-          { id: "user-" + Date.now(), role: "user", message_text: trimmed, created_at: new Date().toISOString() },
-          { id: "ai-" + Date.now(), role: "assistant", message_text: "–ù–µ —É–¥–∞–ª–æ—Å—å —Å–≤—è–∑–∞—Ç—å—Å—è —Å —Å–µ—Ä–≤–∏—Å–æ–º. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑ –∏–ª–∏ –ø—Ä–æ–¥–æ–ª–∂–∏—Ç–µ —Ä–∞–∑–≥–æ–≤–æ—Ä –≤ –ø–æ–¥—Ä–æ–±–Ω–æ–º —Ä–µ–∂–∏–º–µ.", ai_response: { answer: "–ù–µ —É–¥–∞–ª–æ—Å—å —Å–≤—è–∑–∞—Ç—å—Å—è —Å —Å–µ—Ä–≤–∏—Å–æ–º. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑ –∏–ª–∏ –ø—Ä–æ–¥–æ–ª–∂–∏—Ç–µ —Ä–∞–∑–≥–æ–≤–æ—Ä –≤ –ø–æ–¥—Ä–æ–±–Ω–æ–º —Ä–µ–∂–∏–º–µ.", safety_note: null, confidence: "low", suggest_followup: true, intent_type: "error" }, created_at: new Date().toISOString() },
-        ];
-      });
-      setQuickChatInput(trimmed);
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          quickChatInputRef.current?.focus();
-          if (!quickChatScrolledUp) scrollToQuickChatBottom(true);
-        }, 0);
-      });
-    } finally {
-      setQuickChatLoading(false);
-    }
-  }
-
-  // Save patient feedback to case_reviews
-  async function savePatientFeedback() {
-    const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
-    if (!patientRating && !patientUseful && !patientUnclear) {
-      showToast("–ó–∞–ø–æ–ª–Ω–∏—Ç–µ —Ö–æ—Ç—è –±—ã –æ–¥–Ω–æ –ø–æ–ª–µ.", "error");
-      return;
-    }
-    try {
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "save",
-          case_id: sessionId,
-          sessionId: saved.sessionId,
-          access_token: saved.accessToken,
-          publicCode: publicCode || "",
-          module: "support",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          patient_feedback: {
-            rating: patientRating,
-            useful: patientUseful,
-            unclear_or_useless: patientUnclear,
-          },
-          doctor_feedback: {},
-        }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast("–°–ø–∞—Å–∏–±–æ –∑–∞ –æ—Ç–∑—ã–≤!", "success");
-      } else {
-        showToast(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ—Ö—Ä–∞–Ω–∏—Ç—å –æ—Ç–∑—ã–≤", "error");
-      }
-    } catch {
-      showToast("–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ—Ö—Ä–∞–Ω–∏—Ç—å –æ—Ç–∑—ã–≤", "error");
-    }
-  }
-
-  // Care recommendation ‚Üí CTA helper
-  function getCareNextStep(careRecommendation) {
-    const level = careRecommendation?.level;
-    if (level === "urgent_help") {
-      return { text: "–≠–∫—Å—Ç—Ä–µ–Ω–Ω–∞—è –ø–æ–º–æ—â—å", description: "–ï—Å–ª–∏ –µ—Å—Ç—å —Ä–∏—Å–∫ ‚Äî –∑–≤–æ–Ω–∏—Ç–µ 112 –∏–ª–∏ 103", urgent: true };
-    }
-    if (level === "medical_consultation") {
-      return { text: "–†–µ–∫–æ–º–µ–Ω–¥—É–µ—Ç—Å—è –∫–æ–Ω—Å—É–ª—å—Ç–∞—Ü–∏—è –≤—Ä–∞—á–∞", description: "–û–±—Ä–∞—Ç–∏—Ç–µ—Å—å –∫ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç—É –¥–ª—è –æ—á–Ω–æ–π –æ—Ü–µ–Ω–∫–∏", cta: "–°–≤—è–∑–∞—Ç—å—Å—è —Å–æ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–º" };
-    }
-    if (level === "professional_contact") {
-      return { text: "–°—Ç–æ–∏—Ç –æ–±—Å—É–¥–∏—Ç—å —Å–æ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–º", description: "–†–µ–∫–æ–º–µ–Ω–¥—É–µ–º —Å–≤—è–∑–∞—Ç—å—Å—è —Å–æ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–º", cta: "–°–≤—è–∑–∞—Ç—å—Å—è —Å–æ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–º" };
-    }
-    // self_care / self_support / default
-    return { text: "–ú–æ–∂–Ω–æ –ø—Ä–æ–¥–æ–ª–∂–∏—Ç—å –Ω–∞–±–ª—é–¥–µ–Ω–∏–µ", description: "–ü—Ä–∏ –Ω–µ–æ–±—Ö–æ–¥–∏–º–æ—Å—Ç–∏ –≤–µ—Ä–Ω–∏—Ç–µ—Å—å –∫ —Ä–∞–∑–≥–æ–≤–æ—Ä—É", cta: "–ü—Ä–æ–¥–æ–ª–∂–∏—Ç—å —Ä–∞–∑–≥–æ–≤–æ—Ä" };
-  }
-
-  async function ensureStartSession() {
-    if (sessionRef.current) {
-      return sessionRef.current;
-    }
-    if (startSessionPromiseRef.current) {
-      return startSessionPromiseRef.current;
-    }
-    startSessionPromiseRef.current = (async () => {
-      const mod = activeModule || "support";
-      let token;
-      try { token = await getClientToken(mod, "analyze"); } catch (e) {
-        throw new Error("–ù–µ —É–¥–∞–ª–æ—Å—å –Ω–∞—á–∞—Ç—å —Ä–∞–∑–≥–æ–≤–æ—Ä. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.");
-      }
-      const r = await fetch("/api/start-session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-      });
-      const d = await r.json();
-      if (!d.ok) {
-        const code = d.code || (r.status === 401 ? "SESSION_START_401" : r.status === 404 ? "SESSION_START_404" : "SESSION_CREATE_FAILED");
-        throw new Error(`–ù–µ —É–¥–∞–ª–æ—Å—å –Ω–∞—á–∞—Ç—å —Ä–∞–∑–≥–æ–≤–æ—Ä (${code}). –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.`);
-      }
-      const data = { sessionId: d.session_id, accessToken: d.access_token };
-      sessionRef.current = data;
-      setSessionId(data.sessionId);
-      saveSupportSession(data.sessionId, data.accessToken);
-      return data;
-    })();
-    try {
-      return await startSessionPromiseRef.current;
-    } finally {
-      startSessionPromiseRef.current = null;
-    }
-  }
-
-  async function transcribeSupportAudio(audioBlob, currentSession) {
-    if (!isUsableVoiceBlob(audioBlob)) throw new Error("–ó–∞–ø–∏—Å—å —Å–ª–∏—à–∫–æ–º –∫–æ—Ä–æ—Ç–∫–∞—è –∏–ª–∏ –ø—É—Å—Ç–∞—è. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.");
-    const mod = "support";
-    let token;
-    try { token = await getClientToken(mod, "transcribe"); } catch {}
-    const tHeaders = {
-      "Content-Type": audioBlob.type,
-      "X-Session-Id": currentSession.sessionId,
-      "X-Module": "support",
-      "X-Access-Token": currentSession.accessToken,
-    };
-    if (token) tHeaders.Authorization = `Bearer ${token}`;
-
-    let response = await fetch("/api/transcribe", {
-      method: "POST",
-      headers: tHeaders,
-      body: audioBlob,
-    });
-
-    // Retry once when only the short-lived client token has expired.
-    if (response.status === 401 && token) {
-      try { token = await getClientToken(mod, "transcribe"); } catch {}
-      tHeaders.Authorization = `Bearer ${token}`;
-      response = await fetch("/api/transcribe", {
-        method: "POST",
-        headers: tHeaders,
-        body: audioBlob,
-      });
-    }
-
-    const responseText = await response.text();
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch {
-      throw new Error("–°–µ—Ä–≤–µ—Ä –≤–µ—Ä–Ω—É–ª –ø—É—Å—Ç–æ–π –æ—Ç–≤–µ—Ç (–ø–æ–ø—Ä–æ–±—É–π—Ç–µ –ø–µ—Ä–µ–∑–∞–ø—É—Å—Ç–∏—Ç—å —Å–µ—Ä–≤–µ—Ä)");
-    }
-    if (!response.ok) throw new Error(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å —Ä–∞—Å—à–∏—Ñ—Ä–æ–≤–∞—Ç—å –≥–æ–ª–æ—Å");
-    return data;
-  }
-
-  function stopSupportCabinetVoice() {
-    if (cabinetVoiceTimerRef.current) {
-      clearInterval(cabinetVoiceTimerRef.current);
-      cabinetVoiceTimerRef.current = null;
-    }
-    if (cabinetVoiceRecorderRef.current?.state === "recording") {
-      cabinetVoiceRecorderRef.current.stop();
-    }
-    setCabinetVoiceRecording(false);
-  }
-
-  async function startSupportCabinetVoice(target) {
-    if (cabinetVoiceRecording || cabinetVoiceTranscribing) return;
-    if (recording || transcribing || recordingQuestionIndex !== null || questionTranscribingIndex !== null || crisisRecording || crisisTranscribing) {
-      setCabinetVoiceError("–°–Ω–∞—á–∞–ª–∞ –∑–∞–≤–µ—Ä—à–∏—Ç–µ –¥—Ä—É–≥—É—é –∑–∞–ø–∏—Å—å –≥–æ–ª–æ—Å–æ–º.");
-      setCabinetVoiceTarget(target);
-      return;
-    }
-
-    setCabinetVoiceError("");
-    setCabinetVoiceTarget(target);
-    cabinetVoiceIgnoreStopRef.current = false;
-
-    try {
-      const saved = getSupportSession();
-      if (!saved.sessionId || !saved.accessToken) {
-        throw new Error("–°–µ—Å—Å–∏—è –∏—Å—Ç–µ–∫–ª–∞. –í–æ–π–¥–∏—Ç–µ —Å–Ω–æ–≤–∞ –ø–æ –∫–æ–¥—É –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è.");
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const voiceCapture = createVoiceRecording(stream);
-      const recorder = voiceCapture.recorder;
-      cabinetVoiceStreamRef.current = stream;
-      cabinetVoiceRecorderRef.current = recorder;
-      cabinetVoiceChunksRef.current = [];
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) cabinetVoiceChunksRef.current.push(event.data);
-      };
-
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop());
-        cabinetVoiceStreamRef.current = null;
-        cabinetVoiceRecorderRef.current = null;
-        if (cabinetVoiceTimerRef.current) {
-          clearInterval(cabinetVoiceTimerRef.current);
-          cabinetVoiceTimerRef.current = null;
-        }
-        if (cabinetVoiceIgnoreStopRef.current) return;
-
-        const audioBlob = await voiceCapture.blobPromise;
-        setCabinetVoiceTranscribing(true);
-        try {
-          const data = await transcribeSupportAudio(audioBlob, saved);
-          const transcript = data.text || "";
-          if (target === "quick_chat") {
-            setQuickChatInput((previous) => appendVoiceText(previous, transcript));
-          } else {
-            setFollowUpAnswers((previous) => ({
-              ...previous,
-              [target]: appendVoiceText(previous[target], transcript),
-            }));
-          }
-        } catch (error) {
-          setCabinetVoiceError(error.message || "–û—à–∏–±–∫–∞ —Ä–∞—Å—à–∏—Ñ—Ä–æ–≤–∫–∏");
-        } finally {
-          setCabinetVoiceTranscribing(false);
-          setCabinetVoiceTarget(null);
-          setCabinetVoiceTime(0);
-        }
-      };
-
-      recorder.start();
-      setCabinetVoiceRecording(true);
-      setCabinetVoiceTime(0);
-      cabinetVoiceTimerRef.current = setInterval(() => {
-        setCabinetVoiceTime((previous) => {
-          const next = previous + 1;
-          if (next >= 60) {
-            stopSupportCabinetVoice();
-            return 60;
-          }
-          return next;
-        });
-      }, 1000);
-    } catch (error) {
-      cabinetVoiceStreamRef.current?.getTracks().forEach((track) => track.stop());
-      cabinetVoiceStreamRef.current = null;
-      cabinetVoiceRecorderRef.current = null;
-      setCabinetVoiceRecording(false);
-      setCabinetVoiceError(error.message || "–ù–µ —É–¥–∞–ª–æ—Å—å –ø–æ–ª—É—á–∏—Ç—å –¥–æ—Å—Ç—É–ø –∫ –º–∏–∫—Ä–æ—Ñ–æ–Ω—É");
-    }
-  }
-
-  function renderSupportCabinetVoice(target, idleLabel) {
-    const active = cabinetVoiceTarget === target;
-    const anotherBusy = (cabinetVoiceRecording || cabinetVoiceTranscribing) && !active;
-    return (
-      <div style={{ marginTop: 6 }}>
-        <button
-          type="button"
-          style={{ ...s.secondary, fontSize: 12, padding: "7px 12px", opacity: anotherBusy ? 0.5 : 1 }}
-          onClick={() => active && cabinetVoiceRecording ? stopSupportCabinetVoice() : startSupportCabinetVoice(target)}
-          disabled={anotherBusy || (active && cabinetVoiceTranscribing)}
-        >
-          {active && cabinetVoiceTranscribing
-            ? "–†–∞—Å—à–∏—Ñ—Ä–æ–≤—ã–≤–∞–µ–º..."
-            : active && cabinetVoiceRecording
-              ? "‚ñ† –û—Å—Ç–∞–Ω–æ–≤–∏—Ç—å –∏ —Ä–∞—Å—à–∏—Ñ—Ä–æ–≤–∞—Ç—å"
-              : `üéô ${idleLabel}`}
-        </button>
-        {active && cabinetVoiceRecording && (
-          <div style={{ marginTop: 5, color: cabinetVoiceTime > 45 ? "#B85C4A" : "#7A7268", fontSize: 12 }}>
-            –ó–∞–ø–∏—Å—å: {cabinetVoiceTime} —Å–µ–∫ / 60 —Å–µ–∫
-          </div>
-        )}
-        {active && cabinetVoiceError && <div style={{ marginTop: 5, color: "#991B1B", fontSize: 12 }}>{cabinetVoiceError}</div>}
-      </div>
-    );
-  }
-
-  async function startRecording() {
-    setVoiceError("");
-
-    try {
-      await ensureStartSession();
-      const currentSession = sessionRef.current;
-      if (!currentSession?.sessionId || !currentSession?.accessToken) {
-        setVoiceError("–°–µ—Å—Å–∏—è –∏—Å—Ç–µ–∫–ª–∞. –í–æ–π–¥–∏—Ç–µ —Å–Ω–æ–≤–∞ –ø–æ –∫–æ–¥—É –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è.");
-        return;
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      const voiceCapture = createVoiceRecording(stream);
-      const recorder = voiceCapture.recorder;
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop());
-
-        const audioBlob = await voiceCapture.blobPromise;
-
-        setTranscribing(true);
-
-         try {
-           const data = await transcribeSupportAudio(audioBlob, currentSession);
-
-           const transcript = data.text || "";
-          setText(transcript);
-          if (data.voice_observations) {
-            const msgId = `voice-${Date.now()}-${++voiceMsgCounterRef.current}`;
-            setVoiceObservations((prev) => {
-              if (prev.some((e) => e.messageId === msgId)) return prev;
-              return [...prev, {
-                messageId: msgId,
-                round: 0,
-                createdAt: new Date().toISOString(),
-                transcript,
-                analysis: data.voice_observations,
-              }];
-            });
-          }
-          setMode("text");
-        } catch (error) {
-          setVoiceError(error.message || "–û—à–∏–±–∫–∞ —Ä–∞—Å—à–∏—Ñ—Ä–æ–≤–∫–∏");
-        } finally {
-          setTranscribing(false);
-        }
-      };
-
-      recorder.start();
-      setRecording(true);
-      setRecordingTime(0);
-
-      timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => {
-          const next = prev + 1;
-
-          if (next >= 60) {
-            stopRecording();
-            setVoiceError("–ó–∞–ø–∏—Å—å –∞–≤—Ç–æ–º–∞—Ç–∏—á–µ—Å–∫–∏ –æ—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∞ —á–µ—Ä–µ–∑ 60 —Å–µ–∫—É–Ω–¥.");
-            return 60;
-          }
-
-          return next;
-        });
-      }, 1000);
-    } catch (error) {
-      setVoiceError("–ù–µ —É–¥–∞–ª–æ—Å—å –ø–æ–ª—É—á–∏—Ç—å –¥–æ—Å—Ç—É–ø –∫ –º–∏–∫—Ä–æ—Ñ–æ–Ω—É");
-    }
-  }
-
-  function stopRecording() {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-
-    if (mediaRecorderRef.current && recording) {
-      mediaRecorderRef.current.stop();
-      setRecording(false);
-    }
-  }
-
-  async function startQuestionRecording(index) {
-    setVoiceError("");
-
-    try {
-      await ensureStartSession();
-      const currentSession = sessionRef.current;
-      if (!currentSession?.sessionId || !currentSession?.accessToken) {
-        setVoiceError("–°–µ—Å—Å–∏—è –∏—Å—Ç–µ–∫–ª–∞. –í–æ–π–¥–∏—Ç–µ —Å–Ω–æ–≤–∞ –ø–æ –∫–æ–¥—É –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è.");
-        return;
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      const voiceCapture = createVoiceRecording(stream);
-      const recorder = voiceCapture.recorder;
-      questionMediaRecorderRef.current = recorder;
-      questionAudioChunksRef.current = [];
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          questionAudioChunksRef.current.push(event.data);
-        }
-      };
-
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop());
-
-        if (questionTimerRef.current) {
-          clearInterval(questionTimerRef.current);
-        }
-
-        const audioBlob = await voiceCapture.blobPromise;
-
-        setQuestionTranscribingIndex(index);
-
-         try {
-           const data = await transcribeSupportAudio(audioBlob, currentSession);
-
-           setAnswers((prev) => ({
-            ...prev,
-            [index]: data.text || "",
-          }));
-          if (data.voice_observations) {
-            const msgId = `voice-${Date.now()}-${++voiceMsgCounterRef.current}`;
-            setVoiceObservations((prev) => {
-              if (prev.some((e) => e.messageId === msgId)) return prev;
-              return [...prev, {
-                messageId: msgId,
-                round: dialogDepth,
-                createdAt: new Date().toISOString(),
-                transcript: data.text || "",
-                analysis: data.voice_observations,
-              }];
-            });
-          }
-        } catch (error) {
-          setVoiceError(error.message || "–û—à–∏–±–∫–∞ —Ä–∞—Å—à–∏—Ñ—Ä–æ–≤–∫–∏");
-        } finally {
-          setQuestionTranscribingIndex(null);
-          setRecordingQuestionIndex(null);
-          setQuestionRecordingTime(0);
-        }
-      };
-
-      recorder.start();
-      setRecordingQuestionIndex(index);
-      setQuestionRecordingTime(0);
-
-      questionTimerRef.current = setInterval(() => {
-        setQuestionRecordingTime((prev) => {
-          const next = prev + 1;
-
-          if (next >= 60) {
-            stopQuestionRecording();
-            return 60;
-          }
-
-          return next;
-        });
-      }, 1000);
-    } catch (error) {
-      setVoiceError("–ù–µ —É–¥–∞–ª–æ—Å—å –ø–æ–ª—É—á–∏—Ç—å –¥–æ—Å—Ç—É–ø –∫ –º–∏–∫—Ä–æ—Ñ–æ–Ω—É");
-    }
-  }
-
-  function stopQuestionRecording() {
-    if (questionTimerRef.current) {
-      clearInterval(questionTimerRef.current);
-    }
-
-    if (questionMediaRecorderRef.current && recordingQuestionIndex !== null) {
-      questionMediaRecorderRef.current.stop();
-    }
-  }
-
-  async function startCrisisRecording() {
-    setCrisisVoiceError("");
-
-    try {
-      await ensureStartSession().catch(() => {});
-      const currentSession = sessionRef.current;
-      if (!currentSession?.sessionId || !currentSession?.accessToken) {
-        setCrisisVoiceError("–°–µ—Å—Å–∏—è –∏—Å—Ç–µ–∫–ª–∞. –í–æ–π–¥–∏—Ç–µ —Å–Ω–æ–≤–∞ –ø–æ –∫–æ–¥—É –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è.");
-        return;
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      const voiceCapture = createVoiceRecording(stream);
-      const recorder = voiceCapture.recorder;
-      crisisMediaRecorderRef.current = recorder;
-      crisisAudioChunksRef.current = [];
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          crisisAudioChunksRef.current.push(event.data);
-        }
-      };
-
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop());
-
-        if (crisisTimerRef.current) {
-          clearInterval(crisisTimerRef.current);
-        }
-
-        const audioBlob = await voiceCapture.blobPromise;
-
-        setCrisisTranscribing(true);
-
-        try {
-          if (!isUsableVoiceBlob(audioBlob)) throw new Error("–ó–∞–ø–∏—Å—å —Å–ª–∏—à–∫–æ–º –∫–æ—Ä–æ—Ç–∫–∞—è –∏–ª–∏ –ø—É—Å—Ç–∞—è. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.");
-          const mod = "support";
-          let token;
-          try { token = await getClientToken(mod, "transcribe"); } catch {}
-          const tHeaders = {
-            "Content-Type": audioBlob.type,
-            "X-Session-Id": currentSession.sessionId,
-            "X-Module": "support",
-            "X-Access-Token": currentSession.accessToken,
-          };
-          if (token) tHeaders["Authorization"] = `Bearer ${token}`;
-
-          let response = await fetch("/api/transcribe", {
-            method: "POST",
-            headers: tHeaders,
-            body: audioBlob,
-          });
-
-          if (response.status === 401 && token) {
-            try { token = await getClientToken(mod, "transcribe"); } catch {}
-            tHeaders["Authorization"] = `Bearer ${token}`;
-            response = await fetch("/api/transcribe", {
-              method: "POST",
-              headers: tHeaders,
-              body: audioBlob,
-            });
-          }
-
-          const responseText = await response.text();
-          let data;
-          try {
-            data = JSON.parse(responseText);
-          } catch {
-            console.error("Transcribe: non-JSON response", response.status, responseText.slice(0, 200));
-            throw new Error("–°–µ—Ä–≤–µ—Ä –≤–µ—Ä–Ω—É–ª –ø—É—Å—Ç–æ–π –æ—Ç–≤–µ—Ç (–ø–æ–ø—Ä–æ–±—É–π—Ç–µ –ø–µ—Ä–µ–∑–∞–ø—É—Å—Ç–∏—Ç—å —Å–µ—Ä–≤–µ—Ä)");
-          }
-
-          if (!response.ok) {
-            throw new Error(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å —Ä–∞—Å—à–∏—Ñ—Ä–æ–≤–∞—Ç—å –≥–æ–ª–æ—Å");
-          }
-
-          setCrisisText(data.text || "");
-        } catch (error) {
-          setCrisisVoiceError(error.message || "–û—à–∏–±–∫–∞ —Ä–∞—Å—à–∏—Ñ—Ä–æ–≤–∫–∏");
-        } finally {
-          setCrisisTranscribing(false);
-          setCrisisRecording(false);
-          setCrisisRecordingTime(0);
-        }
-      };
-
-      recorder.start();
-      setCrisisRecording(true);
-      setCrisisRecordingTime(0);
-
-      crisisTimerRef.current = setInterval(() => {
-        setCrisisRecordingTime((prev) => {
-          const next = prev + 1;
-
-          if (next >= 60) {
-            stopCrisisRecording();
-            return 60;
-          }
-
-          return next;
-        });
-      }, 1000);
-    } catch (error) {
-      setCrisisVoiceError("–ù–µ —É–¥–∞–ª–æ—Å—å –ø–æ–ª—É—á–∏—Ç—å –¥–æ—Å—Ç—É–ø –∫ –º–∏–∫—Ä–æ—Ñ–æ–Ω—É");
-    }
-  }
-
-  function stopCrisisRecording() {
-    if (crisisTimerRef.current) {
-      clearInterval(crisisTimerRef.current);
-    }
-
-    if (crisisMediaRecorderRef.current && crisisRecording) {
-      crisisMediaRecorderRef.current.stop();
-    }
-  }
-
-  async function submitRound(overrideText) {
-    const inputText = typeof overrideText === "string" ? overrideText : text;
-    if (dialogDepth === 0 && inputText.trim().length < 10) {
-      setError("–ù–∞–ø–∏—à–∏—Ç–µ —Ö–æ—Ç—è –±—ã 2‚Äì3 –ø—Ä–µ–¥–ª–æ–∂–µ–Ω–∏—è.");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    setQuestions(null);
-
-    let analyzeSessionId = sessionId;
-    let analyzeSessionAccess = null;
-
-    // Use the returned session context immediately; React state updates are asynchronous.
-    if (activeModule === "support" && !analyzeSessionId) {
-      try {
-        const sessionData = await ensureStartSession();
-        analyzeSessionId = sessionData.sessionId;
-        analyzeSessionAccess = sessionData;
-        setSessionId(sessionData.sessionId);
-
-        // Save display_name immediately after session creation
-        if (displayNameInput.trim() && !supportDisplayName) {
-          fetch("/api/session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "saveSupportProfile", session_id: sessionData.sessionId, access_token: sessionData.accessToken, display_name: displayNameInput.trim() }),
-          }).then(r => r.json()).then(d => { if (d.ok) setSupportDisplayName(d.display_name); }).catch(() => {});
-        }
-      } catch (e) {
-        setError(e.message || "–ù–µ —É–¥–∞–ª–æ—Å—å –Ω–∞—á–∞—Ç—å —Ä–∞–∑–≥–æ–≤–æ—Ä.");
-        setLoading(false);
-        return;
-      }
-    } else if (activeModule === "support") {
-      const current = sessionRef.current?.sessionId === analyzeSessionId
-        ? sessionRef.current
-        : getSupportSession();
-      if (current.sessionId === analyzeSessionId) analyzeSessionAccess = current;
-    }
-
-    if (dialogDepth >= 3 && activeModule === "support") {
-      setLoadingMessage("–ì–æ—Ç–æ–≤–∏–º –æ—Ç—á—ë—Ç‚Ä¶");
-      setTimeout(() => {
-        if (loading) setLoadingMessage("–ü–æ–¥–≥–æ—Ç–æ–≤–∫–∞ –∑–∞–Ω–∏–º–∞–µ—Ç –±–æ–ª—å—à–µ –≤—Ä–µ–º–µ–Ω–∏, —á–µ–º –æ–±—ã—á–Ω–æ.");
-      }, 40000);
-    } else {
-      setLoadingMessage("");
-    }
-
-    try {
-      const mod = activeModule || "support";
-      const res = await fetchWithClientToken("/api/analyze", mod, "analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(withSessionAccess({
-          text: inputText,
-          answers: dialogDepth === 0 ? {} : answers,
-          conversationHistory,
-          depth: dialogDepth,
-          isContinuation,
-          previousPatientReport,
-          previousDoctorReport,
-          homeTasks,
-          resourceFactors,
-          supportPlan,
-          voiceObservations,
-          module: mod,
-          followup_answered_topics: followupAnsweredTopics || undefined,
-          crisis_mode: crisisMode,
-        }, analyzeSessionId ? {
-          sessionId: analyzeSessionId,
-          accessToken: analyzeSessionAccess?.accessToken,
-        } : null)),
-      });
-
-      if (!res.ok) {
-        if (res instanceof Response) {
-          const errText = await res.text();
-          throw new Error(errText ? JSON.parse(errText).error : "–û—à–∏–±–∫–∞");
-        }
-        throw new Error(res.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –Ω–∞—á–∞—Ç—å —Ä–∞–∑–±–æ—Ä. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.");
-      }
-
-      const data = await res.json();
-
-      if (data.type === "crisis_questions") {
-        setCrisisMode(true);
-        setCrisisBlock(data.crisis || { status: "safety_check_in_progress", emergency_contacts: ["112", "103"] });
-        setQuestions(data.questions || []);
-        setConversationHistory([{ role: "assistant", questions: data.questions || [] }]);
-        setAnswers({});
-        setDialogDepth((d) => d + 1);
-        setPhase("questions");
-        setSupportScreen("questions");
-      } else if (data.type === "questions") {
-        const qs = Array.isArray(data.questions)
-          ? data.questions.filter(Boolean)
-          : [];
-
-        // If questions are empty after dedup (follow-up with sufficient data), skip to report
-        if (qs.length === 0 && followupAnsweredTopics) {
-          setFollowupAnsweredTopics(null);
-          // Submit again with depth incremented to trigger report generation
-          setDialogDepth((d) => d + 1);
-          await submitRound(inputText);
-          return;
-        }
-
-        const newHistory = [
-          ...conversationHistory,
-          ...(dialogDepth > 0
-            ? [{ role: "user", answers }]
-            : []),
-          { role: "assistant", questions: qs },
-        ];
-
-        setConversationHistory(newHistory);
-        setQuestions(qs.length > 0 ? qs : fallbackQ());
-        setAnswers({});
-        setDialogDepth((d) => d + 1);
-        setPhase("questions");
-        setSupportScreen("questions");
-
-        // Persist conversation pairs after each answer round
-        if (dialogDepth > 0 && sessionId) {
-          const pairs = buildConversationPairs(
-            [...conversationHistory, { role: "user", answers }],
-            { questions, answers, patient_input: inputText }
-          );
-            if (pairs.length > 0) {
-            const pairsBody = withAccessToken({ action: "save_conversation_pairs", sessionId, pairs }, sessionId);
-            fetch("/api/session", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(pairsBody),
-            }).catch(() => {});
-          }
-        }
-      } else if (data.type === "processing") {
-        // Backend is still generating the report. Start polling.
-        const sid = sessionId || `session-${Date.now()}`;
-        if (!sessionId) setSessionId(sid);
-        setLoadingMessage("–û—Ç—á—ë—Ç –µ—â—ë —Ñ–æ—Ä–º–∏—Ä—É–µ—Ç—Å—è. –ü–æ–¥–æ–∂–¥–∏—Ç–µ –Ω–µ–º–Ω–æ–≥–æ.");
-        await pollReportStatus(sid, (status) => finalizeReportFromStatus(status, inputText));
-      } else if (data.type === "final") {
-        setResult(data.report || "");
-        if (data.crisis) setCrisisBlock(data.crisis);
-        if (data._debug) setDebugInfo(data._debug);
-        if (data.care_recommendation) setCareRecommendation(data.care_recommendation);
-        setActiveTab("user");
-        setReportSource("generated");
-        setJustFinishedSession(true);
-        setPhase("report");
-        setSupportScreen("report");
-
-        const sid = sessionId || `session-${Date.now()}`;
-        if (!sessionId) setSessionId(sid);
-
-        // Backend now saves the report durably. Use tokens/codes from the response.
-        if (data.public_code) setPublicCode(data.public_code);
-        if (data.access_token) saveSupportSession(sid, data.access_token);
-        if (data.continuation_code) setContinuationCode(data.continuation_code);
-
-        // Persist conversation pairs for all rounds (best-effort).
-        const finalHistory = [
-          ...conversationHistory,
-          ...(dialogDepth > 0 ? [{ role: "user", answers }] : []),
-        ];
-        const finalPairs = buildConversationPairs(finalHistory, { questions, answers, patient_input: inputText });
-        if (finalPairs.length > 0) {
-          const pairsBody = withAccessToken({ action: "save_conversation_pairs", sessionId: sid, pairs: finalPairs }, sid);
-          fetch("/api/session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(pairsBody),
-          }).catch(() => {});
-        }
-
-        // Save case review (local + Supabase)
-        const review = {
-          case_id: sid, sessionId: sid, publicCode: data.public_code || publicCode || "",
-          access_token: data.access_token || getSupportSession().accessToken || "",
-          module: activeModule,
-          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-          environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
-          patient_input: inputText, questions, answers,
-          ai_result: data.report || "", conversationHistory, dialogDepth,
-          previousPatientReport: previousPatientReport || "",
-          previousDoctorReport: previousDoctorReport || "",
-          homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
-          patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
-          doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
-          voice_observations: voiceObservations || null,
-          expert_id: expertData?.id || null,
-          expert_name: expertData?.name || null,
-          expert_role: expertData?.role || null,
-          expert_specialty: expertData?.specialty || null,
-        };
-        fetch("/api/reviews", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "save", ...review }),
-        }).catch(() => {});
-      } else {
-        throw new Error("–ù–µ–∏–∑–≤–µ—Å—Ç–Ω—ã–π —Ç–∏–ø –æ—Ç–≤–µ—Ç–∞");
-      }
-    } catch (e) {
-      const msg = e.message || "";
-      if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("abort")) {
-        // Connection dropped ‚Äî check backend status before giving up.
-        await attemptReportRecovery(sid || sessionId, inputText, data?.report);
-      } else if (dialogDepth < 3 || activeModule !== "support") {
-        setError("–ù–µ —É–¥–∞–ª–æ—Å—å –Ω–∞—á–∞—Ç—å —Ä–∞–∑–±–æ—Ä. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.");
-      } else {
-        setError("–ù–µ —É–¥–∞–ª–æ—Å—å —Å—Ñ–æ—Ä–º–∏—Ä–æ–≤–∞—Ç—å –æ—Ç—á—ë—Ç. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.");
-      }
-    } finally {
-      setLoading(false);
-      setLoadingMessage("");
-    }
-  }
-
-  async function getReportStatus(sessionId) {
-    const res = await fetch("/api/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getReportStatus", sessionId }),
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  }
-
-  async function pollReportStatus(sessionId, onReady) {
-    let attempts = 0;
-    const maxAttempts = 60; // ~60 seconds
-    while (attempts < maxAttempts) {
-      const status = await getReportStatus(sessionId);
-      if (!status) {
-        await new Promise((r) => setTimeout(r, 1000));
-        attempts += 1;
-        continue;
-      }
-      if (status.status === "ready" && status.type === "final") {
-        onReady(status);
-        return;
-      }
-      if (status.status === "failed") {
-        setError(status.message || "–ù–µ —É–¥–∞–ª–æ—Å—å —Å—Ñ–æ—Ä–º–∏—Ä–æ–≤–∞—Ç—å –æ—Ç—á—ë—Ç. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.");
-        setLoading(false);
-        return;
-      }
-      // processing or not_started
-      await new Promise((r) => setTimeout(r, 1000));
-      attempts += 1;
-    }
-    setError("–û—Ç—á—ë—Ç –µ—â—ë —Ñ–æ—Ä–º–∏—Ä—É–µ—Ç—Å—è. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –æ–±–Ω–æ–≤–∏—Ç—å —Å—Ç—Ä–∞–Ω–∏—Ü—É —á–µ—Ä–µ–∑ –º–∏–Ω—É—Ç—É.");
-    setLoading(false);
-  }
-
-  async function attemptReportRecovery(sessionId, inputText, fallbackReport) {
-    if (!sessionId) {
-      setError("–ù–µ —É–¥–∞–ª–æ—Å—å —Å—Ñ–æ—Ä–º–∏—Ä–æ–≤–∞—Ç—å –æ—Ç—á—ë—Ç. –ü—Ä–æ–≤–µ—Ä—å—Ç–µ —Å–æ–µ–¥–∏–Ω–µ–Ω–∏–µ –∏ –ø–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.");
-      return;
-    }
-    setLoading(true);
-    setError("–°–æ–µ–¥–∏–Ω–µ–Ω–∏–µ –ø—Ä–µ—Ä–≤–∞–ª–æ—Å—å. –ü—Ä–æ–≤–µ—Ä—è–µ–º, —Å–æ—Ö—Ä–∞–Ω–∏–ª—Å—è –ª–∏ –æ—Ç—á—ë—Ç‚Ä¶");
-    const status = await getReportStatus(sessionId);
-    if (!status) {
-      setError("–ù–µ —É–¥–∞–ª–æ—Å—å –ø—Ä–æ–≤–µ—Ä–∏—Ç—å —Å—Ç–∞—Ç—É—Å –æ—Ç—á—ë—Ç–∞. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.");
-      setLoading(false);
-      return;
-    }
-    if (status.status === "ready" && status.type === "final") {
-      finalizeReportFromStatus(status, inputText);
-      return;
-    }
-    if (status.status === "processing" || status.status === "not_started") {
-      setError("");
-      setLoadingMessage("–û—Ç—á—ë—Ç –µ—â—ë —Ñ–æ—Ä–º–∏—Ä—É–µ—Ç—Å—è. –ü–æ–¥–æ–∂–¥–∏—Ç–µ –Ω–µ–º–Ω–æ–≥–æ.");
-      await pollReportStatus(sessionId, (readyStatus) => finalizeReportFromStatus(readyStatus, inputText));
-      return;
-    }
-    setError(status.message || "–ù–µ —É–¥–∞–ª–æ—Å—å —Å—Ñ–æ—Ä–º–∏—Ä–æ–≤–∞—Ç—å –æ—Ç—á—ë—Ç. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.");
-    setLoading(false);
-  }
-
-  function finalizeReportFromStatus(status, inputText) {
-    setResult(status.report || "");
-    if (status.care_recommendation) setCareRecommendation(status.care_recommendation);
-    setActiveTab("user");
-    setReportSource("generated");
-    setJustFinishedSession(true);
-    setPhase("report");
-    setSupportScreen("report");
-    if (status.public_code) setPublicCode(status.public_code);
-    if (status.access_token) saveSupportSession(status.session_id, status.access_token);
-    if (status.continuation_code) setContinuationCode(status.continuation_code);
-    setSessionId(status.session_id);
-    setLoading(false);
-    // Save review
-    const review = {
-      case_id: status.session_id, sessionId: status.session_id, publicCode: status.public_code || "",
-      access_token: status.access_token || getSupportSession().accessToken || "",
-      module: activeModule,
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
-      patient_input: inputText, questions, answers,
-      ai_result: status.report || "", conversationHistory, dialogDepth,
-      previousPatientReport: previousPatientReport || "",
-      previousDoctorReport: previousDoctorReport || "",
-      homeTasks: homeTasks || "", resourceFactors: resourceFactors || "",
-      patient_feedback: { rating: 0, useful: "", unclear_or_useless: "" },
-      doctor_feedback: { wrongQuestions: "", missingQuestions: "", badQuestionWording: "", correctedUserReport: "", correctedDoctorReport: "", protocolUpdate: "", generalComment: "" },
-      voice_observations: voiceObservations || null,
-      expert_id: expertData?.id || null,
-      expert_name: expertData?.name || null,
-      expert_role: expertData?.role || null,
-      expert_specialty: expertData?.specialty || null,
-    };
-    fetch("/api/reviews", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "save", ...review }),
-    }).catch(() => {});
-  }
-
-  const [loadingMessage, setLoadingMessage] = useState("");
-
-  function fallbackQ() {
-    return [
-      "–ë—ã–ª–æ –ª–∏ –≤ –ø–æ—Å–ª–µ–¥–Ω–∏–µ –º–µ—Å—è—Ü—ã –≤–∞–∂–Ω–æ–µ —Å–æ–±—ã—Ç–∏–µ, –∫–æ—Ç–æ—Ä–æ–µ –º–æ–≥–ª–æ –ø–æ–≤–ª–∏—è—Ç—å –Ω–∞ –≤–∞—à–µ —Å–æ—Å—Ç–æ—è–Ω–∏–µ?",
-      "–ù–∞—á–∞–ª–æ—Å—å –ª–∏ —Å–æ—Å—Ç–æ—è–Ω–∏–µ –ø–æ—Å–ª–µ –∫–æ–Ω–∫—Ä–µ—Ç–Ω–æ–≥–æ —Å–æ–±—ã—Ç–∏—è –∏–ª–∏ –ø–æ—Å—Ç–µ–ø–µ–Ω–Ω–æ?",
-      "–ö–∞–∫ –¥–∞–≤–Ω–æ –≤—ã –∑–∞–º–µ—á–∞–µ—Ç–µ —ç—Ç–æ —Å–æ—Å—Ç–æ—è–Ω–∏–µ?",
-      "–ù–∞—Å–∫–æ–ª—å–∫–æ —ç—Ç–æ –≤–ª–∏—è–µ—Ç –Ω–∞ —Å–æ–Ω, —Ä–∞–±–æ—Ç—É –∏–ª–∏ –æ—Ç–Ω–æ—à–µ–Ω–∏—è?",
-      "–ë—ã–≤–∞–ª–∏ –ª–∏ –º—ã—Å–ª–∏, —á—Ç–æ –∂–∏—Ç—å –Ω–µ —Ö–æ—á–µ—Ç—Å—è –∏–ª–∏ –ø—Ä–∏—á–∏–Ω–∏—Ç—å —Å–µ–±–µ –≤—Ä–µ–¥?",
-    ];
-  }
-
-  function generatePublicCode() {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    const part = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-    return `–¢–û–ß–ö–ê-${part()}-${part()}`;
-  }
-
-  function buildCaseReview() {
-    const now = new Date().toISOString();
-    const sid = sessionId || `session-${Date.now()}`;
-    const code = publicCode || generatePublicCode();
-
-    if (!sessionId) setSessionId(sid);
-    if (!publicCode) setPublicCode(code);
-
-    return {
-      case_id: sid,
-      sessionId: sid,
-      publicCode: code,
-      createdAt: now,
-      updatedAt: now,
-      environment: window.location.hostname.includes("localhost") ? "local" : "vercel",
-      patient_input: text,
-      questions,
-      answers,
-      ai_result: result,
-      conversationHistory,
-      dialogDepth,
-      previousPatientReport: previousPatientReport || "",
-      previousDoctorReport: previousDoctorReport || "",
-      homeTasks: homeTasks || "",
-      resourceFactors: resourceFactors || "",
-      expert_id: expertData?.id || null,
-      expert_name: expertData?.name || null,
-      expert_role: expertData?.role || null,
-      expert_specialty: expertData?.specialty || null,
-      patient_feedback: {
-        rating: patientRating,
-        useful: patientUseful,
-        unclear_or_useless: patientUnclear,
-      },
-      doctor_feedback: {
-        wrong_questions: doctorFeedback.wrongQuestions,
-        missing_questions: doctorFeedback.missingQuestions,
-        bad_question_wording: doctorFeedback.badQuestionWording,
-        corrected_user_report: doctorFeedback.correctedUserReport,
-        corrected_doctor_report: doctorFeedback.correctedDoctorReport,
-        protocol_update: doctorFeedback.protocolUpdate,
-        general_comment: doctorFeedback.generalComment,
-      },
-    };
-  }
-
-  function downloadCaseReview(caseReview) {
-    const blob = new Blob([JSON.stringify(caseReview, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${caseReview.case_id}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  const userPart = result
-    ? result.split("===DOCTOR_REPORT===")[0]
-        .replace("===USER_REPORT===", "")
-        .trim()
-    : "";
-
-  const doctorPart = result
-    ? result.split("===DOCTOR_REPORT===")[1]?.trim() || ""
-    : "";
-
-  function renderUserReport(text) {
-    if (!text) return null;
-    const highlightTitles = [
-      "–ß—Ç–æ –º–æ–∂–µ—Ç –ø–æ–º–æ—á—å —Å–µ–≥–æ–¥–Ω—è",
-      "–ü–ª–∞–Ω –¥–æ —Å–ª–µ–¥—É—é—â–µ–≥–æ —Ä–∞–∑–≥–æ–≤–æ—Ä–∞",
-      "–î–æ —Å–ª–µ–¥—É—é—â–µ–≥–æ —Ä–∞–∑–≥–æ–≤–æ—Ä–∞",
-    ];
-    const lines = text.split("\n");
-    const sections = [];
-    let current = null;
-    for (const line of lines) {
-      const m = line.match(/^(\d+)\.\s+(.+)/);
-      if (m) {
-        if (current) sections.push(current);
-        current = { num: m[1], title: m[2], lines: [] };
-      } else if (current) {
-        current.lines.push(line);
-      }
-    }
-    if (current) sections.push(current);
-
-    if (!sections.length) {
-      return <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{text}</div>;
-    }
-
-    const isHighlighted = (title) =>
-      highlightTitles.some((h) => title.toLowerCase().includes(h.toLowerCase()) || h.toLowerCase().includes(title.toLowerCase()));
-
-    return sections.map((s, i) => {
-      const hl = isHighlighted(s.title);
-      return (
-        <div
-          key={i}
-          style={{
-            marginBottom: 12,
-            padding: hl ? "14px 18px" : 0,
-            borderRadius: hl ? 14 : 0,
-            background: hl ? "#E2EBE4" : "transparent",
-            border: hl ? "1px solid rgba(125,154,137,.3)" : "none",
-          }}
-        >
-          <div
-            style={{
-              fontWeight: hl ? 700 : 600,
-              fontSize: hl ? 16 : 15,
-              color: hl ? "#2E2A25" : "#2E2A25",
-              marginBottom: s.lines.some((l) => l.trim()) ? 6 : 0,
-            }}
-          >
-            {s.num}. {s.title}
-          </div>
-          {s.lines.some((l) => l.trim()) && (
-            <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7, color: "#7A7268" }}>
-              {s.lines.join("\n").trim()}
-            </div>
-          )}
-        </div>
-      );
-    });
-  }
-
-  function handleBodyIntakeComplete(response) {
-    setBodyIntakeResult(response);
-    setBodyIntakeStage("result");
-    setBodyIntakeStep(0);
-    setBodyScreen("result");
-    const sid = response?.session_id || "";
-    const token = response?.access_token || "";
-    // Credential pair first and atomically: a new session must never be
-    // stored next to a previous session's token. A failed pair write is
-    // fail-closed: the previous pair is cleared and never stays active.
-    const pairSaved = Boolean(sid && token) && saveBodySession(sid, token);
-    if (!pairSaved) clearBodySession();
-    try {
-      if (sid) saveBodyDisplayResult(response);
-      if (response?.continuation_code) {
-        setContinuationCode(response.continuation_code);
-      }
-    } catch (e) {}
-    if (!pairSaved) {
-      showToast("–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ—Ö—Ä–∞–Ω–∏—Ç—å –¥–æ—Å—Ç—É–ø –∫ —Å–µ—Å—Å–∏–∏. –í–æ–π–¥–∏—Ç–µ —Å–Ω–æ–≤–∞ –ø–æ –∫–æ–¥—É –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è.", "error");
-    }
-  }
-
-  function copyBodyCode() {
-    const code = bodyIntakeResult?.continuation_code || continuationCode;
-    if (!code) return;
-    navigator.clipboard.writeText(code).then(() => {
-      setBodyCodeCopied(true);
-      setTimeout(() => setBodyCodeCopied(false), 2500);
-    }).catch(() => {});
-  }
-
-  async function continueBodyByCode() {
-    const code = bodyContinuationInput.trim();
-    if (!code) return;
-    await loadBodyCabinet(code, { preferCode: true });
-    setBodyContinuationInput("");
-  }
-
-  async function loadBodyDiaryHistory() {
-    setBodyDiaryHistoryLoading(true);
-    const sid = bodyDiarySessionId || bodyIntakeResult?.session_id || localStorage.getItem("body_last_session_id");
-    if (!sid) { setBodyDiaryHistoryLoading(false); return; }
-    try {
-      const listBody = withAccessToken({ action: "listBodyDailyLogs", session_id: sid }, sid);
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(listBody),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setBodyDiaryHistory(data.logs);
-        setBodyDiaryHistoryOpen(true);
-      }
-    } catch (e) {
-      console.error("Failed to load diary history:", e);
-    } finally {
-      setBodyDiaryHistoryLoading(false);
-    }
-  }
-
-  function handleReset() {
-    setPhase("input");
-    setSupportScreen("landing");
-    setQuestions(null);
-    setCrisisMode(false);
-    setCrisisBlock(null);
-    setAnswers({});
-    setResult(null);
-    setText("");
-    setError("");
-    setActiveTab("user");
-    setSessionReviewOpen(false);
-    setPatientRating(0);
-    setPatientUseful("");
-    setPatientUnclear("");
-    setDoctorFeedback({
-      wrongQuestions: "",
-      missingQuestions: "",
-      badQuestionWording: "",
-      correctedUserReport: "",
-      correctedDoctorReport: "",
-      protocolUpdate: "",
-      generalComment: "",
-    });
-    setConversationHistory([]);
-    setDialogDepth(0);
-    setSessionData(null);
-    setSessionId(null);
-    setPublicCode(null);
-    setIsContinuation(false);
-    setPreviousPatientReport("");
-    setPreviousDoctorReport("");
-    setSupportPlan(null);
-    setShowSelfAssessment(false);
-    setCanManageWithoutSpecialist(null);
-    setShowSupportToolkit(false);
-    setShowSpecialistIntent(false);
-    setSpecialistIntentDone(false);
-    setHomeTasks("");
-    setResourceFactors("");
-    setDebugInfo(null);
-    setCareRecommendation(null);
-    setSupportCabinet(null);
-    setCabinetLoading(false);
-    setFollowUpAnswers({});
-    setReportSource(null);
-    setJustFinishedSession(false);
-    setContinuationCode(null);
-    setContinuationCodeInput("");
-    setContinuationCodeError("");
-    setRegeneratedCode(null);
-    setBodyIntakeStage("idle");
-    setBodyIntakeResult(null);
-    setBodyScreen("landing");
-    setBodyCabinetData(null);
-    setBodyDiarySessionId(null);
-    setBodyContinuationInput("");
-    setBodyContinuationError("");
-    try {
-      localStorage.removeItem("body_last_session_id");
-      localStorage.removeItem("body_last_result");
-      localStorage.removeItem("body_last_created_at");
-      clearBodySession();
-    } catch (e) {}
-    setSavedBodyResult(null);
-    setShowConsultPrep(false);
-    setRecording(false);
-    setTranscribing(false);
-    setVoiceError("");
-    setRecordingTime(0);
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-    setRecordingQuestionIndex(null);
-    setQuestionRecordingTime(0);
-    setQuestionTranscribingIndex(null);
-    if (questionTimerRef.current) {
-      clearInterval(questionTimerRef.current);
-    }
-    setCrisisOpen(false);
-    setCrisisSubmitted(false);
-    setCrisisText("");
-    setCrisisContact("");
-    setCrisisRecording(false);
-    setCrisisRecordingTime(0);
-    setCrisisTranscribing(false);
-    setCrisisVoiceError("");
-    setCrisisWarning("");
-    setCrisisConfirmation("");
-    setToast({ message: "", type: "", key: 0 });
-    if (crisisTimerRef.current) {
-      clearInterval(crisisTimerRef.current);
-    }
-  }
-
-  async function adminLogin() {
-    if (!adminPassword) return;
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify", password: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setAdminAuthed(true);
-        setAdminRole(data.role || null);
-        if (adminModuleRoute === "body") {
-          setBodyIntakeShowDeleted(false);
-          adminLoadBodyIntake();
-        } else if (adminModuleRoute === "council") {
-          // ClinicalCouncilAdmin loads its own data on mount
-        } else {
-          adminLoadReviews(adminFilter, adminEnv, adminExpertFilter, adminReviewShowTrash);
-        }
-      } else {
-        setAdminRole(null);
-        showToast("–ù–µ–≤–µ—Ä–Ω—ã–π –ø–∞—Ä–æ–ª—å", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –ø–æ–¥–∫–ª—é—á–µ–Ω–∏—è", "error");
-    }
-  }
-
-  async function adminLoadBodyIntake(maxCount = 50) {
-    setBodyIntakeLoading(true);
-    try {
-      const body = {
-        action: "listBodyIntake",
-        password: adminPassword,
-        limit: maxCount,
-        showDeleted: bodyIntakeShowDeleted,
-      };
-      if (bodyIntakeSourceFilter !== "all") {
-        body.source = bodyIntakeSourceFilter;
-      }
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setBodyIntakeRecords(data.records || []);
-        setBodyIntakeTotal(data.count || 0);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ body intake", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ body intake", "error");
-    } finally {
-      setBodyIntakeLoading(false);
-    }
-  }
-
-  async function adminOpenBodyIntakeDetail(id) {
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "getBodyIntakeDetail", password: adminPassword, id }),
-      });
-      const data = await res.json();
-      if (data.ok && data.record) {
-        setBodyIntakeDetail(data.record);
-        setBodyIntakeDetailOpen(true);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –¥–µ—Ç–∞–ª–µ–π", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –¥–µ—Ç–∞–ª–µ–π", "error");
-    }
-  }
-
-  async function adminDeleteBodyIntake(id) {
-    setBodyIntakeDeleteConfirm(null);
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "deleteBodyIntake", password: adminPassword, id }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast("–ê–Ω–∫–µ—Ç–∞ –ø–µ—Ä–µ–º–µ—â–µ–Ω–∞ –≤ –∫–æ—Ä–∑–∏–Ω—É", "success");
-        adminLoadBodyIntake();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ —É–¥–∞–ª–µ–Ω–∏—è", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ —É–¥–∞–ª–µ–Ω–∏—è", "error");
-    }
-  }
-
-  async function adminRestoreBodyIntake(id) {
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "restoreBodyIntake", password: adminPassword, id }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast("–ê–Ω–∫–µ—Ç–∞ –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∞", "success");
-        adminLoadBodyIntake();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∏—è", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∏—è", "error");
-    }
-  }
-
-  function adminDownloadBodyIntakeJSON(record) {
-    const data = {
-      timestamp: record.created_at || new Date().toISOString(),
-      intake_answers: record.answers || null,
-      bmi: record.bmi,
-      care_recommendation: record.care_recommendation,
-      module: record.module,
-      version: record.version,
-      session_id: record.session_id,
-      body_plan: record.body_plan || null,
-      user_report: record.user_report || null,
-      triggered_red_flags: record.triggered_red_flags || [],
-      red_flag_care_level: record.red_flag_care_level || null,
-      used_fallback: record.used_fallback || false,
-      model_used: record.model_used || null,
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `body-intake-${record.id || "unknown"}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function adminLoadBodyDailyLogs(maxCount = 50) {
-    setBodyDiaryLoading(true);
-    try {
-      const body = { action: "listBodyDailyLogs", password: adminPassword, limit: maxCount };
-      if (bodyDiarySessionFilter) body.session_id = bodyDiarySessionFilter;
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setBodyDiaryRecords(data.records || []);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –¥–Ω–µ–≤–Ω–∏–∫–æ–≤", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –¥–Ω–µ–≤–Ω–∏–∫–æ–≤", "error");
-    } finally {
-      setBodyDiaryLoading(false);
-    }
-  }
-
-  async function adminLoadBodyExpertReviews() {
-    setBodyExpertReviewsLoading(true);
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listBodyExpertReviews", password: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setBodyExpertReviews(data.records || []);
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –ø—Ä–∞–≤–æ–∫", "error");
-    } finally {
-      setBodyExpertReviewsLoading(false);
-    }
-  }
-
-  // Service requests admin state and functions
-  const [adminServiceRequests, setAdminServiceRequests] = useState([]);
-  const [adminServiceRequestsLoading, setAdminServiceRequestsLoading] = useState(false);
-  const [adminServiceRequestsFilter, setAdminServiceRequestsFilter] = useState("all");
-
-  async function adminLoadBodyServiceRequests() {
-    setAdminServiceRequestsLoading(true);
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listBodyServiceRequests", password: adminPassword, status: adminServiceRequestsFilter }),
-      });
-      const data = await res.json();
-      if (data.ok) setAdminServiceRequests(data.requests || []);
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –∑–∞–ø—Ä–æ—Å–æ–≤", "error");
-    } finally {
-      setAdminServiceRequestsLoading(false);
-    }
-  }
-
-  async function adminLoadBodyAssignments() {
-    setBodyAssignmentsLoading(true);
-    try {
-      const [clientsRes, expertsRes] = await Promise.all([
-        fetch("/api/admin", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "listUnassignedBodyClients", password: adminPassword }),
-        }),
-        fetch("/api/experts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "listAllExperts", admin_secret: adminPassword }),
-        }),
-      ]);
-      const [clientsData, expertsData] = await Promise.all([clientsRes.json(), expertsRes.json()]);
-      if (clientsData.ok) setBodyAssignments(clientsData.clients || []);
-      if (expertsData.ok) {
-        const experts = (expertsData.experts || []).map((e) => ({
-          ...e,
-          organizations: (e.expert_organization_memberships || [])
-            .filter((m) => m.status === "active")
-            .map((m) => ({ id: m.organization_id, name: m.organizations?.name })),
-        }));
-        setBodyExperts(experts);
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –ø—Ä–∏–≤—è–∑–æ–∫", "error");
-    } finally {
-      setBodyAssignmentsLoading(false);
-    }
-  }
-
-  async function adminAssignBodyClient(bodyClientRef, expertId, orgId, isReassign = false) {
-    setBodyAssignSaving(true);
-    try {
-      const action = isReassign ? "reassignBodyClientExpert" : "assignBodyClientToExpert";
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          password: adminPassword,
-          body_client_ref: bodyClientRef,
-          expert_id: expertId,
-          organization_id: orgId,
-        }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast(data.noop ? "–£–∂–µ –Ω–∞–∑–Ω–∞—á–µ–Ω–æ" : (isReassign ? "–°–ø–µ—Ü–∏–∞–ª–∏—Å—Ç –ø–µ—Ä–µ–Ω–∞–∑–Ω–∞—á–µ–Ω" : "–ö–ª–∏–µ–Ω—Ç –Ω–∞–∑–Ω–∞—á–µ–Ω"), "success");
-        setBodyAssignTarget(null);
-        setBodyAssignIsReassign(false);
-        adminLoadBodyAssignments();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ –Ω–∞–∑–Ω–∞—á–µ–Ω–∏—è", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ —Å–µ—Ç–∏", "error");
-    } finally {
-      setBodyAssignSaving(false);
-    }
-  }
-
-  async function adminUpdateServiceRequest(id, action, extra = {}) {
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "updateBodyServiceRequest", password: adminPassword, id, update_action: action, ...extra }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast("–û–±–Ω–æ–≤–ª–µ–Ω–æ", "success");
-        adminLoadBodyServiceRequests();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –æ–±–Ω–æ–≤–ª–µ–Ω–∏—è", "error");
-    }
-  }
-
-  function adminOpenBodyExpertReviewForm(targetType, targetId, sessionId, sourcePayload, aiOutput) {
-    setBodyExpertReviewForm({
-      target_type: targetType,
-      target_id: targetId,
-      session_id: sessionId,
-      reviewer_name: "–ê–ª–µ–Ω–∞ –ñ—É–∫–æ–≤–∞",
-      reviewer_role: "body_expert",
-      rating_safety: "ok",
-      rating_usefulness: 3,
-      rating_practicality: 3,
-      rating_tone: 3,
-      error_tags: [],
-      what_ai_did_well: "",
-      what_ai_missed: "",
-      corrected_recommendation: "",
-      suggested_questions: "",
-      expert_comment: "",
-      source_payload: sourcePayload || null,
-      ai_output: aiOutput || null,
-    });
-    setBodyExpertReviewFormOpen(true);
-  }
-
-  async function adminSaveBodyExpertReview() {
-    if (!bodyExpertReviewForm) return;
-    setBodyExpertReviewSaving(true);
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "saveBodyExpertReview", password: adminPassword, review: bodyExpertReviewForm }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast("–ü—Ä–∞–≤–∫–∞ —Å–æ—Ö—Ä–∞–Ω–µ–Ω–∞", "success");
-        setBodyExpertReviewFormOpen(false);
-        adminLoadBodyExpertReviews();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ —Å–æ—Ö—Ä–∞–Ω–µ–Ω–∏—è", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ —Å–æ—Ö—Ä–∞–Ω–µ–Ω–∏—è", "error");
-    } finally {
-      setBodyExpertReviewSaving(false);
-    }
-  }
-
-  async function adminExportBodyExpertCases() {
-    setBodyExportingCases(true);
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "exportBodyExpertCases", password: adminPassword }),
-      });
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `body-expert-cases-${new Date().toISOString().split("T")[0]}.jsonl`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –≤—ã–≥—Ä—É–∑–∫–∏", "error");
-    } finally {
-      setBodyExportingCases(false);
-    }
-  }
-
-  async function adminOpenBodyDailyLogDetail(id) {
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "getBodyDailyLogDetail", password: adminPassword, id }),
-      });
-      const data = await res.json();
-      if (data.ok && data.record) {
-        setBodyDiaryDetail(data.record);
-        setBodyDiaryDetailOpen(true);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –¥–Ω–µ–≤–Ω–∏–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –¥–Ω–µ–≤–Ω–∏–∫–∞", "error");
-    }
-  }
-
-  async function adminDeleteBodyDailyLog(id) {
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "deleteBodyDailyLog", password: adminPassword, id }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast("–ó–∞–ø–∏—Å—å —É–¥–∞–ª–µ–Ω–∞", "success");
-        adminLoadBodyDailyLogs();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ —É–¥–∞–ª–µ–Ω–∏—è", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ —É–¥–∞–ª–µ–Ω–∏—è", "error");
-    }
-  }
-
-  async function loadTrainingSessions() {
-    setTrainingLoading(true);
-    setTrainingSessionsError(null);
-    setTrainingSelection(new Set());
-    try {
-      const body = { action: "listTrainingSessions", ...trainingFilter, showTrash: trainingShowTrash };
-      if (expertData) {
-        body.expert_id = expertData.id;
-        body.expert_code = await getStoredExpertCode();
-      } else {
-        body.admin_secret = adminPassword;
-      }
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setTrainingSessions(data.sessions || []);
-        setTrainingSessionsError(null);
-      } else {
-        const err = data.error || "–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏";
-        setTrainingSessionsError(err);
-        showToast(err, "error");
-      }
-    } catch {
-      const err = "–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ —Ç–∞–±–ª–∏—Ü—ã —Ç—Ä–µ–Ω–∏—Ä–æ–≤–æ–∫";
-      setTrainingSessionsError(err);
-      showToast(err, "error");
-    } finally {
-      setTrainingLoading(false);
-    }
-  }
-
-  async function saveTrainingSession(row) {
-    try {
-      const body = { action: "saveTrainingSession", ...row };
-      if (expertData) {
-        body.expert_id = expertData.id;
-        body.expert_code = await getStoredExpertCode();
-      }
-      else body.admin_secret = adminPassword;
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast(data.message || "–°–æ—Ö—Ä–∞–Ω–µ–Ω–æ");
-        if (data.session) {
-          setTrainingSessions((prev) => {
-            const idx = prev.findIndex((s) => s.id === data.session.id);
-            if (idx >= 0) {
-              const next = [...prev];
-              next[idx] = data.session;
-              return next;
-            }
-            return [data.session, ...prev];
-          });
-        }
-        return data;
-      }
-      showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      return null;
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ —Å–æ—Ö—Ä–∞–Ω–µ–Ω–∏—è", "error");
-      return null;
-    }
-  }
-
-  async function updateTrainingSession(id, updates) {
-    try {
-      const body = { action: "updateTrainingSession", id, updates };
-      if (expertData) {
-        body.expert_id = expertData.id;
-        body.expert_code = await getStoredExpertCode();
-      }
-      else body.admin_secret = adminPassword;
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setTrainingSessions((prev) => {
-          const idx = prev.findIndex((s) => s.id === id);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = data.session;
-            return next;
-          }
-          return prev;
-        });
-        showToast("–°–æ—Ö—Ä–∞–Ω–µ–Ω–æ");
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ —Å–æ—Ö—Ä–∞–Ω–µ–Ω–∏—è", "error");
-    }
-  }
-
-  async function deleteTrainingSession(id) {
-    if (!confirm("–£–¥–∞–ª–∏—Ç—å –∑–∞–ø–∏—Å—å?")) return;
-    try {
-      const body = { action: "deleteTrainingSession", id, admin_secret: adminPassword };
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
-        showToast("–ü–µ—Ä–µ–º–µ—â–µ–Ω–æ –≤ –∫–æ—Ä–∑–∏–Ω—É");
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ —É–¥–∞–ª–µ–Ω–∏—è", "error");
-    }
-  }
-
-  async function trashSingleTrainingSession(id) {
-    try {
-      const reason = trainingDeletionReason === "other" ? trainingDeletionReasonCustom || "other" : trainingDeletionReason;
-      const body = { action: "trashTrainingSession", id, admin_secret: adminPassword, expert_name: "admin", deletion_reason: reason };
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
-        setTrainingTrashConfirm(null);
-        setTrainingDeletionReason("");
-        setTrainingDeletionReasonCustom("");
-        showToast("–ü–µ—Ä–µ–º–µ—â–µ–Ω–æ –≤ –∫–æ—Ä–∑–∏–Ω—É");
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –ø–µ—Ä–µ–º–µ—â–µ–Ω–∏—è –≤ –∫–æ—Ä–∑–∏–Ω—É", "error");
-    }
-  }
-
-  async function trashBulkTrainingSessions(ids) {
-    try {
-      const reason = trainingDeletionReason === "other" ? trainingDeletionReasonCustom || "other" : trainingDeletionReason;
-      const body = { action: "trashTrainingSessions", ids, admin_secret: adminPassword, expert_name: "admin", deletion_reason: reason };
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setTrainingSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
-        setTrainingSelection(new Set());
-        setTrainingBulkConfirm(null);
-        setTrainingDeletionReason("");
-        setTrainingDeletionReasonCustom("");
-        showToast(`–ü–µ—Ä–µ–º–µ—â–µ–Ω–æ –≤ –∫–æ—Ä–∑–∏–Ω—É: ${data.count || ids.length}`);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –ø–µ—Ä–µ–º–µ—â–µ–Ω–∏—è –≤ –∫–æ—Ä–∑–∏–Ω—É", "error");
-    }
-  }
-
-  async function restoreSingleTrainingSession(id) {
-    try {
-      const body = { action: "restoreTrainingSession", id, admin_secret: adminPassword };
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
-        showToast("–í–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–æ");
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∏—è", "error");
-    }
-  }
-
-  async function restoreBulkTrainingSessions(ids) {
-    try {
-      const body = { action: "restoreTrainingSessions", ids, admin_secret: adminPassword };
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setTrainingSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
-        setTrainingSelection(new Set());
-        setTrainingBulkConfirm(null);
-        showToast(`–í–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–æ: ${data.count || ids.length}`);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∏—è", "error");
-    }
-  }
-
-  async function permanentDeleteTrainingSession(id) {
-    try {
-      const body = { action: "permanentlyDeleteTrainingSession", id, admin_secret: adminPassword };
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setTrainingSessions((prev) => prev.filter((s) => s.id !== id));
-        setTrainingTrashConfirm(null);
-        showToast("–ó–∞–ø–∏—Å—å —É–¥–∞–ª–µ–Ω–∞ –±–µ–∑–≤–æ–∑–≤—Ä–∞—Ç–Ω–æ");
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –±–µ–∑–≤–æ–∑–≤—Ä–∞—Ç–Ω–æ–≥–æ —É–¥–∞–ª–µ–Ω–∏—è", "error");
-    }
-  }
-
-  async function permanentDeleteBulkTrainingSessions(ids) {
-    try {
-      const body = { action: "permanentlyDeleteTrainingSessions", ids, admin_secret: adminPassword };
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setTrainingSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
-        setTrainingSelection(new Set());
-        setTrainingBulkConfirm(null);
-        showToast(`–£–¥–∞–ª–µ–Ω–æ –±–µ–∑–≤–æ–∑–≤—Ä–∞—Ç–Ω–æ: ${data.count || ids.length}`);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –±–µ–∑–≤–æ–∑–≤—Ä–∞—Ç–Ω–æ–≥–æ —É–¥–∞–ª–µ–Ω–∏—è", "error");
-    }
-  }
-
-  async function createTrainingFromReview() {
-    if (!trainingFormReviewId) return;
-    try {
-      const body = {
-        action: "createTrainingFromReview",
-        review_id: trainingFormReviewId,
-        ...trainingFormData,
-      };
-      if (expertData) {
-        body.expert_id = expertData.id;
-        body.expert_code = await getStoredExpertCode();
-      }
-      else body.admin_secret = adminPassword;
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast(data.message || "–°–æ–∑–¥–∞–Ω–æ");
-        setTrainingSessions((prev) => [data.session, ...prev]);
-        setTrainingFormReviewId(null);
-        setTrainingFormData({ scenario_played: "", expected_case_type: "", session_kind: "initial", expert_comment: "", public_code: "" });
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ —Å–æ–∑–¥–∞–Ω–∏—è", "error");
-    }
-  }
-
-  async function downloadTrainingCsv() {
-    try {
-      const body = { action: "exportTrainingCsv", ...trainingFilter, showTrash: trainingShowTrash };
-      if (expertData) {
-        body.expert_id = expertData.id;
-        body.expert_code = await getStoredExpertCode();
-      }
-      else body.admin_secret = adminPassword;
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${trainingShowTrash ? "training-sessions-trash" : "training-sessions"}-${new Date().toISOString().split("T")[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –≤—ã–≥—Ä—É–∑–∫–∏", "error");
-    }
-  }
-
-  // ‚îÄ‚îÄ Admin Onboarding Requests ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-  async function adminLoadOnboardingRequests(status) {
-    setOnboardingLoading(true);
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listOnboardingRequests", status: status || "all", admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) setOnboardingRequests(data.requests || []);
-    } catch {}
-    setOnboardingLoading(false);
-  }
-
-  async function adminReviewOnboardingRequest(id, action, expertId) {
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reviewOnboardingRequest", id, review_action: action, expert_id: expertId, admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast(action === "approve" ? "–ó–∞—è–≤–∫–∞ –æ–¥–æ–±—Ä–µ–Ω–∞" : "–ó–∞—è–≤–∫–∞ –æ—Ç–∫–ª–æ–Ω–µ–Ω–∞");
-        adminLoadOnboardingRequests("all");
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch { showToast("–û—à–∏–±–∫–∞", "error"); }
-  }
-
-  // ‚îÄ‚îÄ Admin Match Requests ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-  async function adminLoadMatchRequests(status) {
-    setMatchLoading(true);
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listMatchRequests", status: status || "all", admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) setMatchRequests(data.requests || []);
-    } catch {}
-    setMatchLoading(false);
-  }
-
-  async function adminAssignMatchRequest(requestId, expertId) {
-    setMatchAssigning(true);
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "assignMatchRequest", id: requestId, expert_id: expertId, admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast(`–ù–∞–∑–Ω–∞—á–µ–Ω: ${expertId}`);
-        setMatchExpertSelector(null);
-        adminLoadMatchRequests("all");
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch { showToast("–û—à–∏–±–∫–∞", "error"); }
-    setMatchAssigning(false);
-  }
-
-  async function adminLoadEligibleExperts(module) {
-    try {
-      const res = await fetch("/api/experts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listAllExperts", admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        const experts = (data.experts || []).filter(e => {
-          if (!e.is_active) return false;
-          const modules = Array.isArray(e.allowed_modules) ? e.allowed_modules : [];
-          return modules.includes(module || "support");
-        });
-        setMatchExpertList(experts);
-      }
-    } catch {}
-  }
-
-  async function loadQualityStats() {
-    try {
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "getQualityAnalysisStats", admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setQualityStats({
-          new_approved_count: data.new_approved_count || 0,
-          unanalyzed_review_ids: data.unanalyzed_review_ids || [],
-          last_analysis_at: data.last_analysis_at || null,
-          last_analysis_review_count: data.last_analysis_review_count || 0,
-          recommended_to_analyze: data.recommended_to_analyze || false,
-        });
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ —Å—Ç–∞—Ç–∏—Å—Ç–∏–∫–∏", "error");
-    }
-  }
-
-  async function loadQualityInsights() {
-    setQualityLoading(true);
-    try {
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "listQualityInsights", admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setQualityInsights(data.insights || []);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –æ–±–∑–æ—Ä–æ–≤", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –æ–±–∑–æ—Ä–æ–≤", "error");
-    } finally {
-      setQualityLoading(false);
-    }
-  }
-
-  async function generateQualityInsight() {
-    setQualityGenerating(true);
-    setQualityConfirmOpen(false);
-    try {
-      const body = {
-        action: "generateQualityInsight",
-        admin_secret: adminPassword,
-        analysis_type: qualitySelectedReviewIds.length > 0 ? "selected" : "new_approved",
-      };
-      if (qualitySelectedReviewIds.length > 0) {
-        body.review_ids = qualitySelectedReviewIds;
-      }
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast(data.message || "–û–±–∑–æ—Ä —Å–æ–∑–¥–∞–Ω");
-        setQualitySelectedReviewIds([]);
-        await loadQualityStats();
-        await loadQualityInsights();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ —Å–æ–∑–¥–∞–Ω–∏—è –æ–±–∑–æ—Ä–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ —Å–æ–∑–¥–∞–Ω–∏—è –æ–±–∑–æ—Ä–∞", "error");
-    } finally {
-      setQualityGenerating(false);
-    }
-  }
-
-  async function loadQualityInsightDetail(insightId) {
-    try {
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "getQualityInsight", admin_secret: adminPassword, insight_id: insightId }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setQualityDetailInsight(data.insight);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –æ–±–∑–æ—Ä–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ –æ–±–∑–æ—Ä–∞", "error");
-    }
-  }
-
-  async function updateQualityInsightStatus(insightId, status) {
-    try {
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "updateQualityInsightStatus", admin_secret: adminPassword, insight_id: insightId, status }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast(data.message || "–°—Ç–∞—Ç—É—Å –æ–±–Ω–æ–≤–ª—ë–Ω");
-        setQualityInsights((prev) => prev.map((i) => i.id === insightId ? { ...i, status } : i));
-        if (qualityDetailInsight && qualityDetailInsight.id === insightId) {
-          setQualityDetailInsight((prev) => ({ ...prev, status }));
-        }
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –æ–±–Ω–æ–≤–ª–µ–Ω–∏—è —Å—Ç–∞—Ç—É—Å–∞", "error");
-    }
-  }
-
-  function toggleReviewSelection(reviewId) {
-    setQualitySelectedReviewIds((prev) =>
-      prev.includes(reviewId) ? prev.filter((id) => id !== reviewId) : [...prev, reviewId]
-    );
-  }
-
-  function copyOpenCodeTask(insight) {
-    if (!insight || !insight.recommendations || insight.recommendations.length === 0) {
-      showToast("–ù–µ—Ç –ø—Ä–∏–Ω—è—Ç—ã—Ö —Ä–µ–∫–æ–º–µ–Ω–¥–∞—Ü–∏–π –¥–ª—è –∫–æ–ø–∏—Ä–æ–≤–∞–Ω–∏—è", "error");
-      return;
-    }
-    const acceptedRels = insight.recommendations;
-    if (acceptedRels.length === 0) {
-      showToast("–ù–µ—Ç —Ä–µ–∫–æ–º–µ–Ω–¥–∞—Ü–∏–π –¥–ª—è –∑–∞–¥–∞–Ω–∏—è", "error");
-      return;
-    }
-    const lines = [
-      "## –ó–∞–¥–∞–Ω–∏–µ –¥–ª—è OpenCode",
-      "",
-      "### –ù–∞–π–¥–µ–Ω–Ω—ã–µ –ø—Ä–æ–±–ª–µ–º—ã",
-    ];
-    for (const rel of acceptedRels) {
-      lines.push(`- **${rel.title}** (–ø—Ä–∏–æ—Ä–∏—Ç–µ—Ç: ${rel.priority || "—Å—Ä–µ–¥–Ω–∏–π"}, –ø–æ–¥—Ç–≤–µ—Ä–∂–¥–∞—é—â–∏—Ö –∫–µ–π—Å–æ–≤: ${rel.case_count || "‚Äî"})`);
-      if (rel.description) lines.push(`  - –û–ø–∏—Å–∞–Ω–∏–µ: ${rel.description}`);
-      if (rel.suggested_change) lines.push(`  - –ü—Ä–µ–¥–ª–∞–≥–∞–µ–º–æ–µ –∏–∑–º–µ–Ω–µ–Ω–∏–µ: ${rel.suggested_change}`);
-      if (rel.target_file) lines.push(`  - –§–∞–π–ª: ${rel.target_file}`);
-      if (rel.risk_of_change) lines.push(`  - –†–∏—Å–∫: ${rel.risk_of_change}`);
-      lines.push("");
-    }
-    lines.push("### –†–µ–≥—Ä–µ—Å—Å–∏–æ–Ω–Ω—ã–µ —Ç–µ—Å—Ç—ã");
-    if (insight.regression_tests && insight.regression_tests.length > 0) {
-      for (const test of insight.regression_tests) {
-        lines.push(`- –°—Ü–µ–Ω–∞—Ä–∏–π: ${test.scenario || test.scenario || "‚Äî"}`);
-        if (test.expected_behavior) lines.push(`  - –û–∂–∏–¥–∞–µ–º–æ–µ –ø–æ–≤–µ–¥–µ–Ω–∏–µ: ${test.expected_behavior}`);
-      }
-    } else {
-      lines.push("(–Ω–µ —É–∫–∞–∑–∞–Ω—ã)");
-    }
-    lines.push("");
-    lines.push("### –¢—Ä–µ–±–æ–≤–∞–Ω–∏—è");
-    lines.push("- –ü–æ–∫–∞–∑–∞—Ç—å diff –ø–µ—Ä–µ–¥ –ª—é–±—ã–º–∏ –∏–∑–º–µ–Ω–µ–Ω–∏—è–º–∏");
-    lines.push("- –ù–µ –¥–µ–ª–∞—Ç—å –∞–≤—Ç–æ–º–∞—Ç–∏—á–µ—Å–∫–∏–π push –±–µ–∑ –ø—Ä–æ–≤–µ—Ä–∫–∏");
-    lines.push("- –ù–µ –º–µ–Ω—è—Ç—å production –±–µ–∑ —è–≤–Ω–æ–≥–æ –ø–æ–¥—Ç–≤–µ—Ä–∂–¥–µ–Ω–∏—è");
-
-    navigator.clipboard.writeText(lines.join("\n")).then(() => {
-      showToast("–ó–∞–¥–∞–Ω–∏–µ —Å–∫–æ–ø–∏—Ä–æ–≤–∞–Ω–æ –≤ –±—É—Ñ–µ—Ä –æ–±–º–µ–Ω–∞");
-    }).catch(() => {
-      showToast("–û—à–∏–±–∫–∞ –∫–æ–ø–∏—Ä–æ–≤–∞–Ω–∏—è", "error");
-    });
-  }
-
-  function openTrainingForm(review) {
-    const json = getReviewJson(review);
-    let code = review.public_code || json.public_code || json.publicCode || json.session?.public_code || json.sessionCode || json.code || "";
-    setTrainingFormReviewId(review.id);
-    setTrainingFormData({
-      scenario_played: "",
-      expected_case_type: "",
-      session_kind: "initial",
-      expert_comment: "",
-      public_code: code,
-    });
-    setTrainingFormPublicCodeAuto(!!code);
-  }
-
-  async function adminLoadReviews(filterStatus, filterEnv, expertFilter, showTrash) {
-    const st = filterStatus !== undefined ? filterStatus : adminFilter;
-    const env = filterEnv !== undefined ? filterEnv : adminEnv;
-    const exp = expertFilter !== undefined ? expertFilter : adminExpertFilter;
-    const trash = showTrash !== undefined ? showTrash : adminReviewShowTrash;
-    setAdminLoading(true);
-    try {
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "list", admin_secret: adminPassword, status: st, environment: env, expert_filter: exp, limit: 100, showTrash: trash }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setAdminReviews(data.reviews || []);
-        setAdminTotal(data.count || data.reviews?.length || 0);
-      } else {
-        const details = data.details || data.error || null;
-        showToast(details ? `–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏: ${details}` : "–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏", "error");
-      }
-    } catch (err) {
-      console.error("adminLoadReviews error", err);
-      showToast("–û—à–∏–±–∫–∞ –∑–∞–≥—Ä—É–∑–∫–∏ —Å–ø–∏—Å–∫–∞", "error");
-    } finally {
-      setAdminLoading(false);
-    }
-  }
-
-  async function adminUpdateStatus(reviewId, status) {
-    setAdminActionLoading(reviewId);
-    try {
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "updateStatus", review_id: reviewId, status, admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast(data.message || "–°—Ç–∞—Ç—É—Å –æ–±–Ω–æ–≤–ª—ë–Ω");
-        adminLoadReviews();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ –æ–±–Ω–æ–≤–ª–µ–Ω–∏—è", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –æ–±–Ω–æ–≤–ª–µ–Ω–∏—è —Å—Ç–∞—Ç—É—Å–∞", "error");
-    } finally {
-      setAdminActionLoading(null);
-    }
-  }
-
-  function safeObject(value) {
-    if (!value) return {};
-    if (typeof value === "object" && !Array.isArray(value)) return value;
-    if (typeof value === "string") {
-      try {
-        const parsed = JSON.parse(value);
-        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-      } catch {
-        return {};
-      }
-    }
-    return {};
-  }
-
-  function getReviewJson(review) {
-    return safeObject(review?.json_data);
-  }
-
-  function getDoctorCorrection(review) {
-    return safeObject(review?.doctor_correction);
-  }
-
-  function getCorrectedJson(review) {
-    return safeObject(review?.corrected_json);
-  }
-
-  function openCorrectionForm(review) {
-    try {
-      const json = getReviewJson(review);
-      const correction = getDoctorCorrection(review);
-      const corrected = getCorrectedJson(review);
-      const voiceReview = json?.voice_analysis_review || review?.voice_analysis_review || {};
-
-      setCorrectionForm({
-        wrong_questions: correction.wrong_questions || json?.doctor_feedback?.wrong_questions || "",
-        missing_questions: correction.missing_questions || json?.doctor_feedback?.missing_questions || "",
-        bad_question_wording: correction.bad_question_wording || json?.doctor_feedback?.bad_question_wording || "",
-        corrected_user_report: corrected.corrected_user_report || correction.corrected_user_report || json?.corrected_user_report || "",
-        corrected_doctor_report: corrected.corrected_doctor_report || correction.corrected_doctor_report || json?.corrected_doctor_report || "",
-        protocol_update: review?.protocol_update || correction.protocol_update || "",
-        correction_comment: review?.correction_comment || correction.correction_comment || "",
-        voice_accuracy: voiceReview.accuracy || "",
-        voice_usefulness: voiceReview.usefulness || "",
-        voice_influenced: voiceReview.influenced_decision || "",
-        voice_confirmed: voiceReview.confirmed_features || [],
-        voice_comment: voiceReview.comment || "",
-      });
-      setEditingReview(review?.id);
-    } catch (error) {
-      console.error("open correction editor failed", error, review);
-    }
-  }
-
-  function closeCorrectionForm() {
-    setEditingReview(null);
-  }
-
-  async function adminSaveCorrection(reviewId, newStatus) {
-    setAdminActionLoading(reviewId);
-    try {
-      const voiceReview = {};
-      if (correctionForm.voice_accuracy) voiceReview.accuracy = correctionForm.voice_accuracy;
-      if (correctionForm.voice_usefulness) voiceReview.usefulness = correctionForm.voice_usefulness;
-      if (correctionForm.voice_influenced) voiceReview.influenced_decision = correctionForm.voice_influenced;
-      if (correctionForm.voice_confirmed?.length) voiceReview.confirmed_features = correctionForm.voice_confirmed;
-      if (correctionForm.voice_comment) voiceReview.comment = correctionForm.voice_comment;
-      if (Object.keys(voiceReview).length > 0) {
-        voiceReview.reviewed_at = new Date().toISOString();
-      }
-
-      const body = {
-        review_id: reviewId,
-        admin_secret: adminPassword,
-        action: "save_correction",
-        doctor_correction: {
-          wrong_questions: correctionForm.wrong_questions,
-          missing_questions: correctionForm.missing_questions,
-          bad_question_wording: correctionForm.bad_question_wording,
-          corrected_user_report: correctionForm.corrected_user_report,
-          corrected_doctor_report: correctionForm.corrected_doctor_report,
-        },
-        protocol_update: correctionForm.protocol_update,
-        correction_comment: correctionForm.correction_comment,
-        voice_analysis_review: Object.keys(voiceReview).length > 0 ? voiceReview : undefined,
-      };
-      if (newStatus) {
-        body.status = newStatus;
-      }
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...body, action: "saveCorrection" }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast(data.message || "–°–æ—Ö—Ä–∞–Ω–µ–Ω–æ");
-        setEditingReview(null);
-        adminLoadReviews();
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ —Å–æ—Ö—Ä–∞–Ω–µ–Ω–∏—è", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ —Å–æ—Ö—Ä–∞–Ω–µ–Ω–∏—è –ø—Ä–∞–≤–æ–∫", "error");
-    } finally {
-      setAdminActionLoading(null);
-    }
-  }
-
-  function adminDownloadJson(review) {
-    const blob = new Blob([JSON.stringify(review.json_data || review, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${review.case_id || review.id}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function adminDownloadJsonl(status) {
-    const st = status || "approved";
-    try {
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "exportJsonl", admin_secret: adminPassword, status: st }),
-      });
-      const text = await res.text();
-      const blob = new Blob([text], { type: "application/jsonl" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `reviews-${st}-${new Date().toISOString().split("T")[0]}.jsonl`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      showToast("–û—à–∏–±–∫–∞ —ç–∫—Å–ø–æ—Ä—Ç–∞: " + e.message);
-    }
-  }
-
-  async function adminLoadCrisisRequests(filterStatus) {
-    const st = filterStatus !== undefined ? filterStatus : adminCrisisFilter;
-    setAdminCrisisLoading(true);
-    try {
-      const res = await fetch("/api/crisis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "list", status: st, limit: 100, admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setAdminCrisisRequests(data.requests || []);
-      } else {
-        console.error("load crisis requests error", data);
-      }
-    } catch (err) {
-      console.error("adminLoadCrisisRequests error", err);
-    } finally {
-      setAdminCrisisLoading(false);
-    }
-  }
-
-  async function adminUpdateCrisisStatus(requestId, status) {
-    setAdminCrisisActionLoading(requestId);
-    try {
-      const res = await fetch("/api/crisis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "updateStatus", request_id: requestId, status, admin_secret: adminPassword }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast(data.message || "–°—Ç–∞—Ç—É—Å –æ–±–Ω–æ–≤–ª—ë–Ω");
-        adminLoadCrisisRequests(adminCrisisFilter);
-      } else {
-        showToast(data.error || "–û—à–∏–±–∫–∞ –æ–±–Ω–æ–≤–ª–µ–Ω–∏—è", "error");
-      }
-    } catch {
-      showToast("–û—à–∏–±–∫–∞ –æ–±–Ω–æ–≤–ª–µ–Ω–∏—è —Å—Ç–∞—Ç—É—Å–∞", "error");
-    } finally {
-      setAdminCrisisActionLoading(null);
-    }
-  }
-
-  function adminDownloadCrisisJson(req) {
-    const blob = new Blob([JSON.stringify(req, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `crisis-${req.id}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-      function safeText(value, fallback = "‚Äî") {
-        if (value === null || value === undefined) return fallback;
-        if (typeof value === "string") return value || fallback;
-        if (typeof value === "number" || typeof value === "boolean") return String(value);
-        try {
-          return JSON.stringify(value);
-        } catch {
-          return fallback;
-        }
-      }
-
-      function safeReport(value, label) {
-        if (value && typeof value === "string" && value.trim()) return value;
-        return `${label} –Ω–µ –±—ã–ª —Å–æ—Ö—Ä–∞–Ω—ë–Ω`;
-      }
-
-  function shortText(value, max = 240) {
-    const text = safeText(value, "");
-    if (!text) return "‚Äî";
-    return text.length > max ? text.slice(0, max) + "‚Ä¶" : text;
-  }
-
-  function safeDate(value) {
-    if (!value) return "‚Äî";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "‚Äî";
-    return d.toLocaleString("ru-RU");
-  }
-
-  function shorten(text, max = 100) {
-    return shortText(text, max);
-  }
-
-   function normalizeReviewDetails(review) {
-    return normalizeSessionDetails(review);
-  }
-
-  function toggleSection(reviewId, section) {
-    const key = `${reviewId}-${section}`;
-    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  }
-
-  function isSectionOpen(reviewId, section) {
-    return !!expandedSections[`${reviewId}-${section}`];
-  }
-
-  function openModal(title, content) {
-    setModalData({ title, content });
-  }
-
-  function closeModal() {
-    setModalData(null);
-    setTimelineData(null);
-    setTimelineCode(null);
-    setTimelineView("list");
-    setSessionDetailsData(null);
-    setSessionDetailsError(null);
-    setSessionDetailsLoading(false);
-  }
-
-  async function loadSessionTimeline(code) {
-    if (!code || code === "‚Äî") return;
-    if (timelineCode === code && timelineData) return; // already loaded
-
-    // Check cache
-    if (timelineCache[code]) {
-      setTimelineData(timelineCache[code]);
-      setTimelineCode(code);
-      return;
-    }
-
-    setTimelineLoading(true);
-    setTimelineCode(code);
-    try {
-      const body = { action: "getSessionTimeline", public_code: code };
-      if (adminPassword) body.admin_secret = adminPassword;
-      if (expertData?.id) {
-        body.expert_id = expertData.id;
-        body.expert_code = await getStoredExpertCode();
-      }
-
-      const resp = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const result = await resp.json();
-
-      if (result.ok) {
-        setTimelineData(result);
-        setTimelineCache((prev) => ({ ...prev, [code]: result }));
-      } else {
-        showToast(result.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å –ª–∏–Ω–∏—é —Å–µ—Å—Å–∏–π", "error");
-        setTimelineData(null);
-      }
-    } catch (e) {
-      showToast("–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å –ª–∏–Ω–∏—é —Å–µ—Å—Å–∏–π", "error");
-      setTimelineData(null);
-    } finally {
-      setTimelineLoading(false);
-    }
-  }
-
-  async function loadSessionDetails(item) {
-    const cacheKey = item.case_review_id || item.session_id || item.training_session_id;
-    if (!cacheKey) { showToast("–ù–µ—Ç –∏–¥–µ–Ω—Ç–∏—Ñ–∏–∫–∞—Ç–æ—Ä–∞ —Å–µ—Å—Å–∏–∏", "error"); return; }
-
-    if (sessionDetailsCache[cacheKey]) {
-      setSessionDetailsData(sessionDetailsCache[cacheKey]);
-      setTimelineView("detail");
-      setSessionDetailsError(null);
-      return;
-    }
-
-    setSessionDetailsLoading(true);
-    setSessionDetailsError(null);
-    try {
-      const body = { action: "getSessionTimelineDetails", public_code: timelineCode };
-      if (item.case_review_id) body.case_review_id = item.case_review_id;
-      else if (item.session_id) body.session_id = item.session_id;
-      else if (item.training_session_id) body.training_session_id = item.training_session_id;
-      if (adminPassword) body.admin_secret = adminPassword;
-      if (expertData?.id) {
-        body.expert_id = expertData.id;
-        body.expert_code = await getStoredExpertCode();
-      }
-
-      const resp = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const result = await resp.json();
-
-      if (result.ok) {
-        setSessionDetailsData(result.session);
-        setSessionDetailsCache((prev) => ({ ...prev, [cacheKey]: result.session }));
-        setTimelineView("detail");
-      } else {
-        setSessionDetailsError(result.error === "access_denied" ? "–£ –≤–∞—Å –Ω–µ—Ç –¥–æ—Å—Ç—É–ø–∞ –∫ —ç—Ç–æ–π —Å–µ—Å—Å–∏–∏." : result.error || "–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å —Å–µ—Å—Å–∏—é. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.");
-        showToast(result.error === "access_denied" ? "–£ –≤–∞—Å –Ω–µ—Ç –¥–æ—Å—Ç—É–ø–∞ –∫ —ç—Ç–æ–π —Å–µ—Å—Å–∏–∏." : "–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å —Å–µ—Å—Å–∏—é.", "error");
-      }
-    } catch (e) {
-      setSessionDetailsError("–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å —Å–µ—Å—Å–∏—é. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –µ—â—ë —Ä–∞–∑.");
-      showToast("–ù–µ —É–¥–∞–ª–æ—Å—å –∑–∞–≥—Ä—É–∑–∏—Ç—å —Å–µ—Å—Å–∏—é.", "error");
-    } finally {
-      setSessionDetailsLoading(false);
-    }
-  }
-
-  const SESSION_KIND_LABELS_TIMELINE = {
-    initial: "–ü–µ—Ä–≤–∏—á–Ω–∞—è —Å–µ—Å—Å–∏—è",
-    follow_up: "–ü–æ–≤—Ç–æ—Ä–Ω–∞—è —Å–µ—Å—Å–∏—è",
-    diary_check: "–ü—Ä–æ–≤–µ—Ä–∫–∞ –¥–Ω–µ–≤–Ω–∏–∫–∞",
-    support_toolkit_check: "–ü—Ä–æ–≤–µ—Ä–∫–∞ –ø—Ä–∞–∫—Ç–∏–∫",
-    crisis_check: "–°—Ä–æ—á–Ω–æ–µ –æ–±—Ä–∞—â–µ–Ω–∏–µ",
-    doctor_review: "–í—Ä–∞—á–µ–±–Ω—ã–π —Ä–∞–∑–±–æ—Ä",
-    other: "–î—Ä—É–≥–æ–µ",
-  };
-
-  const STATUS_LABELS_TIMELINE = {
-    approved: "–û–¥–æ–±—Ä–µ–Ω–æ",
-    rejected: "–û—Ç–∫–ª–æ–Ω–µ–Ω–æ",
-    pending: "–û–∂–∏–¥–∞–Ω–∏–µ",
-    needs_review: "–ù—É–∂–Ω–∞ –¥–æ—Ä–∞–±–æ—Ç–∫–∞",
-    local_auto_saved: "–ß–µ—Ä–Ω–æ–≤–∏–∫",
-    new: "–ù–æ–≤—ã–π",
-    reviewed: "–ü—Ä–æ—Å–º–æ—Ç—Ä–µ–Ω",
-    needs_prompt_update: "–ù—É–∂–Ω–æ –æ–±–Ω–æ–≤–∏—Ç—å –ø—Ä–æ–º–ø—Ç",
-    approved_for_learning: "–û–¥–æ–±—Ä–µ–Ω –¥–ª—è –æ–±—É—á–µ–Ω–∏—è",
-    archived: "–ê—Ä—Ö–∏–≤",
-  };
-
-  const isAdminPage = typeof window !== "undefined" && window.location.pathname.startsWith("/admin");
-  const isTrainingPage = typeof window !== "undefined" && window.location.pathname === "/admin/training";
-  const adminModuleRoute = adminSubPage || (typeof window !== "undefined"
-    ? window.location.pathname === "/admin/body" ? "body" : window.location.pathname === "/admin/council" ? "council" : "support"
-    : "support");
-  const isDedicatedSubdomain = !APP_BRAND.isSupportPilot && typeof window !== "undefined" && (
-    window.location.hostname === "health.tochka-opori.online" || window.location.hostname.startsWith("health.") ||
-    new URLSearchParams(window.location.search).get("module") === "body"
-  );
-  const isDev = typeof window !== "undefined" && (
-    window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || import.meta.env?.DEV
-  );
-  const showModuleSwitcher = isDev || adminRole === "super";
-
-  // Keep the AnMed pilot's presentation separate from the module selection.
-  useEffect(() => {
-    document.title = APP_BRAND.isSupportPilot
-      ? APP_BRAND.title
-      : isDedicatedSubdomain ? "–û–ø–æ—Ä–∞. –ó–¥–æ—Ä–æ–≤—å–µ & –°—Ç—Ä–æ–π–Ω–æ—Å—Ç—å" : APP_BRAND.title;
-  }, [isDedicatedSubdomain]);
-
-  const s = {
-    page: {
-      minHeight: "100vh",
-      background: "#F6F0E7",
-      color: "#2E2A25",
-      fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
-      padding: "32px",
-    },
-    wrap: { maxWidth: 1200, margin: "0 auto" },
-    header: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 80,
-    },
-    logo: { fontSize: 28, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif" },
-    sub: { color: "#7A7268", marginTop: 4, fontSize: 14 },
-    crisis: {
-      background: "#B85C4A",
-      color: "white",
-      border: 0,
-      borderRadius: 22,
-      padding: "14px 22px",
-      fontWeight: 700,
-      fontSize: 15,
-      cursor: "pointer",
-    },
-    grid: {
-      display: "grid",
-      gridTemplateColumns: "1.1fr 0.9fr",
-      gap: 56,
-      alignItems: "start",
-    },
-    badge: {
-      display: "inline-block",
-      border: "1px solid rgba(46,42,37,.12)",
-      background: "#FFFDF8",
-      borderRadius: 999,
-      padding: "10px 16px",
-      color: "#7A7268",
-      marginBottom: 28,
-      fontSize: 13,
-    },
-    h1: {
-      fontSize: 68,
-      lineHeight: 1.03,
-      fontWeight: 900,
-      margin: 0,
-      letterSpacing: "-0.05em",
-      fontFamily: "Georgia, \"PT Serif\", serif",
-    },
-    p: {
-      color: "#7A7268",
-      fontSize: 20,
-      lineHeight: 1.7,
-      maxWidth: 680,
-    },
-    row: {
-      display: "flex",
-      gap: 14,
-      marginTop: 32,
-      flexWrap: "wrap",
-    },
-    primary: {
-      border: 0,
-      borderRadius: 22,
-      background: "#7D9A89",
-      color: "white",
-      padding: "16px 24px",
-      fontWeight: 700,
-      fontSize: 16,
-      cursor: "pointer",
-    },
-    secondary: {
-      border: "1px solid rgba(46,42,37,.18)",
-      borderRadius: 22,
-      background: "#FFFDF8",
-      color: "#2E2A25",
-      padding: "16px 24px",
-      fontWeight: 600,
-      fontSize: 15,
-      cursor: "pointer",
-    },
-    card: {
-      border: "1px solid rgba(46,42,37,.1)",
-      background: "#FFFDF8",
-      borderRadius: 36,
-      padding: 28,
-      boxShadow: "0 4px 24px rgba(46,42,37,.06)",
-    },
-    inner: {
-      background: "#FAF6EF",
-      borderRadius: 30,
-      padding: 26,
-      marginTop: 22,
-    },
-    textarea: {
-      width: "100%",
-      minHeight: 180,
-      resize: "vertical",
-      border: "1px solid rgba(46,42,37,.12)",
-      borderRadius: 24,
-      background: "#FAF6EF",
-      color: "#2E2A25",
-      padding: 20,
-      fontSize: 16,
-      outline: "none",
-      boxSizing: "border-box",
-    },
-    wide: {
-      width: "100%",
-      marginTop: 18,
-      border: 0,
-      borderRadius: 24,
-      background: "#7D9A89",
-      color: "white",
-      padding: "18px 22px",
-      fontWeight: 700,
-      fontSize: 16,
-      cursor: "pointer",
-    },
-    error: {
-      marginTop: 16,
-      background: "rgba(184,92,74,.1)",
-      color: "#B85C4A",
-      padding: 16,
-      borderRadius: 18,
-    },
-    result: {
-      marginTop: 24,
-      border: "1px solid rgba(46,42,37,.1)",
-      background: "#FFFDF8",
-      borderRadius: 28,
-      padding: 24,
-    },
-    label: { color: "#7A7268", fontSize: 14, marginTop: 18, marginBottom: 6 },
-    label2: { color: "#7A7268", fontSize: 14, marginTop: 22, marginBottom: 6 },
-    questionCard: {
-      background: "#FAF6EF",
-      borderRadius: 18,
-      padding: 16,
-      marginBottom: 14,
-    },
-    questionText: {
-      fontWeight: 700,
-      marginBottom: 10,
-      lineHeight: 1.5,
-    },
-    tabs: {
-      display: "flex",
-      gap: 10,
-      marginBottom: 18,
-    },
-    tab: {
-      border: "1px solid rgba(46,42,37,.12)",
-      background: "transparent",
-      color: "#7A7268",
-      borderRadius: 14,
-      padding: "10px 16px",
-      cursor: "pointer",
-    },
-    activeTab: {
-      border: "1px solid #7D9A89",
-      background: "#E2EBE4",
-      color: "#2E2A25",
-      borderRadius: 14,
-      padding: "10px 16px",
-      fontWeight: 700,
-      cursor: "pointer",
-    },
-    reportBlock: {
-      background: "#FAF6EF",
-      borderRadius: 20,
-      padding: 20,
-    },
-    expertBox: {
-      marginTop: 24,
-      border: "1px solid rgba(46,42,37,.1)",
-      background: "#FAF6EF",
-      borderRadius: 24,
-      padding: 20,
-    },
-    overlay: {
-      position: "fixed",
-      top: 0, left: 0, right: 0, bottom: 0,
-      background: "rgba(46,42,37,.45)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 1000,
-      padding: 20,
-    },
-    modal: {
-      background: "#FFFDF8",
-      borderRadius: 28,
-      padding: 28,
-      maxWidth: 560,
-      width: "100%",
-      border: "1px solid rgba(46,42,37,.1)",
-      boxShadow: "0 8px 40px rgba(46,42,37,.12)",
-    },
-    modalTitle: {
-      fontSize: 26,
-      fontWeight: 900,
-      marginBottom: 12,
-    },
-    modalWarning: {
-      background: "rgba(184,92,74,.1)",
-      color: "#B85C4A",
-      padding: 14,
-      borderRadius: 16,
-      fontSize: 15,
-      lineHeight: 1.5,
-      marginBottom: 20,
-    },
-    crisisTextarea: {
-      width: "100%",
-      minHeight: 100,
-      resize: "vertical",
-      border: "1px solid rgba(46,42,37,.12)",
-      borderRadius: 16,
-      background: "#FAF6EF",
-      color: "#2E2A25",
-      padding: 14,
-      fontSize: 15,
-      outline: "none",
-      boxSizing: "border-box",
-      marginBottom: 14,
-    },
-    crisisInput: {
-      width: "100%",
-      border: "1px solid rgba(46,42,37,.12)",
-      borderRadius: 16,
-      background: "#FAF6EF",
-      color: "#2E2A25",
-      padding: "14px 14px",
-      fontSize: 15,
-      outline: "none",
-      boxSizing: "border-box",
-      marginBottom: 20,
-    },
-    crisisActions: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 10,
-    },
-    crisisWarning: {
-      marginTop: 14,
-      background: "rgba(184,92,74,.08)",
-      border: "1px solid rgba(184,92,74,.2)",
-      color: "#B85C4A",
-      padding: 16,
-      borderRadius: 18,
-      lineHeight: 1.5,
-    },
-    crisisConfirmation: {
-      marginTop: 14,
-      background: "rgba(125,154,137,.12)",
-      border: "1px solid rgba(125,154,137,.3)",
-      color: "#5F7D6C",
-      padding: 16,
-      borderRadius: 18,
-      lineHeight: 1.5,
-    },
-    privacyNote: {
-      marginBottom: 20,
-      background: "rgba(125,154,137,.08)",
-      border: "1px solid rgba(125,154,137,.2)",
-      color: "#5F7D6C",
-      padding: 14,
-      borderRadius: 16,
-      fontSize: 14,
-      lineHeight: 1.5,
-    },
-    toast: {
-      position: "fixed",
-      bottom: 24,
-      left: "50%",
-      transform: "translateX(-50%)",
-      zIndex: 2000,
-      padding: "14px 24px",
-      borderRadius: 16,
-      fontWeight: 600,
-      fontSize: 15,
-      boxShadow: "0 4px 20px rgba(46,42,37,.12)",
-      animation: "toastIn 0.3s ease",
-      textAlign: "center",
-      maxWidth: "calc(100vw - 40px)",
-    },
-    toastSuccess: {
-      background: "#E2EBE4",
-      border: "1px solid rgba(125,154,137,.4)",
-      color: "#2E2A25",
-    },
-    toastError: {
-      background: "rgba(184,92,74,.1)",
-      border: "1px solid rgba(184,92,74,.3)",
-      color: "#B85C4A",
-    },
-    answerInput: {
-      width: "100%",
-      minHeight: 80,
-      resize: "vertical",
-      border: "1px solid rgba(46,42,37,.12)",
-      borderRadius: 16,
-      background: "#FAF6EF",
-      color: "#2E2A25",
-      padding: 14,
-      fontSize: 15,
-      outline: "none",
-      boxSizing: "border-box",
-    },
-  };
-
-  if (isAdminPage) {
-    const t = adminDarkMode
-      ? { bg: "#050817", text: "white", cardBg: "rgba(255,255,255,.03)", cardBorder: "rgba(255,255,255,.08)",
-          border: "rgba(255,255,255,.12)", tabBg: "rgba(255,255,255,.06)", tabActive: "white", tabActiveText: "#020617",
-          inputBg: "rgba(2,6,23,.55)", inputBorder: "rgba(255,255,255,.12)", inputText: "white",
-          accent: "#7bc0e8", muted: "#94a3b8", secondary: "#16213e", secondaryBorder: "#2a3a5c",
-          success: "#bbf7d0", error: "#fecaca", highlight: "rgba(59,130,246,.15)",
-          badgeApproved: "#14532d", badgeApprovedText: "#bbf7d0",
-          badgeRejected: "#7f1d1d", badgeRejectedText: "#fecaca",
-          badgePending: "#1e3a5f", badgePendingText: "#93c5fd",
-          danger: "#ef4444", dangerBg: "rgba(239,68,68,.1)",
-          crisisCard: "rgba(255,255,255,.04)", crisisText: "#e2e8f0", crisisMuted: "#64748b",
-          crisisBorder: "rgba(255,255,255,.1)", crisisAccent: "#a5b4fc",
-          cardLabel: "#64748b", cardValue: "#e2e8f0",
-          filterBg: "rgba(255,255,255,.06)", filterText: "white", filterBorder: "rgba(255,255,255,.12)",
-          jsonlBtn: "#16213e", jsonlBtnBorder: "#2a3a5c", jsonlBtnText: "#7bc0e8",
-          badgeInProgress: "rgba(59,130,246,.2)", badgeInProgressText: "#93c5fd",
-          badgeClosed: "rgba(34,197,94,.2)", badgeClosedText: "#bbf7d0",
-          badgeFalseAlarm: "rgba(100,116,139,.2)", badgeFalseAlarmText: "#cbd5e1",
-          badgeNew: "rgba(220,38,38,.2)", badgeNewText: "#fecaca",
-          badgeHighRisk: "rgba(220,38,38,.2)", badgeHighRiskText: "#fecaca",
-          riskMarker: "#fca5a5", riskMarkerBg: "rgba(220,38,38,.15)",
-          crisisActionPrimary: "rgba(59,130,246,.2)", crisisActionPrimaryText: "#93c5fd",
-          crisisActionSuccess: "rgba(34,197,94,.2)", crisisActionSuccessText: "#bbf7d0",
-          crisisActionNeutral: "rgba(100,116,139,.2)", crisisActionNeutralText: "#cbd5e1",
-          crisisActionJsonl: "rgba(255,255,255,.06)", crisisActionJsonlText: "#94a3b8",
-          crisisActionJsonlBorder: "rgba(255,255,255,.12)",
-        }
-      : { bg: "#f3f1ec", text: "#1a1a1a", cardBg: "#ffffff", cardBorder: "#dcd8d0",
-          border: "#d4cec4", tabBg: "#e6e2da", tabActive: "#2e2a25", tabActiveText: "#ffffff",
-          inputBg: "#ffffff", inputBorder: "#d4cec4", inputText: "#1a1a1a",
-          accent: "#2563eb", muted: "#6b7280", secondary: "#e8e4dc", secondaryBorder: "#d4cec4",
-          success: "#166534", error: "#991b1b", highlight: "rgba(37,99,235,.08)",
-          badgeApproved: "#dcfce7", badgeApprovedText: "#166534",
-          badgeRejected: "#fee2e2", badgeRejectedText: "#991b1b",
-          badgePending: "#dbeafe", badgePendingText: "#1e40af",
-          danger: "#dc2626", dangerBg: "rgba(220,38,38,.06)",
-          crisisCard: "#ffffff", crisisText: "#374151", crisisMuted: "#6b7280",
-          crisisBorder: "#dcd8d0", crisisAccent: "#4f46e5",
-          cardLabel: "#6b7280", cardValue: "#1a1a1a",
-          filterBg: "#ffffff", filterText: "#1a1a1a", filterBorder: "#d4cec4",
-          jsonlBtn: "#e8e4dc", jsonlBtnBorder: "#d4cec4", jsonlBtnText: "#2563eb",
-          badgeInProgress: "#dbeafe", badgeInProgressText: "#1e40af",
-          badgeClosed: "#dcfce7", badgeClosedText: "#166534",
-          badgeFalseAlarm: "#f3f4f6", badgeFalseAlarmText: "#6b7280",
-          badgeNew: "#fee2e2", badgeNewText: "#991b1b",
-          badgeHighRisk: "#fee2e2", badgeHighRiskText: "#991b1b",
-          riskMarker: "#fca5a5", riskMarkerBg: "rgba(220,38,38,.08)",
-          crisisActionPrimary: "#dbeafe", crisisActionPrimaryText: "#1e40af",
-          crisisActionSuccess: "#dcfce7", crisisActionSuccessText: "#166534",
-          crisisActionNeutral: "#f3f4f6", crisisActionNeutralText: "#6b7280",
-          crisisActionJsonl: "#f3f4f6", crisisActionJsonlText: "#6b7280",
-          crisisActionJsonlBorder: "#d4cec4",
-        };
-
-    const detailQualityInsightView = (d, t) => {
-      return (
-        <div style={{ marginTop: 16, borderTop: `1px solid ${t.cardBorder}`, paddingTop: 16 }}>
-          {/* Summary */}
-          {d.summary && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ color: t.cardLabel, fontSize: 11, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>–û–±—â–∏–π –≤—ã–≤–æ–¥</div>
-              <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6 }}>{d.summary}</div>
-            </div>
-          )}
-
-          {/* Strengths */}
-          {d.strengths && d.strengths.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ color: t.success, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>–ß—Ç–æ —Ä–∞–±–æ—Ç–∞–µ—Ç —Ö–æ—Ä–æ—à–æ</div>
-              {d.strengths.map((item, i) => (
-                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6, background: t.highlight }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title}</div>
-                  {item.case_count && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>–ö–µ–π—Å–æ–≤: {item.case_count}</div>}
-                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Recurring Problems */}
-          {d.recurring_problems && d.recurring_problems.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ color: t.error, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>–ü–æ–≤—Ç–æ—Ä—è—é—â–∏–µ—Å—è –ø—Ä–æ–±–ª–µ–º—ã</div>
-              {d.recurring_problems.map((item, i) => (
-                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.error}`, borderRadius: 8, marginBottom: 6, background: t.dangerBg }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title}</span>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
-                      background: item.severity === "critical" ? t.badgeNew
-                        : item.severity === "high" ? t.badgeHighRisk
-                        : item.severity === "medium" ? t.badgePending
-                        : t.badgeFalseAlarm,
-                      color: item.severity === "critical" ? t.badgeNewText
-                        : item.severity === "high" ? t.badgeHighRiskText
-                        : item.severity === "medium" ? t.badgePendingText
-                        : t.badgeFalseAlarmText,
-                    }}>
-                      {QUALITY_SEVERITY_LABELS[item.severity] || item.severity || "‚Äî"}
-                    </span>
-                  </div>
-                  {item.case_count && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>–ö–µ–π—Å–æ–≤: {item.case_count}</div>}
-                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Safety Findings */}
-          {d.safety_findings && d.safety_findings.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ color: t.danger, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>–ë–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç—å</div>
-              {d.safety_findings.map((item, i) => (
-                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.danger}`, borderRadius: 8, marginBottom: 6, background: t.dangerBg }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title || item}</div>
-                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Missed Domains */}
-          {d.missed_domains && d.missed_domains.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ color: t.error, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>–ü—Ä–æ–ø—É—â–µ–Ω–Ω—ã–µ –¥–æ–º–µ–Ω—ã</div>
-              {d.missed_domains.map((item, i) => (
-                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title || item}</div>
-                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Language Findings */}
-          {d.language_findings && d.language_findings.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ color: t.accent, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>–Ø–∑—ã–∫ –∏ —Å—Ç–∏–ª—å</div>
-              {d.language_findings.map((item, i) => (
-                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title || item}</div>
-                  {item.description && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.description}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Recommendations */}
-          {d.recommendations && d.recommendations.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ color: t.accent, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>–ü—Ä–µ–¥–ª–∞–≥–∞–µ–º—ã–µ –∏–∑–º–µ–Ω–µ–Ω–∏—è</div>
-              {d.recommendations.map((item, i) => (
-                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6 }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>{item.title}</span>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
-                      background: item.priority === "critical" || item.priority === "high" ? t.badgeNew : t.badgePending,
-                      color: item.priority === "critical" || item.priority === "high" ? t.badgeNewText : t.badgePendingText,
-                    }}>
-                      {item.priority || "‚Äî"}
-                    </span>
-                  </div>
-                  {item.case_count && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>–ö–µ–π—Å–æ–≤: {item.case_count}</div>}
-                  {item.reason && <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4 }}>{item.reason}</div>}
-                  {item.suggested_change && (
-                    <div style={{ fontSize: 12, color: t.crisisText, marginTop: 4, padding: "6px 8px", background: t.highlight, borderRadius: 6 }}>
-                      <span style={{ fontWeight: 600 }}>–ò–∑–º–µ–Ω–µ–Ω–∏–µ:</span> {item.suggested_change}
-                    </div>
-                  )}
-                  {item.target_file && <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>–§–∞–π–ª: {item.target_file}</div>}
-                  {item.risk_of_change && <div style={{ fontSize: 11, color: t.muted }}>–†–∏—Å–∫: {item.risk_of_change}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Risk Assessment */}
-          {d.risk_of_changes && (
-            <div style={{ marginBottom: 16, padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8 }}>
-              <div style={{ color: t.cardLabel, fontSize: 11, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>–†–∏—Å–∫–∏ –∏–∑–º–µ–Ω–µ–Ω–∏–π</div>
-              <div style={{ fontSize: 13, color: t.crisisText }}>{d.risk_of_changes}</div>
-            </div>
-          )}
-
-          {/* Regression Tests */}
-          {d.regression_tests && d.regression_tests.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ color: t.muted, fontSize: 11, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>–†–µ–≥—Ä–µ—Å—Å–∏–æ–Ω–Ω—ã–µ —Ç–µ—Å—Ç—ã</div>
-              {d.regression_tests.map((item, i) => (
-                <div key={i} style={{ padding: "8px 12px", border: `1px solid ${t.cardBorder}`, borderRadius: 8, marginBottom: 6 }}>
-                  <div style={{ fontWeight: 600, fontSize: 12, color: t.crisisText }}>{item.scenario}</div>
-                  {item.expected_behavior && <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>–û–∂–∏–¥–∞–µ—Ç—Å—è: {item.expected_behavior}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    };
-
-    const renderReviewSections = (review, json, t, data) => {
-      const { patientText, userReport, doctorReport, doctorFeedbackComment, conversationHistory: rounds } = data;
-        const sections = [
-        {
-          key: "patient",
-          label: "–¢–µ–∫—Å—Ç –ø–∞—Ü–∏–µ–Ω—Ç–∞",
-          hasData: !!patientText,
-          summary: shortText(patientText, 200),
-          fullContent: patientText,
-          noDataMessage: null,
-        },
-        {
-          key: "dialogue",
-          label: "–î–∏–∞–ª–æ–≥ —Å —Å–∏—Å—Ç–µ–º–æ–π",
-          hasData: rounds.length > 0 || (Array.isArray(json.questions) && json.questions.length > 0),
-          summary: rounds.length > 0
-            ? `–†–∞—É–Ω–¥–æ–≤: ${rounds.length}`
-            : Array.isArray(json.questions) ? `–í–æ–ø—Ä–æ—Å–æ–≤: ${json.questions.length}` : "",
-          fullContent: null,
-          isDialogue: true,
-          noDataMessage: "–¢–µ–∫—Å—Ç –¥–∏–∞–ª–æ–≥–∞ –Ω–µ –±—ã–ª —Å–æ—Ö—Ä–∞–Ω—ë–Ω",
-        },
-        {
-          key: "userReport",
-          label: "–û—Ç—á—ë—Ç –¥–ª—è –ø–∞—Ü–∏–µ–Ω—Ç–∞",
-          hasData: !!userReport,
-          summary: shortText(userReport, 200),
-          fullContent: userReport,
-          noDataMessage: "–û—Ç—á—ë—Ç –¥–ª—è –ø–∞—Ü–∏–µ–Ω—Ç–∞ –Ω–µ –±—ã–ª —Å–æ—Ö—Ä–∞–Ω—ë–Ω",
-        },
-        {
-          key: "doctorReport",
-          label: "–û—Ç—á—ë—Ç –¥–ª—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞",
-          hasData: !!doctorReport,
-          summary: shortText(doctorReport, 200),
-          fullContent: doctorReport,
-          noDataMessage: "–û—Ç—á—ë—Ç –¥–ª—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞ –Ω–µ –±—ã–ª —Å–æ—Ö—Ä–∞–Ω—ë–Ω",
-        },
-        {
-          key: "feedback",
-          label: "–û—Ç–∑—ã–≤ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞",
-          hasData: !!doctorFeedbackComment || Object.keys(data.doctorFeedback || {}).length > 0,
-          summary: doctorFeedbackComment
-            ? shortText(doctorFeedbackComment, 200)
-            : Object.keys(data.doctorFeedback || {}).length > 0 ? "–ï—Å—Ç—å –¥–∞–Ω–Ω—ã–µ –æ–±—Ä–∞—Ç–Ω–æ–π —Å–≤—è–∑–∏" : "",
-          fullContent: null,
-          isFeedback: true,
-          feedbackData: data.doctorFeedback,
-          noDataMessage: null,
-        },
-      ];
-
-      return (
-        <div style={{ marginBottom: 12 }}>
-          {sections.map((sec) => {
-            const open = isSectionOpen(review.id, sec.key);
-            const canOpen = sec.hasData || sec.isDialogue;
-            return (
-              <div key={sec.key} style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
-                <div
-                  onClick={() => canOpen && toggleSection(review.id, sec.key)}
-                  style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "10px 14px", cursor: canOpen ? "pointer" : "default",
-                    background: open ? t.highlight : "transparent",
-                    userSelect: "none",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: canOpen ? t.crisisText : t.muted }}>
-                      {sec.label}
-                    </span>
-                    {!open && sec.hasData && sec.summary && (
-                      <span style={{ color: t.cardLabel, fontSize: 12, marginLeft: 8, maxWidth: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {sec.summary}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    {!canOpen && <span style={{ color: t.muted, fontSize: 11 }}>{sec.noDataMessage || "–ù–µ—Ç —Å–æ—Ö—Ä–∞–Ω—ë–Ω–Ω—ã—Ö –¥–∞–Ω–Ω—ã—Ö"}</span>}
-                    {canOpen && <span style={{ color: t.cardLabel, fontSize: 11, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>‚ñæ</span>}
-                  </div>
-                </div>
-
-                {open && canOpen && (
-                  <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
-                    {sec.isDialogue ? renderDialogueContent(review, json, t, rounds)
-                      : sec.isFeedback ? renderFeedbackContent(review, json, t, data.doctorFeedback, doctorFeedbackComment)
-                      : renderTextContent(review, sec, t)}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      );
-    };
-
-    const renderTextContent = (review, sec, t) => {
-      const text = sec.fullContent || "";
-      return (
-        <div>
-          <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 300, overflowY: "auto" }}>
-            {sec.isDialogue ? null : text}
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            {text.length > 250 && (
-              <button onClick={() => openModal(sec.label, text)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
-                –û—Ç–∫—Ä—ã—Ç—å –≤ –±–æ–ª—å—à–æ–º –æ–∫–Ω–µ
-              </button>
-            )}
-            {text && (
-              <button onClick={() => { navigator.clipboard.writeText(text); showToast("–°–∫–æ–ø–∏—Ä–æ–≤–∞–Ω–æ"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
-                –°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å
-              </button>
-            )}
-          </div>
-        </div>
-      );
-    };
-
-    const renderDialogueContent = (review, json, t, rounds) => {
-      const items = rounds.length > 0 ? rounds : normalizeConversationHistory([], json).rounds;
-
-      const fullText = renderRoundsToText(items);
-
-      return (
-        <div>
-          {items.length === 0 ? (
-            <div style={{ color: t.muted, fontSize: 13 }}>–ù–µ—Ç —Å–æ—Ö—Ä–∞–Ω—ë–Ω–Ω—ã—Ö –¥–∞–Ω–Ω—ã—Ö –¥–∏–∞–ª–æ–≥–∞</div>
-          ) : (
-            <div style={{ maxHeight: 400, overflowY: "auto" }}>
-              {items.map((rnd) => (
-                <div key={rnd.round} style={{ marginBottom: 14 }}>
-                  <div style={{
-                    background: t.cardLabel, color: "white", fontSize: 11, fontWeight: 700,
-                    padding: "4px 12px", marginBottom: 8, borderRadius: 4,
-                  }}>
-                    –†–∞—É–Ω–¥ {rnd.round}
-                  </div>
-                  <div style={{
-                    marginBottom: 6, padding: "10px 12px",
-                    background: "transparent",
-                    borderLeft: `3px solid ${t.muted}`,
-                    borderRadius: "0 8px 8px 0",
-                  }}>
-                    <div style={{ fontWeight: 700, fontSize: 12, color: t.muted, marginBottom: 4 }}>–¢–æ—á–∫–∞ –æ–ø–æ—Ä—ã</div>
-                    <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                      {rnd.question}
-                    </div>
-                  </div>
-                  <div style={{
-                    padding: "10px 12px",
-                    background: t.highlight,
-                    borderLeft: `3px solid ${t.accent}`,
-                    borderRadius: "0 8px 8px 0",
-                  }}>
-                    <div style={{ fontWeight: 700, fontSize: 12, color: t.accent, marginBottom: 4 }}>–ü–∞—Ü–∏–µ–Ω—Ç</div>
-                    <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                      {rnd.answer}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    };
-
-    function renderRoundsToText(rounds) {
-      return rounds.map((r) => {
-        const lines = [];
-        lines.push(`[–¢–æ—á–∫–∞ –æ–ø–æ—Ä—ã] (—Ä–∞—É–Ω–¥ ${r.round})`);
-        lines.push(r.question);
-        lines.push(`[–ü–∞—Ü–∏–µ–Ω—Ç] (—Ä–∞—É–Ω–¥ ${r.round})`);
-        lines.push(r.answer);
-        return lines.join("\n");
-      }).join("\n\n---\n\n");
-    }
-
-    const renderFeedbackContent = (review, json, t, feedback, feedbackComment) => {
-      const df = feedback || {};
-      const items = [];
-      if (df.wrong_questions) items.push({ label: "–ù–µ–≤–µ—Ä–Ω—ã–µ –≤–æ–ø—Ä–æ—Å—ã", value: df.wrong_questions });
-      if (df.missing_questions) items.push({ label: "–ü—Ä–æ–ø—É—â–µ–Ω–Ω—ã–µ –≤–æ–ø—Ä–æ—Å—ã", value: df.missing_questions });
-      if (df.bad_question_wording) items.push({ label: "–ù–µ–∫–æ—Ä—Ä–µ–∫—Ç–Ω—ã–µ —Ñ–æ—Ä–º—É–ª–∏—Ä–æ–≤–∫–∏", value: df.bad_question_wording });
-      if (df.corrected_user_report) items.push({ label: "–°–∫–æ—Ä—Ä–µ–∫—Ç–∏—Ä–æ–≤–∞–Ω–Ω—ã–π –æ—Ç—á—ë—Ç (–ø–∞—Ü–∏–µ–Ω—Ç)", value: df.corrected_user_report });
-      if (df.corrected_doctor_report) items.push({ label: "–°–∫–æ—Ä—Ä–µ–∫—Ç–∏—Ä–æ–≤–∞–Ω–Ω—ã–π –æ—Ç—á—ë—Ç (—Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç)", value: df.corrected_doctor_report });
-      if (df.protocol_update) items.push({ label: "–û–±–Ω–æ–≤–ª–µ–Ω–∏–µ –ø—Ä–æ—Ç–æ–∫–æ–ª–∞", value: df.protocol_update });
-      if (df.correction_comment) items.push({ label: "–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π –∫ –ø—Ä–∞–≤–∫–µ", value: df.correction_comment });
-      if (df.generalComment) items.push({ label: "–û–±—â–∏–π –∫–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π", value: df.generalComment });
-      if (review?.correction_comment) items.push({ label: "–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π –∞–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä–∞", value: review.correction_comment });
-
-      if (items.length === 0 && !feedbackComment) {
-        return <div style={{ color: t.muted, fontSize: 13 }}>–ù–µ—Ç —Å–æ—Ö—Ä–∞–Ω—ë–Ω–Ω—ã—Ö –¥–∞–Ω–Ω—ã—Ö –æ–±—Ä–∞—Ç–Ω–æ–π —Å–≤—è–∑–∏</div>;
-      }
-
-      const fullText = items.map((i) => `${i.label}:\n${i.value}`).join("\n\n---\n\n");
-
-      return (
-        <div>
-          {feedbackComment && (
-            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6, marginBottom: 8, fontStyle: "italic" }}>{feedbackComment}</div>
-          )}
-          {items.length > 0 && (
-            <div style={{ maxHeight: 400, overflowY: "auto" }}>
-              {items.map((item, i) => (
-                <div key={i} style={{ marginBottom: 10, padding: "8px 10px", border: `1px solid ${t.cardBorder}`, borderRadius: 8 }}>
-                  <div style={{ fontWeight: 700, fontSize: 12, color: t.cardLabel, marginBottom: 4 }}>{item.label}</div>
-                  <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{item.value}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            {items.length > 0 && (
-              <button onClick={() => openModal("–û—Ç–∑—ã–≤ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞", fullText)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
-                –û—Ç–∫—Ä—ã—Ç—å –≤ –±–æ–ª—å—à–æ–º –æ–∫–Ω–µ
-              </button>
-            )}
-            {fullText && (
-              <button onClick={() => { navigator.clipboard.writeText(fullText); showToast("–°–∫–æ–ø–∏—Ä–æ–≤–∞–Ω–æ"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
-                –°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å
-              </button>
-            )}
-          </div>
-        </div>
-      );
-    };
-
-    function formatConversationForCopy(rounds) {
-      return renderRoundsToText(rounds || []);
-    }
-
-    function formatAnonymizedSession(sd) {
-      if (!sd) return "";
-      const parts = [];
-      const { rounds } = normalizeConversationHistory(sd.conversation_history || []);
-      parts.push(`–ü–µ—Ä–≤–∏—á–Ω–æ–µ –æ–±—Ä–∞—â–µ–Ω–∏–µ:\n${sd.patient_text || "‚Äî"}`);
-      parts.push(`–î–∏–∞–ª–æ–≥:\n${rounds.length > 0 ? formatConversationForCopy(rounds) : "–¢–µ–∫—Å—Ç –¥–∏–∞–ª–æ–≥–∞ –Ω–µ –±—ã–ª —Å–æ—Ö—Ä–∞–Ω—ë–Ω"}`);
-      parts.push(`–û—Ç—á—ë—Ç –¥–ª—è –ø–∞—Ü–∏–µ–Ω—Ç–∞:\n${sd.user_report || "–û—Ç—á—ë—Ç –¥–ª—è –ø–∞—Ü–∏–µ–Ω—Ç–∞ –Ω–µ –±—ã–ª —Å–æ—Ö—Ä–∞–Ω—ë–Ω"}`);
-      parts.push(`–û—Ç—á—ë—Ç –¥–ª—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞:\n${sd.doctor_report || "–û—Ç—á—ë—Ç –¥–ª—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞ –Ω–µ –±—ã–ª —Å–æ—Ö—Ä–∞–Ω—ë–Ω"}`);
-      if (sd.correction_comment) parts.push(`–≠–∫—Å–ø–µ—Ä—Ç–Ω–∞—è –ø—Ä–∞–≤–∫–∞:\n${sd.correction_comment}`);
-      const tr = sd.training;
-      if (tr) {
-        const tlines = [];
-        if (tr.scenario_played) tlines.push(`–°—Ü–µ–Ω–∞—Ä–∏–π: ${tr.scenario_played}`);
-        if (tr.expected_case_type) tlines.push(`–û–∂–∏–¥–∞–µ–º—ã–π —Ç–∏–ø: ${tr.expected_case_type}`);
-        if (tr.ai_detected_case_type) tlines.push(`–†–∞—Å–ø–æ–∑–Ω–∞–Ω–æ: ${tr.ai_detected_case_type}`);
-        if (tr.expert_comment) tlines.push(`–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π: ${tr.expert_comment}`);
-        parts.push(`–û—Ü–µ–Ω–∫–∞ —Ç—Ä–µ–Ω–∏—Ä–æ–≤–∫–∏:\n${tlines.join("\n")}`);
-      }
-      return parts.join("\n\n=====\n\n");
-    }
-
-    async function copyToClipboard(text, successMessage) {
-      if (!text) return;
-      try {
-        await navigator.clipboard.writeText(text);
-        showToast(successMessage || "–°–∫–æ–ø–∏—Ä–æ–≤–∞–Ω–æ");
-      } catch {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        try { document.execCommand("copy"); showToast(successMessage || "–°–∫–æ–ø–∏—Ä–æ–≤–∞–Ω–æ"); } catch {}
-        ta.remove();
-      }
-    }
-
-    const renderSessionTimelineDetail = (sd, t) => {
-      if (!sd) return null;
-
-      const { rounds } = normalizeConversationHistory(sd.conversation_history || []);
-
-      const dialogueText = formatConversationForCopy(rounds);
-
-      const sections = [];
-
-      const addSection = (key, label, content, defaultOpen) => {
-        const open = defaultOpen && !!content;
-        sections.push(
-          <div key={key} style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
-            <div
-              onClick={() => {
-                if (!content) return;
-                const k = `tl-${key}`;
-                setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
-              }}
-              style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "10px 14px", cursor: content ? "pointer" : "default",
-                background: open ? t.highlight : "transparent",
-                userSelect: "none",
-              }}
-            >
-              <span style={{ fontWeight: 700, fontSize: 13, color: content ? t.crisisText : t.muted }}>
-                {label}
-              </span>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                {!content && <span style={{ color: t.muted, fontSize: 11 }}>–ù–µ—Ç —Å–æ—Ö—Ä–∞–Ω—ë–Ω–Ω—ã—Ö –¥–∞–Ω–Ω—ã—Ö</span>}
-                {content && <span style={{ color: t.cardLabel, fontSize: 11, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>‚ñæ</span>}
-              </div>
-            </div>
-            {open && content && (
-              <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
-                <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 400, overflowY: "auto" }}>
-                  {content}
-                </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                  {content.length > 250 && (
-                    <button
-                      onClick={() => setTimelineLargeSection({ title: label, content })}
-                      style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
-                    >
-                      –û—Ç–∫—Ä—ã—Ç—å –≤ –±–æ–ª—å—à–æ–º –æ–∫–Ω–µ
-                    </button>
-                  )}
-                  <button
-                    onClick={() => copyToClipboard(content, `${label} —Å–∫–æ–ø–∏—Ä–æ–≤–∞–Ω`)}
-                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
-                  >
-                    –°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      };
-
-      // 1. Patient text
-      addSection("patient", "–ü–µ—Ä–≤–∏—á–Ω–æ–µ –æ–±—Ä–∞—â–µ–Ω–∏–µ", sd.patient_text, true);
-
-      // 2. Dialogue
-      sections.push(
-        <div key="dialogue" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
-          <div
-            onClick={() => {
-              if (rounds.length === 0) return;
-              const k = "tl-dialogue";
-              setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
-            }}
-            style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "10px 14px", cursor: rounds.length > 0 ? "pointer" : "default",
-              background: t.highlight,
-              userSelect: "none",
-            }}
-          >
-            <span style={{ fontWeight: 700, fontSize: 13, color: rounds.length > 0 ? t.crisisText : t.muted }}>
-              –î–∏–∞–ª–æ–≥ —Å —Å–∏—Å—Ç–µ–º–æ–π
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {rounds.length === 0 && (
-                <span style={{ color: t.muted, fontSize: 11 }}>–ù–µ—Ç —Å–æ—Ö—Ä–∞–Ω—ë–Ω–Ω—ã—Ö –¥–∞–Ω–Ω—ã—Ö</span>
-              )}
-              {rounds.length > 0 && (
-                <span style={{ color: t.cardLabel, fontSize: 11, transform: "rotate(180deg)", transition: "transform .2s" }}>‚ñæ</span>
-              )}
-            </div>
-          </div>
-          {rounds.length > 0 && (
-            <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
-              <div style={{ maxHeight: 400, overflowY: "auto" }}>
-                {rounds.map((rnd) => (
-                  <div key={rnd.round} style={{ marginBottom: 14 }}>
-                    <div style={{
-                      background: t.cardLabel, color: "white", fontSize: 11, fontWeight: 700,
-                      padding: "4px 12px", marginBottom: 8, borderRadius: 4,
-                    }}>
-                      –†–∞—É–Ω–¥ {rnd.round}
-                    </div>
-                    <div style={{
-                      marginBottom: 6, padding: "10px 12px",
-                      background: "transparent",
-                      borderLeft: `3px solid ${t.muted}`,
-                      borderRadius: "0 8px 8px 0",
-                    }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: t.muted, marginBottom: 4 }}>–¢–æ—á–∫–∞ –æ–ø–æ—Ä—ã</div>
-                      <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                        {rnd.question}
-                      </div>
-                    </div>
-                    <div style={{
-                      padding: "10px 12px",
-                      background: t.highlight,
-                      borderLeft: `3px solid ${t.accent}`,
-                      borderRadius: "0 8px 8px 0",
-                    }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: t.accent, marginBottom: 4 }}>–ü–∞—Ü–∏–µ–Ω—Ç</div>
-                      <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                        {rnd.answer}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                {dialogueText && (
-                  <button
-                    onClick={() => setTimelineLargeSection({ title: "–î–∏–∞–ª–æ–≥ —Å —Å–∏—Å—Ç–µ–º–æ–π", content: dialogueText })}
-                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
-                  >
-                    –û—Ç–∫—Ä—ã—Ç—å –≤ –±–æ–ª—å—à–æ–º –æ–∫–Ω–µ
-                  </button>
-                )}
-                {dialogueText && (
-                  <button
-                    onClick={() => copyToClipboard(dialogueText, "–î–∏–∞–ª–æ–≥ —Å–∫–æ–ø–∏—Ä–æ–≤–∞–Ω")}
-                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
-                  >
-                    –°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å –¥–∏–∞–ª–æ–≥
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      );
-
-      // 3-10: sections using addSection
-      addSection("user_report", "–û—Ç—á—ë—Ç –¥–ª—è –ø–∞—Ü–∏–µ–Ω—Ç–∞", sd.user_report || "–û—Ç—á—ë—Ç –¥–ª—è –ø–∞—Ü–∏–µ–Ω—Ç–∞ –Ω–µ –±—ã–ª —Å–æ—Ö—Ä–∞–Ω—ë–Ω", !!sd.user_report);
-      if (sd.doctor_correction?.corrected_user_report) {
-        addSection("corrected_user", "–ò—Å–ø—Ä–∞–≤–ª–µ–Ω–Ω–∞—è –≤–µ—Ä—Å–∏—è (–ø–∞—Ü–∏–µ–Ω—Ç)", sd.corrected_user_report, false);
-      }
-
-      addSection("doctor_report", "–û—Ç—á—ë—Ç –¥–ª—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞", sd.doctor_report || "–û—Ç—á—ë—Ç –¥–ª—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞ –Ω–µ –±—ã–ª —Å–æ—Ö—Ä–∞–Ω—ë–Ω", !!sd.doctor_report);
-      if (sd.doctor_correction?.corrected_doctor_report) {
-        addSection("corrected_doctor", "–ò—Å–ø—Ä–∞–≤–ª–µ–Ω–Ω–∞—è –≤–µ—Ä—Å–∏—è (—Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç)", sd.corrected_doctor_report, false);
-      }
-
-      const df = sd.doctor_feedback || {};
-      const feedbackItems = [];
-      if (df.wrong_questions) feedbackItems.push({ label: "–ù–µ–≤–µ—Ä–Ω—ã–µ –≤–æ–ø—Ä–æ—Å—ã", value: df.wrong_questions });
-      if (df.missing_questions) feedbackItems.push({ label: "–ü—Ä–æ–ø—É—â–µ–Ω–Ω—ã–µ –≤–æ–ø—Ä–æ—Å—ã", value: df.missing_questions });
-      if (df.bad_question_wording) feedbackItems.push({ label: "–ù–µ–∫–æ—Ä—Ä–µ–∫—Ç–Ω—ã–µ —Ñ–æ—Ä–º—É–ª–∏—Ä–æ–≤–∫–∏", value: df.bad_question_wording });
-      if (df.generalComment) feedbackItems.push({ label: "–û–±—â–∏–π –∫–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π", value: df.generalComment });
-      const feedbackText = feedbackItems.map((i) => `${i.label}:\n${i.value}`).join("\n\n---\n\n");
-      addSection("feedback", "–û—Ç–∑—ã–≤ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞", feedbackText || df.correction_comment || "", false);
-
-      const correctionParts = [];
-      if (sd.correction_comment) correctionParts.push(`–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π –∫ –ø—Ä–∞–≤–∫–µ:\n${sd.correction_comment}`);
-      if (sd.protocol_update) correctionParts.push(`–û–±–Ω–æ–≤–ª–µ–Ω–∏–µ –ø—Ä–æ—Ç–æ–∫–æ–ª–∞:\n${sd.protocol_update}`);
-      if (sd.doctor_correction?.wrong_questions) correctionParts.push(`–ù–µ–≤–µ—Ä–Ω—ã–µ –≤–æ–ø—Ä–æ—Å—ã:\n${sd.doctor_correction.wrong_questions}`);
-      if (sd.doctor_correction?.missing_questions) correctionParts.push(`–ü—Ä–æ–ø—É—â–µ–Ω–Ω—ã–µ –≤–æ–ø—Ä–æ—Å—ã:\n${sd.doctor_correction.missing_questions}`);
-      if (sd.doctor_correction?.bad_question_wording) correctionParts.push(`–ù–µ–∫–æ—Ä—Ä–µ–∫—Ç–Ω—ã–µ —Ñ–æ—Ä–º—É–ª–∏—Ä–æ–≤–∫–∏:\n${sd.doctor_correction.bad_question_wording}`);
-      addSection("expert_correction", "–≠–∫—Å–ø–µ—Ä—Ç–Ω–∞—è –ø—Ä–∞–≤–∫–∞", correctionParts.join("\n\n---\n\n"), false);
-
-      const diaryStr = sd.diary
-        ? (typeof sd.diary === "string" ? sd.diary : JSON.stringify(sd.diary, null, 2))
-        : "";
-      addSection("diary", "–î–Ω–µ–≤–Ω–∏–∫ —Å–æ—Å—Ç–æ—è–Ω–∏—è", diaryStr, false);
-
-      const spStr = sd.support_plan
-        ? (typeof sd.support_plan === "string" ? sd.support_plan : JSON.stringify(sd.support_plan, null, 2))
-        : "";
-      addSection("support_plan", "–í—ã–±—Ä–∞–Ω–Ω—ã–µ –ø—Ä–∞–∫—Ç–∏–∫–∏", spStr, false);
-
-      addSection("continuation", "–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π –ø–æ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—é", sd.continuation_comment, false);
-
-      const tr = sd.training;
-      if (tr) {
-        const trainingLines = [];
-        if (tr.scenario_played) trainingLines.push(`–°—Ü–µ–Ω–∞—Ä–∏–π: ${tr.scenario_played}`);
-        if (tr.expected_case_type) trainingLines.push(`–û–∂–∏–¥–∞–µ–º—ã–π —Ç–∏–ø —Å–ª—É—á–∞—è: ${tr.expected_case_type}`);
-        if (tr.ai_detected_case_type) trainingLines.push(`–ß—Ç–æ —Ä–∞—Å–ø–æ–∑–Ω–∞–ª–∞ —Å–∏—Å—Ç–µ–º–∞: ${tr.ai_detected_case_type}`);
-        if (tr.ai_detected_secondary_types && tr.ai_detected_secondary_types.length > 0) {
-          trainingLines.push(`–í—Ç–æ—Ä–∏—á–Ω—ã–µ –ø—Ä–∏–∑–Ω–∞–∫–∏: ${tr.ai_detected_secondary_types.join(", ")}`);
-        }
-        const qualityFields = [
-          ["detection_quality", "–†–∞—Å–ø–æ–∑–Ω–∞–≤–∞–Ω–∏–µ"],
-          ["questions_quality", "–í–æ–ø—Ä–æ—Å—ã"],
-          ["report_quality", "–û—Ç—á—ë—Ç"],
-          ["safety_quality", "Safety"],
-          ["language_quality", "–Ø–∑—ã–∫"],
-          ["support_toolkit_quality", "–ü—Ä–∞–∫—Ç–∏–∫–∏"],
-          ["continuation_quality", "–ü—Ä–æ–¥–æ–ª–∂–µ–Ω–∏–µ"],
-        ];
-        for (const [key, label] of qualityFields) {
-          if (tr[key] !== null && tr[key] !== undefined) {
-            trainingLines.push(`${label}: ${tr[key]}`);
-          }
-        }
-        const flagFields = [
-          ["repeated_questions", "–ü–æ–≤—Ç–æ—Ä—ã"],
-          ["missed_risk_flags", "–ü—Ä–æ–ø—É—â–µ–Ω—ã —Ä–∏—Å–∫–∏"],
-          ["wrong_recommendation", "–ù–µ–≤–µ—Ä–Ω–∞—è —Ä–µ–∫–æ–º–µ–Ω–¥–∞—Ü–∏—è"],
-          ["remembered_context", "–£—á—Ç—ë–Ω –∫–æ–Ω—Ç–µ–∫—Å—Ç"],
-        ];
-        for (const [key, label] of flagFields) {
-          if (tr[key]) trainingLines.push(`‚ö†Ô∏è ${label}`);
-        }
-        if (tr.expert_comment) trainingLines.push(`\n–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π —ç–∫—Å–ø–µ—Ä—Ç–∞:\n${tr.expert_comment}`);
-        if (tr.missed_domain) trainingLines.push(`–ü—Ä–æ–ø—É—â–µ–Ω–Ω–∞—è –æ–±–ª–∞—Å—Ç—å: ${tr.missed_domain}`);
-        if (tr.action_needed) trainingLines.push(`–ß—Ç–æ –∏—Å–ø—Ä–∞–≤–∏—Ç—å: ${tr.action_needed}`);
-        addSection("training", "–û—Ü–µ–Ω–∫–∞ —Ç—Ä–µ–Ω–∏—Ä–æ–≤–æ—á–Ω–æ–π —Å–µ—Å—Å–∏–∏", trainingLines.join("\n"), false);
-      }
-
-      // Voice observations block
-      const vo = sd.voice_observations || sd.json_data?.voice_observations || null;
-      if (vo) {
-        const voList = Array.isArray(vo) ? vo : [vo];
-        const voiceContent = voList.map((v, vi) => {
-          const a = v.analysis || v;
-          if (a.status === "insufficient_audio") {
-            return `–°–æ–æ–±—â–µ–Ω–∏–µ ${vi + 1}: –ö–∞—á–µ—Å—Ç–≤–æ –∑–∞–ø–∏—Å–∏ –Ω–µ–¥–æ—Å—Ç–∞—Ç–æ—á–Ω–æ –¥–ª—è –Ω–∞–¥—ë–∂–Ω–æ–≥–æ –æ–ø–∏—Å–∞–Ω–∏—è –æ—Å–æ–±–µ–Ω–Ω–æ—Å—Ç–µ–π —Ä–µ—á–∏.`;
-          }
-          if (a.status === "error" || a.status === "not_available") {
-            return null;
-          }
-          const lines = [];
-          if (a.summary) lines.push(a.summary);
-          if (a.alternative_explanations?.length) {
-            lines.push(`\n–í–æ–∑–º–æ–∂–Ω—ã–µ –∞–ª—å—Ç–µ—Ä–Ω–∞—Ç–∏–≤–Ω—ã–µ –æ–±—ä—è—Å–Ω–µ–Ω–∏—è:\n${a.alternative_explanations.map((e) => `- ${e}`).join("\n")}`);
-          }
-          if (a.suggested_followups?.length) {
-            lines.push(`\n–ß—Ç–æ —Å—Ç–æ–∏—Ç —É—Ç–æ—á–Ω–∏—Ç—å:\n${a.suggested_followups.map((f) => `- ${f}`).join("\n")}`);
-          }
-          if (a.limitations?.length) {
-            lines.push(`\n–û–≥—Ä–∞–Ω–∏—á–µ–Ω–∏–µ:\n${a.limitations.map((l) => `- ${l}`).join("\n")}`);
-          }
-          return lines.join("\n");
-        }).filter(Boolean).join("\n\n---\n\n");
-
-        const voiceLabel = voList.length > 1
-          ? "–ì–æ–ª–æ—Å–æ–≤—ã–µ –ø—Ä–∏–∑–Ω–∞–∫–∏"
-          : (voList[0]?.analysis?.status === "insufficient_audio" || voList[0]?.status === "insufficient_audio"
-              ? "–ì–æ–ª–æ—Å–æ–≤—ã–µ –ø—Ä–∏–∑–Ω–∞–∫–∏ ‚Äî –∫–∞—á–µ—Å—Ç–≤–æ –∑–∞–ø–∏—Å–∏ –Ω–µ–¥–æ—Å—Ç–∞—Ç–æ—á–Ω–æ"
-              : "–ì–æ–ª–æ—Å–æ–≤—ã–µ –ø—Ä–∏–∑–Ω–∞–∫–∏");
-
-        sections.push(
-          <div key="voice" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
-            <div
-              onClick={() => {
-                const k = "tl-voice";
-                setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
-              }}
-              style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "10px 14px", cursor: "pointer",
-                background: t.highlight,
-                userSelect: "none",
-              }}
-            >
-              <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>
-                {voiceLabel}
-              </span>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ color: t.muted, fontSize: 10, border: `1px solid ${t.muted}`, borderRadius: 4, padding: "1px 5px" }}>
-                  –≠–∫—Å–ø–µ—Ä–∏–º–µ–Ω—Ç–∞–ª—å–Ω–æ
-                </span>
-                <span style={{ color: t.cardLabel, fontSize: 11, transform: expandedSections["tl-voice"] ? "rotate(180deg)" : "none", transition: "transform .2s" }}>‚ñæ</span>
-              </div>
-            </div>
-            {expandedSections["tl-voice"] && voiceContent && (
-              <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
-                <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 400, overflowY: "auto" }}>
-                  {voiceContent}
-                </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                  <button
-                    onClick={() => copyToClipboard(voiceContent, "–ì–æ–ª–æ—Å–æ–≤—ã–µ –ø—Ä–∏–∑–Ω–∞–∫–∏ —Å–∫–æ–ø–∏—Ä–æ–≤–∞–Ω—ã")}
-                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}
-                  >
-                    –°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      }
-
-      // Care recommendation section
-      const storedCareRec = sd.json_data?.care_recommendation || null;
-      if (storedCareRec && storedCareRec.level) {
-        const levelLabel = { self_support: "–°–∞–º–æ–ø–æ–¥–¥–µ—Ä–∂–∫–∞", professional_contact: "–û–±—Ä–∞—â–µ–Ω–∏–µ –∫ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç—É", urgent_help: "–°—Ä–æ—á–Ω–∞—è –ø–æ–º–æ—â—å" };
-        const timeLabel = { today: "–°–µ–≥–æ–¥–Ω—è", within_days: "–í –±–ª–∏–∂–∞–π—à–∏–µ –¥–Ω–∏", within_weeks: "–í –±–ª–∏–∂–∞–π—à–∏–µ –Ω–µ–¥–µ–ª–∏", routine: "–ü–ª–∞–Ω–æ–≤–æ" };
-        const levelColor = { self_support: "#5F7D6C", professional_contact: "#7A7268", urgent_help: "#B85C4A" };
-        sections.push(
-          <div key="care-rec" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: t.highlight, userSelect: "none" }}>
-              <span style={{ fontWeight: 700, fontSize: 13, color: levelColor[storedCareRec.level] || t.crisisText }}>
-                –ú–∞—Ä—à—Ä—É—Ç–∏–∑–∞—Ü–∏—è: {levelLabel[storedCareRec.level] || storedCareRec.level}
-              </span>
-              <div style={{ display: "flex", gap: 6 }}>
-                {storedCareRec.timeframe && <span style={{ color: t.muted, fontSize: 10, border: `1px solid ${t.muted}`, borderRadius: 4, padding: "1px 5px" }}>{timeLabel[storedCareRec.timeframe] || storedCareRec.timeframe}</span>}
-              </div>
-            </div>
-            <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "10px 14px", fontSize: 12, lineHeight: 1.6, color: t.crisisText }}>
-              {storedCareRec.specialist_types?.length > 0 && (
-                <div style={{ marginBottom: 4 }}><b>–°–ø–µ—Ü–∏–∞–ª–∏—Å—Ç:</b> {storedCareRec.specialist_types.join(", ")}</div>
-              )}
-              {storedCareRec.reasons?.length > 0 && (
-                <div style={{ marginBottom: 4 }}><b>–ü—Ä–∏—á–∏–Ω—ã:</b> {storedCareRec.reasons.join(", ")}</div>
-              )}
-              {storedCareRec.interim_support?.length > 0 && (
-                <div style={{ marginBottom: 4 }}><b>–í—Ä–µ–º–µ–Ω–Ω–∞—è –æ–ø–æ—Ä–∞:</b>
-                  <ul style={{ margin: "2px 0 0", paddingLeft: 16 }}>
-                    {storedCareRec.interim_support.map((s, i) => <li key={i}>{s}</li>)}
-                  </ul>
-                </div>
-              )}
-              {storedCareRec.urgent_triggers?.length > 0 && (
-                <div><b>–¢—Ä–∏–≥–≥–µ—Ä—ã —Å—Ä–æ—á–Ω–æ–π –ø–æ–º–æ—â–∏:</b> {storedCareRec.urgent_triggers.join(", ")}</div>
-              )}
-            </div>
-          </div>
-        );
-      }
-
-      // Debug info section (raw model response, quality check, etc.)
-      const debugData = sd.json_data?._debug || null;
-      if (debugData) {
-        const debugLines = [];
-        if (debugData.prompt_version) debugLines.push(`Prompt version: ${debugData.prompt_version}`);
-        if (debugData.quality_check) {
-          debugLines.push(`Quality check: ${debugData.quality_check.pass ? "‚úÖ –ø—Ä–æ–π–¥–µ–Ω–∞" : "‚ùå –Ω–∞—Ä—É—à–µ–Ω–∞"}`);
-          if (debugData.quality_check.violations?.length) {
-            debugLines.push(`–ù–∞—Ä—É—à–µ–Ω–∏—è: ${debugData.quality_check.violations.join("; ")}`);
-          }
-        }
-        if (debugData.repair?.repairAttempted) {
-          debugLines.push(`Repair: ${debugData.repair.repairSucceeded ? "‚úÖ —É—Å–ø–µ—à–Ω–æ" : "‚ùå –Ω–µ —É–¥–∞–ª—Å—è"}`);
-        }
-        if (debugData.raw_model_response) {
-          debugLines.push(`\n--- RAW MODEL RESPONSE ---\n${debugData.raw_model_response}`);
-        }
-
-        sections.push(
-          <div key="debug" style={{ marginBottom: 8, border: `1px solid ${t.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
-            <div
-              onClick={() => {
-                const k = "tl-debug";
-                setExpandedSections((prev) => ({ ...prev, [k]: !prev[k] }));
-              }}
-              style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "10px 14px", cursor: "pointer",
-                background: t.highlight,
-                userSelect: "none",
-              }}
-            >
-              <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisText }}>
-                üõ† –¢–µ—Ö–Ω–∏—á–µ—Å–∫–∞—è –∏–Ω—Ñ–æ—Ä–º–∞—Ü–∏—è (raw model response)
-              </span>
-              <span style={{ color: t.cardLabel, fontSize: 11, transform: expandedSections["tl-debug"] ? "rotate(180deg)" : "none", transition: "transform .2s" }}>‚ñæ</span>
-            </div>
-            {expandedSections["tl-debug"] && (
-              <div style={{ borderTop: `1px solid ${t.cardBorder}`, padding: "12px 14px" }}>
-                <div style={{ color: t.crisisText, fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 500, overflowY: "auto" }}>
-                  {debugLines.join("\n")}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      }
-
-      // Large section overlay (within detail modal)
-      if (timelineLargeSection) {
-        return (
-          <div>
-            <button
-              onClick={() => setTimelineLargeSection(null)}
-              style={{ border: 0, background: "transparent", color: t.accent, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 12 }}
-            >
-              ‚Üê –ù–∞–∑–∞–¥ –∫ —Å–µ—Å—Å–∏–∏
-            </button>
-            <h4 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 700 }}>{timelineLargeSection.title}</h4>
-            <div style={{
-              color: t.crisisText, fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
-              maxHeight: "calc(90vh - 280px)", overflowY: "auto", marginBottom: 12,
-            }}>
-              {timelineLargeSection.content}
-            </div>
-            <button
-              onClick={() => copyToClipboard(timelineLargeSection.content, `${timelineLargeSection.title} —Å–∫–æ–ø–∏—Ä–æ–≤–∞–Ω`)}
-              style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
-            >
-              –°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å
-            </button>
-          </div>
-        );
-      }
-
-      return <div>{sections}</div>;
-    };
-
-    function copySessionDetails(sd) {
-      if (!sd) return;
-      const text = formatAnonymizedSession(sd);
-      copyToClipboard(text, "–û–±–µ–∑–ª–∏—á–µ–Ω–Ω–∞—è —Å–µ—Å—Å–∏—è —Å–∫–æ–ø–∏—Ä–æ–≤–∞–Ω–∞");
-    }
-
-    function Section({ title, children }) {
-      return (
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 15, color: t.text, marginBottom: 8, paddingBottom: 4, borderBottom: `1px solid ${t.border}` }}>
-            {title}
-          </div>
-          {children}
-        </div>
-      );
-    }
-
-    function Field({ label, value, mono }) {
-      if (!value || value === "‚Äî" || value === "") return null;
-      return (
-        <div style={{ display: "flex", gap: 8, marginBottom: 4, fontSize: 14, lineHeight: 1.6 }}>
-          {label && <span style={{ color: t.muted, minWidth: 130, flexShrink: 0 }}>{label}:</span>}
-          <span style={{ color: t.text, fontFamily: mono ? "monospace" : "inherit", fontWeight: mono ? 600 : 400 }}>{value}</span>
-        </div>
-      );
-    }
-
-    function normalizeCare(v, fallback) {
-      if (v == null) return fallback || "self_care";
-      if (typeof v === "object") return v.level || fallback || "self_care";
-      return v;
-    }
-
-    function careLabel(level) {
-      const n = normalizeCare(level);
-      if (n === "urgent_help") return "–°—Ä–æ—á–Ω–æ";
-      if (n === "medical_consultation") return "–í—Ä–∞—á";
-      return "Self-care";
-    }
-
-    return (
-      <AdminErrorBoundary>
-      <div style={{ minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "Inter, system-ui, Arial", padding: 32 }}>
-        <style>{`
-  * { box-sizing: border-box; }
-  @keyframes toastIn {
-    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
-    to { opacity: 1; transform: translateX(-50%) translateY(0); }
-  }
-`}</style>
-
-        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 40 }}>
-          <div
-            onClick={goToBodyCabinet}
-            role={isDedicatedSubdomain ? "button" : undefined}
-            aria-label={isDedicatedSubdomain ? "–í–µ—Ä–Ω—É—Ç—å—Å—è –≤ –ª–∏—á–Ω—ã–π –∫–∞–±–∏–Ω–µ—Ç" : undefined}
-            tabIndex={isDedicatedSubdomain ? 0 : undefined}
-            onKeyDown={isDedicatedSubdomain ? (e) => { if (e.key === "Enter" || e.key === " ") goToBodyCabinet(); } : undefined}
-            style={{ display: "flex", alignItems: "center", gap: 12, cursor: isDedicatedSubdomain ? "pointer" : "default" }}
-            className="app-logo-link"
-          >
-              <img src="/logo-tochka-opory-header.png" alt={adminModuleRoute === "body" ? "–û–ø–æ—Ä–∞. –ó–¥–æ—Ä–æ–≤—å–µ & –°—Ç—Ä–æ–π–Ω–æ—Å—Ç—å" : "–¢–æ—á–∫–∞ –æ–ø–æ—Ä—ã"} style={{ height: 44, width: "auto", display: "block" }} />
-              <div>
-                <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.2 }}>{adminModuleRoute === "body" ? "–û–ø–æ—Ä–∞. –ó–¥–æ—Ä–æ–≤—å–µ & –°—Ç—Ä–æ–π–Ω–æ—Å—Ç—å" : "–¢–æ—á–∫–∞ –æ–ø–æ—Ä—ã"}</div>
-                <div style={{ fontSize: 14, color: t.muted }}>{adminModuleRoute === "body" ? "–ê–¥–º–∏–Ω-–ø–∞–Ω–µ–ª—å / –ê–Ω–∫–µ—Ç—ã –∑–¥–æ—Ä–æ–≤—å—è" : adminModuleRoute === "council" ? "–ê–¥–º–∏–Ω-–ø–∞–Ω–µ–ª—å / –≠–∫—Å–ø–µ—Ä—Ç–Ω—ã–π —Å–æ–≤–µ—Ç" : isTrainingPage ? "–¢–∞–±–ª–∏—Ü–∞ —Ç—Ä–µ–Ω–∏—Ä–æ–≤–æ–∫" : "–ê–¥–º–∏–Ω-–ø–∞–Ω–µ–ª—å / –û—Ç–∑—ã–≤—ã –æ —Å–µ—Å—Å–∏—è—Ö"}</div>
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button
-                onClick={() => setAdminDarkMode(!adminDarkMode)}
-                style={{
-                  background: t.tabBg, color: t.text, border: `1px solid ${t.border}`,
-                  padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13,
-                }}
-              >
-                {adminDarkMode ? "‚òÄÔ∏è –°–≤–µ—Ç–ª–∞—è" : "üåô –¢—ë–º–Ω–∞—è"}
-              </button>
-              <a href={adminModuleRoute === "body" ? "https://health.tochka-opori.online" : adminModuleRoute === "council" ? "/admin" : "/"} onClick={adminModuleRoute === "council" ? (e) => { e.preventDefault(); setAdminSubPage(null); window.history.pushState({}, "", "/admin"); } : undefined} style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>‚Üê {adminModuleRoute === "council" ? "–í –ø–∞–Ω–µ–ª—å –∞–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä–∞" : "–ù–∞ –≥–ª–∞–≤–Ω—É—é"}</a>
-            </div>
-          </div>
-
-          {!adminAuthed ? (
-            <div style={{ maxWidth: 400, margin: "60px auto" }}>
-              <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20 }}>–í—Ö–æ–¥ –≤ –∞–¥–º–∏–Ω-–ø–∞–Ω–µ–ª—å</h2>
-              <input
-                type="password"
-                style={{
-                  width: "100%", border: `1px solid ${t.inputBorder}`, borderRadius: 16,
-                  background: t.inputBg, color: t.inputText, padding: "14px", fontSize: 15,
-                  outline: "none", boxSizing: "border-box", marginBottom: 16,
-                }}
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && adminLogin()}
-                placeholder="–ü–∞—Ä–æ–ª—å –∞–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä–∞"
-              />
-              <button
-                style={{
-                  width: "100%", border: 0, borderRadius: 24, background: t.accent, color: "#fff",
-                  padding: "18px 22px", fontWeight: 900, fontSize: 16, cursor: "pointer",
-                }}
-                onClick={adminLogin}
-              >
-                –í–æ–π—Ç–∏
-              </button>
-            </div>
-          ) : adminModuleRoute === "body" ? (
-            <>
-              {/* Body intake admin header */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                <div><div style={{ fontSize: 22, fontWeight: 700 }}>–ê–Ω–∫–µ—Ç—ã –∑–¥–æ—Ä–æ–≤—å—è</div><div style={{ fontSize: 13, color: t.muted, marginTop: 2 }}>–ü–µ—Ä–≤–∏—á–Ω—ã–µ –∞–Ω–∫–µ—Ç—ã –∏ AI-—Ä–∞–∑–±–æ—Ä—ã –∫–ª–∏–µ–Ω—Ç–æ–≤</div></div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <button
-                    onClick={() => adminLoadBodyIntake()}
-                    style={{
-                      background: t.tabBg, color: t.text, border: `1px solid ${t.border}`,
-                      padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontSize: 13,
-                    }}
-                  >
-                    –û–±–Ω–æ–≤–∏—Ç—å
-                  </button>
-                  <a href="https://health.tochka-opori.online" style={{ color: t.accent, fontSize: 14, textDecoration: "none" }}>‚Üê –ù–∞ –≥–ª–∞–≤–Ω—É—é</a>
-                </div>
-              </div>
-
-              {/* Tabs: –ê–Ω–∫–µ—Ç—ã | –î–Ω–µ–≤–Ω–∏–∫–∏ | –ö–æ—Ä–∑–∏–Ω–∞ */}
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          {["intake", "diary", "trash", "reviews", "requests", "assignments"].map(tab => (
-            <button
-              key={tab}
-              style={{
-                border: 0, borderRadius: 14, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer",
-                background: bodyAdminTab === tab ? t.tabActive : t.tabBg,
-                color: bodyAdminTab === tab ? t.tabActiveText : t.text,
-              }}
-              onClick={() => {
-                setBodyAdminTab(tab);
-                setBodyIntakeDetailOpen(false);
-                setBodyDiaryDetailOpen(false);
-                if (tab === "intake") { setBodyIntakeShowDeleted(false); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }
-                else if (tab === "trash") { setBodyIntakeShowDeleted(true); setBodyIntakeSourceFilter("all"); adminLoadBodyIntake(); }
-                else if (tab === "diary") { adminLoadBodyDailyLogs(); }
-                else if (tab === "reviews") { adminLoadBodyExpertReviews(); }
-                else if (tab === "requests") { adminLoadBodyServiceRequests(); }
-                else if (tab === "assignments") { adminLoadBodyAssignments(); }
-              }}
-            >
-              {tab === "intake" ? "–ê–Ω–∫–µ—Ç—ã" : tab === "diary" ? "–î–Ω–µ–≤–Ω–∏–∫–∏" : tab === "trash" ? "–ö–æ—Ä–∑–∏–Ω–∞" : tab === "reviews" ? "–≠–∫—Å–ø–µ—Ä—Ç–Ω—ã–µ –ø—Ä–∞–≤–∫–∏" : tab === "requests" ? "–ó–∞–ø—Ä–æ—Å—ã" : "–ü—Ä–∏–≤—è–∑–∫–∞"}
-            </button>
-          ))}
-              </div>
-
-              {/* Source filter tabs (only for intake tab) */}
-              {bodyAdminTab === "intake" && (
-                <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
-                  {[
-                    { key: "all", label: "–í—Å–µ" },
-                    { key: "alena_client", label: "–ö–ª–∏–µ–Ω—Ç—ã –ê–ª–µ–Ω—ã" },
-                    { key: "self_signup", label: "–°–∞–º–æ—Å—Ç–æ—è—Ç–µ–ª—å–Ω—ã–µ" },
-                    { key: "specialist_referral", label: "–ü–æ –Ω–∞–ø—Ä–∞–≤–ª–µ–Ω–∏—é" },
-                    { key: "test", label: "–¢–µ—Å—Ç–æ–≤—ã–µ" },
-                  ].map(f => (
-                    <button
-                      key={f.key}
-                      style={{
-                        border: 0, borderRadius: 10, padding: "5px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                        background: bodyIntakeSourceFilter === f.key ? t.tabActive : t.tabBg,
-                        color: bodyIntakeSourceFilter === f.key ? t.tabActiveText : t.text,
-                      }}
-                      onClick={() => { setBodyIntakeSourceFilter(f.key); adminLoadBodyIntake(); }}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Body intake table (intake or trash tab) */}
-              {(bodyAdminTab === "intake" || bodyAdminTab === "trash") && (
-                bodyIntakeLoading ? (
-                  <div style={{ textAlign: "center", padding: 40, color: t.muted }}>–ó–∞–≥—Ä—É–∑–∫–∞...</div>
-                ) : bodyIntakeRecords.length === 0 && !bodyIntakeShowDeleted ? (
-                  <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
-                    <div style={{ fontSize: 18, marginBottom: 8 }}>–ü–æ–∫–∞ –Ω–µ—Ç –∞–Ω–∫–µ—Ç –º–æ–¥—É–ª—è –ó–¥–æ—Ä–æ–≤—å–µ & –°—Ç—Ä–æ–π–Ω–æ—Å—Ç—å</div>
-                    <div style={{ fontSize: 14 }}>–ó–∞–ø–æ–ª–Ω–µ–Ω–Ω—ã–µ intake-–∞–Ω–∫–µ—Ç—ã –ø–æ—è–≤—è—Ç—Å—è –∑–¥–µ—Å—å.</div>
-                  </div>
-                ) : bodyIntakeRecords.length === 0 && bodyIntakeShowDeleted ? (
-                  <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
-                    <div style={{ fontSize: 18, marginBottom: 8 }}>–ö–æ—Ä–∑–∏–Ω–∞ –ø—É—Å—Ç–∞</div>
-                    <div style={{ fontSize: 14 }}>–£–¥–∞–ª—ë–Ω–Ω—ã—Ö –∞–Ω–∫–µ—Ç –Ω–µ—Ç.</div>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 13, color: t.muted, marginBottom: 12 }}>
-                      –í—Å–µ–≥–æ –∑–∞–ø–∏—Å–µ–π: {bodyIntakeTotal}
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {bodyIntakeRecords.map((rec) => {
-                        const answers = rec.answers || {};
-                        const client = rec.client || {};
-                        const careLevel = normalizeCare(rec.care_recommendation);
-                        const sourceLabel = {
-                          alena_client: "–ê–ª–µ–Ω–∞",
-                          self_signup: "–°–∞–º–æ—Å—Ç.",
-                          specialist_referral: "–ù–∞–ø—Ä–∞–≤–ª–µ–Ω–∏–µ",
-                          test: "–¢–µ—Å—Ç",
-                        }[rec.source] || rec.source || "‚Äî";
-                        const sourceColor = {
-                          alena_client: "#86a08f",
-                          self_signup: "#8d8378",
-                          specialist_referral: "#b8946e",
-                          test: "#a0a0a0",
-                        }[rec.source] || "#8d8378";
-                        return (
-                        <div
-                          key={rec.id}
-                          style={{
-                            border: `1px solid ${t.cardBorder}`, borderRadius: 16, padding: "16px 20px",
-                            background: t.cardBg, cursor: "pointer",
-                          }}
-                        >
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                              <span style={{ fontSize: 13, color: t.muted }}>
-                                {new Date(rec.created_at).toLocaleString("ru-RU")}
-                              </span>
-                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: `${sourceColor}22`, color: sourceColor }}>
-                                {sourceLabel}
-                              </span>
-                              {rec.specialist_name && (
-                                <span style={{ fontSize: 12, color: t.muted, fontStyle: "italic" }}>
-                                  ‚Üí {rec.specialist_name}
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
-                              {rec.triggered_red_flags?.length > 0 && (
-                                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "rgba(239,68,68,.2)", color: "#fca5a5" }}>
-                                  {rec.triggered_red_flags.length} —Ñ–ª–∞–≥
-                                </span>
-                              )}
-                              {careLevel && (
-                                <span style={{
-                                  fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
-                                  background: careLevel === "urgent_help" ? "rgba(239,68,68,.2)" :
-                                    careLevel === "medical_consultation" ? "rgba(251,191,36,.2)" : "rgba(34,197,94,.2)",
-                                  color: careLevel === "urgent_help" ? "#fca5a5" :
-                                    careLevel === "medical_consultation" ? "#fde68a" : "#bbf7d0",
-                                }}>
-                                  {careLabel(careLevel)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div style={{ fontSize: 15, fontWeight: 600, color: t.text }}>
-                            {answers.display_name || client.display_name || "–ë–µ–∑ –∏–º–µ–Ω–∏"}
-                          </div>
-                          {answers.goal && (
-                            <div style={{ fontSize: 12, color: t.muted, marginTop: 1, fontStyle: "italic" }}>
-                              –¶–µ–ª—å: {answers.goal}
-                            </div>
-                          )}
-
-                          {rec.session_id && (
-                            <div style={{ fontSize: 12, color: t.muted, marginTop: 4, fontFamily: "monospace" }}>
-                              –ö–æ–¥: {rec.session_id}
-                            </div>
-                          )}
-
-                          {(rec.user_report || answers.user_report) && (
-                            <div style={{ fontSize: 13, lineHeight: 1.5, color: t.text, marginTop: 6 }}>
-                              {(rec.user_report || answers.user_report || "").slice(0, 200)}
-                              {(rec.user_report || answers.user_report || "").length > 200 ? "..." : ""}
-                            </div>
-                          )}
-
-                          {rec.deleted_at && (
-                            <div style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>
-                              –£–¥–∞–ª—ë–Ω: {new Date(rec.deleted_at).toLocaleString("ru-RU")} ({rec.deleted_by})
-                            </div>
-                          )}
-
-                          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); adminOpenBodyIntakeDetail(rec.id); }}
-                              style={{
-                                background: t.accent, color: "#fff", border: 0, borderRadius: 8,
-                                padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                              }}
-                            >
-                              –û—Ç–∫—Ä—ã—Ç—å
-                            </button>
-                            {bodyIntakeShowDeleted ? (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); adminRestoreBodyIntake(rec.id); }}
-                                style={{
-                                  background: "transparent", color: t.accent, border: `1px solid ${t.accent}`, borderRadius: 8,
-                                  padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                                }}
-                              >
-                                –í–æ—Å—Å—Ç–∞–Ω–æ–≤–∏—Ç—å
-                              </button>
-                            ) : (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setBodyIntakeDeleteConfirm(rec.id); }}
-                                style={{
-                                  background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 8,
-                                  padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                                }}
-                              >
-                                –£–¥–∞–ª–∏—Ç—å
-                              </button>
-                            )}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); adminDownloadBodyIntakeJSON(rec); }}
-                              style={{
-                                background: "transparent", color: t.muted, border: `1px solid ${t.border}`, borderRadius: 8,
-                                padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                              }}
-                            >
-                              JSON
-                            </button>
-                          </div>
-                        </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )
-              )}
-
-              {/* Body daily logs table (diary tab) */}
-              {bodyAdminTab === "diary" && (
-                <>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
-                    <input
-                      type="text"
-                      placeholder="–§–∏–ª—å—Ç—Ä –ø–æ session_id"
-                      value={bodyDiarySessionFilter}
-                      onChange={(e) => setBodyDiarySessionFilter(e.target.value)}
-                      style={{
-                        flex: 1, height: 36, padding: "0 12px", borderRadius: 8,
-                        border: `1px solid ${t.border}`, background: t.inputBg, color: t.inputText,
-                        fontSize: 13, outline: "none", fontFamily: "monospace",
-                      }}
-                    />
-                    <button
-                      onClick={() => adminLoadBodyDailyLogs()}
-                      style={{
-                        height: 36, padding: "0 14px", borderRadius: 8, border: 0,
-                        background: t.tabBg, color: t.text, fontWeight: 600, fontSize: 13, cursor: "pointer",
-                      }}
-                    >
-                      –ü–æ–∏—Å–∫
-                    </button>
-                    <button
-                      onClick={() => { setBodyDiarySessionFilter(""); adminLoadBodyDailyLogs(); }}
-                      style={{
-                        height: 36, padding: "0 14px", borderRadius: 8, border: `1px solid ${t.border}`,
-                        background: "transparent", color: t.muted, fontWeight: 500, fontSize: 13, cursor: "pointer",
-                      }}
-                    >
-                      –°–±—Ä–æ—Å–∏—Ç—å
-                    </button>
-                  </div>
-
-                  {bodyDiaryLoading ? (
-                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>–ó–∞–≥—Ä—É–∑–∫–∞...</div>
-                  ) : bodyDiaryRecords.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: 60, color: t.muted }}>
-                      <div style={{ fontSize: 18, marginBottom: 8 }}>–î–Ω–µ–≤–Ω–∏–∫–æ–≤ –ø–æ–∫–∞ –Ω–µ—Ç</div>
-                      <div style={{ fontSize: 14 }}>–ó–∞–ø–∏—Å–∏ –¥–Ω–µ–≤–Ω–∏–∫–∞ –ø–æ—è–≤—è—Ç—Å—è –∑–¥–µ—Å—å –ø–æ—Å–ª–µ —Ç–æ–≥–æ, –∫–∞–∫ –∫–ª–∏–µ–Ω—Ç—ã –Ω–∞—á–Ω—É—Ç –∏—Ö –∑–∞–ø–æ–ª–Ω—è—Ç—å.</div>
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {bodyDiaryRecords.map((rec) => (
-                        <div
-                          key={rec.id}
-                          style={{
-                            border: `1px solid ${t.cardBorder}`, borderRadius: 16, padding: "14px 18px",
-                            background: t.cardBg,
-                          }}
-                        >
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                            <div style={{ fontSize: 13, color: t.muted }}>
-                              {rec.log_date} {rec.created_at ? new Date(rec.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : ""}
-                            </div>
-                            <div style={{ fontSize: 12, color: t.muted, fontFamily: "monospace" }}>
-                              {rec.session_id?.slice(0, 12)}‚Ä¶
-                            </div>
-                          </div>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: t.text, marginBottom: 4 }}>
-                            –®–∞–≥–∏: {rec.steps ?? "‚Äî"} | –¢—Ä–µ–Ω–∏—Ä–æ–≤–∫–∞: {rec.workout_done ? rec.workout_type || "–¥–∞" : "–Ω–µ—Ç"} | –ö–∞–ª–æ—Ä–∏–∏: {rec.calories ?? "‚Äî"}
-                          </div>
-                          {rec.overeating_level && (
-                            <div style={{ fontSize: 12, color: t.muted }}>
-                              –ü–µ—Ä–µ–µ–¥–∞–Ω–∏–µ: {rec.overeating_level === "severe" ? "–≤—ã—Ä–∞–∂–µ–Ω–Ω–æ" : rec.overeating_level === "slight" ? "–Ω–µ–º–Ω–æ–≥–æ" : rec.overeating_level}
-                              {rec.sweet_cravings ? ` | –¢—è–≥–∞: ${rec.sweet_cravings}` : ""}
-                            </div>
-                          )}
-                          {rec.sleep_hours && (
-                            <div style={{ fontSize: 12, color: t.muted }}>
-                              –°–æ–Ω: {rec.sleep_hours} —á | –≠–Ω–µ—Ä–≥–∏—è: {rec.energy_level ?? "‚Äî"}/10
-                            </div>
-                          )}
-                          {rec.ai_day_summary && (
-                            <div style={{ fontSize: 13, color: t.text, marginTop: 4, lineHeight: 1.5, fontStyle: "italic" }}>
-                              {rec.ai_day_summary.slice(0, 150)}{rec.ai_day_summary.length > 150 ? "..." : ""}
-                            </div>
-                          )}
-                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                            <button
-                              onClick={() => adminOpenBodyDailyLogDetail(rec.id)}
-                              style={{
-                                background: t.accent, color: "#fff", border: 0, borderRadius: 8,
-                                padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                              }}
-                            >
-                              –û—Ç–∫—Ä—ã—Ç—å
-                            </button>
-                            <button
-                              onClick={() => adminDeleteBodyDailyLog(rec.id)}
-                              style={{
-                                background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 8,
-                                padding: "6px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                              }}
-                            >
-                              –£–¥–∞–ª–∏—Ç—å
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Reviews tab */}
-              {bodyAdminTab === "reviews" && (
-                <>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>
-                      –≠–∫—Å–ø–µ—Ä—Ç–Ω—ã–µ –ø—Ä–∞–≤–∫–∏ ({bodyExpertReviews.length})
-                    </div>
-                    <button
-                      onClick={adminExportBodyExpertCases}
-                      disabled={bodyExportingCases}
-                      style={{
-                        padding: "10px 18px", borderRadius: 12, border: `1px solid ${t.border}`,
-                        background: t.tabBg, color: t.text, fontWeight: 600, fontSize: 13, cursor: "pointer",
-                        opacity: bodyExportingCases ? 0.5 : 1,
-                      }}
-                    >
-                      {bodyExportingCases ? "–í—ã–≥—Ä—É–∑–∫–∞..." : "–°–∫–∞—á–∞—Ç—å –∫–µ–π—Å—ã (.jsonl)"}
-                    </button>
-                  </div>
-                  {bodyExpertReviewsLoading ? (
-                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>–ó–∞–≥—Ä—É–∑–∫–∞...</div>
-                  ) : bodyExpertReviews.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>
-                      <div style={{ fontSize: 18, marginBottom: 8 }}>–≠–∫—Å–ø–µ—Ä—Ç–Ω—ã—Ö –ø—Ä–∞–≤–æ–∫ –ø–æ–∫–∞ –Ω–µ—Ç</div>
-                      <div style={{ fontSize: 13 }}>–û—Ç–∫—Ä–æ–π—Ç–µ –∞–Ω–∫–µ—Ç—É –∏–ª–∏ –¥–Ω–µ–≤–Ω–∏–∫ –∏ –Ω–∞–∂–º–∏—Ç–µ ¬´–≠–∫—Å–ø–µ—Ä—Ç–Ω–∞—è –ø—Ä–∞–≤–∫–∞¬ª</div>
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {bodyExpertReviews.map((r, i) => (
-                        <div key={r.id || i} style={{
-                          border: `1px solid ${t.cardBorder}`, borderRadius: 16, padding: "14px 18px",
-                          background: t.cardBg,
-                        }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                            <div style={{ fontSize: 13, color: t.muted }}>
-                              {new Date(r.created_at).toLocaleString("ru-RU")} ¬∑ {r.reviewer_name}
-                            </div>
-                            <div style={{ fontSize: 12, color: t.muted }}>
-                              {r.target_type === "intake" ? "–ê–Ω–∫–µ—Ç–∞" : r.target_type === "daily_log" ? "–î–Ω–µ–≤–Ω–∏–∫" : "–¢–∞—Ä–µ–ª–∫–∞"}
-                            </div>
-                          </div>
-                          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 12, color: t.muted, marginBottom: 4 }}>
-                            <span>–ë–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç—å: {r.rating_safety || "‚Äî"}</span>
-                            <span>–ü–æ–ª–µ–∑–Ω–æ—Å—Ç—å: {r.rating_usefulness ?? "‚Äî"}/5</span>
-                            <span>–ü—Ä–∞–∫—Ç–∏—á–Ω–æ—Å—Ç—å: {r.rating_practicality ?? "‚Äî"}/5</span>
-                            <span>–¢–æ–Ω: {r.rating_tone ?? "‚Äî"}/5</span>
-                          </div>
-                          {Array.isArray(r.error_tags) && r.error_tags.length > 0 && (
-                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 4 }}>
-                              {r.error_tags.map((tag, j) => (
-                                <span key={j} style={{
-                                  fontSize: 11, padding: "2px 8px", borderRadius: 6,
-                                  background: "rgba(239,68,68,.1)", color: "#991b1b",
-                                }}>
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {r.corrected_recommendation && (
-                            <div style={{ fontSize: 13, color: t.text, lineHeight: 1.5, marginTop: 4, fontStyle: "italic" }}>
-                              {r.corrected_recommendation.slice(0, 200)}{r.corrected_recommendation.length > 200 ? "..." : ""}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Expert review form modal */}
-              {bodyExpertReviewFormOpen && bodyExpertReviewForm && (
-                <div style={{
-                  position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 1100,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }} onClick={() => setBodyExpertReviewFormOpen(false)}>
-                  <div style={{
-                    background: "#ffffff", borderRadius: 20, padding: 28, maxWidth: 600, width: "90%",
-                    maxHeight: "85vh", overflowY: "auto",
-                  }} onClick={(e) => e.stopPropagation()}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                      <div style={{ fontSize: 20, fontWeight: 700, color: "#2f2925" }}>
-                        –≠–∫—Å–ø–µ—Ä—Ç–Ω–∞—è –ø—Ä–∞–≤–∫–∞
-                      </div>
-                      <button onClick={() => setBodyExpertReviewFormOpen(false)} style={{ background: "none", border: 0, fontSize: 20, cursor: "pointer", color: "#8d8378" }}>‚úï</button>
-                    </div>
-
-                    <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 16 }}>
-                      {bodyExpertReviewForm.target_type === "intake" ? "–ê–Ω–∫–µ—Ç–∞ –∑–¥–æ—Ä–æ–≤—å—è" :
-                       bodyExpertReviewForm.target_type === "daily_log" ? "–î–Ω–µ–≤–Ω–∏–∫" : "–ê–Ω–∞–ª–∏–∑ —Ç–∞—Ä–µ–ª–∫–∏"}
-                      {" ¬∑ "}
-                      {bodyExpertReviewForm.session_id}
-                    </div>
-
-                    {/* Safety */}
-                    <div style={{ marginBottom: 16 }}>
-                      <label style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#2f2925", marginBottom: 6 }}>–ë–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç—å</label>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        {[
-                          { value: "ok", label: "–û–∫" },
-                          { value: "questionable", label: "–°–ø–æ—Ä–Ω–æ" },
-                          { value: "dangerous", label: "–û–ø–∞—Å–Ω–æ" },
-                        ].map(o => (
-                          <button key={o.value} type="button" onClick={() => setBodyExpertReviewForm(prev => ({ ...prev, rating_safety: o.value }))} style={{
-                            padding: "8px 16px", borderRadius: 10, border: bodyExpertReviewForm.rating_safety === o.value ? "2px solid #7D9A89" : "1px solid #d8cec1",
-                            background: bodyExpertReviewForm.rating_safety === o.value ? "#e8f0ea" : "#ffffff",
-                            color: "#2f2925", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit",
-                          }}>
-                            {o.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Ratings */}
-                    {["rating_usefulness", "rating_practicality", "rating_tone"].map((key, idx) => (
-                      <div key={key} style={{ marginBottom: 14 }}>
-                        <label style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#2f2925", marginBottom: 4 }}>
-                          {["–ü–æ–ª–µ–∑–Ω–æ—Å—Ç—å", "–ü—Ä–∞–∫—Ç–∏—á–Ω–æ—Å—Ç—å", "–¢–æ–Ω"][idx]}
-                        </label>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          {[1, 2, 3, 4, 5].map(n => (
-                            <button key={n} type="button" onClick={() => setBodyExpertReviewForm(prev => ({ ...prev, [key]: n }))} style={{
-                              width: 36, height: 36, borderRadius: 8,
-                              border: bodyExpertReviewForm[key] === n ? "2px solid #7D9A89" : "1px solid #d8cec1",
-                              background: bodyExpertReviewForm[key] === n ? "#e8f0ea" : "#ffffff",
-                              color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
-                            }}>
-                              {n}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Error tags */}
-                    <div style={{ marginBottom: 16 }}>
-                      <label style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#2f2925", marginBottom: 6 }}>–û—à–∏–±–∫–∏</label>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {[
-                          "–Ω–µ —Ö–≤–∞—Ç–∞–µ—Ç –≤–æ–ø—Ä–æ—Å–æ–≤", "—Å–ª–∏—à–∫–æ–º –æ–±—â–∏–π –ø–ª–∞–Ω", "–Ω–µ–≤–µ—Ä–Ω–∞—è –æ—Ü–µ–Ω–∫–∞ –ø–∏—Ç–∞–Ω–∏—è",
-                          "–Ω–µ–≤–µ—Ä–Ω–∞—è –æ—Ü–µ–Ω–∫–∞ –∞–∫—Ç–∏–≤–Ω–æ—Å—Ç–∏", "–Ω–µ–≤–µ—Ä–Ω–∞—è –æ—Ü–µ–Ω–∫–∞ —Å–Ω–∞", "–Ω–µ–≤–µ—Ä–Ω–∞—è –æ—Ü–µ–Ω–∫–∞ —Ç–∞—Ä–µ–ª–∫–∏",
-                          "–Ω—É–∂–Ω–æ –∫ –≤—Ä–∞—á—É", "—Å–ª–∏—à–∫–æ–º –∂–µ—Å—Ç–∫–æ", "—Å–ª–∏—à–∫–æ–º –º—è–≥–∫–æ", "–∫–∞–Ω—Ü–µ–ª—è—Ä–∏—Ç", "–¥—Ä—É–≥–æ–µ",
-                        ].map(tag => {
-                          const checked = bodyExpertReviewForm.error_tags.includes(tag);
-                          return (
-                            <label key={tag} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "#5f574f" }}>
-                              <input type="checkbox" checked={checked} onChange={() => {
-                                setBodyExpertReviewForm(prev => ({
-                                  ...prev,
-                                  error_tags: checked
-                                    ? prev.error_tags.filter(t => t !== tag)
-                                    : [...prev.error_tags, tag],
-                                }));
-                              }} style={{ accentColor: "#86a08f", width: 18, height: 18 }} />
-                              {tag}
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Text fields */}
-                    {[
-                      { key: "what_ai_did_well", label: "–ß—Ç–æ AI —Å–¥–µ–ª–∞–ª —Ö–æ—Ä–æ—à–æ" },
-                      { key: "what_ai_missed", label: "–ß—Ç–æ AI —É–ø—É—Å—Ç–∏–ª" },
-                      { key: "corrected_recommendation", label: "–ö–∞–∫ –±—ã –≤—ã —Å—Ñ–æ—Ä–º—É–ª–∏—Ä–æ–≤–∞–ª–∏ —Ä–µ–∫–æ–º–µ–Ω–¥–∞—Ü–∏—é" },
-                      { key: "suggested_questions", label: "–ö–∞–∫–∏–µ –≤–æ–ø—Ä–æ—Å—ã –Ω—É–∂–Ω–æ –¥–æ–±–∞–≤–∏—Ç—å" },
-                      { key: "expert_comment", label: "–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π —ç–∫—Å–ø–µ—Ä—Ç–∞" },
-                    ].map(f => (
-                      <div key={f.key} style={{ marginBottom: 14 }}>
-                        <label style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#2f2925", marginBottom: 4 }}>{f.label}</label>
-                        <textarea
-                          style={{
-                            width: "100%", minHeight: 60, padding: 10, borderRadius: 10,
-                            border: "1px solid #d8cec1", fontSize: 14, fontFamily: "inherit",
-                            resize: "vertical", outline: "none", boxSizing: "border-box",
-                          }}
-                          value={bodyExpertReviewForm[f.key] || ""}
-                          onChange={e => setBodyExpertReviewForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                        />
-                      </div>
-                    ))}
-
-                    <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                      <button
-                        onClick={adminSaveBodyExpertReview}
-                        disabled={bodyExpertReviewSaving}
-                        style={{
-                          flex: 1, height: 48, borderRadius: 14, border: 0,
-                          background: bodyExpertReviewSaving ? "#c4d0c6" : "#7D9A89",
-                          color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
-                        }}
-                      >
-                        {bodyExpertReviewSaving ? "–°–æ—Ö—Ä–∞–Ω—è–µ–º..." : "–°–æ—Ö—Ä–∞–Ω–∏—Ç—å –ø—Ä–∞–≤–∫—É"}
-                      </button>
-                      <button
-                        onClick={() => setBodyExpertReviewFormOpen(false)}
-                        style={{
-                          padding: "0 24px", borderRadius: 14, border: "1px solid #d8cec1",
-                          background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
-                        }}
-                      >
-                        –û—Ç–º–µ–Ω–∞
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Service Requests Tab */}
-              {bodyAdminTab === "requests" && (
-                <>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>
-                      –ó–∞–ø—Ä–æ—Å—ã –∫–ª–∏–µ–Ω—Ç–æ–≤ ({adminServiceRequests.length})
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      {["all", "submitted", "accepted", "needs_clarification", "scheduled", "answered", "completed", "cancelled"].map(f => (
-                        <button key={f} onClick={() => { setAdminServiceRequestsFilter(f); }} style={{
-                          padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.border}`,
-                          background: adminServiceRequestsFilter === f ? t.tabActive : t.tabBg,
-                          color: adminServiceRequestsFilter === f ? t.tabActiveText : t.text,
-                          cursor: "pointer", fontSize: 12, fontWeight: 600,
-                        }}>
-                          {f === "all" ? "–í—Å–µ" : f === "submitted" ? "–ù–æ–≤—ã–µ" : f === "accepted" ? "–ü—Ä–∏–Ω—è—Ç—ã–µ" : f === "needs_clarification" ? "–£—Ç–æ—á–Ω–µ–Ω–∏–µ" : f === "scheduled" ? "–ó–∞–ø–ª–∞–Ω–∏—Ä–æ–≤–∞–Ω—ã" : f === "answered" ? "–û—Ç–≤–µ—á–µ–Ω—ã" : f === "completed" ? "–ó–∞–≤–µ—Ä—à–µ–Ω—ã" : "–û—Ç–º–µ–Ω–µ–Ω—ã"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <button onClick={adminLoadBodyServiceRequests} style={{ marginBottom: 12, padding: "6px 14px", borderRadius: 8, border: `1px solid ${t.border}`, background: t.tabBg, color: t.text, cursor: "pointer", fontSize: 13 }}>
-                    –û–±–Ω–æ–≤–∏—Ç—å
-                  </button>
-                  {adminServiceRequestsLoading ? (
-                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>–ó–∞–≥—Ä—É–∑–∫–∞...</div>
-                  ) : adminServiceRequests.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: 40, color: t.muted }}>–ù–µ—Ç –∑–∞–ø—Ä–æ—Å–æ–≤</div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {adminServiceRequests.map(r => {
-                        // Pricing-shaped rows must never be offered the legacy
-                        // no-charge action, even if their snapshot is malformed.
-                        const canonical = r.service_code != null || r.price_credits != null;
-                        const clarificationStatuses = canonical ? ["accepted"] : [];
-                        const answerStatuses = canonical ? ["accepted", "needs_clarification"] : ["submitted", "accepted"];
-                        const scheduleStatuses = canonical ? ["accepted", "needs_clarification"] : ["submitted", "accepted"];
-                        const completeStatuses = canonical ? ["answered", "scheduled"] : ["submitted", "accepted", "answered", "scheduled"];
-                        const cancelStatuses = ["submitted", "accepted", "needs_clarification", "scheduled"];
-                        return (
-                        <div key={r.id} style={{ padding: "12px 16px", borderRadius: 12, border: `1px solid ${t.border}`, background: t.cardBg }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{r.title || r.request_type}</div>
-                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                              {/* SLA badge */}
-                              {(() => {
-                                const now = new Date();
-                                const due = r.due_at ? new Date(r.due_at) : null;
-                                const activeStatuses = ["submitted", "accepted", "needs_clarification"];
-                                let slaLabel, slaColor;
-                                if (r.status === "scheduled") { slaLabel = "–ó–∞–ø–ª–∞–Ω–∏—Ä–æ–≤–∞–Ω–æ"; slaColor = "#6b8fc7"; }
-                                else if (r.status === "answered") { slaLabel = "–û—Ç–≤–µ—Ç –¥–∞–Ω"; slaColor = "#7D9A89"; }
-                                else if (r.status === "completed") { slaLabel = "–ó–∞–≤–µ—Ä—à–µ–Ω–æ"; slaColor = "#7D9A89"; }
-                                else if (r.status === "cancelled") { slaLabel = "–û—Ç–º–µ–Ω—ë–Ω"; slaColor = "#b5473f"; }
-                                else if (activeStatuses.includes(r.status) && due) {
-                                  if (now > due) { slaLabel = "–ü—Ä–æ—Å—Ä–æ—á–µ–Ω"; slaColor = "#b5473f"; }
-                                  else if ((due - now) < 6 * 60 * 60 * 1000) { slaLabel = "–°–∫–æ—Ä–æ —Å—Ä–æ–∫"; slaColor = "#e8a857"; }
-                                  else { slaLabel = "–í —Å—Ä–æ–∫–µ"; slaColor = "#7D9A89"; }
-                                }
-                                if (slaLabel) return <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: slaColor + "18", color: slaColor, fontWeight: 600 }}>{slaLabel}</span>;
-                                return null;
-                              })()}
-                              <span style={{ fontSize: 12, fontWeight: 600, color: { submitted: "#e8a857", accepted: "#5f8b7a", answered: "#7D9A89", completed: "#7D9A89", cancelled: "#b5473f", scheduled: "#6b8fc7" }[r.status] || "#8a7e72" }}>
-                                {r.status}
-                              </span>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 8 }}>{r.message?.slice(0, 200)}</div>
-                            <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 8 }}>
-                             {r.specialist_name} ¬∑ {new Date(r.created_at).toLocaleDateString("ru-RU")}
-                             {r.service_code && ` ¬∑ ${r.service_code}`}
-                             {r.service_topic && ` ¬∑ —Ç–µ–º–∞: ${r.service_topic}`}
-                             {r.meeting_format && ` ¬∑ —Ñ–æ—Ä–º–∞—Ç: ${r.meeting_format}`}
-                             {r.price_credits != null ? ` ¬∑ –°—Ç–æ–∏–º–æ—Å—Ç—å: ${r.price_credits.toLocaleString("ru-RU")} –∫—Ä–µ–¥–∏—Ç–æ–≤` : " ¬∑ Legacy –±–µ–∑ snapshot-—Ü–µ–Ω—ã"}
-                             {` ¬∑ –ó–∞—Ä–µ–∑–µ—Ä–≤–∏—Ä–æ–≤–∞–Ω–æ: ${r.reserved_credits || 0}`}
-                             {` ¬∑ –°–ø–∏—Å–∞–Ω–æ: ${r.charged_credits || 0}`}
-                            {r.due_at && ` ¬∑ —Å—Ä–æ–∫: ${new Date(r.due_at).toLocaleDateString("ru-RU")}`}
-                          </div>
-                          {/* Contact info for phone/video/offline */}
-                          {r.client_contact && (r.client_contact.phone || r.client_contact.preferred_date) && (
-                            <div style={{ fontSize: 12, color: "#5f574f", marginBottom: 8, padding: "6px 10px", borderRadius: 8, background: "#faf6ef" }}>
-                              {r.client_contact.phone && <span>–¢–µ–ª: {r.client_contact.phone} ¬∑ </span>}
-                              {r.client_contact.preferred_date && <span>–î–∞—Ç–∞: {r.client_contact.preferred_date} ¬∑ </span>}
-                              {r.client_contact.preferred_time_from && <span>–° {r.client_contact.preferred_time_from} </span>}
-                              {r.client_contact.preferred_time_to && <span>–¥–æ {r.client_contact.preferred_time_to} </span>}
-                              {r.client_contact.preferred_time_text && <span>({r.client_contact.preferred_time_text})</span>}
-                            </div>
-                          )}
-                          {r.specialist_response && (
-                            <div style={{ fontSize: 13, color: "#5f574f", padding: 8, borderRadius: 8, background: "#f0f5f1", marginBottom: 8 }}>
-                              <strong>–û—Ç–≤–µ—Ç:</strong> {r.specialist_response}
-                            </div>
-                          )}
-                          {r.status === "completed" && (
-                            <div style={{ fontSize: 11, color: "#8a7e72", marginBottom: 8 }}>
-                              –¢–µ—Å—Ç–æ–≤—ã–π —Ä–µ–∂–∏–º: —Ñ–∞–∫—Ç–∏—á–µ—Å–∫–æ–µ —Å–ø–∏—Å–∞–Ω–∏–µ –∫—Ä–µ–¥–∏—Ç–æ–≤ –ø–æ–∫–∞ –Ω–µ –≤—ã–ø–æ–ª–Ω—è–µ—Ç—Å—è
-                            </div>
-                          )}
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            {r.status === "submitted" && (
-                              <button onClick={() => adminUpdateServiceRequest(r.id, "accept")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>–ü—Ä–∏–Ω—è—Ç—å</button>
-                            )}
-                            {clarificationStatuses.includes(r.status) && (
-                              <button onClick={() => {
-                                const resp = window.prompt("–ß—Ç–æ –Ω—É–∂–Ω–æ —É—Ç–æ—á–Ω–∏—Ç—å —É –∫–ª–∏–µ–Ω—Ç–∞?");
-                                if (resp) adminUpdateServiceRequest(r.id, "needs_clarification", { specialist_response: resp });
-                              }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #e8a857", background: "#fff7e8", color: "#6b4b1f", cursor: "pointer", fontSize: 12 }}>–£—Ç–æ—á–Ω–∏—Ç—å</button>
-                            )}
-                            {answerStatuses.includes(r.status) || scheduleStatuses.includes(r.status) ? (
-                              <>
-                                {answerStatuses.includes(r.status) && <button onClick={() => {
-                                  const resp = window.prompt("–û—Ç–≤–µ—Ç —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞:");
-                                  if (resp) adminUpdateServiceRequest(r.id, "answer", { specialist_response: resp });
-                                }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>–û—Ç–≤–µ—Ç–∏—Ç—å</button>}
-                                {scheduleStatuses.includes(r.status) && <button onClick={() => {
-                                  const dt = window.prompt("–î–∞—Ç–∞ –∏ –≤—Ä–µ–º—è (YYYY-MM-DD HH:MM):");
-                                  const comment = window.prompt("–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π (–Ω–µ–æ–±—è–∑–∞—Ç–µ–ª—å–Ω–æ):");
-                                  if (dt) adminUpdateServiceRequest(r.id, "schedule", { scheduled_at: dt, scheduled_comment: comment });
-                                }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #6b8fc7", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>–ó–∞–ø–ª–∞–Ω–∏—Ä–æ–≤–∞—Ç—å</button>}
-                              </>
-                            ) : null}
-                            {completeStatuses.includes(r.status) && (
-                              <>
-                                <button onClick={() => adminUpdateServiceRequest(r.id, "complete")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7D9A89", background: "#e8f0ea", color: "#2f2925", cursor: "pointer", fontSize: 12 }}>–ó–∞–≤–µ—Ä—à–∏—Ç—å</button>
-                                {!canonical && <button onClick={() => adminUpdateServiceRequest(r.id, "complete_no_charge")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #d8cec1", background: "#fff", color: "#5f574f", cursor: "pointer", fontSize: 12 }}>–ó–∞–∫—Ä—ã—Ç—å –±–µ–∑ —Å–ø–∏—Å–∞–Ω–∏—è</button>}
-                              </>
-                            )}
-                            {cancelStatuses.includes(r.status) && <button onClick={() => adminUpdateServiceRequest(r.id, "cancel")} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #b5473f", background: "#fff", color: "#b5473f", cursor: "pointer", fontSize: 12 }}>–û—Ç–º–µ–Ω–∏—Ç—å</button>}
-                          </div>
-                        </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Assignments tab */}
-              {bodyAdminTab === "assignments" && (
-                <>
-                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>–ü—Ä–∏–≤—è–∑–∫–∞ –∫–ª–∏–µ–Ω—Ç–æ–≤ –∫ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞–º</div>
-                  {bodyAssignmentsLoading ? (
-                    <div style={{ color: t.muted, fontSize: 13 }}>–ó–∞–≥—Ä—É–∑–∫–∞...</div>
-                  ) : bodyAssignments.length === 0 ? (
-                    <div style={{ color: t.muted, fontSize: 13 }}>–ù–µ—Ç –∞–∫—Ç–∏–≤–Ω—ã—Ö body-–∫–ª–∏–µ–Ω—Ç–æ–≤</div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {bodyAssignments.map((c) => (
-                        <div key={c.body_client_ref} style={{
-                          background: t.cardBg, border: `1px solid ${t.border}`, borderRadius: 12, padding: 14,
-                          display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between",
-                        }}>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>{c.display_name}</div>
-                            <div style={{ fontSize: 12, color: t.muted }}>
-                              {c.legacy_specialist_name ? `Legacy: ${c.legacy_specialist_name}` : "–ë–µ–∑ legacy-–º–µ—Ç–∫–∏"}
-                              {c.assignment_status.assigned ? (
-                                <span style={{ marginLeft: 8, color: "#7D9A89" }}>
-                                  ‚Üí {c.assignment_status.expert_name} ({c.assignment_status.organization_name})
-                                </span>
-                              ) : (
-                                <span style={{ marginLeft: 8, color: "#b5473f" }}>–ù–µ –Ω–∞–∑–Ω–∞—á–µ–Ω</span>
-                              )}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setBodyAssignTarget(c.body_client_ref);
-                              setBodyAssignIsReassign(c.assignment_status.assigned);
-                              setBodyAssignExpertId("");
-                              setBodyAssignOrgId(null);
-                              setBodyAssignExpertOrgs([]);
-                            }}
-                            style={{
-                              padding: "6px 14px", borderRadius: 8, border: `1px solid ${t.border}`,
-                              background: t.tabBg, color: t.text, cursor: "pointer", fontSize: 12, fontWeight: 600,
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {c.assignment_status.assigned ? "–ü–µ—Ä–µ–Ω–∞–∑–Ω–∞—á–∏—Ç—å" : "–ù–∞–∑–Ω–∞—á–∏—Ç—å"}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Assignment modal */}
-                  {bodyAssignTarget && (
-                    <div style={{
-                      position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
-                      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-                    }} onClick={() => { setBodyAssignTarget(null); setBodyAssignIsReassign(false); }}>
-                      <div style={{
-                        background: t.bg, borderRadius: 20, padding: 32, maxWidth: 440, width: "90%",
-                      }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>
-                          {bodyAssignIsReassign ? "–ü–µ—Ä–µ–Ω–∞–∑–Ω–∞—á–∏—Ç—å —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞" : "–ù–∞–∑–Ω–∞—á–∏—Ç—å —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞"}
-                        </div>
-
-                        <label style={{ fontSize: 13, color: t.muted, marginBottom: 4, display: "block" }}>–°–ø–µ—Ü–∏–∞–ª–∏—Å—Ç</label>
-                        <select
-                          value={bodyAssignExpertId}
-                          onChange={(e) => {
-                            const expertId = e.target.value;
-                            setBodyAssignExpertId(expertId);
-                            setBodyAssignOrgId(null);
-                            // Find selected expert's organization memberships
-                            const expert = bodyExperts.find((ex) => ex.id === expertId);
-                            setBodyAssignExpertOrgs(expert?.organizations || []);
-                          }}
-                          style={{
-                            width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${t.border}`,
-                            background: t.cardBg, color: t.text, fontSize: 14, marginBottom: 16,
-                          }}
-                        >
-                          <option value="">–í—ã–±–µ—Ä–∏—Ç–µ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞</option>
-                          {bodyExperts.filter((e) => e.is_active).map((e) => (
-                            <option key={e.id} value={e.id}>{e.name} ‚Äî {e.role || "—Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç"}</option>
-                          ))}
-                        </select>
-
-                        <label style={{ fontSize: 13, color: t.muted, marginBottom: 4, display: "block" }}>–ö–æ–Ω—Ç–µ–∫—Å—Ç</label>
-                        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-                          <button
-                            onClick={() => setBodyAssignOrgId(null)}
-                            style={{
-                              padding: "8px 14px", borderRadius: 8, border: `1px solid ${!bodyAssignOrgId ? "#7D9A89" : t.border}`,
-                              background: !bodyAssignOrgId ? "#e8f0ea" : t.cardBg, color: t.text, cursor: "pointer", fontSize: 13,
-                            }}
-                          >
-                            –ß–∞—Å—Ç–Ω–∞—è –ø—Ä–∞–∫—Ç–∏–∫–∞
-                          </button>
-                          {bodyAssignExpertOrgs.map((org) => (
-                            <button
-                              key={org.id}
-                              onClick={() => setBodyAssignOrgId(org.id)}
-                              style={{
-                                padding: "8px 14px", borderRadius: 8, border: `1px solid ${bodyAssignOrgId === org.id ? "#7D9A89" : t.border}`,
-                                background: bodyAssignOrgId === org.id ? "#e8f0ea" : t.cardBg, color: t.text, cursor: "pointer", fontSize: 13,
-                              }}
-                            >
-                              {org.name || "–û—Ä–≥–∞–Ω–∏–∑–∞—Ü–∏—è"}
-                            </button>
-                          ))}
-                        </div>
-
-                        <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 8 }}>
-                          <button
-                            onClick={() => { setBodyAssignTarget(null); setBodyAssignExpertId(""); setBodyAssignIsReassign(false); }}
-                            style={{ padding: "8px 16px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.cardBg, color: t.text, cursor: "pointer", fontSize: 13 }}
-                          >
-                            –û—Ç–º–µ–Ω–∞
-                          </button>
-                          <button
-                            disabled={!bodyAssignExpertId || bodyAssignSaving}
-                            onClick={() => adminAssignBodyClient(bodyAssignTarget, bodyAssignExpertId, bodyAssignOrgId, bodyAssignIsReassign)}
-                            style={{
-                              padding: "8px 16px", borderRadius: 10, border: 0,
-                              background: bodyAssignExpertId && !bodyAssignSaving ? (bodyAssignIsReassign ? "#B85C4A" : "#7D9A89") : "#c4d0c6",
-                              color: "#fff", fontWeight: 700, fontSize: 13, cursor: bodyAssignExpertId ? "pointer" : "default",
-                            }}
-                          >
-                            {bodyAssignSaving ? "–°–æ—Ö—Ä–∞–Ω–µ–Ω–∏–µ..." : (bodyAssignIsReassign ? "–ü–µ—Ä–µ–Ω–∞–∑–Ω–∞—á–∏—Ç—å" : "–ù–∞–∑–Ω–∞—á–∏—Ç—å")}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Delete confirmation modal */}
-              {bodyIntakeDeleteConfirm && (
-                <div style={{
-                  position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
-                  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-                }} onClick={() => setBodyIntakeDeleteConfirm(null)}>
-                  <div style={{
-                    background: t.bg, borderRadius: 20, padding: 32, maxWidth: 400, width: "90%",
-                  }} onClick={(e) => e.stopPropagation()}>
-                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>–£–¥–∞–ª–∏—Ç—å –∞–Ω–∫–µ—Ç—É?</div>
-                    <div style={{ fontSize: 14, color: t.muted, marginBottom: 24, lineHeight: 1.5 }}>
-                      –ê–Ω–∫–µ—Ç–∞ –±—É–¥–µ—Ç –ø–µ—Ä–µ–º–µ—â–µ–Ω–∞ –≤ –∫–æ—Ä–∑–∏–Ω—É. –í—ã —Å–º–æ–∂–µ—Ç–µ –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–∏—Ç—å –µ—ë –ø–æ–∑–∂–µ.
-                    </div>
-                    <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
-                      <button
-                        onClick={() => setBodyIntakeDeleteConfirm(null)}
-                        style={{
-                          background: "transparent", color: t.text, border: `1px solid ${t.border}`, borderRadius: 12,
-                          padding: "10px 20px", fontWeight: 600, fontSize: 14, cursor: "pointer",
-                        }}
-                      >
-                        –û—Ç–º–µ–Ω–∞
-                      </button>
-                      <button
-                        onClick={() => adminDeleteBodyIntake(bodyIntakeDeleteConfirm)}
-                        style={{
-                          background: "#ef4444", color: "#fff", border: 0, borderRadius: 12,
-                          padding: "10px 20px", fontWeight: 600, fontSize: 14, cursor: "pointer",
-                        }}
-                      >
-                        –£–¥–∞–ª–∏—Ç—å
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Body intake detail modal ‚Äî human-readable */}
-              {bodyIntakeDetailOpen && bodyIntakeDetail && (
-                <div style={{
-                  position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
-                  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-                }} onClick={() => setBodyIntakeDetailOpen(false)}>
-                  <div style={{
-                    background: t.bg, borderRadius: 20, padding: 32, maxWidth: 720, width: "90%",
-                    maxHeight: "85vh", overflowY: "auto",
-                  }} onClick={(e) => e.stopPropagation()}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20, alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>–ê–Ω–∫–µ—Ç–∞ –∑–¥–æ—Ä–æ–≤—å—è</div>
-                        {bodyIntakeDetail.session_id && (
-                          <div style={{ fontSize: 14, color: t.muted, fontFamily: "monospace", fontWeight: 600, marginTop: 2 }}>
-                            {bodyIntakeDetail.session_id}
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => setBodyIntakeDetailOpen(false)}
-                        style={{ background: "none", border: 0, color: t.muted, cursor: "pointer", fontSize: 20 }}
-                      >
-                        ‚úï
-                      </button>
-                    </div>
-
-                    {/* 1. General Info */}
-                    <Section title="–û–±—â–∞—è –∏–Ω—Ñ–æ—Ä–º–∞—Ü–∏—è">
-                      <Field label="–î–∞—Ç–∞" value={new Date(bodyIntakeDetail.created_at).toLocaleString("ru-RU")} />
-                      <Field label="–ò—Å—Ç–æ—á–Ω–∏–∫" value={bodyIntakeDetail.source || "‚Äî"} />
-                      <Field label="–°–ø–µ—Ü–∏–∞–ª–∏—Å—Ç" value={bodyIntakeDetail.specialist_name || "‚Äî"} />
-                      <Field label="–ö–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è" value={bodyIntakeDetail.session_id || "–∫–æ–¥ –Ω–µ —Å–æ–∑–¥–∞–Ω"} mono />
-                      <Field label="–í–µ—Ä—Å–∏—è" value={bodyIntakeDetail.version || "‚Äî"} />
-                      <Field label="ID" value={bodyIntakeDetail.id || "‚Äî"} mono />
-                    </Section>
-
-                    {/* 2. Client Info */}
-                    {(() => {
-                      const a = bodyIntakeDetail.answers || {};
-                      const c = bodyIntakeDetail.client || {};
-                      return (
-                        <Section title="–ò–Ω—Ñ–æ—Ä–º–∞—Ü–∏—è –æ –∫–ª–∏–µ–Ω—Ç–µ">
-                          <Field label="–ò–º—è / –ø—Å–µ–≤–¥–æ–Ω–∏–º" value={a.display_name || c.display_name || "‚Äî"} />
-                          <Field label="–ü–æ–ª" value={{ male: "–ú—É–∂—Å–∫–æ–π", female: "–ñ–µ–Ω—Å–∫–∏–π", prefer_not_to_say: "–ù–µ —Ö–æ—á—É —É–∫–∞–∑—ã–≤–∞—Ç—å", other: "–ù–µ —Ö–æ—á—É —É–∫–∞–∑—ã–≤–∞—Ç—å", prefer_not: "–ù–µ —Ö–æ—á—É —É–∫–∞–∑—ã–≤–∞—Ç—å" }[a.sex] || "–ù–µ —É–∫–∞–∑–∞–Ω"} />
-                          <Field label="–í–æ–∑—Ä–∞—Å—Ç" value={a.age || "‚Äî"} />
-                          <Field label="–¶–µ–ª—å" value={a.goal === "custom" ? a.goal_custom : ({
-                            improve_wellbeing: "–£–ª—É—á—à–∏—Ç—å —Å–∞–º–æ—á—É–≤—Å—Ç–≤–∏–µ",
-                            slimness: "–°—Ç—Ä–æ–π–Ω–æ—Å—Ç—å",
-                            custom: a.goal_custom || "–°–≤–æ–π –≤–∞—Ä–∏–∞–Ω—Ç",
-                          })[a.goal] || a.goal || "‚Äî"} />
-                        </Section>
-                      );
-                    })()}
-
-                    {/* 3. Key Measurements */}
-                    {(() => {
-                      const a = bodyIntakeDetail.answers || {};
-                      const bmi = bodyIntakeDetail.bmi;
-                      return (
-                        <Section title="–û—Å–Ω–æ–≤–Ω—ã–µ –ø–æ–∫–∞–∑–∞—Ç–µ–ª–∏">
-                          {bmi && <Field label="–ò–ú–¢" value={bmi} />}
-                          <Field label="–†–æ—Å—Ç" value={a.height_cm ? `${a.height_cm} —Å–º` : "‚Äî"} />
-                          <Field label="–í–µ—Å" value={a.weight_kg ? `${a.weight_kg} –∫–≥` : "‚Äî"} />
-                          {a.waist_cm && <Field label="–û–±—ä—ë–º —Ç–∞–ª–∏–∏" value={`${a.waist_cm} —Å–º`} />}
-                          <Field label="–ê–∫—Ç–∏–≤–Ω–æ—Å—Ç—å –Ω–∞ —Ä–∞–±–æ—Ç–µ" value={{
-                            sedentary: "–°–∏–¥—è—á–∞—è",
-                            light: "–õ—ë–≥–∫–∞—è",
-                            moderate: "–£–º–µ—Ä–µ–Ω–Ω–∞—è",
-                            heavy: "–¢—è–∂—ë–ª–∞—è",
-                          }[a.work_activity_level] || a.work_activity_level || "‚Äî"} />
-                          <Field label="–®–∞–≥–æ–≤ –≤ –¥–µ–Ω—å" value={{
-                            less_3000: "–ú–µ–Ω—å—à–µ 3000",
-                            "3000_6000": "3000‚Äì6000",
-                            "6000_10000": "6000‚Äì10000",
-                            more_10000: "–ë–æ–ª—å—à–µ 10000",
-                          }[a.daily_steps_estimate] || a.daily_steps_estimate || "‚Äî"} />
-                          <Field label="–°–æ–Ω" value={{
-                            less_5: "–ú–µ–Ω—å—à–µ 5 —á",
-                            "5_6": "5‚Äì6 —á",
-                            "6_7": "6‚Äì7 —á",
-                            "7_8": "7‚Äì8 —á",
-                            more_8: "–ë–æ–ª—å—à–µ 8 —á",
-                          }[a.sleep_hours_estimate] || a.sleep_hours_estimate || "‚Äî"} />
-                          <Field label="–ü–∏—Ç–∞–Ω–∏–µ (–≥–ª–∞–≤–Ω–∞—è –ø—Ä–æ–±–ª–µ–º–∞)" value={{
-                            overeating: "–ü–µ—Ä–µ–µ–¥–∞–Ω–∏–µ",
-                            unhealthy_food: "–ù–µ–∑–¥–æ—Ä–æ–≤—ã–π –≤—ã–±–æ—Ä",
-                            irregular: "–ù–µ—Ä–µ–≥—É–ª—è—Ä–Ω–æ–µ",
-                            portion_control: "–ö–æ–Ω—Ç—Ä–æ–ª—å –ø–æ—Ä—Ü–∏–π",
-                            snacking: "–ß–∞—Å—Ç—ã–µ –ø–µ—Ä–µ–∫—É—Å—ã",
-                            other: "–î—Ä—É–≥–æ–µ",
-                          }[a.nutrition_main_problem] || a.nutrition_main_problem || "‚Äî"} />
-                          {a.health_limitations && <Field label="–û–≥—Ä–∞–Ω–∏—á–µ–Ω–∏—è –ø–æ –∑–¥–æ—Ä–æ–≤—å—é" value={a.health_limitations} />}
-                        </Section>
-                      );
-                    })()}
-
-                    {/* 3b. Lifestyle & Nutrition */}
-                    {(() => {
-                      const a = bodyIntakeDetail.answers || {};
-                      const trnTypes = Array.isArray(a.training_types) ? a.training_types.join(", ") : a.training_types;
-                      const drinks = Array.isArray(a.daily_drinks) ? a.daily_drinks.join(", ") : a.daily_drinks;
-                      const foodOrg = Array.isArray(a.food_organization) ? a.food_organization.join(", ") : a.food_organization;
-                      return (
-                        <Section title="–û–±—Ä–∞–∑ –∂–∏–∑–Ω–∏ –∏ –ø–∏—Ç–∞–Ω–∏–µ">
-                          <Field label="–¢—Ä–µ–Ω–∏—Ä–æ–≤–∫–∏" value={{
-                            none: "–ù–µ—Ç",
-                            irregular: "–ù–µ—Ä–µ–≥—É–ª—è—Ä–Ω–æ",
-                            "1_2_week": "1‚Äì2 —Ä–∞–∑–∞ –≤ –Ω–µ–¥–µ–ª—é",
-                            "3plus_week": "3+ —Ä–∞–∑–∞ –≤ –Ω–µ–¥–µ–ª—é",
-                          }[a.training_current] || a.training_current || "‚Äî"} />
-                          {trnTypes && <Field label="–¢–∏–ø—ã —Ç—Ä–µ–Ω–∏—Ä–æ–≤–æ–∫" value={trnTypes} />}
-                          <Field label="–û–≥—Ä–∞–Ω–∏—á–µ–Ω–∏—è –ø—Ä–∏ –Ω–∞–≥—Ä—É–∑–∫–µ" value={a.training_limitations || "‚Äî"} />
-                          <Field label="–í—Ä–µ–º—è –æ—Ç—Ö–æ–¥–∞ –∫–æ —Å–Ω—É" value={a.sleep_bedtime || "‚Äî"} />
-                          <Field label="–í—Ä–µ–º—è –ø–æ–¥—ä—ë–º–∞" value={a.sleep_wake_time || "‚Äî"} />
-                          <Field label="–†–∞–∑–Ω–∏—Ü–∞ –±—É–¥–Ω–∏/–≤—ã—Ö–æ–¥–Ω—ã–µ" value={{
-                            no: "–ù–µ—Ç",
-                            slight: "–ù–µ–±–æ–ª—å—à–∞—è",
-                            yes: "–°–∏–ª—å–Ω–∞—è",
-                          }[a.sleep_schedule_shift] || a.sleep_schedule_shift || "‚Äî"} />
-                          <Field label="–ù–∞–ø–∏—Ç–∫–∏" value={drinks || "‚Äî"} />
-                          <Field label="–í–æ–¥—ã –≤ –¥–µ–Ω—å (–æ—Ü–µ–Ω–∫–∞)" value={a.water_l_estimate ? `${a.water_l_estimate} –ª` : "‚Äî"} />
-                          <Field label="–ü—Ä–∏—ë–º–æ–≤ –ø–∏—â–∏ –≤ –¥–µ–Ω—å" value={{
-                            "1": "1",
-                            "2": "2",
-                            "3": "3",
-                            "4plus": "4+",
-                            irregular: "–ù–µ—Ä–µ–≥—É–ª—è—Ä–Ω–æ",
-                          }[a.meals_per_day] || a.meals_per_day || "‚Äî"} />
-                          <Field label="–û—Ä–≥–∞–Ω–∏–∑–∞—Ü–∏—è –ø–∏—Ç–∞–Ω–∏—è" value={foodOrg || "‚Äî"} />
-                        </Section>
-                      );
-                    })()}
-
-                    {/* 4. Red Flags */}
-                    {(() => {
-                      const redFlags = bodyIntakeDetail.triggered_red_flags;
-                      const redLabels = {
-                        chest_pain: "–ë–æ–ª—å –≤ –≥—Ä—É–¥–∏",
-                        severe_dizziness: "–°–∏–ª—å–Ω–æ–µ –≥–æ–ª–æ–≤–æ–∫—Ä—É–∂–µ–Ω–∏–µ",
-                        unexplained_weight_loss: "–ù–µ–æ–±—ä—è—Å–Ω–∏–º–∞—è –ø–æ—Ç–µ—Ä—è –≤–µ—Å–∞",
-                        blood_in_stool: "–ö—Ä–æ–≤—å –≤ —Å—Ç—É–ª–µ",
-                        fainting: "–û–±–º–æ—Ä–æ–∫–∏",
-                        none: "–ù–∏—á–µ–≥–æ",
-                      };
-                      const activeFlags = Array.isArray(redFlags) ? redFlags.filter(f => f !== "none") : [];
-                      return (
-                        <Section title="–ö—Ä–∞—Å–Ω—ã–µ —Ñ–ª–∞–≥–∏">
-                          {activeFlags.length > 0 ? (
-                            <ul style={{ margin: "4px 0 0 0", paddingLeft: 18, color: t.text, fontSize: 14, lineHeight: 1.7 }}>
-                              {activeFlags.map(f => (
-                                <li key={f}>{redLabels[f] || f}</li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <Field label="" value="–ù–µ –æ—Ç–º–µ—á–µ–Ω–æ" />
-                          )}
-                          {bodyIntakeDetail.red_flag_care_level && (
-                            <Field label="–£—Ä–æ–≤–µ–Ω—å —Ä–∏—Å–∫–∞" value={{
-                              urgent_help: "–°—Ä–æ—á–Ω–∞—è –ø–æ–º–æ—â—å",
-                              medical_consultation: "–ö–æ–Ω—Å—É–ª—å—Ç–∞—Ü–∏—è –≤—Ä–∞—á–∞",
-                            }[bodyIntakeDetail.red_flag_care_level] || bodyIntakeDetail.red_flag_care_level} />
-                          )}
-                        </Section>
-                      );
-                    })()}
-
-                    {/* 4b. Health Context */}
-                    {bodyIntakeDetail.health_context && (() => {
-                      const hc = bodyIntakeDetail.health_context;
-                      return (
-                        <Section title="–ó–¥–æ—Ä–æ–≤—å–µ, –∞–Ω–∞–ª–∏–∑—ã –∏ –ø—Ä–µ–ø–∞—Ä–∞—Ç—ã">
-                          {hc.health_conditions?.length > 0 && (
-                            <div style={{ marginBottom: 12 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>–°–æ—Å—Ç–æ—è–Ω–∏—è</div>
-                              {hc.health_conditions.map((c, i) => (
-                                <div key={i} style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>‚Ä¢ {c.name}{c.comment ? ` (${c.comment})` : ""}</div>
-                              ))}
-                            </div>
-                          )}
-                          {hc.medications?.length > 0 && (
-                            <div style={{ marginBottom: 12 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>–õ–µ–∫–∞—Ä—Å—Ç–≤–∞</div>
-                              {hc.medications.map((m, i) => (
-                                <div key={i} style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>‚Ä¢ {m.name}{m.dosage ? ` ${m.dosage}` : ""}{m.prescribed_by ? ` (${m.prescribed_by})` : ""}</div>
-                              ))}
-                            </div>
-                          )}
-                          {hc.supplements?.length > 0 && (
-                            <div style={{ marginBottom: 12 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>–ë–ê–î—ã –∏ –≤–∏—Ç–∞–º–∏–Ω—ã</div>
-                              {hc.supplements.map((s, i) => (
-                                <div key={i} style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>‚Ä¢ {s.name}{s.dosage ? ` ${s.dosage}` : ""}{s.recommended_by ? ` (${s.recommended_by})` : ""}</div>
-                              ))}
-                            </div>
-                          )}
-                          {hc.lab_notes?.has_recent_labs && (
-                            <div style={{ marginBottom: 12 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>–ê–Ω–∞–ª–∏–∑—ã</div>
-                              {hc.lab_notes.items?.length > 0 && (
-                                <div style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>–ú–∞—Ä–∫–µ—Ä—ã: {hc.lab_notes.items.join(", ")}</div>
-                              )}
-                              {hc.lab_notes.comment && (
-                                <div style={{ fontSize: 13, color: t.text, marginBottom: 2 }}>{hc.lab_notes.comment}</div>
-                              )}
-                            </div>
-                          )}
-                          {hc.documents_note && (
-                            <Field label="–í—ã–ø–∏—Å–∫–∏" value={hc.documents_note} />
-                          )}
-                          <Field label="–°–æ–≥–ª–∞—Å–∏–µ" value={hc.consent_acknowledged ? "–î–∞" : "–ù–µ—Ç"} />
-                        </Section>
-                      );
-                    })()}
-
-                    {/* 5. Care Recommendation */}
-                    {(() => {
-                      const care = bodyIntakeDetail.care_recommendation;
-                      const careLevel = normalizeCare(care);
-                      const careBg = careLevel === "urgent_help" ? "rgba(239,68,68,.1)" :
-                        careLevel === "medical_consultation" ? "rgba(251,191,36,.1)" : "rgba(34,197,94,.1)";
-                      const careColor = careLevel === "urgent_help" ? "#991b1b" :
-                        careLevel === "medical_consultation" ? "#92400e" : "#166534";
-                      const careLabelText = careLevel === "urgent_help" ? "–°—Ä–æ—á–Ω–∞—è –ø–æ–º–æ—â—å" :
-                        careLevel === "medical_consultation" ? "–ö–æ–Ω—Å—É–ª—å—Ç–∞—Ü–∏—è –≤—Ä–∞—á–∞" : "Self-care";
-                      const data = bodyIntakeDetail;
-                      return (
-                        <Section title="AI-—Ä–∞–∑–±–æ—Ä">
-                          {data.user_report && (
-                            <div style={{ marginBottom: 16 }}>
-                              <div style={{ fontWeight: 600, fontSize: 13, color: t.muted, marginBottom: 6, letterSpacing: "0.03em" }}>–û—Ç—á—ë—Ç –¥–ª—è –ø–æ–ª—å–∑–æ–≤–∞—Ç–µ–ª—è</div>
-                              <div style={{ fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}` }}>
-                                {data.user_report}
-                              </div>
-                            </div>
-                          )}
-                          {care && (
-                            <div style={{ padding: 14, borderRadius: 12, background: careBg, border: `1px solid ${t.cardBorder}` }}>
-                              <div style={{ fontWeight: 700, fontSize: 14, color: careColor, marginBottom: 4 }}>–£—Ä–æ–≤–µ–Ω—å: {careLabelText}</div>
-                              {typeof care === "object" && care.reasons?.length > 0 && (
-                                <div style={{ fontSize: 13, color: t.text, marginTop: 6 }}>
-                                  <strong>–ü—Ä–∏—á–∏–Ω—ã:</strong> {care.reasons.join(", ")}
-                                </div>
-                              )}
-                              {typeof care === "object" && care.specialist_types?.length > 0 && (
-                                <div style={{ fontSize: 13, color: t.text, marginTop: 4 }}>
-                                  <strong>–°–ø–µ—Ü–∏–∞–ª–∏—Å—Ç:</strong> {{
-                                    emergency_service: "–°–∫–æ—Ä–∞—è –ø–æ–º–æ—â—å",
-                                    general_physician: "–¢–µ—Ä–∞–ø–µ–≤—Ç",
-                                    nutritionist: "–î–∏–µ—Ç–æ–ª–æ–≥",
-                                    endocrinologist: "–≠–Ω–¥–æ–∫—Ä–∏–Ω–æ–ª–æ–≥",
-                                    gastroenterologist: "–ì–∞—Å—Ç—Ä–æ—ç–Ω—Ç–µ—Ä–æ–ª–æ–≥",
-                                    psychologist: "–ü—Å–∏—Ö–æ–ª–æ–≥",
-                                    psychotherapist: "–ü—Å–∏—Ö–æ—Ç–µ—Ä–∞–ø–µ–≤—Ç",
-                                  }[care.specialist_types[0]] || care.specialist_types.join(", ")}
-                                </div>
-                              )}
-                              {typeof care === "object" && care.interim_support?.length > 0 && (
-                                <div style={{ marginTop: 8 }}>
-                                  {care.interim_support.map((s, i) => (
-                                    <div key={i} style={{ fontSize: 13, color: t.text, paddingLeft: 12, marginTop: 2 }}>
-                                      ‚Ä¢ {s}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {data.used_fallback && (
-                            <div style={{ marginTop: 8, fontSize: 12, color: t.muted, fontStyle: "italic" }}>
-                              –ò—Å–ø–æ–ª—å–∑–æ–≤–∞–Ω fallback (–º–æ–¥–µ–ª—å –Ω–µ –¥–∞–ª–∞ —Å—Ç—Ä—É–∫—Ç—É—Ä–∏—Ä–æ–≤–∞–Ω–Ω–æ–≥–æ –æ—Ç–≤–µ—Ç–∞)
-                            </div>
-                          )}
-                        </Section>
-                      );
-                    })()}
-
-                    {/* 6. Body Plan */}
-                    {(() => {
-                      const plan = bodyIntakeDetail.body_plan || bodyIntakeDetail.answers?.body_plan;
-                      if (!plan) return null;
-                      const days = plan.days || [];
-                      return (
-                        <Section title="–ü–ª–∞–Ω –Ω–∞ 7 –¥–Ω–µ–π">
-                          {plan.focus && (
-                            <div style={{ fontSize: 14, color: t.muted, fontStyle: "italic", marginBottom: 12 }}>
-                              –§–æ–∫—É—Å: {plan.focus}
-                            </div>
-                          )}
-                          {days.map(d => (
-                            <div key={d.day} style={{
-                              border: `1px solid ${t.cardBorder}`,
-                              borderRadius: 12, padding: "12px 16px", marginBottom: 8,
-                              background: t.cardBg,
-                            }}>
-                              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4, color: t.text }}>
-                                –î–µ–Ω—å {d.day}: {d.title}
-                              </div>
-                              {d.actions?.map((a, i) => (
-                                <div key={i} style={{ color: t.muted, fontSize: 13, paddingLeft: 12, marginTop: 2 }}>
-                                  ‚Ä¢ {a}
-                                </div>
-                              ))}
-                              {d.note && (
-                                <div style={{ color: t.muted, fontSize: 12, fontStyle: "italic", marginTop: 4 }}>
-                                  {d.note}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </Section>
-                      );
-                    })()}
-
-                    {/* Deleted info */}
-                    {bodyIntakeDetail.deleted_at && (
-                      <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.2)", fontSize: 13, color: "#991b1b" }}>
-                        –£–¥–∞–ª—ë–Ω: {new Date(bodyIntakeDetail.deleted_at).toLocaleString("ru-RU")} ({bodyIntakeDetail.deleted_by})
-                      </div>
-                    )}
-
-                    {/* Raw JSON in details (technical) */}
-                    <details style={{ marginBottom: 20 }}>
-                      <summary style={{ cursor: "pointer", fontSize: 13, color: t.muted, fontWeight: 600, padding: 8, borderRadius: 8, background: t.cardBg }}>
-                        –¢–µ—Ö–Ω–∏—á–µ—Å–∫–∏–µ –¥–∞–Ω–Ω—ã–µ
-                      </summary>
-                      <pre style={{ fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}`, maxHeight: 300, overflowY: "auto", margin: 0 }}>
-                        {JSON.stringify(bodyIntakeDetail.answers || {}, null, 2)}
-                      </pre>
-                    </details>
-
-                    {/* Actions */}
-                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                      <button
-                        onClick={() => adminDownloadBodyIntakeJSON(bodyIntakeDetail)}
-                        style={{
-                          background: t.accent, color: "#fff", border: 0, borderRadius: 12,
-                          padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", flex: 1, minWidth: 140,
-                        }}
-                      >
-                        –°–∫–∞—á–∞—Ç—å JSON
-                      </button>
-                      <button
-                        onClick={() => {
-                          const a = bodyIntakeDetail.answers || {};
-                          adminOpenBodyExpertReviewForm("intake", bodyIntakeDetail.id, bodyIntakeDetail.session_id, a, {
-                            user_report: bodyIntakeDetail.user_report,
-                            body_plan: bodyIntakeDetail.body_plan,
-                            care_recommendation: bodyIntakeDetail.care_recommendation,
-                            bmi: bodyIntakeDetail.bmi,
-                            triggered_red_flags: bodyIntakeDetail.triggered_red_flags,
-                          });
-                        }}
-                        style={{
-                          background: "#e8f0ea", color: "#2f2925", border: "1px solid #c4d0c6", borderRadius: 12,
-                          padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", minWidth: 140,
-                        }}
-                      >
-                        ‚úèÔ∏è –≠–∫—Å–ø–µ—Ä—Ç–Ω–∞—è –ø—Ä–∞–≤–∫–∞
-                      </button>
-                      {bodyIntakeDetail.deleted_at ? (
-                        <button
-                          onClick={() => { adminRestoreBodyIntake(bodyIntakeDetail.id); setBodyIntakeDetailOpen(false); }}
-                          style={{
-                            background: "transparent", color: t.accent, border: `1px solid ${t.accent}`, borderRadius: 12,
-                            padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                          }}
-                        >
-                          –í–æ—Å—Å—Ç–∞–Ω–æ–≤–∏—Ç—å
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => { setBodyIntakeDetailOpen(false); setBodyIntakeDeleteConfirm(bodyIntakeDetail.id); }}
-                          style={{
-                            background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 12,
-                            padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                          }}
-                        >
-                          –£–¥–∞–ª–∏—Ç—å
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Body diary detail modal */}
-              {bodyDiaryDetailOpen && bodyDiaryDetail && (
-                <div style={{
-                  position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
-                  display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
-                }} onClick={() => setBodyDiaryDetailOpen(false)}>
-                  <div style={{
-                    background: t.bg, borderRadius: 20, padding: 32, maxWidth: 640, width: "90%",
-                    maxHeight: "85vh", overflowY: "auto",
-                  }} onClick={(e) => e.stopPropagation()}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20, alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontSize: 20, fontWeight: 700 }}>–ó–∞–ø–∏—Å—å –¥–Ω–µ–≤–Ω–∏–∫–∞</div>
-                        <div style={{ fontSize: 14, color: t.muted, fontFamily: "monospace", fontWeight: 600, marginTop: 2 }}>
-                          {bodyDiaryDetail.session_id} ¬∑ {bodyDiaryDetail.log_date}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setBodyDiaryDetailOpen(false)}
-                        style={{ background: "none", border: 0, color: t.muted, cursor: "pointer", fontSize: 20 }}
-                      >
-                        ‚úï
-                      </button>
-                    </div>
-
-                    {/* Activity */}
-                    <Section title="–ê–∫—Ç–∏–≤–Ω–æ—Å—Ç—å">
-                      <Field label="–®–∞–≥–∏" value={bodyDiaryDetail.steps ?? "‚Äî"} />
-                      <Field label="–¢—Ä–µ–Ω–∏—Ä–æ–≤–∫–∞" value={bodyDiaryDetail.workout_done ? (bodyDiaryDetail.workout_type || "–î–∞") : "–ù–µ—Ç"} />
-                      <Field label="–ò–Ω—Ç–µ–Ω—Å–∏–≤–Ω–æ—Å—Ç—å" value={bodyDiaryDetail.workout_intensity || "‚Äî"} />
-                      <Field label="–ú–∏–Ω—É—Ç –∞–∫—Ç–∏–≤–Ω–æ—Å—Ç–∏" value={bodyDiaryDetail.activity_minutes ?? "‚Äî"} />
-                    </Section>
-
-                    {/* Nutrition */}
-                    <Section title="–ü–∏—Ç–∞–Ω–∏–µ">
-                      <Field label="–ü—Ä–∏—ë–º–æ–≤ –ø–∏—â–∏" value={bodyDiaryDetail.meals_count ?? "‚Äî"} />
-                      <Field label="–ö–∞–ª–æ—Ä–∏–∏ (–æ—Ü–µ–Ω–∫–∞)" value={bodyDiaryDetail.calories ? `${bodyDiaryDetail.calories} –∫–∫–∞–ª` : "‚Äî"} />
-                      <Field label="–ü–µ—Ä–µ–µ–¥–∞–Ω–∏–µ" value={{
-                        none: "–ù–µ—Ç",
-                        slight: "–ù–µ–º–Ω–æ–≥–æ",
-                        moderate: "–£–º–µ—Ä–µ–Ω–Ω–æ",
-                        severe: "–í—ã—Ä–∞–∂–µ–Ω–Ω–æ",
-                      }[bodyDiaryDetail.overeating_level] || bodyDiaryDetail.overeating_level || "‚Äî"} />
-                      <Field label="–¢—è–≥–∞ –∫ —Å–ª–∞–¥–∫–æ–º—É" value={bodyDiaryDetail.sweet_cravings || "‚Äî"} />
-                      {bodyDiaryDetail.nutrition_comment && (
-                        <Field label="–ó–∞–º–µ—Ç–∫–∏ –æ –ø–∏—Ç–∞–Ω–∏–∏" value={bodyDiaryDetail.nutrition_comment} />
-                      )}
-                    </Section>
-
-                    {/* Sleep & Health */}
-                    <Section title="–°–æ–Ω –∏ —Å–∞–º–æ—á—É–≤—Å—Ç–≤–∏–µ">
-                      <Field label="–ß–∞—Å–æ–≤ —Å–Ω–∞" value={bodyDiaryDetail.sleep_hours ? `${bodyDiaryDetail.sleep_hours} —á` : "‚Äî"} />
-                      <Field label="–ö–∞—á–µ—Å—Ç–≤–æ —Å–Ω–∞" value={{
-                        terrible: "–£–∂–∞—Å–Ω–æ–µ",
-                        poor: "–ü–ª–æ—Ö–æ–µ",
-                        average: "–°—Ä–µ–¥–Ω–µ–µ",
-                        good: "–•–æ—Ä–æ—à–µ–µ",
-                        excellent: "–û—Ç–ª–∏—á–Ω–æ–µ",
-                      }[bodyDiaryDetail.sleep_quality] || bodyDiaryDetail.sleep_quality || "‚Äî"} />
-                      <Field label="–£—Ä–æ–≤–µ–Ω—å —ç–Ω–µ—Ä–≥–∏–∏" value={bodyDiaryDetail.energy_level ? `${bodyDiaryDetail.energy_level}/10` : "‚Äî"} />
-                      <Field label="–ù–∞—Å—Ç—Ä–æ–µ–Ω–∏–µ" value={bodyDiaryDetail.mood_level ? `${bodyDiaryDetail.mood_level}/10` : "‚Äî"} />
-                      {bodyDiaryDetail.health_notes && (
-                        <Field label="–ó–∞–º–µ—Ç–∫–∏ –æ —Å–∞–º–æ—á—É–≤—Å—Ç–≤–∏–∏" value={bodyDiaryDetail.health_notes} />
-                      )}
-                    </Section>
-
-                    {/* Water */}
-                    {bodyDiaryDetail.water_l != null && (
-                      <Section title="–í–æ–¥–∞">
-                        <Field label="–í–æ–¥—ã, –ª–∏—Ç—Ä—ã" value={`${bodyDiaryDetail.water_l} –ª`} />
-                      </Section>
-                    )}
-
-                    {/* AI Summary */}
-                    {bodyDiaryDetail.ai_day_summary && (
-                      <Section title="AI-–∏—Ç–æ–≥ –¥–Ω—è">
-                        <div style={{
-                          fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap",
-                          background: t.cardBg, padding: 14, borderRadius: 12,
-                          border: `1px solid ${t.cardBorder}`,
-                        }}>
-                          {bodyDiaryDetail.ai_day_summary}
-                        </div>
-                      </Section>
-                    )}
-
-                    {/* Voice transcript */}
-                    {bodyDiaryDetail.voice_transcript && (
-                      <Section title="–ì–æ–ª–æ—Å–æ–≤–æ–π –≤–≤–æ–¥ (—Ä–∞—Å—à–∏—Ñ—Ä–æ–≤–∫–∞)">
-                        <div style={{
-                          fontSize: 13, lineHeight: 1.5, fontStyle: "italic", color: t.muted,
-                          background: t.cardBg, padding: 14, borderRadius: 12,
-                          border: `1px solid ${t.cardBorder}`,
-                        }}>
-                          {bodyDiaryDetail.voice_transcript}
-                        </div>
-                      </Section>
-                    )}
-
-                    {/* Plate photos */}
-                    {bodyDiaryDetail.plate_photos?.length > 0 && (
-                      <Section title="–§–æ—Ç–æ —Ç–∞—Ä–µ–ª–æ–∫">
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                          {bodyDiaryDetail.plate_photos.map((photo, i) => (
-                            <img
-                              key={i}
-                              src={photo}
-                              alt={`–§–æ—Ç–æ —Ç–∞—Ä–µ–ª–∫–∏ ${i + 1}`}
-                              style={{
-                                width: 120, height: 120, borderRadius: 12,
-                                objectFit: "cover", border: `1px solid ${t.cardBorder}`,
-                              }}
-                            />
-                          ))}
-                        </div>
-                        {bodyDiaryDetail.plate_analysis?.length > 0 && (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                            {bodyDiaryDetail.plate_analysis.map((a, i) => (
-                              <div key={i} style={{ fontSize: 13, lineHeight: 1.5, padding: 12, borderRadius: 10, background: t.cardBg, border: `1px solid ${t.cardBorder}` }}>
-                                <div style={{ fontWeight: 700, color: t.text, marginBottom: 6 }}>{a.photo_name || `–§–æ—Ç–æ ${i + 1}`}</div>
-                                {a.error ? (
-                                  <div style={{ color: "#b5473f" }}>{a.error}</div>
-                                ) : (
-                                  <>
-                                    {a.balance_summary && <div style={{ color: t.text, marginBottom: 4 }}>{a.balance_summary}</div>}
-                                    {a.what_is_missing && (
-                                      <div style={{ color: t.muted, marginBottom: 4 }}>
-                                        –ß–µ–≥–æ –Ω–µ —Ö–≤–∞—Ç–∞–µ—Ç: {Array.isArray(a.what_is_missing) ? a.what_is_missing.join(", ") : a.what_is_missing}
-                                      </div>
-                                    )}
-                                    {a.gentle_suggestion && <div style={{ color: "#7D9A89", fontStyle: "italic", marginBottom: 4 }}>{a.gentle_suggestion}</div>}
-                                    {a.confidence && typeof a.confidence === "number" && (
-                                      <div style={{ color: t.muted, fontSize: 11 }}>–¢–æ—á–Ω–æ—Å—Ç—å: {Math.round(a.confidence * 100)}%</div>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            ))}
-                            <div style={{ fontSize: 11, color: t.muted }}>–ü—Ä–∏–º–µ—Ä–Ω–∞—è –æ—Ü–µ–Ω–∫–∞ –ø–æ —Ñ–æ—Ç–æ, –Ω–µ —Ç–æ—á–Ω—ã–π —Ä–∞—Å—á—ë—Ç –∫–∞–ª–æ—Ä–∏–π</div>
-                          </div>
-                        )}
-                        <button
-                          onClick={() => {
-                            adminOpenBodyExpertReviewForm("plate_analysis", bodyDiaryDetail.id, bodyDiaryDetail.session_id, {
-                              plate_photos: bodyDiaryDetail.plate_photos,
-                            }, bodyDiaryDetail.plate_analysis);
-                          }}
-                          style={{
-                            marginTop: 10,
-                            background: "#f5f0e8", color: "#2f2925", border: "1px solid #d8cec1", borderRadius: 10,
-                            padding: "8px 16px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                          }}
-                        >
-                          ‚úèÔ∏è –≠–∫—Å–ø–µ—Ä—Ç–Ω–∞—è –ø—Ä–∞–≤–∫–∞ –ø–æ —Ç–∞—Ä–µ–ª–∫–µ
-                        </button>
-                      </Section>
-                    )}
-
-                    {/* Raw JSON (technical) */}
-                    <details style={{ marginBottom: 16 }}>
-                      <summary style={{ cursor: "pointer", fontSize: 13, color: t.muted, fontWeight: 600, padding: 8, borderRadius: 8, background: t.cardBg }}>
-                        –¢–µ—Ö–Ω–∏—á–µ—Å–∫–∏–µ –¥–∞–Ω–Ω—ã–µ
-                      </summary>
-                      <pre style={{ fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap", background: t.cardBg, padding: 14, borderRadius: 12, border: `1px solid ${t.cardBorder}`, maxHeight: 300, overflowY: "auto", margin: 0 }}>
-                        {JSON.stringify(bodyDiaryDetail, null, 2)}
-                      </pre>
-                    </details>
-
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button
-                        onClick={() => {
-                          adminOpenBodyExpertReviewForm("daily_log", bodyDiaryDetail.id, bodyDiaryDetail.session_id, {
-                            log_date: bodyDiaryDetail.log_date,
-                            steps: bodyDiaryDetail.steps,
-                            workout_done: bodyDiaryDetail.workout_done,
-                            water_l: bodyDiaryDetail.water_l,
-                            sleep_hours: bodyDiaryDetail.sleep_hours,
-                            energy_level: bodyDiaryDetail.energy_level,
-                            mood_level: bodyDiaryDetail.mood_level,
-                            plate_photos: bodyDiaryDetail.plate_photos,
-                          }, {
-                            ai_day_summary: bodyDiaryDetail.ai_day_summary,
-                            ai_focus_tomorrow: bodyDiaryDetail.ai_focus_tomorrow,
-                            plate_analysis: bodyDiaryDetail.plate_analysis,
-                          });
-                        }}
-                        style={{
-                          background: "#e8f0ea", color: "#2f2925", border: "1px solid #c4d0c6", borderRadius: 12,
-                          padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer", flex: 1,
-                        }}
-                      >
-                        ‚úèÔ∏è –≠–∫—Å–ø–µ—Ä—Ç–Ω–∞—è –ø—Ä–∞–≤–∫–∞
-                      </button>
-                      <button
-                        onClick={() => { adminDeleteBodyDailyLog(bodyDiaryDetail.id); setBodyDiaryDetailOpen(false); }}
-                        style={{
-                          background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: 12,
-                          padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer",
-                        }}
-                      >
-                        –£–¥–∞–ª–∏—Ç—å
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          ) : adminModuleRoute === "council" ? (
-            <ClinicalCouncilAdmin adminPassword={adminPassword} theme={t} />
-          ) : (
-            <>
-              {/* Tabs */}
-              <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-                <button
-                  style={{
-                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    background: adminReqTab === "reviews" ? t.tabActive : t.tabBg,
-                    color: adminReqTab === "reviews" ? t.tabActiveText : t.text,
-                  }}
-                  onClick={() => setAdminReqTab("reviews")}
-                >
-                  –û—Ç–∑—ã–≤—ã –æ —Å–µ—Å—Å–∏—è—Ö
-                </button>
-                <button
-                  style={{
-                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    background: adminReqTab === "crisis" ? t.tabActive : t.tabBg,
-                    color: adminReqTab === "crisis" ? t.tabActiveText : t.text,
-                  }}
-                  onClick={() => { setAdminReqTab("crisis"); adminLoadCrisisRequests(adminCrisisFilter); }}
-                >
-                  –°—Ä–æ—á–Ω—ã–µ –æ–±—Ä–∞—â–µ–Ω–∏—è
-                </button>
-                <button
-                  style={{
-                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    background: adminReqTab === "requests" ? t.tabActive : t.tabBg,
-                    color: adminReqTab === "requests" ? t.tabActiveText : t.text,
-                  }}
-                  onClick={() => { setAdminReqTab("requests"); adminLoadRequests(adminReqFilter); }}
-                >
-                  –ó–∞—è–≤–∫–∏ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–≤
-                </button>
-                <button
-                  style={{
-                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    background: adminReqTab === "training" ? t.tabActive : t.tabBg,
-                    color: adminReqTab === "training" ? t.tabActiveText : t.text,
-                  }}
-                  onClick={() => { setAdminReqTab("training"); loadTrainingSessions(); }}
-                >
-                  –¢–∞–±–ª–∏—Ü–∞ —Ç—Ä–µ–Ω–∏—Ä–æ–≤–æ–∫
-                </button>
-                <button
-                  style={{
-                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    background: adminReqTab === "quality" ? t.tabActive : t.tabBg,
-                    color: adminReqTab === "quality" ? t.tabActiveText : t.text,
-                  }}
-                  onClick={() => { setAdminReqTab("quality"); loadQualityStats(); loadQualityInsights(); }}
-                >
-                  –û–±–∑–æ—Ä—ã –∫–∞—á–µ—Å—Ç–≤–∞
-                </button>
-                <button
-                  style={{
-                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    background: adminReqTab === "organizations" ? t.tabActive : t.tabBg,
-                    color: adminReqTab === "organizations" ? t.tabActiveText : t.text,
-                  }}
-                  onClick={() => { setAdminReqTab("organizations"); adminLoadOrganizations(); }}
-                >
-                  –û—Ä–≥–∞–Ω–∏–∑–∞—Ü–∏–∏
-                </button>
-                <button
-                  style={{
-                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    background: adminReqTab === "onboarding" ? t.tabActive : t.tabBg,
-                    color: adminReqTab === "onboarding" ? t.tabActiveText : t.text,
-                  }}
-                  onClick={() => { setAdminReqTab("onboarding"); adminLoadOnboardingRequests("all"); }}
-                >
-                  –ó–∞—è–≤–∫–∏ –Ω–∞ –ø–æ–¥–∫–ª—é—á–µ–Ω–∏–µ
-                </button>
-                <button
-                  style={{
-                    border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    background: adminReqTab === "match" ? t.tabActive : t.tabBg,
-                    color: adminReqTab === "match" ? t.tabActiveText : t.text,
-                  }}
-                  onClick={() => { setAdminReqTab("match"); adminLoadMatchRequests("all"); }}
-                >
-                  –ü–æ–¥–±–æ—Ä —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞
-                </button>
-                {adminRole === "super" && (
-                  <button
-                    style={{
-                      border: 0, borderRadius: 14, padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                      background: t.tabBg, color: t.text,
-                    }}
-                    onClick={() => { setAdminSubPage("council"); window.history.pushState({}, "", "/admin/council"); }}
-                  >
-                    –≠–∫—Å–ø–µ—Ä—Ç–Ω—ã–π —Å–æ–≤–µ—Ç ‚Üí
-                  </button>
-                )}
-              </div>
-
-              {adminReqTab === "crisis" ? (
-                <>
-                  <div style={{ color: t.muted, fontSize: 13, lineHeight: 1.5, marginBottom: 16, padding: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.cardBg }}>
-                    –°–æ—Ö—Ä–∞–Ω–µ–Ω–∏–µ —Å—Ä–æ—á–Ω—ã—Ö –æ–±—Ä–∞—â–µ–Ω–∏–π –≤—Ä–µ–º–µ–Ω–Ω–æ –æ—Ç–∫–ª—é—á–µ–Ω–æ –≤ privacy-safe —Ä–µ–∂–∏–º–µ. –û–±—Ä–∞—â–µ–Ω–∏—è –Ω–µ —Å–æ—Ö—Ä–∞–Ω—è—é—Ç—Å—è –≤ –±–∞–∑—É –¥–∞–Ω–Ω—ã—Ö.
-                  </div>
-                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
-                    <select
-                      value={adminCrisisFilter}
-                      onChange={(e) => { const v = e.target.value; setAdminCrisisFilter(v); adminLoadCrisisRequests(v); }}
-                      style={{
-                        border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
-                        color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
-                      }}
-                    >
-                      <option value="new">–ù–æ–≤—ã–µ</option>
-                      <option value="in_progress">–í —Ä–∞–±–æ—Ç–µ</option>
-                      <option value="closed">–ó–∞–∫—Ä—ã—Ç—ã–µ</option>
-                      <option value="false_alarm">–¢–µ—Å—Ç–æ–≤—ã–µ</option>
-                      <option value="all">–í—Å–µ</option>
-                    </select>
-                    <button
-                      style={{
-                        border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
-                        color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
-                      }}
-                      onClick={() => adminLoadCrisisRequests(adminCrisisFilter)}
-                    >
-                      {adminCrisisLoading ? "–ó–∞–≥—Ä—É–∑–∫–∞..." : `–û–±–Ω–æ–≤–∏—Ç—å (${adminCrisisRequests.length})`}
-                    </button>
-                  </div>
-
-                  {adminCrisisLoading ? (
-                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>–ó–∞–≥—Ä—É–∑–∫–∞...</div>
-                  ) : adminCrisisRequests.length === 0 ? (
-                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>–ù–µ—Ç –æ–±—Ä–∞—â–µ–Ω–∏–π</div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                      {adminCrisisRequests.map((req) => (
-                        <div key={req.id} style={{
-                          border: `1px solid ${t.crisisBorder}`, borderRadius: 20,
-                          background: t.crisisCard, padding: 20,
-                        }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                              <span style={{ color: t.crisisMuted, fontSize: 12 }}>
-                                {new Date(req.created_at).toLocaleString("ru-RU")}
-                              </span>
-                              <span style={{
-                                fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
-                                background: req.status === "in_progress" ? t.badgeInProgress : req.status === "closed" ? t.badgeClosed : req.status === "false_alarm" ? t.badgeFalseAlarm : t.badgeNew,
-                                color: req.status === "in_progress" ? t.badgeInProgressText : req.status === "closed" ? t.badgeClosedText : req.status === "false_alarm" ? t.badgeFalseAlarmText : t.badgeNewText,
-                              }}>
-                                {req.status === "new" ? "–ù–æ–≤–æ–µ" : req.status === "in_progress" ? "–í —Ä–∞–±–æ—Ç–µ" : req.status === "closed" ? "–ó–∞–∫—Ä—ã—Ç–æ" : req.status === "false_alarm" ? "–¢–µ—Å—Ç–æ–≤–æ–µ" : req.status}
-                              </span>
-                              <span style={{ color: t.crisisMuted, fontSize: 12 }}>
-                                {req.environment} / {req.source}
-                              </span>
-                              {req.high_risk_detected && (
-                                <span style={{
-                                  fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
-                                  background: t.badgeHighRisk, color: t.badgeHighRiskText,
-                                }}>
-                                  –í—ã—Å–æ–∫–∏–π —Ä–∏—Å–∫
-                                </span>
-                              )}
-                            </div>
-                            {req.public_code && (
-                              <span style={{ fontWeight: 700, fontSize: 13, color: t.crisisAccent, letterSpacing: 0.5 }}>
-                                {req.public_code}
-                              </span>
-                            )}
-                          </div>
-
-                          {req.crisis_text && (
-                            <div style={{ marginBottom: 8 }}>
-                              <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 2 }}>–°–∏—Ç—É–∞—Ü–∏—è</div>
-                              <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5 }}>{req.crisis_text}</div>
-                            </div>
-                          )}
-
-                          {req.contact && (
-                            <div style={{ marginBottom: 8 }}>
-                              <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 2 }}>–ö–æ–Ω—Ç–∞–∫—Ç</div>
-                              <div style={{ color: t.crisisText, fontSize: 13 }}>{req.contact}</div>
-                            </div>
-                          )}
-
-                          {req.risk_markers && Array.isArray(req.risk_markers) && req.risk_markers.length > 0 && (
-                            <div style={{ marginBottom: 8 }}>
-                              <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 2 }}>–ú–∞—Ä–∫–µ—Ä—ã —Ä–∏—Å–∫–∞</div>
-                              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                                {req.risk_markers.map((m, i) => (
-                                  <span key={i} style={{
-                                    fontSize: 11, padding: "2px 6px", borderRadius: 4,
-                                    background: t.riskMarkerBg, color: t.riskMarker,
-                                  }}>{m}</span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {req.admin_comment && (
-                            <div style={{ marginBottom: 8, color: t.crisisMuted, fontSize: 13, fontStyle: "italic" }}>
-                              –ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π: {req.admin_comment}
-                            </div>
-                          )}
-
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
-                            {req.status === "new" && (
-                              <button
-                                disabled={adminCrisisActionLoading === req.id}
-                                style={{
-                                  border: 0, borderRadius: 12, background: t.crisisActionPrimary, color: t.crisisActionPrimaryText,
-                                  padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
-                                  opacity: adminCrisisActionLoading === req.id ? 0.5 : 1,
-                                }}
-                                onClick={() => adminUpdateCrisisStatus(req.id, "in_progress")}
-                              >
-                                –í–∑—è—Ç—å –≤ —Ä–∞–±–æ—Ç—É
-                              </button>
-                            )}
-                            {req.status === "in_progress" && (
-                              <button
-                                disabled={adminCrisisActionLoading === req.id}
-                                style={{
-                                  border: 0, borderRadius: 12, background: t.crisisActionSuccess, color: t.crisisActionSuccessText,
-                                  padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
-                                  opacity: adminCrisisActionLoading === req.id ? 0.5 : 1,
-                                }}
-                                onClick={() => adminUpdateCrisisStatus(req.id, "closed")}
-                              >
-                                –ó–∞–∫—Ä—ã—Ç—å
-                              </button>
-                            )}
-                            <button
-                              disabled={adminCrisisActionLoading === req.id}
-                              style={{
-                                border: 0, borderRadius: 12, background: t.crisisActionNeutral, color: t.crisisActionNeutralText,
-                                padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
-                                opacity: adminCrisisActionLoading === req.id ? 0.5 : 1,
-                              }}
-                              onClick={() => adminUpdateCrisisStatus(req.id, "false_alarm")}
-                            >
-                              –õ–æ–∂–Ω–∞—è/—Ç–µ—Å—Ç–æ–≤–∞—è
-                            </button>
-                            <button
-                              style={{
-                                border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
-                                color: t.crisisActionJsonlText, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                              }}
-                              onClick={() => adminDownloadCrisisJson(req)}
-                            >
-                              –°–∫–∞—á–∞—Ç—å JSON
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : adminReqTab === "requests" ? (
-                <>
-                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
-                    <select
-                      value={adminReqFilter}
-                      onChange={(e) => { const v = e.target.value; setAdminReqFilter(v); adminLoadRequests(v); }}
-                      style={{
-                        border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
-                        color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
-                      }}
-                    >
-                      <option value="pending">–û–∂–∏–¥–∞—é—Ç</option>
-                      <option value="approved">–û–¥–æ–±—Ä–µ–Ω–Ω—ã–µ</option>
-                      <option value="rejected">–û—Ç–∫–ª–æ–Ω—ë–Ω–Ω—ã–µ</option>
-                      <option value="all">–í—Å–µ</option>
-                    </select>
-                    <button
-                      style={{
-                        border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
-                        color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
-                      }}
-                      onClick={() => adminLoadRequests(adminReqFilter)}
-                    >
-                      –û–±–Ω–æ–≤–∏—Ç—å ({adminRequests.length})
-                    </button>
-                  </div>
-
-                  {adminRequests.length === 0 ? (
-                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>–ù–µ—Ç –∑–∞—è–≤–æ–∫</div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                      {adminRequests.map((req) => (
-                        <div key={req.id} style={{
-                          border: `1px solid ${t.crisisBorder}`, borderRadius: 20,
-                          background: t.crisisCard, padding: 20,
-                        }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                              <span style={{ color: t.crisisMuted, fontSize: 12 }}>
-                                {new Date(req.created_at).toLocaleString("ru-RU")}
-                              </span>
-                              <span style={{
-                                fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
-                                background: req.status === "approved" ? t.badgeClosed : req.status === "rejected" ? t.badgeNew : t.badgePending,
-                                color: req.status === "approved" ? t.badgeClosedText : req.status === "rejected" ? t.badgeNewText : t.badgePendingText,
-                              }}>
-                                {req.status}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div style={{ marginBottom: 8 }}>
-                            <span style={{ fontWeight: 700, color: t.crisisText }}>{req.name}</span>
-                            <span style={{ color: t.crisisMuted, marginLeft: 8 }}>{req.role}</span>
-                          </div>
-                          <div style={{ color: t.cardLabel, fontSize: 13, marginBottom: 8 }}>
-                            {req.email && <span>Email: {req.email}  </span>}
-                            {req.telegram && <span>Telegram: {req.telegram}  </span>}
-                            {req.specialty && <span>–°–ø–µ—Ü–∏–∞–ª–∏–∑–∞—Ü–∏—è: {req.specialty}  </span>}
-                            {req.city && <span>–ì–æ—Ä–æ–¥: {req.city}  </span>}
-                            {req.organization && <span>–û—Ä–≥–∞–Ω–∏–∑–∞—Ü–∏—è: {req.organization}</span>}
-                          </div>
-                          {req.comment && (
-                            <div style={{ color: t.crisisMuted, fontSize: 13, fontStyle: "italic", marginBottom: 8 }}>
-                              "{req.comment}"
-                            </div>
-                          )}
-
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            {req.status !== "approved" && (
-                              <button style={{ border: 0, borderRadius: 12, background: t.badgeClosed, color: t.badgeClosedText, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
-                                onClick={() => adminUpdateRequestStatus(req.id, "approved")}>
-                                –û–¥–æ–±—Ä–∏—Ç—å
-                              </button>
-                            )}
-                            {req.status !== "rejected" && (
-                              <button style={{ border: 0, borderRadius: 12, background: t.badgeNew, color: t.badgeNewText, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}
-                                onClick={() => adminUpdateRequestStatus(req.id, "rejected")}>
-                                –û—Ç–∫–ª–æ–Ω–∏—Ç—å
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {/*
-                    TODO: "–°–æ–∑–¥–∞—Ç—å —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞ –∏ —Å–≥–µ–Ω–µ—Ä–∏—Ä–æ–≤–∞—Ç—å –∫–æ–¥"
-                    –î–æ–±–∞–≤–∏—Ç—å –∫–Ω–æ–ø–∫—É —Ä—è–¥–æ–º —Å –æ–¥–æ–±—Ä–µ–Ω–Ω—ã–º–∏ –∑–∞—è–≤–∫–∞–º–∏ –¥–ª—è —Å–æ–∑–¥–∞–Ω–∏—è –∑–∞–ø–∏—Å–∏ –≤ experts
-                    –∏ –≥–µ–Ω–µ—Ä–∞—Ü–∏–∏ access_code. –ó–∞–ø–æ–ª–Ω—è—Ç—å –≤—Ä—É—á–Ω—É—é.
-                  */}
-                </>
-              ) : adminReqTab === "training" ? (
-                <>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
-                  {/* Active / Trash toggle */}
-                  <button onClick={() => { setTrainingShowTrash(false); setTrainingSelection(new Set()); loadTrainingSessions(); }} style={{ border: 0, borderRadius: 12, padding: "10px 16px", fontWeight: 700, fontSize: 14, cursor: "pointer", background: !trainingShowTrash ? t.tabActive : t.tabBg, color: !trainingShowTrash ? t.tabActiveText : t.text }}>–ê–∫—Ç–∏–≤–Ω—ã–µ –∑–∞–ø–∏—Å–∏</button>
-                  <button onClick={() => { setTrainingShowTrash(true); setTrainingSelection(new Set()); loadTrainingSessions(); }} style={{ border: 0, borderRadius: 12, padding: "10px 16px", fontWeight: 700, fontSize: 14, cursor: "pointer", background: trainingShowTrash ? t.tabActive : t.tabBg, color: trainingShowTrash ? t.tabActiveText : t.text }}>–ö–æ—Ä–∑–∏–Ω–∞</button>
-
-                  <select value={trainingFilter.status} onChange={(e) => setTrainingFilter((f) => ({ ...f, status: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
-                    <option value="all">–í—Å–µ —Å—Ç–∞—Ç—É—Å—ã</option>
-                    {["new","reviewed","needs_prompt_update","approved_for_learning","rejected","archived"].map((o) => <option key={o} value={o}>{st(o)}</option>)}
-                  </select>
-                  <select value={trainingFilter.expected_case_type} onChange={(e) => setTrainingFilter((f) => ({ ...f, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
-                    <option value="all">–í—Å–µ —Ç–∏–ø—ã —Å–ª—É—á–∞–µ–≤</option>
-                    {["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}
-                  </select>
-                  <select value={trainingFilter.session_kind} onChange={(e) => setTrainingFilter((f) => ({ ...f, session_kind: e.target.value }))} style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer" }}>
-                    <option value="all">–í—Å–µ —Ç–∏–ø—ã —Å–µ—Å—Å–∏–π</option>
-                    {["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}
-                  </select>
-                  <input value={trainingFilter.public_code} onChange={(e) => setTrainingFilter((f) => ({ ...f, public_code: e.target.value }))} placeholder="–ö–æ–¥ –¢–û–ß–ö–ê-XXXX-XXXX" style={{ border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg, color: t.filterText, padding: "10px 16px", fontSize: 14, outline: "none", width: 200 }} />
-                  <button onClick={() => loadTrainingSessions()} style={{ border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg, color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
-                    {trainingLoading ? "–ó–∞–≥—Ä—É–∑–∫–∞..." : `–û–±–Ω–æ–≤–∏—Ç—å (${trainingSessions.length})`}
-                  </button>
-                  <button onClick={downloadTrainingCsv} style={{ border: `1px solid ${t.jsonlBtnBorder}`, borderRadius: 12, background: t.jsonlBtn, color: t.jsonlBtnText, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
-                    –°–∫–∞—á–∞—Ç—å CSV
-                  </button>
-                </div>
-
-                {/* Bulk action bar */}
-                {trainingSelection.size > 0 && (
-                  <div style={{ marginBottom: 16, padding: "12px 16px", border: `1px solid ${t.accent}`, borderRadius: 12, background: t.highlight, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                    <span style={{ color: t.text, fontWeight: 700, fontSize: 14 }}>–í—ã–±—Ä–∞–Ω–æ: {trainingSelection.size}</span>
-                    {trainingShowTrash ? (
-                      <>
-                        <button onClick={() => setTrainingBulkConfirm("restore")} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>–í–æ—Å—Å—Ç–∞–Ω–æ–≤–∏—Ç—å –≤—ã–±—Ä–∞–Ω–Ω—ã–µ</button>
-                        <button onClick={() => setTrainingBulkConfirm("permanentDelete")} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>–£–¥–∞–ª–∏—Ç—å –≤—ã–±—Ä–∞–Ω–Ω—ã–µ –Ω–∞–≤—Å–µ–≥–¥–∞</button>
-                      </>
-                    ) : (
-                      <button onClick={() => { setTrainingDeletionReason("bulk"); setTrainingBulkConfirm("trash"); }} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>–£–¥–∞–ª–∏—Ç—å –≤—ã–±—Ä–∞–Ω–Ω—ã–µ</button>
-                    )}
-                    <button onClick={() => setTrainingSelection(new Set())} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>–°–Ω—è—Ç—å –≤—ã–¥–µ–ª–µ–Ω–∏–µ</button>
-                  </div>
-                )}
-
-                {/* Bulk confirm modal */}
-                {trainingBulkConfirm && (
-                  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-                    <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20, padding: 24, maxWidth: 500, width: "90%" }}>
-                      {trainingBulkConfirm === "trash" && (
-                        <>
-                          <div style={{ fontWeight: 800, fontSize: 18, color: t.crisisText, marginBottom: 12 }}>–ü–µ—Ä–µ–º–µ—Å—Ç–∏—Ç—å –≤ –∫–æ—Ä–∑–∏–Ω—É {trainingSelection.size} –∑–∞–ø–∏—Å–µ–π?</div>
-                          <div style={{ color: t.muted, fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>–ò—Å—Ö–æ–¥–Ω—ã–µ —Å–µ—Å—Å–∏–∏ –∏ —ç–∫—Å–ø–µ—Ä—Ç–Ω—ã–µ —Ä–µ–≤—å—é —É–¥–∞–ª–µ–Ω—ã –Ω–µ –±—É–¥—É—Ç.</div>
-                          <div style={{ marginBottom: 16 }}>
-                            <select value={trainingDeletionReason} onChange={(e) => setTrainingDeletionReason(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 14, width: "100%", outline: "none" }}>
-                              <option value="bulk">–ú–∞—Å—Å–æ–≤–æ–µ —É–¥–∞–ª–µ–Ω–∏–µ</option>
-                              <option value="aborted">–û–±–æ—Ä–≤–∞–Ω–Ω–∞—è —Å–µ—Å—Å–∏—è</option>
-                              <option value="duplicate">–î—É–±–ª–∏–∫–∞—Ç</option>
-                              <option value="technical_test">–¢–µ—Ö–Ω–∏—á–µ—Å–∫–∏–π —Ç–µ—Å—Ç</option>
-                              <option value="erroneous">–û—à–∏–±–æ—á–Ω–∞—è –∑–∞–ø–∏—Å—å</option>
-                              <option value="insufficient_data">–ù–µ–¥–æ—Å—Ç–∞—Ç–æ—á–Ω–æ –¥–∞–Ω–Ω—ã—Ö</option>
-                            </select>
-                          </div>
-                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                            <button onClick={() => { setTrainingBulkConfirm(null); setTrainingDeletionReason("") }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>–û—Ç–º–µ–Ω–∞</button>
-                            <button onClick={() => trashBulkTrainingSessions([...trainingSelection])} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>–ü–µ—Ä–µ–º–µ—Å—Ç–∏—Ç—å –≤ –∫–æ—Ä–∑–∏–Ω—É</button>
-                          </div>
-                        </>
-                      )}
-                      {trainingBulkConfirm === "restore" && (
-                        <>
-                          <div style={{ fontWeight: 800, fontSize: 18, color: t.crisisText, marginBottom: 12 }}>–í–æ—Å—Å—Ç–∞–Ω–æ–≤–∏—Ç—å {trainingSelection.size} –∑–∞–ø–∏—Å–µ–π?</div>
-                          <div style={{ color: t.muted, fontSize: 14, marginBottom: 16 }}>–ó–∞–ø–∏—Å–∏ –≤–µ—Ä–Ω—É—Ç—Å—è –≤ –∞–∫—Ç–∏–≤–Ω—É—é —Ç–∞–±–ª–∏—Ü—É.</div>
-                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                            <button onClick={() => setTrainingBulkConfirm(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>–û—Ç–º–µ–Ω–∞</button>
-                            <button onClick={() => restoreBulkTrainingSessions([...trainingSelection])} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>–í–æ—Å—Å—Ç–∞–Ω–æ–≤–∏—Ç—å</button>
-                          </div>
-                        </>
-                      )}
-                      {trainingBulkConfirm === "permanentDelete" && (
-                        <>
-                          <div style={{ fontWeight: 800, fontSize: 18, color: t.error, marginBottom: 12 }}>–ë–µ–∑–≤–æ–∑–≤—Ä–∞—Ç–Ω–æ —É–¥–∞–ª–∏—Ç—å {trainingSelection.size} –∑–∞–ø–∏—Å–µ–π?</div>
-                          <div style={{ color: t.muted, fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>
-                            –ó–∞–ø–∏—Å–∏ –±—É–¥—É—Ç —É–¥–∞–ª–µ–Ω—ã –±–µ–∑ –≤–æ–∑–º–æ–∂–Ω–æ—Å—Ç–∏ –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∏—è.
-                            <br />–ò—Å—Ö–æ–¥–Ω—ã–µ —Å–µ—Å—Å–∏–∏ –∏ case review –æ—Å—Ç–∞–Ω—É—Ç—Å—è –≤ –±–∞–∑–µ.
-                          </div>
-                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                            <button onClick={() => setTrainingBulkConfirm(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>–û—Ç–º–µ–Ω–∞</button>
-                            <button onClick={() => permanentDeleteBulkTrainingSessions([...trainingSelection])} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>–£–¥–∞–ª–∏—Ç—å –Ω–∞–≤—Å–µ–≥–¥–∞</button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Single trash confirm */}
-                {trainingTrashConfirm && (
-                  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-                    <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20, padding: 24, maxWidth: 500, width: "90%" }}>
-                      <div style={{ fontWeight: 800, fontSize: 18, color: t.crisisText, marginBottom: 8 }}>–£–¥–∞–ª–∏—Ç—å —Ç—Ä–µ–Ω–∏—Ä–æ–≤–æ—á–Ω—É—é –∑–∞–ø–∏—Å—å?</div>
-                      <div style={{ color: t.text, fontSize: 14, marginBottom: 8 }}>
-                        <div>–ö–æ–¥: {trainingTrashConfirm.public_code || "‚Äî"}</div>
-                        <div>–°—Ü–µ–Ω–∞—Ä–∏–π: {trainingTrashConfirm.scenario_played || "‚Äî"}</div>
-                        <div>–¢–∏–ø —Å–µ—Å—Å–∏–∏: {sk(trainingTrashConfirm.session_kind) || "‚Äî"}</div>
-                      </div>
-                      <div style={{ color: t.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>–ó–∞–ø–∏—Å—å –ø–µ—Ä–µ–º–µ—Å—Ç–∏—Ç—Å—è –≤ –∫–æ—Ä–∑–∏–Ω—É. –ò—Å—Ö–æ–¥–Ω–∞—è —Å–µ—Å—Å–∏—è –∏ —ç–∫—Å–ø–µ—Ä—Ç–Ω–æ–µ —Ä–µ–≤—å—é –æ—Å—Ç–∞–Ω—É—Ç—Å—è –≤ –±–∞–∑–µ.</div>
-                      <div style={{ marginBottom: 16 }}>
-                        <select value={trainingDeletionReason} onChange={(e) => setTrainingDeletionReason(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 14, width: "100%", outline: "none" }}>
-                          <option value="">–í—ã–±–µ—Ä–∏—Ç–µ –ø—Ä–∏—á–∏–Ω—É</option>
-                          <option value="aborted">–û–±–æ—Ä–≤–∞–Ω–Ω–∞—è —Å–µ—Å—Å–∏—è</option>
-                          <option value="duplicate">–î—É–±–ª–∏–∫–∞—Ç</option>
-                          <option value="technical_test">–¢–µ—Ö–Ω–∏—á–µ—Å–∫–∏–π —Ç–µ—Å—Ç</option>
-                          <option value="erroneous">–û—à–∏–±–æ—á–Ω–∞—è –∑–∞–ø–∏—Å—å</option>
-                          <option value="insufficient_data">–ù–µ–¥–æ—Å—Ç–∞—Ç–æ—á–Ω–æ –¥–∞–Ω–Ω—ã—Ö</option>
-                          <option value="other">–î—Ä—É–≥–æ–µ</option>
-                        </select>
-                        {trainingDeletionReason === "other" && (
-                          <input placeholder="–û–ø–∏—à–∏—Ç–µ –ø—Ä–∏—á–∏–Ω—É" value={trainingDeletionReasonCustom || ""} onChange={(e) => setTrainingDeletionReasonCustom(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 14, width: "100%", outline: "none", marginTop: 8 }} />
-                        )}
-                      </div>
-                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                        <button onClick={() => { setTrainingTrashConfirm(null); setTrainingDeletionReason(""); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>–û—Ç–º–µ–Ω–∞</button>
-                        <button onClick={() => trashSingleTrainingSession(trainingTrashConfirm.id)} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>–ü–µ—Ä–µ–º–µ—Å—Ç–∏—Ç—å –≤ –∫–æ—Ä–∑–∏–Ω—É</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Permanent delete confirm */}
-                {trainingPermanentConfirm && (
-                  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-                    <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20, padding: 24, maxWidth: 500, width: "90%" }}>
-                      <div style={{ fontWeight: 800, fontSize: 18, color: t.error, marginBottom: 12 }}>–£–¥–∞–ª–∏—Ç—å –∑–∞–ø–∏—Å—å –±–µ–∑ –≤–æ–∑–º–æ–∂–Ω–æ—Å—Ç–∏ –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∏—è?</div>
-                      <div style={{ color: t.muted, fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>
-                        –ë—É–¥–µ—Ç –æ–∫–æ–Ω—á–∞—Ç–µ–ª—å–Ω–æ —É–¥–∞–ª–µ–Ω–∞ —Ç–æ–ª—å–∫–æ –∑–∞–ø–∏—Å—å —Ç–∞–±–ª–∏—Ü—ã —Ç—Ä–µ–Ω–∏—Ä–æ–≤–æ–∫.
-                        <br />–ò—Å—Ö–æ–¥–Ω–∞—è —Å–µ—Å—Å–∏—è –∏ case review –æ—Å—Ç–∞–Ω—É—Ç—Å—è –≤ –±–∞–∑–µ.
-                      </div>
-                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                        <button onClick={() => { setTrainingPermanentConfirm(null) }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>–û—Ç–º–µ–Ω–∞</button>
-                        <button onClick={() => { permanentDeleteTrainingSession(trainingPermanentConfirm.id); setTrainingPermanentConfirm(null); }} style={{ border: 0, borderRadius: 10, background: t.error, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>–£–¥–∞–ª–∏—Ç—å –Ω–∞–≤—Å–µ–≥–¥–∞</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {!trainingShowTrash && trainingNewRow && (
-                  <div style={{ border: `1px solid ${t.accent}`, borderRadius: 16, background: t.cardBg, padding: 16, marginBottom: 16 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: t.text }}>–ù–æ–≤–∞—è —Å—Ç—Ä–æ–∫–∞</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-                      <input placeholder="–ö–æ–¥ –ø–∞—Ü–∏–µ–Ω—Ç–∞" value={trainingNewRow.public_code || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, public_code: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
-                      <select value={trainingNewRow.session_kind || "initial"} onChange={(e) => setTrainingNewRow((r) => ({ ...r, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
-                        {["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}
-                      </select>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-                      <input placeholder="–ß—Ç–æ –∏–≥—Ä–∞–µ–º –≤ —ç—Ç–æ–π —Å–µ—Å—Å–∏–∏?" value={trainingNewRow.scenario_played || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
-                      <select value={trainingNewRow.expected_case_type || ""} onChange={(e) => setTrainingNewRow((r) => ({ ...r, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
-                        <option value="">–û–∂–∏–¥–∞–µ–º—ã–π —Ç–∏–ø —Å–ª—É—á–∞—è</option>
-                        {["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}
-                      </select>
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={async () => { const r = await saveTrainingSession(trainingNewRow); if (r) setTrainingNewRow(null); }} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>–°–æ—Ö—Ä–∞–Ω–∏—Ç—å</button>
-                      <button onClick={() => setTrainingNewRow(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>–û—Ç–º–µ–Ω–∞</button>
-                    </div>
-                  </div>
-                )}
-
-                {!trainingShowTrash && !trainingNewRow && (
-                  <button onClick={() => setTrainingNewRow({ session_kind: "initial", status: "new" })} style={{ border: `1px dashed ${t.accent}`, borderRadius: 12, background: "transparent", color: t.accent, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer", marginBottom: 16 }}>
-                    + –î–æ–±–∞–≤–∏—Ç—å —Å—Ç—Ä–æ–∫—É
-                  </button>
-                )}
-
-                {trainingSessionsError && (
-                  <div style={{ color: t.error || "#e74c3c", textAlign: "center", padding: "12px 16px", marginBottom: 12, background: t.dangerBg || "rgba(231,76,60,0.08)", borderRadius: 12, border: `1px solid ${t.badgeNewText || "#e74c3c"}`, fontWeight: 600, fontSize: 14, lineHeight: 1.4 }}>
-                    {trainingSessionsError}
-                  </div>
-                )}
-
-                {trainingLoading ? (
-                  <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>–ó–∞–≥—Ä—É–∑–∫–∞...</div>
-                ) : trainingSessions.length === 0 ? (
-                  <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>–ù–µ—Ç –∑–∞–ø–∏—Å–µ–π</div>
-                ) : (
-                  <div style={{ overflowX: "auto", fontSize: 12 }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1400 }}>
-                      <thead>
-                        <tr style={{ background: t.tabBg }}>
-                          <th style={{ padding: "8px 6px", borderBottom: `1px solid ${t.border}`, width: 36 }}>
-                            <input type="checkbox" checked={trainingSessions.length > 0 && trainingSelection.size === trainingSessions.length} onChange={(e) => { if (e.target.checked) { setTrainingSelection(new Set(trainingSessions.map((s) => s.id))); } else { setTrainingSelection(new Set()); } }} />
-                          </th>
-                          {trainingShowTrash
-                            ? ["–î–∞—Ç–∞ —É–¥–∞–ª–µ–Ω–∏—è","–£–¥–∞–ª–∏–ª","–ü—Ä–∏—á–∏–Ω–∞","–î–∞—Ç–∞ —Å–æ–∑–¥–∞–Ω–∏—è","–ö–æ–¥ –ø–∞—Ü–∏–µ–Ω—Ç–∞","–ù–æ–º–µ—Ä —Å–µ—Å—Å–∏–∏","–¢–∏–ø —Å–µ—Å—Å–∏–∏","–≠–∫—Å–ø–µ—Ä—Ç","–°—Ü–µ–Ω–∞—Ä–∏–π","–û–∂–∏–¥–∞–µ–º—ã–π —Ç–∏–ø —Å–ª—É—á–∞—è","–ú–æ–¥–µ–ª—å","–°—Ç–∞—Ç—É—Å","–ö—Ä–∞—Ç–∫–∏–π –≤—ã–≤–æ–¥"].map((h) => (
-                              <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontWeight: 700, color: t.muted, borderBottom: `1px solid ${t.border}`, whiteSpace: "nowrap" }}>{h}</th>
-                            ))
-                            : ["–î–∞—Ç–∞","–ö–æ–¥ –ø–∞—Ü–∏–µ–Ω—Ç–∞","–ù–æ–º–µ—Ä —Å–µ—Å—Å–∏–∏","–¢–∏–ø —Å–µ—Å—Å–∏–∏","–≠–∫—Å–ø–µ—Ä—Ç","–°—Ü–µ–Ω–∞—Ä–∏–π","–û–∂–∏–¥–∞–µ–º—ã–π —Ç–∏–ø —Å–ª—É—á–∞—è","–ß—Ç–æ —Ä–∞—Å–ø–æ–∑–Ω–∞–ª–∞ —Å–∏—Å—Ç–µ–º–∞","–ö–∞—á–µ—Å—Ç–≤–æ —Ä–∞—Å–ø–æ–∑–Ω–∞–≤–∞–Ω–∏—è","–ú–æ–¥–µ–ª—å","Fallback","–í–æ–ø—Ä–æ—Å—ã","–û—Ç—á—ë—Ç","Safety","–Ø–∑—ã–∫","–ü—Ä–∞–∫—Ç–∏–∫–∏","–ü—Ä–æ–¥–æ–ª–∂–µ–Ω–∏–µ","–ü–æ–≤—Ç–æ—Ä—ã","–†–∏—Å–∫–∏","–†–µ–∫–æ–º–µ–Ω–¥–∞—Ü–∏—è","–ö–æ–Ω—Ç–µ–∫—Å—Ç","–°—Ç–∞—Ç—É—Å","–ö—Ä–∞—Ç–∫–∏–π –≤—ã–≤–æ–¥","–ü—Ä–æ–±–ª–µ–º–∞","–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π","–î–µ–π—Å—Ç–≤–∏–µ","–ü—Ä–æ–¥–æ–ª–∂."].map((h) => (
-                              <th key={h} style={{ padding: "8px 6px", textAlign: "left", fontWeight: 700, color: t.muted, borderBottom: `1px solid ${t.border}`, whiteSpace: "nowrap" }}>{h}</th>
-                            ))
-                          }
-                          <th style={{ padding: "8px 6px", borderBottom: `1px solid ${t.border}`, width: 100 }}></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {trainingSessions.map((s) => {
-                          const isEditing = trainingEditId === s.id;
-                          const ed = isEditing ? trainingEditData : {};
-                          const isSelected = trainingSelection.has(s.id);
-                          return (
-                            <tr key={s.id} style={{ borderBottom: `1px solid ${t.cardBorder}`, background: isSelected ? t.highlight : "transparent" }}>
-                              <td style={{ padding: "6px" }}>
-                                <input type="checkbox" checked={isSelected} onChange={() => { const next = new Set(trainingSelection); if (isSelected) next.delete(s.id); else next.add(s.id); setTrainingSelection(next); }} />
-                              </td>
-                              {trainingShowTrash ? (
-                                <>
-                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.json_data?._deleted?.at ? new Date(s.json_data._deleted.at).toLocaleDateString("ru-RU") : ""}</td>
-                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.json_data?._deleted?.by_expert_name || "‚Äî"}</td>
-                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, maxWidth: 120 }}>{s.json_data?._deleted?.reason || "‚Äî"}</td>
-                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.created_at ? new Date(s.created_at).toLocaleDateString("ru-RU") : ""}</td>
-                                  <td style={{ padding: "6px", fontWeight: 700, color: t.accent, fontSize: 12, whiteSpace: "nowrap" }}>{s.public_code || "‚Äî"}</td>
-                                  <td style={{ padding: "6px", color: t.text }}>{s.session_sequence ?? ""}</td>
-                                  <td style={{ padding: "6px", color: t.text }}>{sk(s.session_kind) || ""}</td>
-                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.expert_name || s.expert_role || "‚Äî"}</td>
-                                  <td style={{ padding: "6px", color: t.text }}>{s.scenario_played || ""}</td>
-                                  <td style={{ padding: "6px", color: t.text }}>{ct(s.expected_case_type) || ""}</td>
-                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.model_used || "‚Äî"}</td>
-                                  <td style={{ padding: "6px" }}>
-                                    <span style={{
-                                      fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
-                                      background: s.status === "approved_for_learning" ? t.badgeClosed : s.status === "rejected" ? t.badgeNew : s.status === "reviewed" ? t.badgeInProgress : t.badgePending,
-                                      color: s.status === "approved_for_learning" ? t.badgeClosedText : s.status === "rejected" ? t.badgeNewText : s.status === "reviewed" ? t.badgeInProgressText : t.badgePendingText,
-                                    }}>{st(s.status) || "–ù–æ–≤—ã–π"}</span>
-                                  </td>
-                                  <td style={{ padding: "6px", maxWidth: 120, color: t.text, fontSize: 11 }}>{s.short_summary || ""}</td>
-                                  <td style={{ padding: "6px", whiteSpace: "nowrap" }}>
-                                    <button onClick={() => restoreSingleTrainingSession(s.id)} style={{ border: 0, borderRadius: 6, background: t.accent, color: "#fff", padding: "4px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", marginRight: 4 }}>–í–æ—Å—Å—Ç–∞–Ω–æ–≤–∏—Ç—å</button>
-                                    <button onClick={() => setTrainingPermanentConfirm(s)} style={{ border: 0, borderRadius: 6, background: t.error, color: "#fff", padding: "4px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>–£–¥–∞–ª–∏—Ç—å –Ω–∞–≤—Å–µ–≥–¥–∞</button>
-                                  </td>
-                                </>
-                              ) : (
-                                <>
-                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11, whiteSpace: "nowrap" }}>{s.created_at ? new Date(s.created_at).toLocaleDateString("ru-RU") : ""}</td>
-                                  <td style={{ padding: "6px", fontWeight: 700, color: t.accent, fontSize: 12, whiteSpace: "nowrap" }}>{s.public_code || "‚Äî"}</td>
-                                  <td style={{ padding: "6px", color: t.text }}>{s.session_sequence ?? ""}</td>
-                                  <td style={{ padding: "6px" }}>{isEditing
-                                    ? <select value={ed.session_kind || s.session_kind || "initial"} onChange={(e) => setTrainingEditData((d) => ({ ...d, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}</select>
-                                    : <span style={{ color: t.text }}>{sk(s.session_kind) || ""}</span>}</td>
-                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.expert_name || (s.expert_role ? s.expert_role : "") || "‚Äî"}</td>
-                                  <td style={{ padding: "6px" }}>{isEditing
-                                    ? <input value={ed.scenario_played ?? s.scenario_played ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
-                                    : <span style={{ color: t.text }}>{s.scenario_played || ""}</span>}</td>
-                                  <td style={{ padding: "6px" }}>{isEditing
-                                    ? <select value={ed.expected_case_type ?? s.expected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}><option value="">‚Äî</option>{["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}</select>
-                                    : <span style={{ color: t.text }}>{ct(s.expected_case_type) || ""}</span>}</td>
-                                  <td style={{ padding: "6px" }}>{isEditing
-                                    ? <input value={ed.ai_detected_case_type ?? s.ai_detected_case_type ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, ai_detected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 80 }} />
-                                    : <span style={{ color: t.text }}>{s.ai_detected_case_type || ""}</span>}</td>
-                                  <td style={{ padding: "6px" }}>{isEditing
-                                    ? <input type="number" min="1" max="5" value={ed.detection_quality ?? s.detection_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, detection_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                    : <span style={{ color: s.detection_quality >= 4 ? t.success : s.detection_quality <= 2 ? t.error : t.text }}>{s.detection_quality ?? ""}</span>}</td>
-                                  <td style={{ padding: "6px", color: t.muted, fontSize: 11 }}>{s.model_used || "‚Äî"}</td>
-                                  <td style={{ padding: "6px", color: s.fallback_used ? t.error : t.muted, fontSize: 11 }}>{s.fallback_used ? "–î–∞" : "‚Äî"}</td>
-                                  <td style={{ padding: "6px" }}>{isEditing
-                                    ? <input type="number" min="1" max="5" value={ed.questions_quality ?? s.questions_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, questions_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                    : <span style={{ color: s.questions_quality >= 4 ? t.success : s.questions_quality <= 2 ? t.error : t.text }}>{s.questions_quality ?? ""}</span>}</td>
-                                  <td style={{ padding: "6px" }}>{isEditing
-                                    ? <input type="number" min="1" max="5" value={ed.report_quality ?? s.report_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, report_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                    : <span style={{ color: s.report_quality >= 4 ? t.success : s.report_quality <= 2 ? t.error : t.text }}>{s.report_quality ?? ""}</span>}</td>
-                                  <td style={{ padding: "6px" }}>{isEditing
-                                    ? <input type="number" min="1" max="5" value={ed.safety_quality ?? s.safety_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, safety_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                    : <span style={{ color: s.safety_quality >= 4 ? t.success : s.safety_quality <= 2 ? t.error : t.text }}>{s.safety_quality ?? ""}</span>}</td>
-                                  <td style={{ padding: "6px" }}>{isEditing
-                                    ? <input type="number" min="1" max="5" value={ed.language_quality ?? s.language_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, language_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                    : <span style={{ color: s.language_quality >= 4 ? t.success : s.language_quality <= 2 ? t.error : t.text }}>{s.language_quality ?? ""}</span>}</td>
-                                  <td style={{ padding: "6px" }}>{isEditing
-                                    ? <input type="number" min="1" max="5" value={ed.support_toolkit_quality ?? s.support_toolkit_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, support_toolkit_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                    : <span style={{ color: s.support_toolkit_quality >= 4 ? t.success : s.support_toolkit_quality <= 2 ? t.error : t.text }}>{s.support_toolkit_quality ?? ""}</span>}</td>
-                                  <td style={{ padding: "6px" }}>{isEditing
-                                    ? <input type="number" min="1" max="5" value={ed.continuation_quality ?? s.continuation_quality ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, continuation_quality: e.target.value ? parseInt(e.target.value) : null }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 50 }} />
-                                    : <span style={{ color: s.continuation_quality >= 4 ? t.success : s.continuation_quality <= 2 ? t.error : t.text }}>{s.continuation_quality ?? ""}</span>}</td>
-                                  <td style={{ padding: "6px", color: s.repeated_questions ? t.error : t.muted, fontSize: 11 }}>{s.repeated_questions ? "–î–∞" : "‚Äî"}</td>
-                                  <td style={{ padding: "6px", color: s.missed_risk_flags ? t.error : t.muted, fontSize: 11 }}>{s.missed_risk_flags ? "–î–∞" : "‚Äî"}</td>
-                                  <td style={{ padding: "6px", color: s.wrong_recommendation ? t.error : t.muted, fontSize: 11 }}>{s.wrong_recommendation ? "–î–∞" : "‚Äî"}</td>
-                                  <td style={{ padding: "6px", color: s.remembered_context ? t.success : t.muted, fontSize: 11 }}>{s.remembered_context ? "–î–∞" : "‚Äî"}</td>
-                                  <td style={{ padding: "6px" }}>{isEditing
-                                    ? <select value={ed.status ?? s.status ?? "new"} onChange={(e) => setTrainingEditData((d) => ({ ...d, status: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11 }}>{["new","reviewed","needs_prompt_update","approved_for_learning","rejected","archived"].map((o) => <option key={o} value={o}>{st(o)}</option>)}</select>
-                                    : <span style={{
-                                        fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
-                                        background: s.status === "approved_for_learning" ? t.badgeClosed : s.status === "rejected" ? t.badgeNew : s.status === "reviewed" ? t.badgeInProgress : t.badgePending,
-                                        color: s.status === "approved_for_learning" ? t.badgeClosedText : s.status === "rejected" ? t.badgeNewText : s.status === "reviewed" ? t.badgeInProgressText : t.badgePendingText,
-                                      }}>{st(s.status) || "–ù–æ–≤—ã–π"}</span>}</td>
-                                  <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
-                                    ? <input value={ed.short_summary ?? s.short_summary ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, short_summary: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
-                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.short_summary || ""}</span>}</td>
-                                  <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
-                                    ? <input value={ed.main_problem ?? s.main_problem ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, main_problem: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
-                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.main_problem || ""}</span>}</td>
-                                  <td style={{ padding: "6px", maxWidth: 120 }}>{isEditing
-                                    ? <input value={ed.expert_comment ?? s.expert_comment ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, expert_comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 120 }} />
-                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.expert_comment || ""}</span>}</td>
-                                  <td style={{ padding: "6px", maxWidth: 100 }}>{isEditing
-                                    ? <input value={ed.action_needed ?? s.action_needed ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, action_needed: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
-                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.action_needed || ""}</span>}</td>
-                                  <td style={{ padding: "6px", maxWidth: 100 }}>{isEditing
-                                    ? <input value={ed.continuation_comment ?? s.continuation_comment ?? ""} onChange={(e) => setTrainingEditData((d) => ({ ...d, continuation_comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 6, background: t.inputBg, color: t.inputText, padding: "4px 6px", fontSize: 11, width: 100 }} />
-                                    : <span style={{ color: t.text, fontSize: 11 }}>{s.continuation_comment || ""}</span>}</td>
-                                  <td style={{ padding: "6px", whiteSpace: "nowrap" }}>
-                                    {isEditing ? (
-                                      <>
-                                        <button onClick={async () => { await updateTrainingSession(s.id, trainingEditData); setTrainingEditId(null); setTrainingEditData({}); }} style={{ border: 0, borderRadius: 6, background: t.accent, color: "#fff", padding: "4px 8px", fontWeight: 700, fontSize: 11, cursor: "pointer", marginRight: 4 }}>–°–æ—Ö—Ä–∞–Ω–∏—Ç—å</button>
-                                        <button onClick={() => { setTrainingEditId(null); setTrainingEditData({}); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: t.tabBg, color: t.text, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>–û—Ç–º–µ–Ω–∞</button>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <button onClick={() => { setTrainingEditId(s.id); setTrainingEditData({}); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: "transparent", color: t.accent, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer", marginRight: 4 }}>‚úé</button>
-                                        <button onClick={() => { setTrainingTrashConfirm(s); setTrainingDeletionReason(""); }} style={{ border: `1px solid ${t.border}`, borderRadius: 6, background: "transparent", color: t.muted, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>üóë</button>
-                                      </>
-                                    )}
-                                  </td>
-                                </>
-                              )}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                </>
-              ) : adminReqTab === "quality" ? (
-                <>
-
-                {/* Quality insight stats counter */}
-                <div style={{ marginBottom: 24, padding: 20, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.cardBg }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-                    <div>
-                      <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 8px 0" }}>–û–±–∑–æ—Ä—ã –∫–∞—á–µ—Å—Ç–≤–∞</h2>
-                      <div style={{ color: t.muted, fontSize: 14, lineHeight: 1.6 }}>
-                        –°–∏—Å—Ç–µ–º–∞ —Ä–µ–∫–æ–º–µ–Ω–¥—É–µ—Ç —Ñ–æ—Ä–º–∏—Ä–æ–≤–∞—Ç—å –æ–±–∑–æ—Ä –ø–æ—Å–ª–µ –∫–∞–∂–¥—ã—Ö 10 –Ω–æ–≤—ã—Ö –æ–¥–æ–±—Ä–µ–Ω–Ω—ã—Ö –∫–µ–π—Å–æ–≤.
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 36, fontWeight: 900, color: qualityStats.recommended_to_analyze ? t.danger : t.accent }}>
-                        {qualityStats.new_approved_count}
-                      </div>
-                      <div style={{ color: t.muted, fontSize: 13 }}>–Ω–æ–≤—ã—Ö –æ–¥–æ–±—Ä–µ–Ω–Ω—ã—Ö –∫–µ–π—Å–æ–≤</div>
-                    </div>
-                  </div>
-
-                  {qualityStats.last_analysis_at && (
-                    <div style={{ color: t.muted, fontSize: 13, marginTop: 8 }}>
-                      –ü–æ—Å–ª–µ–¥–Ω–∏–π –æ–±–∑–æ—Ä: {new Date(qualityStats.last_analysis_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
-                      {qualityStats.last_analysis_review_count > 0 ? ` (${qualityStats.last_analysis_review_count} –∫–µ–π—Å–æ–≤)` : ""}
-                    </div>
-                  )}
-
-                  <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-                    <button
-                      onClick={() => {
-                        if (qualityStats.new_approved_count === 0 && qualitySelectedReviewIds.length === 0) {
-                          showToast("–ù–µ—Ç –∫–µ–π—Å–æ–≤ –¥–ª—è –∞–Ω–∞–ª–∏–∑–∞", "error");
-                          return;
-                        }
-                        setQualityConfirmOpen(true);
-                      }}
-                      disabled={qualityGenerating}
-                      style={{
-                        border: 0, borderRadius: 14, padding: "12px 24px", fontWeight: 700, fontSize: 15, cursor: qualityGenerating ? "not-allowed" : "pointer",
-                        background: qualityStats.recommended_to_analyze ? t.danger : t.accent,
-                        color: qualityStats.recommended_to_analyze ? "#fff" : "#fff",
-                        opacity: qualityGenerating ? 0.6 : 1,
-                      }}
-                    >
-                      {qualityGenerating ? "–ê–Ω–∞–ª–∏–∑–∏—Ä—É–µ–º..." : qualitySelectedReviewIds.length > 0
-                        ? `–°—Ñ–æ—Ä–º–∏—Ä–æ–≤–∞—Ç—å –æ–±–∑–æ—Ä –≤—ã–±—Ä–∞–Ω–Ω—ã—Ö (${qualitySelectedReviewIds.length})`
-                        : "–°—Ñ–æ—Ä–º–∏—Ä–æ–≤–∞—Ç—å –æ–±–∑–æ—Ä –Ω–æ–≤—ã—Ö –∫–µ–π—Å–æ–≤"}
-                    </button>
-                    <button
-                      onClick={() => { loadQualityStats(); loadQualityInsights(); }}
-                      style={{
-                        border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
-                        color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
-                      }}
-                    >
-                      –û–±–Ω–æ–≤–∏—Ç—å
-                    </button>
-                  </div>
-
-                  {qualityStats.new_approved_count > 0 && qualityStats.new_approved_count < 5 && (
-                    <div style={{ color: t.muted, fontSize: 13, marginTop: 8, padding: "8px 12px", border: `1px solid ${t.border}`, borderRadius: 8, background: t.highlight }}>
-                      –ö–µ–π—Å–æ–≤ –ø–æ–∫–∞ –º–∞–ª–æ. –í—ã–≤–æ–¥—ã –º–æ–≥—É—Ç –±—ã—Ç—å –ø—Ä–µ–¥–≤–∞—Ä–∏—Ç–µ–ª—å–Ω—ã–º–∏.
-                    </div>
-                  )}
-
-                  {qualityStats.recommended_to_analyze && (
-                    <div style={{ color: t.danger, fontSize: 15, fontWeight: 700, marginTop: 8, padding: "8px 12px", border: `1px solid ${t.danger}`, borderRadius: 8, background: t.dangerBg }}>
-                      –ü–æ—Ä–∞ —Å—Ñ–æ—Ä–º–∏—Ä–æ–≤–∞—Ç—å –Ω–æ–≤—ã–π –æ–±–∑–æ—Ä
-                    </div>
-                  )}
-                </div>
-
-                {/* Quality insights list */}
-                {qualityLoading ? (
-                  <div style={{ color: t.muted, textAlign: "center", padding: 40 }}>–ó–∞–≥—Ä—É–∑–∫–∞...</div>
-                ) : qualityInsights.length === 0 ? (
-                  <div style={{ color: t.muted, textAlign: "center", padding: 40 }}>–ù–µ—Ç —Å–æ—Ö—Ä–∞–Ω—ë–Ω–Ω—ã—Ö –æ–±–∑–æ—Ä–æ–≤</div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                    {qualityInsights.map((insight) => {
-                      const isDetailView = qualityDetailInsight && qualityDetailInsight.id === insight.id;
-                      const d = isDetailView ? qualityDetailInsight : insight;
-                      return (
-                        <div key={insight.id} style={{
-                          border: `1px solid ${t.cardBorder}`, borderRadius: 20,
-                          background: t.crisisCard, padding: 20,
-                        }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                              <span style={{ fontWeight: 700, fontSize: 16 }}>–û–±–∑–æ—Ä –∫–∞—á–µ—Å—Ç–≤–∞</span>
-                              <span style={{ color: t.crisisMuted, fontSize: 13 }}>
-                                –æ—Ç {new Date(insight.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
-                              </span>
-                              <span style={{
-                                fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
-                                background: insight.status === "accepted" || insight.status === "partially_accepted" ? t.badgeClosed
-                                  : insight.status === "rejected" ? t.badgeNew
-                                  : insight.status === "under_review" ? t.badgeInProgress
-                                  : insight.status === "archived" ? t.badgeFalseAlarm
-                                  : t.badgePending,
-                                color: insight.status === "accepted" || insight.status === "partially_accepted" ? t.badgeClosedText
-                                  : insight.status === "rejected" ? t.badgeNewText
-                                  : insight.status === "under_review" ? t.badgeInProgressText
-                                  : insight.status === "archived" ? t.badgeFalseAlarmText
-                                  : t.badgePendingText,
-                              }}>
-                                {QUALITY_STATUS_LABELS[insight.status] || insight.status}
-                              </span>
-                            </div>
-                            <div style={{ color: t.crisisMuted, fontSize: 13 }}>
-                              {insight.review_count} –∫–µ–π—Å–æ–≤
-                              {insight.model_used ? ` ¬∑ ${insight.model_used}` : ""}
-                              {insight.fallback_used ? " ¬∑ fallback" : ""}
-                            </div>
-                          </div>
-
-                          {!isDetailView && insight.summary && (
-                            <div style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
-                              {insight.summary.slice(0, 300)}{insight.summary.length > 300 ? "..." : ""}
-                            </div>
-                          )}
-
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            <button
-                              onClick={async () => {
-                                if (isDetailView) {
-                                  setQualityDetailInsight(null);
-                                } else {
-                                  await loadQualityInsightDetail(insight.id);
-                                }
-                              }}
-                              style={{
-                                border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg,
-                                color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                              }}
-                            >
-                              {isDetailView ? "–°–≤–µ—Ä–Ω—É—Ç—å" : "–ü–æ–¥—Ä–æ–±–Ω–µ–µ"}
-                            </button>
-                            <select
-                              value={insight.status}
-                              onChange={(e) => updateQualityInsightStatus(insight.id, e.target.value)}
-                              style={{
-                                border: `1px solid ${t.inputBorder}`, borderRadius: 8, background: t.inputBg,
-                                color: t.inputText, padding: "6px 12px", fontSize: 12, cursor: "pointer",
-                              }}
-                            >
-                              {["new","under_review","accepted","partially_accepted","rejected","archived"].map((s) => (
-                                <option key={s} value={s}>{QUALITY_STATUS_LABELS[s]}</option>
-                              ))}
-                            </select>
-                            <button
-                              onClick={() => copyOpenCodeTask(insight)}
-                              style={{
-                                border: `1px solid ${t.jsonlBtnBorder}`, borderRadius: 8, background: t.jsonlBtn,
-                                color: t.jsonlBtnText, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                              }}
-                            >
-                              –°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å –∑–∞–¥–∞–Ω–∏–µ –¥–ª—è OpenCode
-                            </button>
-                          </div>
-
-                          {isDetailView && d && detailQualityInsightView(d, t)}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Confirm dialog */}
-                {qualityConfirmOpen && (
-                  <div style={{
-                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-                    background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center",
-                    justifyContent: "center", zIndex: 1000,
-                  }} onClick={() => setQualityConfirmOpen(false)}>
-                    <div style={{
-                      background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
-                      padding: 24, maxWidth: 500, width: "90%",
-                    }} onClick={(e) => e.stopPropagation()}>
-                      <h3 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 700 }}>–°—Ñ–æ—Ä–º–∏—Ä–æ–≤–∞—Ç—å –æ–±–∑–æ—Ä</h3>
-                      <p style={{ color: t.crisisText, fontSize: 14, lineHeight: 1.6, margin: "0 0 16px" }}>
-                        {qualitySelectedReviewIds.length > 0
-                          ? `–í –∞–Ω–∞–ª–∏–∑ –≤–æ–π–¥—É—Ç ${qualitySelectedReviewIds.length} –≤—ã–±—Ä–∞–Ω–Ω—ã—Ö –∫–µ–π—Å–æ–≤.`
-                          : `–í –∞–Ω–∞–ª–∏–∑ –≤–æ–π–¥—É—Ç ${qualityStats.new_approved_count} –Ω–æ–≤—ã—Ö –æ–¥–æ–±—Ä–µ–Ω–Ω—ã—Ö –∫–µ–π—Å–æ–≤.`
-                        }
-                        {qualityStats.new_approved_count > 30 && qualitySelectedReviewIds.length === 0 && (
-                          <><br />–í —ç—Ç–æ—Ç –æ–±–∑–æ—Ä –≤–æ–π–¥—É—Ç 30 –∏–∑ {qualityStats.new_approved_count} –Ω–æ–≤—ã—Ö –æ–¥–æ–±—Ä–µ–Ω–Ω—ã—Ö –∫–µ–π—Å–æ–≤. –ü–æ—Å–ª–µ –∞–Ω–∞–ª–∏–∑–∞ –æ—Å—Ç–∞–Ω–µ—Ç—Å—è –µ—â—ë {qualityStats.new_approved_count - 30}.</>
-                        )}
-                        <br /><br />
-                        –≠—Ç–æ –Ω–µ –∏–∑–º–µ–Ω–∏—Ç –ø—Ä–æ–º–ø—Ç—ã –∏–ª–∏ production –∞–≤—Ç–æ–º–∞—Ç–∏—á–µ—Å–∫–∏.
-                      </p>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          onClick={generateQualityInsight}
-                          disabled={qualityGenerating}
-                          style={{
-                            flex: 1, border: 0, borderRadius: 12, background: t.accent, color: "#fff",
-                            padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: qualityGenerating ? "not-allowed" : "pointer",
-                            opacity: qualityGenerating ? 0.6 : 1,
-                          }}
-                        >
-                          {qualityGenerating ? "–ê–Ω–∞–ª–∏–∑–∏—Ä—É–µ–º..." : "–ü—Ä–æ–¥–æ–ª–∂–∏—Ç—å"}
-                        </button>
-                        <button
-                          onClick={() => setQualityConfirmOpen(false)}
-                          style={{
-                            flex: 1, border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
-                            color: t.text, padding: "12px 20px", fontWeight: 600, fontSize: 14, cursor: "pointer",
-                          }}
-                        >
-                          –û—Ç–º–µ–Ω–∞
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                </>
-              ) : adminReqTab === "organizations" ? (
-                <>
-                  <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 20px 0" }}>–û—Ä–≥–∞–Ω–∏–∑–∞—Ü–∏–∏</h2>
-
-                  <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
-                    <button onClick={() => { setOrgFormEditId(null); setOrgForm({ name: "", slug: "", type: "clinic", city: "", comment: "" }); setOrgFormOpen(true); }} style={{ border: 0, borderRadius: 14, padding: "12px 24px", fontWeight: 700, fontSize: 14, cursor: "pointer", background: t.accent, color: "#fff" }}>
-                      + –°–æ–∑–¥–∞—Ç—å –æ—Ä–≥–∞–Ω–∏–∑–∞—Ü–∏—é
-                    </button>
-                  </div>
-
-                  {/* Organization cards */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                    {organizations.map((org) => (
-                      <div key={org.id} style={{ border: `1px solid ${t.cardBorder}`, borderRadius: 20, background: t.cardBg, padding: 20 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: 16 }}>{org.name}</div>
-                            <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>
-                              {(orgTypeLabels[org.type] || org.type)} ¬∑ {org.status}
-                              {org.city ? ` ¬∑ ${org.city}` : ""}
-                            </div>
-                          </div>
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button onClick={() => { setOrgForm({ name: org.name, slug: org.slug || "", type: org.type, city: org.city || "", comment: org.comment || "" }); setOrgFormEditId(org.id); setOrgFormOpen(true); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
-                              –†–µ–¥–∞–∫—Ç–∏—Ä–æ–≤–∞—Ç—å
-                            </button>
-                            <button onClick={async () => { setOrgDetail(org); adminLoadOrganizationExperts(org.id); }} style={{ border: `1px solid ${t.accent}`, borderRadius: 10, background: t.highlight, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
-                              –û—Ç–∫—Ä—ã—Ç—å ({org.expert_count} —Å–ø–µ—Ü., {org.patient_count} –ø–∞—Ü–∏–µ–Ω—Ç–æ–≤)
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {organizations.length === 0 && (
-                      <div style={{ color: t.muted, textAlign: "center", padding: 60, fontSize: 14 }}>
-                        –ù–µ—Ç –æ—Ä–≥–∞–Ω–∏–∑–∞—Ü–∏–π
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Organization detail */}
-                  {orgDetail && (
-                    <div style={{ marginTop: 32, border: `1px solid ${t.accent}`, borderRadius: 20, background: t.highlight, padding: 24 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
-                        <div>
-                          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>{orgDetail.name}</h3>
-                          <div style={{ color: t.muted, fontSize: 13 }}>{orgDetail.type} ¬∑ {orgDetail.status} ¬∑ {orgDetail.city || "–≥–æ—Ä–æ–¥ –Ω–µ —É–∫–∞–∑–∞–Ω"}</div>
-                        </div>
-                        <button onClick={() => setOrgDetail(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "6px 12px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
-                          –ó–∞–∫—Ä—ã—Ç—å
-                        </button>
-                      </div>
-
-                      <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>–°–ø–µ—Ü–∏–∞–ª–∏—Å—Ç—ã –æ—Ä–≥–∞–Ω–∏–∑–∞—Ü–∏–∏</div>
-                        {orgExperts.length === 0 ? (
-                          <div style={{ color: t.muted, fontSize: 13 }}>–ù–µ—Ç —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–≤</div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            {orgExperts.map((m) => (
-                              <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", border: `1px solid ${t.cardBorder}`, borderRadius: 12, background: t.cardBg, flexWrap: "wrap", gap: 8 }}>
-                                <div>
-                                  <span style={{ fontWeight: 600, fontSize: 14 }}>{m.experts?.name || "‚Äî"}</span>
-                                  <span style={{ color: t.muted, fontSize: 12, marginLeft: 8 }}>{m.role} ¬∑ {m.experts?.specialty || ""}</span>
-                                </div>
-                                <div style={{ display: "flex", gap: 6 }}>
-                                  <span style={{ fontSize: 11, color: t.muted }}>{m.experts?.access_code || ""}</span>
-                                  <button onClick={() => handleRemoveExpertFromOrg(m.expert_id)} style={{ border: `1px solid ${t.badgeNewText}`, borderRadius: 8, background: t.dangerBg, color: t.badgeNewText, padding: "4px 8px", fontWeight: 600, fontSize: 11, cursor: "pointer" }}>
-                                    –£–¥–∞–ª–∏—Ç—å
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <button onClick={async () => { const experts = await adminListAllExperts(); setOrgAddExpertOpen(true); }} style={{ border: `1px dashed ${t.accent}`, borderRadius: 10, background: "transparent", color: t.accent, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer", marginTop: 12 }}>
-                          + –î–æ–±–∞–≤–∏—Ç—å —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞
-                        </button>
-                      </div>
-
-                      {/* Add expert modal */}
-                      {orgAddExpertOpen && (
-                        <div style={{ marginTop: 12, padding: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.cardBg }}>
-                          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>–î–æ–±–∞–≤–∏—Ç—å —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞</div>
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                            <input placeholder="ID —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞" value={orgAddExpertId} onChange={(e) => setOrgAddExpertId(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", width: 200 }} />
-                            <select value={orgAddExpertRole} onChange={(e) => setOrgAddExpertRole(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
-                              {["owner","admin","supervisor","doctor","assistant","observer"].map((r) => <option key={r} value={r}>{r}</option>)}
-                            </select>
-                            <button onClick={handleAddExpertToOrg} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>–î–æ–±–∞–≤–∏—Ç—å</button>
-                            <button onClick={() => setOrgAddExpertOpen(false)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>–û—Ç–º–µ–Ω–∞</button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Create/Edit organization form */}
-                  {orgFormOpen && (
-                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-                      <div style={{ background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20, padding: 24, maxWidth: 500, width: "90%" }}>
-                        <h3 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 800 }}>{orgFormEditId ? "–†–µ–¥–∞–∫—Ç–∏—Ä–æ–≤–∞—Ç—å –æ—Ä–≥–∞–Ω–∏–∑–∞—Ü–∏—é" : "–°–æ–∑–¥–∞—Ç—å –æ—Ä–≥–∞–Ω–∏–∑–∞—Ü–∏—é"}</h3>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                          <input placeholder="–ù–∞–∑–≤–∞–Ω–∏–µ *" value={orgForm.name} onChange={(e) => setOrgForm((f) => ({ ...f, name: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            <label style={{ fontSize: 13, fontWeight: 600, color: t.text }}>Slug / —Ç–µ—Ö–Ω–∏—á–µ—Å–∫–∏–π –∞–¥—Ä–µ—Å</label>
-                            <input placeholder="slug-organization" value={orgForm.slug} onChange={(e) => setOrgForm((f) => ({ ...f, slug: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
-                            <div style={{ fontSize: 12, color: t.muted, lineHeight: 1.4 }}>
-                              –ö–æ—Ä–æ—Ç–∫–∏–π —É–Ω–∏–∫–∞–ª—å–Ω—ã–π –∏–¥–µ–Ω—Ç–∏—Ñ–∏–∫–∞—Ç–æ—Ä –ª–∞—Ç–∏–Ω–∏—Ü–µ–π, –Ω–∞–ø—Ä–∏–º–µ—Ä kazan-clinic –∏–ª–∏ demo-test. –ú–æ–∂–Ω–æ –æ—Å—Ç–∞–≤–∏—Ç—å –ø—É—Å—Ç—ã–º ‚Äî —Å–∏—Å—Ç–µ–º–∞ —Å–æ–∑–¥–∞—Å—Ç –∞–≤—Ç–æ–º–∞—Ç–∏—á–µ—Å–∫–∏.
-                            </div>
-                          </div>
-                          <select value={orgForm.type} onChange={(e) => setOrgForm((f) => ({ ...f, type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, cursor: "pointer" }}>
-                            {Object.entries(orgTypeLabels).map(([val, label]) => <option key={val} value={val}>{label}</option>)}
-                          </select>
-                          <input placeholder="–ì–æ—Ä–æ–¥" value={orgForm.city} onChange={(e) => setOrgForm((f) => ({ ...f, city: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none" }} />
-                          <textarea placeholder="–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π" value={orgForm.comment} onChange={(e) => setOrgForm((f) => ({ ...f, comment: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "10px 14px", fontSize: 14, outline: "none", minHeight: 60, resize: "vertical" }} />
-                        </div>
-                        <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
-                          <button onClick={handleCreateOrganization} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                            {orgFormEditId ? "–°–æ—Ö—Ä–∞–Ω–∏—Ç—å" : "–°–æ–∑–¥–∞—Ç—å"}
-                          </button>
-                          <button onClick={() => { setOrgFormOpen(false); setOrgFormEditId(null); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
-                            –û—Ç–º–µ–Ω–∞
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : adminReqTab === "onboarding" ? (
-                <>
-                  <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 20px 0" }}>–ó–∞—è–≤–∫–∏ –Ω–∞ –ø–æ–¥–∫–ª—é—á–µ–Ω–∏–µ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–≤</h2>
-                  <div style={{ display: "flex", gap: 12, marginBottom: 24, alignItems: "center" }}>
-                    <button
-                      onClick={() => adminLoadOnboardingRequests("all")}
-                      style={{ border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg, color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}
-                    >
-                      {onboardingLoading ? "–ó–∞–≥—Ä—É–∑–∫–∞..." : `–û–±–Ω–æ–≤–∏—Ç—å (${onboardingRequests.length})`}
-                    </button>
-                  </div>
-                  {onboardingLoading ? (
-                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>–ó–∞–≥—Ä—É–∑–∫–∞...</div>
-                  ) : onboardingRequests.length === 0 ? (
-                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>–ù–µ—Ç –∑–∞—è–≤–æ–∫</div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                      {onboardingRequests.map((req) => (
-                        <div key={req.id} style={{ border: `1px solid ${t.cardBorder}`, borderRadius: 20, background: t.cardBg, padding: 20 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                            <div>
-                              <div style={{ fontWeight: 700, fontSize: 16 }}>{req.name}</div>
-                              <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>
-                                {req.contact_email && <span>{req.contact_email} ¬∑ </span>}
-                                {req.contact_phone && <span>{req.contact_phone} ¬∑ </span>}
-                                –ú–æ–¥—É–ª—å: {req.module} ¬∑ {req.status}
-                              </div>
-                              <div style={{ color: t.muted, fontSize: 12, marginTop: 2 }}>
-                                {new Date(req.created_at).toLocaleString("ru-RU")}
-                                {req.reviewed_at && ` ¬∑ –†–∞—Å—Å–º–æ—Ç—Ä–µ–Ω–æ: ${new Date(req.reviewed_at).toLocaleString("ru-RU")}`}
-                              </div>
-                            </div>
-                            <span style={{
-                              fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
-                              background: req.status === "submitted" ? "#FEF3C7" : req.status === "approved" ? "#E2EBE4" : "#f0e0e0",
-                              color: req.status === "submitted" ? "#92400E" : req.status === "approved" ? "#5F7D6C" : "#8B4A3A",
-                            }}>
-                              {req.status === "submitted" ? "–û–∂–∏–¥–∞–µ—Ç" : req.status === "approved" ? "–û–¥–æ–±—Ä–µ–Ω–∞" : req.status === "rejected" ? "–û—Ç–∫–ª–æ–Ω–µ–Ω–∞" : req.status}
-                            </span>
-                          </div>
-                          {req.comment && (
-                            <div style={{ fontSize: 13, color: t.text, marginBottom: 8, padding: 8, background: t.filterBg, borderRadius: 8 }}>
-                              {req.comment}
-                            </div>
-                          )}
-                          {req.status === "submitted" && (
-                            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                              <button
-                                onClick={async () => {
-                                  const experts = await adminListAllExperts();
-                                  const eligible = experts.filter(e => e.is_active && Array.isArray(e.allowed_modules) && e.allowed_modules.includes(req.module));
-                                  if (eligible.length === 0) { showToast("–ù–µ—Ç –¥–æ—Å—Ç—É–ø–Ω—ã—Ö —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–≤", "error"); return; }
-                                  setMatchExpertList(eligible);
-                                  setMatchExpertSelector(`onboarding-${req.id}`);
-                                }}
-                                style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                              >
-                                –û–¥–æ–±—Ä–∏—Ç—å –∏ –ø—Ä–∏–≤—è–∑–∞—Ç—å
-                              </button>
-                              <button
-                                onClick={() => adminReviewOnboardingRequest(req.id, "reject")}
-                                style={{ border: `1px solid #ef4444`, borderRadius: 10, background: "transparent", color: "#ef4444", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                              >
-                                –û—Ç–∫–ª–æ–Ω–∏—Ç—å
-                              </button>
-                            </div>
-                          )}
-                          {matchExpertSelector === `onboarding-${req.id}` && (
-                            <div style={{ marginTop: 12, padding: 12, border: `1px solid ${t.border}`, borderRadius: 12, background: t.filterBg }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>–í—ã–±–µ—Ä–∏—Ç–µ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞:</div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                {matchExpertList.map((exp) => (
-                                  <button
-                                    key={exp.id}
-                                    onClick={() => adminReviewOnboardingRequest(req.id, "approve", exp.id)}
-                                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.cardBg, color: t.text, padding: "8px 12px", textAlign: "left", cursor: "pointer", fontSize: 13 }}
-                                  >
-                                    {exp.name} ({exp.role})
-                                  </button>
-                                ))}
-                              </div>
-                              <button onClick={() => setMatchExpertSelector(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: "transparent", color: t.muted, padding: "6px 12px", fontSize: 12, cursor: "pointer", marginTop: 8 }}>
-                                –û—Ç–º–µ–Ω–∞
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : adminReqTab === "match" ? (
-                <>
-                  <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 20px 0" }}>–ó–∞—è–≤–∫–∏ –Ω–∞ –ø–æ–¥–±–æ—Ä —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞</h2>
-                  <div style={{ display: "flex", gap: 12, marginBottom: 24, alignItems: "center" }}>
-                    <button
-                      onClick={() => adminLoadMatchRequests("all")}
-                      style={{ border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg, color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer" }}
-                    >
-                      {matchLoading ? "–ó–∞–≥—Ä—É–∑–∫–∞..." : `–û–±–Ω–æ–≤–∏—Ç—å (${matchRequests.length})`}
-                    </button>
-                  </div>
-                  {matchLoading ? (
-                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>–ó–∞–≥—Ä—É–∑–∫–∞...</div>
-                  ) : matchRequests.length === 0 ? (
-                    <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>–ù–µ—Ç –∑–∞—è–≤–æ–∫</div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                      {matchRequests.map((req) => (
-                        <div key={req.id} style={{ border: `1px solid ${t.cardBorder}`, borderRadius: 20, background: t.cardBg, padding: 20 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                            <div>
-                              <div style={{ fontWeight: 700, fontSize: 16 }}>–ü–∞—Ü–∏–µ–Ω—Ç: {req.owner_id?.slice(0, 8)}...</div>
-                              <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>
-                                –ú–æ–¥—É–ª—å: {req.module} ¬∑ {req.status}
-                              </div>
-                              <div style={{ color: t.muted, fontSize: 12, marginTop: 2 }}>
-                                {new Date(req.created_at).toLocaleString("ru-RU")}
-                                {req.assigned_at && ` ¬∑ –ù–∞–∑–Ω–∞—á–µ–Ω–æ: ${new Date(req.assigned_at).toLocaleString("ru-RU")}`}
-                              </div>
-                            </div>
-                            <span style={{
-                              fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
-                              background: req.status === "submitted" ? "#FEF3C7" : req.status === "assigned" ? "#E2EBE4" : "#f0f0f0",
-                              color: req.status === "submitted" ? "#92400E" : req.status === "assigned" ? "#5F7D6C" : "#666",
-                            }}>
-                              {req.status === "submitted" ? "–û–∂–∏–¥–∞–µ—Ç" : req.status === "assigned" ? "–ù–∞–∑–Ω–∞—á–µ–Ω" : req.status}
-                            </span>
-                          </div>
-                          {req.message && (
-                            <div style={{ fontSize: 13, color: t.text, marginBottom: 8, padding: 8, background: t.filterBg, borderRadius: 8 }}>
-                              {req.message}
-                            </div>
-                          )}
-                          {req.status === "submitted" && (
-                            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                              <button
-                                onClick={async () => {
-                                  await adminLoadEligibleExperts(req.module);
-                                  setMatchExpertSelector(req.id);
-                                }}
-                                style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                              >
-                                –ù–∞–∑–Ω–∞—á–∏—Ç—å —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞
-                              </button>
-                            </div>
-                          )}
-                          {matchExpertSelector === req.id && (
-                            <div style={{ marginTop: 12, padding: 12, border: `1px solid ${t.border}`, borderRadius: 12, background: t.filterBg }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>–í—ã–±–µ—Ä–∏—Ç–µ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞:</div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                {matchExpertList.map((exp) => (
-                                  <button
-                                    key={exp.id}
-                                    onClick={() => adminAssignMatchRequest(req.id, exp.id)}
-                                    disabled={matchAssigning}
-                                    style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.cardBg, color: t.text, padding: "8px 12px", textAlign: "left", cursor: "pointer", fontSize: 13 }}
-                                  >
-                                    {exp.name} ({exp.role})
-                                  </button>
-                                ))}
-                              </div>
-                              <button onClick={() => setMatchExpertSelector(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: "transparent", color: t.muted, padding: "6px 12px", fontSize: 12, cursor: "pointer", marginTop: 8 }}>
-                                –û—Ç–º–µ–Ω–∞
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-              <>
-              {/* Reviews filters */}
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
-                <select
-                  value={adminFilter}
-                  onChange={(e) => { const v = e.target.value; setAdminFilter(v); adminLoadReviews(v, adminEnv); }}
-                  style={{
-                    border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
-                    color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
-                  }}
-                >
-                  <option value="all">–í—Å–µ</option>
-                  <option value="pending">–û–∂–∏–¥–∞—é—Ç</option>
-                  <option value="approved">–û–¥–æ–±—Ä–µ–Ω–Ω—ã–µ</option>
-                  <option value="rejected">–û—Ç–∫–ª–æ–Ω—ë–Ω–Ω—ã–µ</option>
-                  <option value="needs_review">–ù–∞ –¥–æ—Ä–∞–±–æ—Ç–∫—É</option>
-                  <option value="local_auto_saved">–õ–æ–∫–∞–ª—å–Ω—ã–µ</option>
-                </select>
-                <select
-                  value={adminEnv}
-                  onChange={(e) => { const v = e.target.value; setAdminEnv(v); adminLoadReviews(adminFilter, v); }}
-                  style={{
-                    border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
-                    color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
-                  }}
-                >
-                  <option value="all">–í—Å–µ</option>
-                  <option value="production">–†–∞–±–æ—á–∏–π —Å–∞–π—Ç (Production)</option>
-                  <option value="preview">–ü—Ä–µ–¥–ø—Ä–æ—Å–º–æ—Ç—Ä (Preview)</option>
-                  <option value="development">–†–∞–∑—Ä–∞–±–æ—Ç–∫–∞ (Development)</option>
-                  <option value="local">–õ–æ–∫–∞–ª—å–Ω–æ (Local)</option>
-                </select>
-                <select
-                  value={adminExpertFilter}
-                  onChange={(e) => { const v = e.target.value; setAdminExpertFilter(v); adminLoadReviews(adminFilter, adminEnv, v); }}
-                  style={{
-                    border: `1px solid ${t.filterBorder}`, borderRadius: 12, background: t.filterBg,
-                    color: t.filterText, padding: "10px 16px", fontSize: 14, cursor: "pointer",
-                  }}
-                >
-                  <option value="all">–í—Å–µ –æ—Ç–∑—ã–≤—ã</option>
-                  <option value="with_expert">–° —ç–∫—Å–ø–µ—Ä—Ç–æ–º</option>
-                  <option value="without_expert">–ë–µ–∑ —ç–∫—Å–ø–µ—Ä—Ç–∞</option>
-                </select>
-                <button
-                  style={{
-                    border: `1px solid ${t.border}`, borderRadius: 12, background: t.tabBg,
-                    color: t.text, padding: "10px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
-                  }}
-                  onClick={() => adminLoadReviews()}
-                >
-                  {adminLoading ? "–ó–∞–≥—Ä—É–∑–∫–∞..." : `–û–±–Ω–æ–≤–∏—Ç—å (${adminTotal})`}
-                </button>
-                <button
-                  style={{
-                    border: `1px solid ${adminReviewShowTrash ? t.crisisAccent : t.border}`,
-                    borderRadius: 12,
-                    background: adminReviewShowTrash ? t.crisisAccent : t.tabBg,
-                    color: adminReviewShowTrash ? "#fff" : t.text,
-                    padding: "10px 16px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                  }}
-                  onClick={() => {
-                    const next = !adminReviewShowTrash;
-                    setAdminReviewShowTrash(next);
-                    adminLoadReviews(adminFilter, adminEnv, adminExpertFilter, next);
-                  }}
-                >
-                  {adminReviewShowTrash ? "üóë –ê–∫—Ç–∏–≤–Ω—ã–µ" : "üóë –ö–æ—Ä–∑–∏–Ω–∞"}
-                </button>
-              </div>
-
-              {/* Reviews list */}
-              {adminLoading ? (
-                <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>–ó–∞–≥—Ä—É–∑–∫–∞...</div>
-              ) : adminReviews.length === 0 ? (
-                <div style={{ color: t.muted, textAlign: "center", padding: 60 }}>–ù–µ—Ç –∑–∞–ø–∏—Å–µ–π</div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  {adminReviews.map((review) => {
-                    try {
-                    const json = getReviewJson(review);
-                    const correction = getDoctorCorrection(review);
-                    const corrected = getCorrectedJson(review);
-                    const norm = normalizeReviewDetails(review);
-
-                    const patientText = safeText(norm.patientText);
-                    const userReport = safeText(norm.userReport);
-                    const doctorReport = safeText(norm.doctorReport);
-                    const doctorFeedbackComment = safeText(norm.doctorFeedback?.generalComment || "");
-                    const rounds = norm.rounds;
-                    const status = safeText(json.status, "legacy");
-                    const source = safeText(json.source, "‚Äî");
-                    const environment = safeText(json.environment, "‚Äî");
-                    const publicCode = safeText(json.public_code || json.publicCode, "‚Äî");
-                    const expertName = safeText(json.expert_name || "");
-                    const expertRole = safeText(json.expert_role || "");
-                    const expertSpecialty = safeText(json.expert_specialty || "");
-                    const city = safeText(json.city || "");
-                    const organization = safeText(json.organization || "");
-
-                    return (
-                      <div
-                        key={review.id}
-                        style={{
-                          border: `1px solid ${t.crisisBorder}`, borderRadius: 20,
-                          background: t.crisisCard, padding: 20,
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                            {status === "approved" && (
-                              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", fontSize: 11, color: t.muted }}>
-                                <input
-                                  type="checkbox"
-                                  checked={qualitySelectedReviewIds.includes(review.id)}
-                                  onChange={() => toggleReviewSelection(review.id)}
-                                  style={{ cursor: "pointer" }}
-                                />
-                                –í –æ–±–∑–æ—Ä
-                              </label>
-                            )}
-                            <span style={{ color: t.crisisMuted, fontSize: 12 }}>
-                              {safeDate(review.created_at)}
-                            </span>
-                            <span style={{
-                              fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8,
-                              background: status === "approved" ? t.badgeClosed : status === "rejected" ? t.badgeNew : status === "needs_review" ? t.badgePending : status === "local_auto_saved" ? t.badgeInProgress : t.badgeFalseAlarm,
-                              color: status === "approved" ? t.badgeClosedText : status === "rejected" ? t.badgeNewText : status === "needs_review" ? t.badgePendingText : status === "local_auto_saved" ? t.badgeInProgressText : t.badgeFalseAlarmText,
-                            }}>
-                              {status}
-                            </span>
-                            <span style={{ color: t.cardLabel, fontSize: 12 }}>
-                              {environment} / {source}
-                            </span>
-                          </div>
-                          {publicCode !== "‚Äî" ? (
-                            <span
-                              onClick={() => loadSessionTimeline(publicCode)}
-                              title="–ü–æ–∫–∞–∑–∞—Ç—å –≤—Å–µ —Å–µ—Å—Å–∏–∏ –ø–æ —ç—Ç–æ–º—É –∫–æ–¥—É"
-                              style={{ fontWeight: 700, fontSize: 13, color: t.crisisAccent, letterSpacing: 0.5, cursor: "pointer", textDecoration: "underline dotted", textUnderlineOffset: 3 }}
-                            >
-                              {publicCode}
-                            </span>
-                          ) : (
-                            <span style={{ fontWeight: 700, fontSize: 13, color: t.muted, letterSpacing: 0.5 }}>
-                              –ö–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è –Ω–µ —Å–æ—Ö—Ä–∞–Ω—ë–Ω
-                            </span>
-                          )}
-                        </div>
-
-                        {expertName && (
-                          <div style={{ marginBottom: 10, fontSize: 12, color: t.crisisAccent }}>
-                            üî¨ {expertName}{expertRole ? `, ${expertRole}` : ""}{expertSpecialty ? ` (${expertSpecialty})` : ""}{city ? ` ¬∑ ${city}` : ""}{organization ? ` ¬∑ ${organization}` : ""}
-                          </div>
-                        )}
-
-                        {renderReviewSections(review, json, t, { patientText, userReport, doctorReport, doctorFeedbackComment, conversationHistory: rounds, doctorFeedback: norm.doctorFeedback })}
-
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button
-                            disabled={!review?.id || adminActionLoading === review.id}
-                            style={{
-                              border: 0, borderRadius: 12, background: t.badgeClosed, color: t.badgeClosedText,
-                              padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
-                              opacity: adminActionLoading === review.id ? 0.5 : 1,
-                            }}
-                            onClick={() => adminUpdateStatus(review.id, "approved")}
-                          >
-                            –û–¥–æ–±—Ä–∏—Ç—å
-                          </button>
-                          <button
-                            disabled={!review?.id || adminActionLoading === review.id}
-                            style={{
-                              border: 0, borderRadius: 12, background: t.badgeNew, color: t.badgeNewText,
-                              padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
-                              opacity: adminActionLoading === review.id ? 0.5 : 1,
-                            }}
-                            onClick={() => adminUpdateStatus(review.id, "rejected")}
-                          >
-                            –û—Ç–∫–ª–æ–Ω–∏—Ç—å
-                          </button>
-                          <button
-                            disabled={!review?.id || adminActionLoading === review.id}
-                            style={{
-                              border: 0, borderRadius: 12, background: t.badgePending, color: t.badgePendingText,
-                              padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
-                              opacity: adminActionLoading === review.id ? 0.5 : 1,
-                            }}
-                            onClick={() => adminUpdateStatus(review.id, "needs_review")}
-                          >
-                            –¢—Ä–µ–±—É–µ—Ç –¥–æ—Ä–∞–±–æ—Ç–∫–∏
-                          </button>
-                          <button
-                            disabled={!review?.id}
-                            style={{
-                              border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
-                              color: t.crisisActionJsonlText, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                            }}
-                            onClick={() => adminDownloadJson(review)}
-                          >
-                            –°–∫–∞—á–∞—Ç—å JSON
-                          </button>
-                          <button
-                            disabled={!review?.id}
-                            style={{
-                              border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
-                              color: t.crisisAccent, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                            }}
-                            onClick={() => {
-                              setTrainingFormReviewId(review.id);
-                              setTrainingFormData((d) => ({ ...d, public_code: review.public_code || "" }));
-                            }}
-                          >
-                            + –í —Ç–∞–±–ª–∏—Ü—É —Ç—Ä–µ–Ω–∏—Ä–æ–≤–æ–∫
-                          </button>
-                          <button
-                            disabled={!review?.id}
-                            style={{
-                              border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
-                              color: t.crisisAccent, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                            }}
-                            onClick={() => openCorrectionForm(review)}
-                          >
-                            –†–µ–¥–∞–∫—Ç–∏—Ä–æ–≤–∞—Ç—å
-                          </button>
-                          {!adminReviewShowTrash ? (
-                            <button
-                              disabled={!review?.id}
-                              title="–£–¥–∞–ª–∏—Ç—å –∏–∑ –æ—Ç–∑—ã–≤–æ–≤"
-                              style={{
-                                border: `1px solid ${t.crisisBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
-                                color: "#e74c3c", padding: "8px 14px", fontWeight: 600, fontSize: 16, cursor: "pointer",
-                                lineHeight: 1,
-                              }}
-                              onClick={() => {
-                                const j = getReviewJson(review);
-                                const code = j.public_code || j.publicCode || review.public_code || "‚Äî";
-                                setDeleteConfirmReviewId(review.id);
-                                setDeleteConfirmCode(code);
-                                setDeleteConfirmType("soft");
-                                setDeleteConfirmStep(1);
-                              }}
-                            >
-                              üóë
-                            </button>
-                          ) : (
-                            <>
-                              <button
-                                disabled={!review?.id}
-                                title="–í–æ—Å—Å—Ç–∞–Ω–æ–≤–∏—Ç—å"
-                                style={{
-                                  border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
-                                  color: t.badgeClosedText, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                                }}
-                                onClick={async () => {
-                                  setAdminActionLoading(review.id);
-                                  try {
-                                    const res = await fetch("/api/reviews", {
-                                      method: "POST",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({ action: "restoreReview", review_id: review.id, admin_secret: adminPassword }),
-                                    });
-                                    const d = await res.json();
-                                    showToast(d.message || (d.ok ? "–í–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–æ" : d.error), d.ok ? "success" : "error");
-                                    if (d.ok) adminLoadReviews();
-                                  } catch {
-                                    showToast("–û—à–∏–±–∫–∞ –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∏—è", "error");
-                                  } finally {
-                                    setAdminActionLoading(null);
-                                  }
-                                }}
-                              >
-                                ‚Ü©Ô∏è –í–æ—Å—Å—Ç–∞–Ω–æ–≤–∏—Ç—å
-                              </button>
-                              <button
-                                disabled={!review?.id}
-                                title="–£–¥–∞–ª–∏—Ç—å –±–µ–∑–≤–æ–∑–≤—Ä–∞—Ç–Ω–æ"
-                                style={{
-                                  border: `1px solid ${t.crisisBorder}`, borderRadius: 12, background: t.crisisActionJsonl,
-                                  color: "#e74c3c", padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer",
-                                }}
-                                onClick={() => {
-                                  const j = getReviewJson(review);
-                                  const code = j.public_code || j.publicCode || review.public_code || "‚Äî";
-                                  setDeleteConfirmReviewId(review.id);
-                                  setDeleteConfirmCode(code);
-                                  setDeleteConfirmType("permanent");
-                                  setDeleteConfirmStep(1);
-                                }}
-                              >
-                                üóë –£–¥–∞–ª–∏—Ç—å –∑–∞–ø–∏—Å—å
-                              </button>
-                              <button
-                                disabled={!review?.id}
-                                title="–£–¥–∞–ª–∏—Ç—å –≤—Å—é —Ç–µ—Å—Ç–æ–≤—É—é —Å–µ—Å—Å–∏—é"
-                                style={{
-                                  border: `1px solid #e74c3c`, borderRadius: 12,
-                                  background: "#e74c3c", color: "#fff",
-                                  padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer",
-                                }}
-                                onClick={() => {
-                                  const j = getReviewJson(review);
-                                  const code = j.public_code || j.publicCode || review.public_code || "‚Äî";
-                                  setDeleteConfirmReviewId(review.id);
-                                  setDeleteConfirmCode(code);
-                                  setDeleteConfirmType("full");
-                                  setDeleteConfirmStep(1);
-                                }}
-                              >
-                                ‚ò† –ü–æ–ª–Ω–æ—Å—Ç—å—é
-                              </button>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Delete confirmation dialog */}
-                        {deleteConfirmReviewId === review.id && deleteConfirmStep >= 1 && (
-                          <div style={{
-                            marginTop: 16, border: `2px solid #e74c3c`, borderRadius: 16,
-                            background: t.cardBorder, padding: 20, position: "relative",
-                          }}>
-                            <div style={{ fontWeight: 700, fontSize: 15, color: "#e74c3c", marginBottom: 12 }}>
-                              {deleteConfirmType === "soft" ? "üóë –£–¥–∞–ª–µ–Ω–∏–µ –∫–∞—Ä—Ç–æ—á–∫–∏" :
-                               deleteConfirmType === "permanent" ? "üî• –ë–µ–∑–≤–æ–∑–≤—Ä–∞—Ç–Ω–æ–µ —É–¥–∞–ª–µ–Ω–∏–µ" :
-                               "‚ò† –£–¥–∞–ª–µ–Ω–∏–µ –≤—Å–µ–π —Ç–µ—Å—Ç–æ–≤–æ–π —Å–µ—Å—Å–∏–∏"}
-                            </div>
-
-                            {deleteConfirmType === "soft" && deleteConfirmStep === 1 && (
-                              <>
-                                <p style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, margin: "0 0 12px" }}>
-                                  –ö–∞—Ä—Ç–æ—á–∫–∞ –æ—Ç–∑—ã–≤–∞ <strong>{deleteConfirmCode}</strong> –±—É–¥–µ—Ç –ø–µ—Ä–µ–º–µ—â–µ–Ω–∞ –≤ –∫–æ—Ä–∑–∏–Ω—É.<br />
-                                  –ò—Å—Ö–æ–¥–Ω–∞—è —Å–µ—Å—Å–∏—è –∏ –¥–∏–∞–ª–æ–≥ –æ—Å—Ç–∞–Ω—É—Ç—Å—è –≤ –±–∞–∑–µ.
-                                </p>
-                                <div style={{ display: "flex", gap: 8 }}>
-                                  <button
-                                    style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                                    onClick={async () => {
-                                      setAdminActionLoading(review.id);
-                                      try {
-                                        const res = await fetch("/api/reviews", {
-                                          method: "POST",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({ action: "softDeleteReview", review_id: review.id, admin_secret: adminPassword }),
-                                        });
-                                        const d = await res.json();
-                                        showToast(d.message || (d.ok ? "–£–¥–∞–ª–µ–Ω–æ" : d.error), d.ok ? "success" : "error");
-                                        if (d.ok) { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); adminLoadReviews(); }
-                                      } catch { showToast("–û—à–∏–±–∫–∞ —É–¥–∞–ª–µ–Ω–∏—è", "error"); }
-                                      finally { setAdminActionLoading(null); }
-                                    }}
-                                  >
-                                    –ü–µ—Ä–µ–º–µ—Å—Ç–∏—Ç—å –≤ –∫–æ—Ä–∑–∏–Ω—É
-                                  </button>
-                                  <button
-                                    style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
-                                    onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
-                                  >
-                                    –û—Ç–º–µ–Ω–∞
-                                  </button>
-                                </div>
-                              </>
-                            )}
-
-                            {deleteConfirmType === "permanent" && (
-                              <>
-                                {deleteConfirmStep === 1 ? (
-                                  <>
-                                    <p style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, margin: "0 0 4px" }}>
-                                      –í—ã —É–≤–µ—Ä–µ–Ω—ã, —á—Ç–æ —Ö–æ—Ç–∏—Ç–µ <strong style={{ color: "#e74c3c" }}>–±–µ–∑–≤–æ–∑–≤—Ä–∞—Ç–Ω–æ —É–¥–∞–ª–∏—Ç—å</strong> –∑–∞–ø–∏—Å—å <strong>{deleteConfirmCode}</strong>?
-                                    </p>
-                                    <p style={{ color: t.muted, fontSize: 12, margin: "0 0 12px" }}>
-                                      –ë—É–¥–µ—Ç —É–¥–∞–ª–µ–Ω–∞ —Ç–æ–ª—å–∫–æ —ç—Ç–∞ –∑–∞–ø–∏—Å—å <code>case_review</code>.<br />
-                                      –î–µ–π—Å—Ç–≤–∏–µ –Ω–µ–ª—å–∑—è –æ—Ç–º–µ–Ω–∏—Ç—å.
-                                    </p>
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                      <button
-                                        style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                                        onClick={() => setDeleteConfirmStep(2)}
-                                      >
-                                        –î–∞, —É–¥–∞–ª–∏—Ç—å –Ω–∞–≤—Å–µ–≥–¥–∞
-                                      </button>
-                                      <button
-                                        style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
-                                        onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
-                                      >
-                                        –û—Ç–º–µ–Ω–∞
-                                      </button>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <p style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, margin: "0 0 12px" }}>
-                                      ‚ö†Ô∏è –ü–æ—Å–ª–µ–¥–Ω–µ–µ –ø–æ–¥—Ç–≤–µ—Ä–∂–¥–µ–Ω–∏–µ. –ó–∞–ø–∏—Å—å <strong>{deleteConfirmCode}</strong> –±—É–¥–µ—Ç —É–¥–∞–ª–µ–Ω–∞ –±–µ–∑–≤–æ–∑–≤—Ä–∞—Ç–Ω–æ. –í–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∏–µ –Ω–µ–≤–æ–∑–º–æ–∂–Ω–æ.
-                                    </p>
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                      <button
-                                        style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                                        onClick={async () => {
-                                          setAdminActionLoading(review.id);
-                                          try {
-                                            const res = await fetch("/api/reviews", {
-                                              method: "POST",
-                                              headers: { "Content-Type": "application/json" },
-                                              body: JSON.stringify({ action: "permanentDeleteReview", review_id: review.id, admin_secret: adminPassword }),
-                                            });
-                                            const d = await res.json();
-                                            showToast(d.message || (d.ok ? "–£–¥–∞–ª–µ–Ω–æ" : d.error), d.ok ? "success" : "error");
-                                            if (d.ok) { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); adminLoadReviews(); }
-                                          } catch { showToast("–û—à–∏–±–∫–∞ —É–¥–∞–ª–µ–Ω–∏—è", "error"); }
-                                          finally { setAdminActionLoading(null); }
-                                        }}
-                                      >
-                                        üî• –ü–æ–¥—Ç–≤–µ—Ä–∂–¥–∞—é –±–µ–∑–≤–æ–∑–≤—Ä–∞—Ç–Ω–æ–µ —É–¥–∞–ª–µ–Ω–∏–µ
-                                      </button>
-                                      <button
-                                        style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
-                                        onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
-                                      >
-                                        –û—Ç–º–µ–Ω–∞
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-                              </>
-                            )}
-
-                            {deleteConfirmType === "full" && (
-                              <>
-                                {deleteConfirmStep === 1 ? (
-                                  <>
-                                    <p style={{ color: t.crisisText, fontSize: 13, lineHeight: 1.5, margin: "0 0 4px" }}>
-                                      ‚ö†Ô∏è –í—ã —Å–æ–±–∏—Ä–∞–µ—Ç–µ—Å—å <strong style={{ color: "#e74c3c" }}>–ø–æ–ª–Ω–æ—Å—Ç—å—é —É–¥–∞–ª–∏—Ç—å —Ç–µ—Å—Ç–æ–≤—É—é —Å–µ—Å—Å–∏—é</strong> <strong>{deleteConfirmCode}</strong>.
-                                    </p>
-                                    <p style={{ color: t.muted, fontSize: 12, margin: "0 0 12px" }}>
-                                      –ë—É–¥—É—Ç —É–¥–∞–ª–µ–Ω—ã: <code>case_review</code>, <code>training_session</code>, <code>session</code>.<br />
-                                      –î–∏–∞–ª–æ–≥ –∏ –æ—Ç—á—ë—Ç—ã –≤–æ—Å—Å—Ç–∞–Ω–æ–≤–∏—Ç—å –±—É–¥–µ—Ç –Ω–µ–≤–æ–∑–º–æ–∂–Ω–æ.
-                                    </p>
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                      <button
-                                        style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                                        onClick={() => setDeleteConfirmStep(2)}
-                                      >
-                                        –î–∞, —è –ø–æ–Ω–∏–º–∞—é. –£–¥–∞–ª–∏—Ç—å –≤—Å—ë.
-                                      </button>
-                                      <button
-                                        style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
-                                        onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
-                                      >
-                                        –û—Ç–º–µ–Ω–∞
-                                      </button>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <p style={{ color: "#e74c3c", fontSize: 13, lineHeight: 1.5, margin: "0 0 12px", fontWeight: 700 }}>
-                                      ‚ò†Ô∏è –ü–æ—Å–ª–µ–¥–Ω–µ–µ –ø—Ä–µ–¥—É–ø—Ä–µ–∂–¥–µ–Ω–∏–µ!<br />
-                                      –°–µ—Å—Å–∏—è <strong>{deleteConfirmCode}</strong> –±—É–¥–µ—Ç —É–¥–∞–ª–µ–Ω–∞ –∏–∑ –≤—Å–µ—Ö —Ç–∞–±–ª–∏—Ü.<br />
-                                      –í–æ—Å—Å—Ç–∞–Ω–æ–≤–ª–µ–Ω–∏–µ –Ω–µ–≤–æ–∑–º–æ–∂–Ω–æ. –≠—Ç–æ –¥–µ–π—Å—Ç–≤–∏–µ —Ç–æ–ª—å–∫–æ –¥–ª—è –∞–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä–∞.
-                                    </p>
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                      <button
-                                        style={{ border: 0, borderRadius: 10, background: "#e74c3c", color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-                                        onClick={async () => {
-                                          setAdminActionLoading(review.id);
-                                          try {
-                                            const res = await fetch("/api/reviews", {
-                                              method: "POST",
-                                              headers: { "Content-Type": "application/json" },
-                                              body: JSON.stringify({ action: "deleteFullTestSession", review_id: review.id, admin_secret: adminPassword }),
-                                            });
-                                            const d = await res.json();
-                                            if (d.ok) {
-                                              showToast(d.message + ` (case_review: ${d.deleted.case_review}, session: ${d.deleted.session}, training: ${d.deleted.training_sessions})`, "success");
-                                              setDeleteConfirmReviewId(null);
-                                              setDeleteConfirmStep(0);
-                                              adminLoadReviews();
-                                            } else {
-                                              showToast(d.error || "–û—à–∏–±–∫–∞", "error");
-                                            }
-                                          } catch { showToast("–û—à–∏–±–∫–∞ —É–¥–∞–ª–µ–Ω–∏—è —Å–µ—Å—Å–∏–∏", "error"); }
-                                          finally { setAdminActionLoading(null); }
-                                        }}
-                                      >
-                                        ‚ò†Ô∏è –ü–æ–¥—Ç–≤–µ—Ä–∂–¥–∞—é –ø–æ–ª–Ω–æ–µ —É–¥–∞–ª–µ–Ω–∏–µ
-                                      </button>
-                                      <button
-                                        style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
-                                        onClick={() => { setDeleteConfirmReviewId(null); setDeleteConfirmStep(0); }}
-                                      >
-                                        –û—Ç–º–µ–Ω–∞
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        )}
-
-                        {trainingFormReviewId === review.id && (
-                          <div style={{ marginTop: 16, borderTop: `1px solid ${t.cardBorder}`, paddingTop: 16 }}>
-                            <div style={{ color: t.crisisText, fontWeight: 700, fontSize: 14, marginBottom: 12 }}>–î–æ–±–∞–≤–ª–µ–Ω–∏–µ –≤ —Ç–∞–±–ª–∏—Ü—É —Ç—Ä–µ–Ω–∏—Ä–æ–≤–æ–∫</div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-                              <input placeholder="–ö–æ–¥ –ø–∞—Ü–∏–µ–Ω—Ç–∞" value={trainingFormData.public_code || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, public_code: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
-                              <select value={trainingFormData.session_kind || "initial"} onChange={(e) => setTrainingFormData((d) => ({ ...d, session_kind: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
-                                {["initial","follow_up","diary_check","support_toolkit_check","crisis_check","doctor_review","other"].map((o) => <option key={o} value={o}>{sk(o)}</option>)}
-                              </select>
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-                              <input placeholder="–ß—Ç–æ –∏–≥—Ä–∞–µ–º –≤ —ç—Ç–æ–π —Å–µ—Å—Å–∏–∏?" value={trainingFormData.scenario_played || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, scenario_played: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none" }} />
-                              <select value={trainingFormData.expected_case_type || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, expected_case_type: e.target.value }))} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, cursor: "pointer" }}>
-                                <option value="">–û–∂–∏–¥–∞–µ–º—ã–π —Ç–∏–ø —Å–ª—É—á–∞—è</option>
-                                {["anxiety","sleep","depression_like","grief","trauma","body_tension","adhd_like","substance","alcohol","bipolar_red_flags","psychosis_red_flags","acute_psychosis","suicide_risk","self_harm_risk","medication_issue","mixed","other"].map((o) => <option key={o} value={o}>{ct(o)}</option>)}
-                              </select>
-                            </div>
-                            <textarea value={trainingFormData.expert_comment || ""} onChange={(e) => setTrainingFormData((d) => ({ ...d, expert_comment: e.target.value }))} placeholder="–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π —ç–∫—Å–ø–µ—Ä—Ç–∞" style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", width: "100%", minHeight: 40, marginBottom: 10, resize: "vertical" }} />
-                            <div style={{ display: "flex", gap: 8 }}>
-                              <button onClick={createTrainingFromReview} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>–°–æ–∑–¥–∞—Ç—å</button>
-                              <button onClick={() => setTrainingFormReviewId(null)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "8px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>–û—Ç–º–µ–Ω–∞</button>
-                            </div>
-                          </div>
-                        )}
-                        {editingReview === review.id && (
-                          <div style={{ marginTop: 16, borderTop: `1px solid ${t.cardBorder}`, paddingTop: 16 }}>
-                            <div style={{ color: t.crisisText, fontWeight: 700, fontSize: 14, marginBottom: 12 }}>–†–µ–¥–∞–∫—Ü–∏—è –æ—Ç–∑—ã–≤–∞</div>
-
-                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="–ß—Ç–æ –±—ã–ª–æ –Ω–µ–≤–µ—Ä–Ω–æ –≤ –≤–æ–ø—Ä–æ—Å–∞—Ö?" value={correctionForm?.wrong_questions || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, wrong_questions: e.target.value })} />
-                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="–ö–∞–∫–∏–µ –≤–æ–ø—Ä–æ—Å—ã –Ω—É–∂–Ω–æ –±—ã–ª–æ –¥–æ–±–∞–≤–∏—Ç—å?" value={correctionForm?.missing_questions || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, missing_questions: e.target.value })} />
-                            <input style={{ ...s.crisisInput, marginBottom: 8 }} placeholder="–ö–∞–∫–∏–µ –≤–æ–ø—Ä–æ—Å—ã –±—ã–ª–∏ –ª–∏—à–Ω–∏–º–∏?" value={correctionForm?.bad_question_wording || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, bad_question_wording: e.target.value })} />
-                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="–ò—Å–ø—Ä–∞–≤–ª–µ–Ω–Ω–∞—è –≤–µ—Ä—Å–∏—è –æ—Ç—á–µ—Ç–∞ –¥–ª—è –ø–∞—Ü–∏–µ–Ω—Ç–∞" value={correctionForm?.corrected_user_report || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, corrected_user_report: e.target.value })} />
-                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="–ò—Å–ø—Ä–∞–≤–ª–µ–Ω–Ω–∞—è –≤–µ—Ä—Å–∏—è –æ—Ç—á–µ—Ç–∞ –¥–ª—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞" value={correctionForm?.corrected_doctor_report || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, corrected_doctor_report: e.target.value })} />
-                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 8 }} placeholder="–ü—Ä–µ–¥–ª–æ–∂–µ–Ω–∏–µ –¥–ª—è –∏–∑–º–µ–Ω–µ–Ω–∏—è –ø—Ä–æ—Ç–æ–∫–æ–ª–∞ / prompts" value={correctionForm?.protocol_update || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, protocol_update: e.target.value })} />
-                            <textarea style={{ ...s.crisisTextarea, minHeight: 60, marginBottom: 12 }} placeholder="–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π —Ä–µ–¥–∞–∫—Ç–æ—Ä–∞" value={correctionForm?.correction_comment || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, correction_comment: e.target.value })} />
-
-                            <div style={{ borderTop: `1px solid ${t.cardBorder}`, paddingTop: 12, marginBottom: 12 }}>
-                              <div style={{ color: t.crisisText, fontWeight: 700, fontSize: 13, marginBottom: 8 }}>
-                                –û—Ü–µ–Ω–∫–∞ –≥–æ–ª–æ—Å–æ–≤–æ–≥–æ –∞–Ω–∞–ª–∏–∑–∞ <span style={{ color: t.muted, fontWeight: 400, fontSize: 11 }}>–≠–∫—Å–ø–µ—Ä–∏–º–µ–Ω—Ç–∞–ª—å–Ω–æ</span>
-                              </div>
-
-                              <div style={{ marginBottom: 8 }}>
-                                <div style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>–¢–æ—á–Ω–æ—Å—Ç—å –Ω–∞–±–ª—é–¥–µ–Ω–∏–π</div>
-                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                  {[["correct", "–í–µ—Ä–Ω–æ"], ["partially_correct", "–ß–∞—Å—Ç–∏—á–Ω–æ –≤–µ—Ä–Ω–æ"], ["incorrect", "–ù–µ–≤–µ—Ä–Ω–æ"], ["cannot_assess", "–ù–µ–≤–æ–∑–º–æ–∂–Ω–æ –æ—Ü–µ–Ω–∏—Ç—å"]].map(([val, label]) => (
-                                    <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, color: t.crisisText, fontSize: 12, cursor: "pointer" }}>
-                                      <input type="radio" name="voice_accuracy" checked={correctionForm.voice_accuracy === val} onChange={() => setCorrectionForm({ ...correctionForm, voice_accuracy: val })} />
-                                      {label}
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div style={{ marginBottom: 8 }}>
-                                <div style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>–ü–æ–ª–µ–∑–Ω–æ—Å—Ç—å</div>
-                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                  {[["useful", "–ü–æ–ª–µ–∑–Ω–æ"], ["mostly_useful", "–°–∫–æ—Ä–µ–µ –ø–æ–ª–µ–∑–Ω–æ"], ["neutral", "–ù–µ–π—Ç—Ä–∞–ª—å–Ω–æ"], ["mostly_harmful", "–°–∫–æ—Ä–µ–µ –º–µ—à–∞–µ—Ç"], ["harmful", "–ú–µ—à–∞–µ—Ç"]].map(([val, label]) => (
-                                    <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, color: t.crisisText, fontSize: 12, cursor: "pointer" }}>
-                                      <input type="radio" name="voice_usefulness" checked={correctionForm.voice_usefulness === val} onChange={() => setCorrectionForm({ ...correctionForm, voice_usefulness: val })} />
-                                      {label}
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div style={{ marginBottom: 8 }}>
-                                <div style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>–ü–æ–≤–ª–∏—è–ª–æ –Ω–∞ —Ä–µ—à–µ–Ω–∏–µ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞</div>
-                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                  {[["yes", "–î–∞"], ["no", "–ù–µ—Ç"], ["partially", "–ß–∞—Å—Ç–∏—á–Ω–æ"]].map(([val, label]) => (
-                                    <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, color: t.crisisText, fontSize: 12, cursor: "pointer" }}>
-                                      <input type="radio" name="voice_influenced" checked={correctionForm.voice_influenced === val} onChange={() => setCorrectionForm({ ...correctionForm, voice_influenced: val })} />
-                                      {label}
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div style={{ marginBottom: 8 }}>
-                                <div style={{ color: t.muted, fontSize: 11, marginBottom: 4 }}>–ü–æ–¥—Ç–≤–µ—Ä–∂–¥—ë–Ω–Ω—ã–µ –ø—Ä–∏–∑–Ω–∞–∫–∏</div>
-                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                  {[["tempo", "–¢–µ–º–ø"], ["pauses", "–ü–∞—É–∑—ã"], ["volume", "–ì—Ä–æ–º–∫–æ—Å—Ç—å"], ["prosody", "–í—ã—Ä–∞–∑–∏—Ç–µ–ª—å–Ω–æ—Å—Ç—å"], ["tension", "–ù–∞–ø—Ä—è–∂–µ–Ω–∏–µ"], ["stability", "–ò–∑–º–µ–Ω—á–∏–≤–æ—Å—Ç—å"], ["audio_quality", "–ö–∞—á–µ—Å—Ç–≤–æ –∑–∞–ø–∏—Å–∏"]].map(([val, label]) => {
-                                    const checked = correctionForm.voice_confirmed?.includes(val);
-                                    return (
-                                      <label key={val} style={{ display: "flex", alignItems: "center", gap: 4, color: t.crisisText, fontSize: 12, cursor: "pointer" }}>
-                                        <input type="checkbox" checked={checked} onChange={() => {
-                                          const current = correctionForm.voice_confirmed || [];
-                                          setCorrectionForm({
-                                            ...correctionForm,
-                                            voice_confirmed: checked ? current.filter((c) => c !== val) : [...current, val],
-                                          });
-                                        }} />
-                                        {label}
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-
-                              <textarea style={{ ...s.crisisTextarea, minHeight: 50 }} placeholder="–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞ –∫ –∞–Ω–∞–ª–∏–∑—É –∑–≤—É—á–∞–Ω–∏—è —Ä–µ—á–∏" value={correctionForm?.voice_comment || ""} onChange={(e) => setCorrectionForm({ ...correctionForm, voice_comment: e.target.value })} />
-                            </div>
-
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                              <button
-                                disabled={!review?.id || adminActionLoading === review.id}
-                                style={{ border: 0, borderRadius: 12, background: t.badgeInProgress, color: t.badgeInProgressText, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: adminActionLoading === review.id ? 0.5 : 1 }}
-                                onClick={() => adminSaveCorrection(review.id, null)}
-                              >
-                                –°–æ—Ö—Ä–∞–Ω–∏—Ç—å –ø—Ä–∞–≤–∫–∏
-                              </button>
-                              <button
-                                disabled={!review?.id || adminActionLoading === review.id}
-                                style={{ border: 0, borderRadius: 12, background: t.badgeClosed, color: t.badgeClosedText, padding: "8px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", opacity: adminActionLoading === review.id ? 0.5 : 1 }}
-                                onClick={() => adminSaveCorrection(review.id, "approved")}
-                              >
-                                –û–¥–æ–±—Ä–∏—Ç—å –ø–æ—Å–ª–µ –ø—Ä–∞–≤–∫–∏
-                              </button>
-                              <button
-                                style={{ border: `1px solid ${t.crisisActionJsonlBorder}`, borderRadius: 12, background: t.crisisActionJsonl, color: t.crisisActionJsonlText, padding: "8px 14px", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
-                                onClick={closeCorrectionForm}
-                              >
-                                –û—Ç–º–µ–Ω–∞
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                    } catch (error) {
-                      console.error("review card render error", error, review);
-                      return (
-                        <div key={review?.id} style={{ border: `1px solid ${t.badgeNew}`, borderRadius: 20, background: t.dangerBg, padding: 20, color: t.badgeNewText, fontSize: 13 }}>
-                          <div>–û—à–∏–±–∫–∞ –æ—Ç–æ–±—Ä–∞–∂–µ–Ω–∏—è review {review?.id}</div>
-                          <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, color: t.muted, marginTop: 6 }}>
-                            {String(error?.message || error)}
-                          </pre>
-                        </div>
-                      );
-                    }
-                  })}
-                </div>
-              )}
-
-              <button
-                onClick={() => adminDownloadJsonl("approved")}
-                style={{
-                  background: t.jsonlBtn, color: t.jsonlBtnText, border: `1px solid ${t.jsonlBtnBorder}`,
-                  padding: "8px 16px", borderRadius: 6, cursor: "pointer", fontSize: 13,
-                  marginTop: 8,
-                }}
-              >
-                –≠–∫—Å–ø–æ—Ä—Ç–∏—Ä–æ–≤–∞—Ç—å –æ–¥–æ–±—Ä–µ–Ω–Ω—ã–µ –≤ JSONL
-              </button>
-
-              {/* Future /admin/experts page placeholder */}
-              {/*
-                TODO: "–ü–æ–∑–∂–µ –¥–æ–±–∞–≤–∏—Ç—å —Å–ø–∏—Å–æ–∫ –∑–∞—Ä–µ–≥–∏—Å—Ç—Ä–∏—Ä–æ–≤–∞–Ω–Ω—ã—Ö —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–≤, –æ—Ç–∫–ª—é—á–µ–Ω–∏–µ is_active –∏ –ø—Ä–æ—Å–º–æ—Ç—Ä –∏—Ö reviews."
-              */}
-              </>
-            )}
-          </>
-          )}
-        </div>
-
-        {modalData && (
-          <div style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center",
-            justifyContent: "center", zIndex: 3000, padding: 20,
-          }} onClick={closeModal}>
-            <div style={{
-              background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
-              padding: 24, maxWidth: 800, width: "100%", maxHeight: "90vh",
-              display: "flex", flexDirection: "column",
-            }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{modalData.title}</h3>
-                <button onClick={closeModal} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>‚úï</button>
-              </div>
-              <div style={{
-                flex: 1, overflowY: "auto", color: t.crisisText, fontSize: 14,
-                lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
-              }}>
-                {modalData.content}
-              </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button
-                  onClick={() => { navigator.clipboard.writeText(modalData.content); showToast("–°–∫–æ–ø–∏—Ä–æ–≤–∞–Ω–æ"); }}
-                  style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
-                >
-                  –°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å
-                </button>
-                <button onClick={closeModal} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                  –ó–∞–∫—Ä—ã—Ç—å
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Patient modal (expert ‚Äî My Patients) */}
-        {patientModalOpen && (
-          <div style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center",
-            justifyContent: "center", zIndex: 3001, padding: 20,
-          }} onClick={() => { setPatientModalOpen(false); }}>
-            <div style={{
-              background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
-              padding: 24, maxWidth: 700, width: "100%", maxHeight: "90vh",
-              display: "flex", flexDirection: "column",
-            }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>–ú–æ–∏ –ø–∞—Ü–∏–µ–Ω—Ç—ã</h3>
-                  {expertData?.membership?.organization_name && (
-                    <div style={{ color: t.muted, fontSize: 13, marginTop: 4 }}>{expertData.membership.organization_name}</div>
-                  )}
-                </div>
-                <button onClick={() => setPatientModalOpen(false)} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>‚úï</button>
-              </div>
-
-              {/* Assign patient by code */}
-              <div style={{ marginBottom: 16, padding: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.highlight }}>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>–î–æ–±–∞–≤–∏—Ç—å –ø–∞—Ü–∏–µ–Ω—Ç–∞ –ø–æ –∫–æ–¥—É</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input placeholder="–¢–û–ß–ö–ê-XXXX-XXXX" value={patientModalCode} onChange={(e) => setPatientModalCode(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", flex: 1 }} />
-                  <button onClick={handleAssignPatient} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                    –ù–∞–∑–Ω–∞—á–∏—Ç—å
-                  </button>
-                </div>
-              </div>
-
-              {/* Create invite link */}
-              <div style={{ marginBottom: 16, padding: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 16, background: t.highlight }}>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>–°–æ–∑–¥–∞—Ç—å —Å—Å—ã–ª–∫—É –¥–ª—è –ø–∞—Ü–∏–µ–Ω—Ç–∞</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <input placeholder="–ú–µ—Ç–∫–∞ (–Ω–∞–ø—Ä–∏–º–µ—Ä, –ü–∞—Ü–∏–µ–Ω—Ç 1)" value={inviteLinkLabel} onChange={(e) => setInviteLinkLabel(e.target.value)} style={{ border: `1px solid ${t.inputBorder}`, borderRadius: 10, background: t.inputBg, color: t.inputText, padding: "8px 12px", fontSize: 13, outline: "none", flex: 1 }} />
-                  <button onClick={handleCreateInviteLink} style={{ border: 0, borderRadius: 10, background: t.accent, color: "#fff", padding: "8px 14px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                    –°–æ–∑–¥–∞—Ç—å —Å—Å—ã–ª–∫—É
-                  </button>
-                </div>
-                {inviteLinkCreated && (
-                  <div style={{ marginTop: 12, padding: 12, border: `1px solid ${t.badgeClosed}`, borderRadius: 10, background: t.cardBg }}>
-                    <div style={{ fontSize: 12, color: t.muted, marginBottom: 4 }}>–°—Å—ã–ª–∫–∞ —Å–æ–∑–¥–∞–Ω–∞:</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, wordBreak: "break-all", marginBottom: 8 }}>{inviteLinkCreated.url}</div>
-                    <button onClick={() => { navigator.clipboard.writeText(inviteLinkCreated.url); showToast("–°—Å—ã–ª–∫–∞ —Å–∫–æ–ø–∏—Ä–æ–≤–∞–Ω–∞"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 8, background: t.tabBg, color: t.text, padding: "4px 10px", fontSize: 11, cursor: "pointer" }}>
-                      –ö–æ–ø–∏—Ä–æ–≤–∞—Ç—å
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Patient list */}
-              <div style={{ flex: 1, overflowY: "auto", marginBottom: 16 }}>
-                {myPatientsLoading ? (
-                  <div style={{ color: t.muted, textAlign: "center", padding: 40, fontSize: 14 }}>–ó–∞–≥—Ä—É–∑–∫–∞...</div>
-                ) : myPatients.length === 0 ? (
-                  <div style={{ color: t.muted, textAlign: "center", padding: 40, fontSize: 14 }}>–ù–µ—Ç –Ω–∞–∑–Ω–∞—á–µ–Ω–Ω—ã—Ö –ø–∞—Ü–∏–µ–Ω—Ç–æ–≤</div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {myPatients.map((p) => (
-                      <div key={p.id} style={{ padding: "12px 16px", border: `1px solid ${t.cardBorder}`, borderRadius: 14, background: t.cardBg, cursor: "pointer" }}
-                        onClick={() => loadSessionTimeline(p.public_code)}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 4 }}>
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: 14, color: t.accent, letterSpacing: 0.5 }}>
-                              {p.public_code}
-                            </div>
-                            {p.patient_label && (
-                              <div style={{ color: t.muted, fontSize: 12, marginTop: 2 }}>{p.patient_label}</div>
-                            )}
-                          </div>
-                          <div style={{ textAlign: "right", fontSize: 12, color: t.muted }}>
-                            {p.limited_access ? (
-                              <div>–ü–æ–¥—Ä–æ–±–Ω—ã–µ –¥–∞–Ω–Ω—ã–µ –Ω–µ–¥–æ—Å—Ç—É–ø–Ω—ã –¥–ª—è –≤–∞—à–µ–π —Ä–æ–ª–∏</div>
-                            ) : (
-                              <>
-                                <div>–°–µ—Å—Å–∏–π: {p.session_count || 0}</div>
-                                {p.last_session_at && (
-                                  <div>{new Date(p.last_session_at).toLocaleDateString("ru-RU")}</div>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        {(p.last_risk_level || p.last_care_recommendation) && (
-                          <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                            {p.last_risk_level && (
-                              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: p.last_risk_level === "high" ? t.dangerBg : p.last_risk_level === "medium" ? t.badgePending : t.badgeClosed, color: p.last_risk_level === "high" ? t.badgeNewText : p.last_risk_level === "medium" ? t.badgePendingText : t.badgeClosedText }}>
-                                –†–∏—Å–∫: {p.last_risk_level}
-                              </span>
-                            )}
-                            {p.last_care_recommendation?.level && (
-                              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: t.badgeInProgress, color: t.badgeInProgressText }}>
-                                {p.last_care_recommendation.level}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {(timelineLoading || timelineData) && (
-          <div style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center",
-            justifyContent: "center", zIndex: 3001, padding: 20,
-          }} onClick={() => { closeModal(); }}>
-            <div style={{
-              background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
-              padding: 24, maxWidth: 700, width: "100%", maxHeight: "90vh",
-              display: "flex", flexDirection: "column",
-            }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>–õ–∏–Ω–∏—è —Å–µ—Å—Å–∏–π</h3>
-                  {timelineCode && <div style={{ color: t.accent, fontSize: 14, fontWeight: 600, marginTop: 4 }}>{timelineCode}</div>}
-                </div>
-                <button onClick={() => { closeModal(); }} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>‚úï</button>
-              </div>
-
-              <div style={{ flex: 1, overflowY: "auto" }}>
-                {timelineLoading && (
-                  <div style={{ padding: 32, textAlign: "center", color: t.muted, fontSize: 14 }}>
-                    –ó–∞–≥—Ä—É–∂–∞–µ–º –ª–∏–Ω–∏—é —Å–µ—Å—Å–∏–π‚Ä¶
-                  </div>
-                )}
-
-                {!timelineLoading && timelineData && (
-                  <div>
-                    <div style={{ color: t.cardLabel, fontSize: 13, marginBottom: 16 }}>
-                      –ù–∞–π–¥–µ–Ω–æ –æ–±—Ä–∞—â–µ–Ω–∏–π: {timelineData.session_count}
-                      {timelineData.single_session_message && (
-                        <span style={{ display: "block", marginTop: 4, fontStyle: "italic" }}>{timelineData.single_session_message}</span>
-                      )}
-                    </div>
-
-                    {timelineData.items && timelineData.items.length > 0 && timelineData.items.map((item, idx) => {
-                      const seq = item.display_sequence || idx + 1;
-                      const kindLabel = SESSION_KIND_LABELS_TIMELINE[item.session_kind] || item.session_kind || "–°–µ—Å—Å–∏—è";
-                      const dateStr = item.created_at ? new Date(item.created_at).toLocaleString("ru-RU", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "‚Äî";
-                      const statusLabel = STATUS_LABELS_TIMELINE[item.status] || item.status || "‚Äî";
-
-                      return (
-                        <div key={`${item.session_id || item.case_review_id || item.training_session_id || idx}-${idx}`} style={{
-                          marginBottom: 16, border: `1px solid ${t.cardBorder}`, borderRadius: 14, padding: 16,
-                          background: t.crisisCard,
-                        }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <span style={{
-                                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                                width: 28, height: 28, borderRadius: "50%", background: t.accent, color: "#fff",
-                                fontWeight: 700, fontSize: 13,
-                              }}>{seq}</span>
-                              <span style={{ fontWeight: 700, fontSize: 14 }}>{kindLabel}</span>
-                            </div>
-                            <span style={{
-                              fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 8,
-                              background: item.status === "approved" ? t.badgeClosed : item.status === "rejected" ? t.badgeNew : t.badgePending,
-                              color: item.status === "approved" ? t.badgeClosedText : item.status === "rejected" ? t.badgeNewText : t.badgePendingText,
-                            }}>{statusLabel}</span>
-                          </div>
-
-                          <div style={{ color: t.cardLabel, fontSize: 12, marginBottom: 4 }}>{dateStr}</div>
-
-                          {item.interval_after_previous && (
-                            <div style={{ color: t.cardLabel, fontSize: 11, marginBottom: 8, fontStyle: "italic" }}>
-                              {item.interval_after_previous}
-                            </div>
-                          )}
-
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
-                            {item.model_used && <span style={{ fontSize: 11, color: t.muted, background: t.tabBg, padding: "2px 8px", borderRadius: 6 }}>{item.model_used}</span>}
-                            {item.fallback_used && <span style={{ fontSize: 11, color: t.muted, background: t.tabBg, padding: "2px 8px", borderRadius: 6 }}>fallback</span>}
-                            {item.expert_name && <span style={{ fontSize: 11, color: t.muted }}>–≠–∫—Å–ø–µ—Ä—Ç: {item.expert_name}</span>}
-                          </div>
-
-                          {item.patient_text_preview && (
-                            <div style={{ color: t.crisisText, fontSize: 12, lineHeight: 1.5, marginBottom: 8, maxHeight: 60, overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {item.patient_text_preview}
-                            </div>
-                          )}
-
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-                            {item.user_report_available && <span style={{ fontSize: 10, color: t.cardLabel }}>üìã –û—Ç—á—ë—Ç –¥–ª—è –ø–∞—Ü–∏–µ–Ω—Ç–∞</span>}
-                            {item.doctor_report_available && <span style={{ fontSize: 10, color: t.cardLabel }}>üìã –û—Ç—á—ë—Ç –¥–ª—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞</span>}
-                            {item.conversation_available && <span style={{ fontSize: 10, color: t.cardLabel }}>üí¨ –î–∏–∞–ª–æ–≥</span>}
-                            {item.support_plan_available && <span style={{ fontSize: 10, color: t.cardLabel }}>üìã –ü—Ä–∞–∫—Ç–∏–∫–∏</span>}
-                            {item.diary_available && <span style={{ fontSize: 10, color: t.cardLabel }}>üìì –î–Ω–µ–≤–Ω–∏–∫</span>}
-                          </div>
-
-                          {/* Training-specific fields */}
-                          {item.source === "training_session" && (
-                            <div style={{ background: t.tabBg, borderRadius: 8, padding: 10, marginBottom: 8 }}>
-                              {item.scenario_played && <div style={{ fontSize: 11, marginBottom: 2 }}><span style={{ color: t.cardLabel }}>–°—Ü–µ–Ω–∞—Ä–∏–π:</span> <span style={{ color: t.crisisText }}>{item.scenario_played}</span></div>}
-                              {item.expected_case_type && <div style={{ fontSize: 11, marginBottom: 2 }}><span style={{ color: t.cardLabel }}>–û–∂–∏–¥–∞–µ–º—ã–π —Ç–∏–ø:</span> <span style={{ color: t.crisisText }}>{item.expected_case_type}</span></div>}
-                              {item.ai_detected_case_type && <div style={{ fontSize: 11, marginBottom: 2 }}><span style={{ color: t.cardLabel }}>–†–∞—Å–ø–æ–∑–Ω–∞–Ω–æ:</span> <span style={{ color: t.crisisText }}>{item.ai_detected_case_type}</span></div>}
-                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
-                                {item.detection_quality && <span style={{ fontSize: 10, color: t.cardLabel }}>–†–∞—Å–ø–æ–∑–Ω–∞–≤–∞–Ω–∏–µ: {item.detection_quality}</span>}
-                                {item.questions_quality && <span style={{ fontSize: 10, color: t.cardLabel }}>–í–æ–ø—Ä–æ—Å—ã: {item.questions_quality}</span>}
-                                {item.report_quality && <span style={{ fontSize: 10, color: t.cardLabel }}>–û—Ç—á—ë—Ç: {item.report_quality}</span>}
-                                {item.safety_quality && <span style={{ fontSize: 10, color: t.cardLabel }}>Safety: {item.safety_quality}</span>}
-                              </div>
-                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
-                                {item.repeated_questions && <span style={{ fontSize: 10, color: t.badgeNewText }}>–ü–æ–≤—Ç–æ—Ä—ã –≤–æ–ø—Ä–æ—Å–æ–≤</span>}
-                                {item.missed_risk_flags && <span style={{ fontSize: 10, color: t.badgeNewText }}>–ü—Ä–æ–ø—É—â–µ–Ω—ã —Ä–∏—Å–∫–∏</span>}
-                                {item.wrong_recommendation && <span style={{ fontSize: 10, color: t.badgeNewText }}>–ù–µ–≤–µ—Ä–Ω–∞—è —Ä–µ–∫–æ–º–µ–Ω–¥–∞—Ü–∏—è</span>}
-                                {item.remembered_context && <span style={{ fontSize: 10, color: t.badgeClosedText }}>–£—á—Ç—ë–Ω –∫–æ–Ω—Ç–µ–∫—Å—Ç</span>}
-                              </div>
-                              {item.expert_comment && (
-                                <div style={{ fontSize: 11, marginTop: 4, color: t.crisisText, fontStyle: "italic" }}>{item.expert_comment}</div>
-                              )}
-                            </div>
-                          )}
-
-                          <button
-                            onClick={() => loadSessionDetails(item)}
-                            disabled={sessionDetailsLoading}
-                            style={{
-                              border: `1px solid ${t.border}`, borderRadius: 10,
-                              background: t.accent, color: "#fff",
-                              padding: "8px 16px", fontWeight: 600, fontSize: 12,
-                              cursor: sessionDetailsLoading ? "wait" : "pointer",
-                              marginTop: 8,
-                            }}
-                          >
-                            {sessionDetailsLoading ? "–ó–∞–≥—Ä—É–∂–∞–µ–º –¥–∞–Ω–Ω—ã–µ —Å–µ—Å—Å–∏–∏‚Ä¶" : "–û—Ç–∫—Ä—ã—Ç—å —Å–µ—Å—Å–∏—é"}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button onClick={() => { closeModal(); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                  –ó–∞–∫—Ä—ã—Ç—å
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Session detail view */}
-        {timelineData && timelineView === "detail" && sessionDetailsData && (
-          <div style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center",
-            justifyContent: "center", zIndex: 3002, padding: 20,
-          }} onClick={() => { setTimelineView("list"); setSessionDetailsData(null); setSessionDetailsError(null); }}>
-            <div style={{
-              background: t.cardBg, border: `1px solid ${t.cardBorder}`, borderRadius: 20,
-              padding: 24, maxWidth: 800, width: "100%", maxHeight: "90vh",
-              display: "flex", flexDirection: "column",
-            }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                <div>
-                  <button
-                    onClick={() => { setTimelineView("list"); setSessionDetailsData(null); setSessionDetailsError(null); }}
-                    style={{ border: 0, background: "transparent", color: t.accent, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 8 }}
-                  >
-                    ‚Üê –ù–∞–∑–∞–¥ –∫ –ª–∏–Ω–∏–∏ —Å–µ—Å—Å–∏–π
-                  </button>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
-                    –°–µ—Å—Å–∏—è{sessionDetailsData.session_sequence ? ` ‚Ññ${sessionDetailsData.session_sequence}` : ""}
-                  </h3>
-                  <div style={{ color: t.accent, fontSize: 14, fontWeight: 600, marginTop: 2 }}>
-                    {SESSION_KIND_LABELS_TIMELINE[sessionDetailsData.session_kind] || sessionDetailsData.session_kind || "–°–µ—Å—Å–∏—è"}
-                  </div>
-                  {sessionDetailsData.created_at && (
-                    <div style={{ color: t.cardLabel, fontSize: 12, marginTop: 2 }}>
-                      {new Date(sessionDetailsData.created_at).toLocaleString("ru-RU", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </div>
-                  )}
-                </div>
-                <button onClick={() => { setTimelineView("list"); setSessionDetailsData(null); setSessionDetailsError(null); }} style={{ border: 0, background: "transparent", color: t.muted, fontSize: 22, cursor: "pointer", padding: 4 }}>‚úï</button>
-              </div>
-
-              <div style={{ flex: 1, overflowY: "auto" }}>
-                {renderSessionTimelineDetail(sessionDetailsData, t)}
-              </div>
-
-              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button onClick={() => copySessionDetails(sessionDetailsData)} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                  –°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å –æ–±–µ–∑–ª–∏—á–µ–Ω–Ω—É—é —Å–µ—Å—Å–∏—é
-                </button>
-                <button onClick={() => { setTimelineView("list"); }} style={{ border: `1px solid ${t.border}`, borderRadius: 10, background: t.tabBg, color: t.text, padding: "10px 18px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                  –ó–∞–∫—Ä—ã—Ç—å
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {toast.message && (
-          <div
-            key={toast.key}
-            style={{
-              position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
-              zIndex: 3010, padding: "14px 24px", borderRadius: 16, fontWeight: 600, fontSize: 15,
-              boxShadow: adminDarkMode ? "0 8px 30px rgba(0,0,0,.5)" : "0 4px 20px rgba(0,0,0,.1)",
-              animation: "toastIn 0.3s ease",
-              textAlign: "center", maxWidth: "calc(100vw - 40px)",
-              ...(toast.type === "error"
-                ? { background: t.dangerBg, border: `1px solid ${t.badgeNewText}`, color: t.badgeNewText }
-                : { background: t.highlight, border: `1px solid ${t.badgeClosedText}`, color: t.badgeClosedText }),
-            }}
-          >
-            {toast.message}
-          </div>
-        )}
-      </div>
-    </AdminErrorBoundary>
-    );
-  }
-
-  // --- Expert Invite page (/expert-invite/<token>) ---
-  if (typeof window !== "undefined" && window.location.pathname.match(/^\/expert-invite\//)) {
-    return <ExpertInvitePage />;
-  }
-
-  // --- Specialist Cabinet page (/specialist) ---
-  if (typeof window !== "undefined" && window.location.pathname.match(/^\/specialist\/?$/)) {
-    return <SpecialistCabinet />;
-  }
-
-  // Keep the legacy expert surface out of the AnMed pilot; its staff entry is /specialist.
-  if (APP_BRAND.isSupportPilot && typeof window !== "undefined" && window.location.pathname.match(/^\/expert\/?$/)) {
-    window.location.replace("/specialist");
-    return null;
-  }
-
-  // --- Expert Cabinet page (/expert) ---
-  if (typeof window !== "undefined" && window.location.pathname.match(/^\/expert\/?$/)) {
-    return <ExpertCabinet />;
-  }
-
-  const isNewLinkingInvite = Boolean(
-    phase !== "cabinet" &&
-    supportScreen === "landing" &&
-    inviteInfo?.valid &&
-    inviteInfo.invite_kind === "patient_specialist" &&
-    ["specialist_to_patient", "patient_to_specialist"].includes(inviteInfo.direction)
-  );
-
-  return (
-    <div style={s.page} className="app-page">
-      <style>{`
-  * {
-    box-sizing: border-box;
-  }
-
-  @keyframes toastIn {
-    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
-    to { opacity: 1; transform: translateX(-50%) translateY(0); }
-  }
-
-  html, body, #root {
-    width: 100%;
-    max-width: 100%;
-    overflow-x: hidden;
-  }
-
-    .app-logo {
-      height: 96px;
-      width: auto;
-    }
-    .app-logo-link {
-      transition: opacity 0.15s ease;
-    }
-    .app-logo-link:hover {
-      opacity: 0.85;
-    }
-    @media (max-width: 768px) {
-      .app-logo {
-        height: 72px;
-      }
-    }
-    @media (max-width: 768px) {
-      .app-page {
-      padding: 18px !important;
-    }
-
-    .app-header {
-      flex-direction: column !important;
-      align-items: flex-start !important;
-      gap: 16px !important;
-      margin-bottom: 36px !important;
-    }
-
-    .app-grid {
-      display: block !important;
-    }
-
-    .app-hero-title {
-      font-size: 38px !important;
-      line-height: 1.08 !important;
-      letter-spacing: -0.03em !important;
-    }
-
-    .app-hero-text {
-      font-size: 17px !important;
-      line-height: 1.55 !important;
-    }
-
-    .app-actions {
-      flex-direction: column !important;
-      width: 100% !important;
-    }
-
-    .app-actions button {
-      width: 100% !important;
-    }
-
-    .app-card {
-      margin-top: 32px !important;
-      padding: 18px !important;
-      border-radius: 24px !important;
-      width: 100% !important;
-      max-width: 100% !important;
-    }
-
-    textarea,
-    input {
-      width: 100% !important;
-      max-width: 100% !important;
-      font-size: 16px !important;
-    }
-
-    button {
-      max-width: 100% !important;
-      white-space: normal !important;
-    }
-
-    .modal {
-      width: calc(100vw - 28px) !important;
-      max-width: calc(100vw - 28px) !important;
-      max-height: calc(100vh - 28px) !important;
-      overflow-y: auto !important;
-      padding: 18px !important;
-    }
-
-    .tabs {
-      flex-direction: column !important;
-    }
-
-    .tabs button {
-      width: 100% !important;
-    }
-
-    .report-block {
-      overflow-wrap: anywhere !important;
-      word-break: break-word !important;
-    }
-  }
-`}</style>
-          <div style={s.wrap}>
-        <header style={{ ...s.header, marginBottom: APP_BRAND.isSupportPilot ? 28 : (activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding"].includes(bodyScreen)) || (activeModule === "support" && supportScreen !== "landing") ? 24 : 80 }} className="app-header">
-          {APP_BRAND.isSupportPilot ? (
-            <a
-              href="/"
-              aria-label={`${APP_BRAND.name} ‚Äî –Ω–∞ –≥–ª–∞–≤–Ω—É—é`}
-              className="app-logo-link"
-              style={{ display: "flex", alignItems: "center", gap: 12, color: "inherit", textDecoration: "none" }}
-            >
-              {APP_BRAND.isPneumo ? (
-                <img src={APP_BRAND.logoHeader} alt={APP_BRAND.name} style={{ height: 72, width: "auto", display: "block", objectFit: "contain", flexShrink: 0 }} />
-              ) : (
-                <div aria-label={APP_BRAND.name} style={{ minWidth: 190 }}>
-                  <div style={{ ...s.logo, color: "#14264A", fontSize: 34, fontWeight: 900, letterSpacing: "-0.04em" }}>
-                    {APP_BRAND.isKgmu ? <span style={{ color: "#176B66", letterSpacing: "-0.025em" }}>–ö–∞–∑–∞–Ω—Å–∫–∏–π –ì–ú–£</span> : <>–ê–Ω<span style={{ color: "#E63E4B" }}>–ú–µ–¥</span></>}
-                  </div>
-                  <div style={s.sub}>{APP_BRAND.subtitle}</div>
-                </div>
-              )}
-              {APP_BRAND.isPneumo && (
-                <div>
-                  <div style={{ ...s.logo, fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>{APP_BRAND.name}</div>
-                  <div style={s.sub}>{APP_BRAND.subtitle}</div>
-                </div>
-              )}
-            </a>
-          ) : (
-            <div
-              style={{ display: "flex", alignItems: "center", gap: 12, cursor: activeModule === "support" && supportScreen !== "landing" ? "pointer" : "default" }}
-              onClick={activeModule === "support" && supportScreen !== "landing" ? goToSupportLanding : undefined}
-              title={activeModule === "support" && supportScreen !== "landing" ? "–ù–∞ –≥–ª–∞–≤–Ω—É—é" : undefined}
-            >
-              <img
-                src="/logo-tochka-opory-header.png"
-                alt={isDedicatedSubdomain ? "–û–ø–æ—Ä–∞. –ó–¥–æ—Ä–æ–≤—å–µ & –°—Ç—Ä–æ–π–Ω–æ—Å—Ç—å" : APP_BRAND.name}
-                className="app-logo"
-                style={{ display: "block", flexShrink: 0, objectFit: "contain", height: 96, width: "auto" }}
-              />
-              <div>
-                <div style={s.logo}>{isDedicatedSubdomain ? "–û–ø–æ—Ä–∞. –ó–¥–æ—Ä–æ–≤—å–µ & –°—Ç—Ä–æ–π–Ω–æ—Å—Ç—å" : APP_BRAND.name}</div>
-                {!isDedicatedSubdomain && <div style={s.sub}>{APP_BRAND.subtitle}</div>}
-              </div>
-            </div>
-          )}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            {((activeModule === "support" && supportScreen === "landing") || (activeModule === "body" && bodyScreen === "landing")) && (
-              <button
-                style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
-                onClick={() => setAboutProjectOpen(true)}
-              >
-                –û –ø—Ä–æ–µ–∫—Ç–µ
-              </button>
-            )}
-            {!isDedicatedSubdomain && (<>
-            {!(activeModule === "support" && supportScreen !== "landing") && (
-            <button
-              style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }}
-              onClick={() => { window.location.href = "/specialist"; }}
-            >
-              –ö–∞–±–∏–Ω–µ—Ç —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞
-            </button>
-            )}
-            <button
-              style={s.crisis}
-              onClick={() => setCrisisOpen(true)}
-            >
-              –°—Ä–æ—á–Ω–∞—è –ø–æ–º–æ—â—å
-            </button>
-            </>)}
-          </div>
-        </header>
-
-        {APP_BRAND.isSupportPilot && (
-          <div role="note" style={{ margin: "0 0 32px", padding: "12px 16px", borderRadius: 12, background: "#FFF1F1", border: "1px solid #E9B4B8", color: "#7D2530", fontSize: 14, lineHeight: 1.5 }}>
-            {APP_BRAND.pilotNotice}
-          </div>
-        )}
-
-        {/* Invite banners ‚Äî only on landing page, never overlay cabinet */}
-        {phase !== "cabinet" && supportScreen === "landing" && inviteChecking && (
-          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", textAlign: "center", color: "#7A7268", fontSize: 14 }}>
-            –ü—Ä–æ–≤–µ—Ä–∫–∞ —Å—Å—ã–ª–∫–∏...
-          </div>
-        )}
-        {/* NEW patient_specialist invitation ‚Äî Accept/Decline */}
-        {phase !== "cabinet" && supportScreen === "landing" && inviteInfo && inviteInfo.valid && inviteInfo.invite_kind === "patient_specialist" && inviteInfo.direction === "specialist_to_patient" && (
-          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "18px 24px", borderRadius: 16, background: "rgba(46,125,50,0.08)", border: "1px solid rgba(46,125,50,0.2)", textAlign: "center" }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#2e7d32", marginBottom: 6 }}>
-              –í–∞—Å –ø—Ä–∏–≥–ª–∞—à–∞–µ—Ç —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç {inviteInfo.expert_name || ""}
-            </div>
-            {inviteInfo.expires_at && (
-              <div style={{ fontSize: 12, color: "#4a7c4c", marginBottom: 12 }}>
-                –°—Å—ã–ª–∫–∞ –¥–µ–π—Å—Ç–≤–∏—Ç–µ–ª—å–Ω–∞ –¥–æ {new Date(inviteInfo.expires_at).toLocaleDateString("ru-RU")}
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-              <button
-                onClick={() => acceptPublicSpecialistInvitation(inviteToken)}
-                style={{ padding: "10px 24px", borderRadius: 12, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
-              >
-                –ü—Ä–∏–Ω—è—Ç—å
-              </button>
-              <button
-                onClick={() => declinePublicSpecialistInvitation(inviteToken)}
-                style={{ padding: "10px 24px", borderRadius: 12, border: "1px solid rgba(46,42,37,.15)", background: "transparent", color: "#7A7268", fontWeight: 600, fontSize: 14, cursor: "pointer" }}
-              >
-                –û—Ç–∫–ª–æ–Ω–∏—Ç—å
-              </button>
-            </div>
-          </div>
-        )}
-        {/* NEW patient ‚Üí specialist invitation: authenticated specialist or onboarding */}
-        {phase !== "cabinet" && supportScreen === "landing" && inviteInfo && inviteInfo.valid && inviteInfo.invite_kind === "patient_specialist" && inviteInfo.direction === "patient_to_specialist" && (
-          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "18px 24px", borderRadius: 16, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.12)", textAlign: "center" }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#5F574F", marginBottom: 8 }}>
-              –ü–∞—Ü–∏–µ–Ω—Ç –ø—Ä–∏–≥–ª–∞—à–∞–µ—Ç —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞ –ø–æ–¥–∫–ª—é—á–∏—Ç—å—Å—è
-            </div>
-            {inviteSpecialistAuth.loading ? (
-              <div style={{ fontSize: 13, color: "#7A7268" }}>–ü—Ä–æ–≤–µ—Ä–∫–∞ –≤—Ö–æ–¥–∞ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞...</div>
-            ) : inviteSpecialistAuth.error ? (
-              <div style={{ fontSize: 13, color: "#B85C4A" }}>{inviteSpecialistAuth.error}</div>
-            ) : inviteInfo.status === "onboarding_submitted" ? (
-              <div style={{ fontSize: 13, color: "#5F7D6C" }}>–ó–∞—è–≤–∫–∞ –æ—Ç–ø—Ä–∞–≤–ª–µ–Ω–∞. –ê–¥–º–∏–Ω–∏—Å—Ç—Ä–∞—Ç–æ—Ä —Ä–∞—Å—Å–º–æ—Ç—Ä–∏—Ç –µ—ë –æ—Ç–¥–µ–ª—å–Ω–æ.</div>
-            ) : inviteSpecialistAuth.authenticated ? (
-              <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                <button onClick={() => respondToPatientInvitationAsSpecialist("acceptPatientInvitation")} style={{ padding: "10px 24px", borderRadius: 12, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                  –ü—Ä–∏–Ω—è—Ç—å
-                </button>
-                <button onClick={() => respondToPatientInvitationAsSpecialist("declinePatientInvitation")} style={{ padding: "10px 24px", borderRadius: 12, border: "1px solid rgba(46,42,37,.15)", background: "transparent", color: "#7A7268", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
-                  –û—Ç–∫–ª–æ–Ω–∏—Ç—å
-                </button>
-              </div>
-            ) : (
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
-                  –ï—Å–ª–∏ —É –≤–∞—Å –µ—â—ë –Ω–µ—Ç –∫–∞–±–∏–Ω–µ—Ç–∞ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞, –æ—Å—Ç–∞–≤—å—Ç–µ –∫–æ–Ω—Ç–∞–∫—Ç–Ω—ã–µ –¥–∞–Ω–Ω—ã–µ –¥–ª—è –ø–æ–¥–∫–ª—é—á–µ–Ω–∏—è. –ö–ª–∏–Ω–∏—á–µ—Å–∫–∏–µ –¥–∞–Ω–Ω—ã–µ –ø–∞—Ü–∏–µ–Ω—Ç–∞ –ø–æ —ç—Ç–æ–π —Å—Å—ã–ª–∫–µ –Ω–µ –æ—Ç–∫—Ä—ã–≤–∞—é—Ç—Å—è.
-                </div>
-                <div style={{ display: "grid", gap: 8 }}>
-                  <input style={s.answerInput} placeholder="–ò–º—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞" value={onboardingForm.name} onChange={(e) => setOnboardingForm({ ...onboardingForm, name: e.target.value })} />
-                  <input style={s.answerInput} type="email" placeholder="Email (–Ω–µ–æ–±—è–∑–∞—Ç–µ–ª—å–Ω–æ)" value={onboardingForm.contact_email} onChange={(e) => setOnboardingForm({ ...onboardingForm, contact_email: e.target.value })} />
-                  <input style={s.answerInput} placeholder="–¢–µ–ª–µ—Ñ–æ–Ω (–Ω–µ–æ–±—è–∑–∞—Ç–µ–ª—å–Ω–æ)" value={onboardingForm.contact_phone} onChange={(e) => setOnboardingForm({ ...onboardingForm, contact_phone: e.target.value })} />
-                  <textarea style={{ ...s.answerInput, minHeight: 70 }} placeholder="–ö–æ–º–º–µ–Ω—Ç–∞—Ä–∏–π (–Ω–µ–æ–±—è–∑–∞—Ç–µ–ª—å–Ω–æ)" value={onboardingForm.comment} onChange={(e) => setOnboardingForm({ ...onboardingForm, comment: e.target.value })} />
-                </div>
-                <button onClick={submitPatientSpecialistOnboarding} disabled={onboardingSubmitting || onboardingForm.name.trim().length < 2} style={{ ...s.primary, marginTop: 12, width: "100%" }}>
-                  {onboardingSubmitting ? "–û—Ç–ø—Ä–∞–≤–∫–∞..." : "–ü–æ–¥–∫–ª—é—á–∏—Ç—å—Å—è –∫–∞–∫ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç"}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-        {/* LEGACY doctor invite ‚Äî anonymous conversation */}
-        {phase !== "cabinet" && supportScreen === "landing" && inviteInfo && inviteInfo.valid && inviteInfo.invite_kind === "legacy_doctor_invite" && (
-          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: "rgba(46,125,50,0.08)", border: "1px solid rgba(46,125,50,0.2)", textAlign: "center" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#2e7d32", marginBottom: 4 }}>üîó –í—ã –æ—Ç–∫—Ä—ã–ª–∏ —Å—Å—ã–ª–∫—É —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞</div>
-            <div style={{ fontSize: 13, color: "#4a7c4c", lineHeight: 1.5 }}>
-              –†–∞–∑–≥–æ–≤–æ—Ä –æ—Å—Ç–∞–Ω–µ—Ç—Å—è –∞–Ω–æ–Ω–∏–º–Ω—ã–º, –Ω–æ —Ä–µ–∑—É–ª—å—Ç–∞—Ç –±—É–¥–µ—Ç –¥–æ—Å—Ç—É–ø–µ–Ω —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç—É, –∫–æ—Ç–æ—Ä—ã–π –¥–∞–ª –≤–∞–º —Å—Å—ã–ª–∫—É.
-            </div>
-          </div>
-        )}
-        {phase !== "cabinet" && supportScreen === "landing" && inviteInfo && !inviteInfo.valid && !inviteChecking && (
-          <div style={{ maxWidth: 600, margin: "0 auto 20px", padding: "14px 20px", borderRadius: 16, background: "rgba(255,152,0,0.08)", border: "1px solid rgba(255,152,0,0.2)", textAlign: "center" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#e65100", marginBottom: 4 }}>‚ö†Ô∏è {inviteInfo.error || "–°—Å—ã–ª–∫–∞ –Ω–µ–¥–µ–π—Å—Ç–≤–∏—Ç–µ–ª—å–Ω–∞"}</div>
-            <div style={{ fontSize: 13, color: "#bf5f00", lineHeight: 1.5 }}>
-              –í—ã –º–æ–∂–µ—Ç–µ –Ω–∞—á–∞—Ç—å –æ–±—ã—á–Ω—ã–π –∞–Ω–æ–Ω–∏–º–Ω—ã–π —Ä–∞–∑–≥–æ–≤–æ—Ä.
-            </div>
-          </div>
-        )}
-
-        {(() => {
-          if (isNewLinkingInvite) return null;
-          const isBodyCabinet = activeModule === "body" && ["cabinet", "diary_view", "diary_edit", "diary_result", "onboarding", "health_context", "service_requests"].includes(bodyScreen);
-          const isSupportCabinet = activeModule === "support" && supportScreen !== "landing";
-          const bodyMaxWidth = activeModule === "body" && bodyScreen === "cabinet" ? 1120
-            : activeModule === "body" && ["diary_view", "diary_edit", "diary_result", "health_context", "service_requests"].includes(bodyScreen) ? 820
-            : activeModule === "body" && bodyScreen === "onboarding" ? 640
-            : null;
-          const isFullWidth = isBodyCabinet || isSupportCabinet;
-          const fullWidthMax = isSupportCabinet ? 1180 : (bodyMaxWidth || 1120);
-          return (
-        <main style={isFullWidth ? { maxWidth: fullWidthMax, margin: "0 auto", padding: "0 16px", width: "100%", boxSizing: "border-box" } : s.grid} className={isFullWidth ? "" : "app-grid"}>
-          {!isFullWidth && (
-          <section>
-            <h1 style={s.h1} className="app-hero-title">
-              {activeModule === "body" ? "–†–∞–∑–±–µ—Ä—ë–º—Å—è —Å –ø–∏—Ç–∞–Ω–∏–µ–º, –¥–≤–∏–∂–µ–Ω–∏–µ–º –∏ —Ä–µ–∂–∏–º–æ–º" : "–ù–∞–π–¥—ë–º —Ç–æ—á–∫—É –æ–ø–æ—Ä—ã"}
-            </h1>
-            <p style={s.p} className="app-hero-text">
-              {activeModule === "body"
-                ? "–ü–æ–¥–¥–µ—Ä–∂–∏–º –Ω–∞ –ø—É—Ç–∏ –∫ –∑–¥–æ—Ä–æ–≤–æ–º—É –∏ —Å—Ç—Ä–æ–π–Ω–æ–º—É —Ç–µ–ª—É"
-                : "–†–∞—Å—Å–∫–∞–∂–∏—Ç–µ, —á—Ç–æ —Å –≤–∞–º–∏ –ø—Ä–æ–∏—Å—Ö–æ–¥–∏—Ç ‚Äî –≥–æ–ª–æ—Å–æ–º –∏–ª–∏ —Ç–µ–∫—Å—Ç–æ–º. –°–µ—Ä–≤–∏—Å –ø–æ–º–æ–∂–µ—Ç –º—è–≥–∫–æ —Ä–∞–∑–æ–±—Ä–∞—Ç—å —Å–æ—Å—Ç–æ—è–Ω–∏–µ, –∑–∞–º–µ—Ç–∏—Ç—å –≤–∞–∂–Ω—ã–µ –ø—Ä–∏–∑–Ω–∞–∫–∏ –∏ –ø—Ä–µ–¥–ª–æ–∂–∏—Ç—å –ø–æ–Ω—è—Ç–Ω—ã–π —Å–ª–µ–¥—É—é—â–∏–π —à–∞–≥."}
-            </p>
-
-            {phase === "input" && (
-            <div style={{ ...s.row, flexWrap: "wrap", alignItems: "center" }} className="app-actions">
-              {activeModule !== "body" && (
-                <button style={s.primary} onClick={async () => {
-                  try {
-                    await ensureStartSession();
-                  } catch (e) {
-                    setError(e.message);
-                    return;
-                  }
-                  setMode("voice");
-                }}>
-                  –†–∞—Å—Å–∫–∞–∑–∞—Ç—å –≥–æ–ª–æ—Å–æ–º
-                </button>
-              )}
-              {activeModule === "support" && (
-                <button
-                  style={{ ...s.secondary, marginTop: 0 }}
-                  onClick={() => {
-                    const saved = getSupportSession();
-                    if (saved.sessionId && saved.accessToken) {
-                      loadSupportCabinet();
-                    } else {
-                      setSessionModalOpen(true);
-                    }
-                  }}
-                >
-                  {(() => {
-                    const saved = getSupportSession();
-                    return saved.sessionId && saved.accessToken
-                      ? "–ü—Ä–æ–¥–æ–ª–∂–∏—Ç—å –ø–æ—Å–ª–µ–¥–Ω–∏–π —Ä–∞–∑–≥–æ–≤–æ—Ä"
-                      : "–ü—Ä–æ–¥–æ–ª–∂–∏—Ç—å —Ä–∞–∑–≥–æ–≤–æ—Ä";
-                  })()}
-                </button>
-              )}
-            </div>
-            )}
-
-            {/* Display name input ‚Äî shown when no saved session */}
-            {activeModule === "support" && phase === "input" && !getSupportSession().sessionId && (
-              <div style={{ marginTop: 16 }}>
-                <label style={{ fontSize: 13, color: "#7A7268", marginBottom: 6, display: "block" }}>–ö–∞–∫ –∫ –≤–∞–º –æ–±—Ä–∞—â–∞—Ç—å—Å—è?</label>
-                <input
-                  type="text"
-                  style={{ ...s.answerInput, maxWidth: 320 }}
-                  value={displayNameInput}
-                  onChange={(e) => setDisplayNameInput(e.target.value)}
-                  placeholder="–ò–º—è –∏–ª–∏ –ø—Å–µ–≤–¥–æ–Ω–∏–º (–Ω–µ–æ–±—è–∑–∞—Ç–µ–ª—å–Ω–æ)"
-                  maxLength={50}
-                />
-              </div>
-            )}
-
-            {activeModule === "body" && bodyScreen === "landing" && (
-              <div style={{ marginTop: 16, padding: 16, borderRadius: 14, background: "#f6f0e7", border: "1px solid #d8cec1" }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 8 }}>
-                  –£–∂–µ –µ—Å—Ç—å –∫–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è?
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input
-                    type="text"
-                    placeholder="HEALTH-XXXX-XXX-XXXX-XXXX-XXXX"
-                    value={bodyContinuationInput || ""}
-                    onChange={(e) => setBodyContinuationInput(e.target.value.toUpperCase())}
-                    onKeyDown={(e) => e.key === "Enter" && continueBodyByCode()}
-                    style={{
-                      flex: 1, height: 44, padding: "0 14px", borderRadius: 12,
-                      border: "1px solid #d8cec1", background: "#ffffff",
-                      color: "#2f2925", fontSize: 15, outline: "none",
-                      fontFamily: "monospace", boxSizing: "border-box",
-                    }}
-                  />
-                  <button
-                    onClick={continueBodyByCode}
-                    disabled={loading || !bodyContinuationInput.trim()}
-                    style={{
-                      height: 44, padding: "0 18px", borderRadius: 12, border: 0,
-                      background: loading ? "#c4d0c6" : "#7D9A89", color: "#ffffff", fontWeight: 700,
-                      fontSize: 14, cursor: loading ? "not-allowed" : "pointer", whiteSpace: "nowrap",
-                    }}
-                  >
-                    {loading ? "–û—Ç–∫—Ä—ã—Ç–∏–µ..." : "–ü—Ä–æ–¥–æ–ª–∂–∏—Ç—å"}
-                  </button>
-                </div>
-                {bodyContinuationError && (
-                  <div style={{ color: "#B85C4A", fontSize: 13, marginTop: 8 }}>{bodyContinuationError}</div>
-                )}
-              </div>
-            )}
-
-            {phase === "input" && showModuleSwitcher && (
-            <div style={{ ...s.row, marginTop: 8, gap: 6 }} className="app-actions">
-              <button
-                style={activeModule === "support" ? s.primary : s.secondary}
-                onClick={() => { setActiveModule("support"); setBodyIntakeStage("idle"); setBodyIntakeResult(null); }}
-              >
-                –¢–æ—á–∫–∞ –æ–ø–æ—Ä—ã
-              </button>
-              <button
-                style={activeModule === "body" ? s.primary : s.secondary}
-                onClick={() => { setActiveModule("body"); setBodyIntakeStage("idle"); setBodyIntakeResult(null); setBodyScreen("landing"); }}
-              >
-                –ó–¥–æ—Ä–æ–≤—å–µ & –°—Ç—Ä–æ–π–Ω–æ—Å—Ç—å
-              </button>
-            </div>
-            )}
-
-
-
-            {phase === "input" && (
-              activeModule === "body" ? (
-                <p style={{ color: "#7A7268", fontSize: 13, marginTop: 24, lineHeight: 1.5 }}>
-                  AI-–∫–æ–º–ø–∞–Ω—å–æ–Ω –ø–æ–º–æ–≥–∞–µ—Ç —Ä–∞–∑–æ–±—Ä–∞—Ç—å—Å—è —Å —Ä–µ–∂–∏–º–æ–º, –ø–∏—Ç–∞–Ω–∏–µ–º, –∞–∫—Ç–∏–≤–Ω–æ—Å—Ç—å—é –∏ —Å–∞–º–æ–∫–æ–Ω—Ç—Ä–æ–ª–µ–º. –ù–µ –∑–∞–º–µ–Ω—è–µ—Ç –≤—Ä–∞—á–∞ –∏ –Ω–µ –Ω–∞–∑–Ω–∞—á–∞–µ—Ç –ª–µ—á–µ–Ω–∏–µ.
-                </p>
-              ) : (
-                <>
-                  <p style={{ color: "#7A7268", fontSize: 13, marginTop: 24, lineHeight: 1.5 }}>
-                    –°–µ—Ä–≤–∏—Å —Ä–∞–±–æ—Ç–∞–µ—Ç –≤ —Ç–µ—Å—Ç–æ–≤–æ–º —Ä–µ–∂–∏–º–µ, –Ω–µ —Å—Ç–∞–≤–∏—Ç –¥–∏–∞–≥–Ω–æ–∑ –∏ –Ω–µ –∑–∞–º–µ–Ω—è–µ—Ç –∫–æ–Ω—Å—É–ª—å—Ç–∞—Ü–∏—é —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞. –ù–µ —É–∫–∞–∑—ã–≤–∞–π—Ç–µ –ø–µ—Ä—Å–æ–Ω–∞–ª—å–Ω—ã–µ –¥–∞–Ω–Ω—ã–µ –≤ —Ç–µ–∫—Å—Ç–µ –æ–±—Ä–∞—â–µ–Ω–∏—è.
-                  </p>
-                  <p style={{ color: "#B85C4A", fontSize: 12, marginTop: 8, lineHeight: 1.4 }}>
-                    –ï—Å–ª–∏ –≤—ã —á—É–≤—Å—Ç–≤—É–µ—Ç–µ, —á—Ç–æ –º–æ–∂–µ—Ç–µ –ø—Ä–∏—á–∏–Ω–∏—Ç—å –≤—Ä–µ–¥ —Å–µ–±–µ –∏–ª–∏ –¥—Ä—É–≥–æ–º—É —á–µ–ª–æ–≤–µ–∫—É, –ª–∏–±–æ –≤–∞–º –Ω—É–∂–Ω–∞ —Å—Ä–æ—á–Ω–∞—è –ø—Å–∏—Ö–∏–∞—Ç—Ä–∏—á–µ—Å–∫–∞—è –ø–æ–º–æ—â—å ‚Äî –Ω–µ–º–µ–¥–ª–µ–Ω–Ω–æ –æ–±—Ä–∞—Ç–∏—Ç–µ—Å—å –ø–æ —Ç–µ–ª–µ—Ñ–æ–Ω—É 112 (–∏–ª–∏ –≤ —ç–∫—Å—Ç—Ä–µ–Ω–Ω—ã–µ —Å–ª—É–∂–±—ã –≤–∞—à–µ–π —Å—Ç—Ä–∞–Ω—ã) –ª–∏–±–æ –∫ –±–ª–∏–∂–∞–π—à–µ–º—É –º–µ–¥–∏—Ü–∏–Ω—Å–∫–æ–º—É —É—á—Ä–µ–∂–¥–µ–Ω–∏—é.
-                  </p>
-                </>
-              )
-            )}
-          </section>
-          )}
-
-          {/* Body intake form */}
-          {activeModule === "body" && bodyScreen === "intake" && (
-            <BodyIntake onComplete={handleBodyIntakeComplete} />
-          )}
-
-          {/* Body intake result ‚Äî step-by-step flow */}
-          {activeModule === "body" && bodyScreen === "result" && bodyIntakeResult && (
-            <section style={s.card} className="app-card">
-
-              {/* Step 1: Summary */}
-              {bodyIntakeStep === 0 && (
-                <>
-                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16, color: "#2f2925" }}>
-                    –í–∞—à –ø–µ—Ä–≤—ã–π —Ä–∞–∑–±–æ—Ä
-                  </div>
-
-                  <div style={{ fontSize: 16, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#2f2925" }}>
-                    {bodyIntakeResult.user_report}
-                  </div>
-
-                  {/* Urgent/medical warning ‚Äî shown on step 1 */}
-                  {bodyIntakeResult?.care_recommendation?.level === "medical_consultation" && (
-                    <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: "rgba(251,191,36,.10)", border: "1px solid rgba(251,191,36,.25)" }}>
-                      <div style={{ fontWeight: 700, color: "#92400e", marginBottom: 6 }}>–ö–æ–≥–¥–∞ –ª—É—á—à–µ –æ–±—Ä–∞—Ç–∏—Ç—å—Å—è –∫ –≤—Ä–∞—á—É</div>
-                      <div style={{ color: "#78350f", fontSize: 14, lineHeight: 1.6 }}>
-                        –ü–æ –≤–∞—à–∏–º –¥–∞–Ω–Ω—ã–º –µ—Å—Ç—å –ø—Ä–∏–∑–Ω–∞–∫–∏, –∫–æ—Ç–æ—Ä—ã–µ —Å—Ç–æ–∏—Ç –æ–±—Å—É–¥–∏—Ç—å —Å–æ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–º. –†–µ–∫–æ–º–µ–Ω–¥—É–µ–º –∑–∞–ø–∏—Å–∞—Ç—å—Å—è –∫ —Ç–µ—Ä–∞–ø–µ–≤—Ç—É –≤ –±–ª–∏–∂–∞–π—à–∏–µ –¥–Ω–∏.
-                      </div>
-                    </div>
-                  )}
-                  {bodyIntakeResult?.care_recommendation?.level === "urgent_help" && (
-                    <div style={{ marginTop: 20, padding: 16, borderRadius: 14, background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.3)" }}>
-                      <div style={{ fontWeight: 700, color: "#991b1b", marginBottom: 6 }}>–í–æ–∑–º–æ–∂–Ω–æ, –Ω—É–∂–Ω–∞ —Å—Ä–æ—á–Ω–∞—è –ø–æ–º–æ—â—å</div>
-                      <div style={{ color: "#7f1d1d", fontSize: 14, lineHeight: 1.6 }}>
-                        –ï—Å–ª–∏ —É –≤–∞—Å –∏–ª–∏ —Ä—è–¥–æ–º —Å –≤–∞–º–∏ –µ—Å—Ç—å —Å–∏–º–ø—Ç–æ–º—ã, –∫–æ—Ç–æ—Ä—ã–µ —Ç—Ä–µ–±—É—é—Ç –Ω–µ–º–µ–¥–ª–µ–Ω–Ω–æ–π –ø–æ–º–æ—â–∏ ‚Äî –∑–≤–æ–Ω–∏—Ç–µ 103 –∏–ª–∏ 112.
-                      </div>
-                    </div>
-                  )}
-
-                  <button onClick={() => setBodyIntakeStep(1)} style={{
-                    marginTop: 24, width: "100%", height: 52, borderRadius: 16, border: 0,
-                    background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
-                  }}>
-                    –î–∞–ª—å—à–µ
-                  </button>
-                </>
-              )}
-
-              {/* Step 2: Continuation code */}
-              {bodyIntakeStep === 1 && (
-                <>
-                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 16, color: "#2f2925" }}>
-                    –í–∞—à –∫–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è
-                  </div>
-                  <div style={{ color: "#665c52", fontSize: 14, marginBottom: 16, lineHeight: 1.6 }}>
-                    –°–æ—Ö—Ä–∞–Ω–∏—Ç–µ —ç—Ç–æ—Ç –∫–æ–¥. –û–Ω –æ—Ç–∫—Ä—ã–≤–∞–µ—Ç –≤–∞—à –ø—Ä–æ—Ñ–∏–ª—å, –ø–ª–∞–Ω –∏ –¥–Ω–µ–≤–Ω–∏–∫ –Ω–∞ –ª—é–±–æ–º —É—Å—Ç—Ä–æ–π—Å—Ç–≤–µ.
-                  </div>
-                  {(bodyIntakeResult.continuation_code || continuationCode) ? (
-                    <div style={{
-                      textAlign: "center", padding: 24, borderRadius: 16, background: "#f6f0e7",
-                      border: "1px solid #d8cec1", marginBottom: 20,
-                    }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "0.06em", color: "#2f2925", fontFamily: "monospace", marginBottom: 12, wordBreak: "break-all" }}>
-                        {bodyIntakeResult.continuation_code || continuationCode}
-                      </div>
-                      <button onClick={copyBodyCode} style={{
-                        padding: "10px 24px", borderRadius: 12, border: 0,
-                        background: bodyCodeCopied ? "#4caf50" : "#7D9A89",
-                        color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
-                      }}>
-                        {bodyCodeCopied ? "–ö–æ–¥ —Å–∫–æ–ø–∏—Ä–æ–≤–∞–Ω" : "–°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å –∫–æ–¥"}
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{
-                      textAlign: "center", padding: 24, borderRadius: 16, background: "#f6f0e7",
-                      border: "1px solid #d8cec1", marginBottom: 20, color: "#665c52", fontSize: 14, lineHeight: 1.6,
-                    }}>
-                      –ö–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è –Ω–µ —Ö—Ä–∞–Ω–∏—Ç—Å—è –Ω–∞ —É—Å—Ç—Ä–æ–π—Å—Ç–≤–µ. –í –ª–∏—á–Ω–æ–º –∫–∞–±–∏–Ω–µ—Ç–µ –º–æ–∂–Ω–æ —Å–æ–∑–¥–∞—Ç—å –Ω–æ–≤—ã–π –∫–æ–¥.
-                    </div>
-                  )}
-                  <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                    <button onClick={() => setBodyIntakeStep(0)} style={{
-                      flex: 1, height: 48, borderRadius: 14, border: "1px solid #d8cec1",
-                      background: "#ede7dc", color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
-                    }}>
-                      –ù–∞–∑–∞–¥
-                    </button>
-                    <button onClick={() => setBodyIntakeStep(2)} style={{
-                      flex: 2, height: 48, borderRadius: 14, border: 0,
-                      background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
-                    }}>
-                      –ü—Ä–æ–¥–æ–ª–∂–∏—Ç—å
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {/* Step 3: 3-day plan */}
-              {bodyIntakeStep === 2 && bodyIntakeResult.body_plan?.days && (
-                <>
-                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 4, color: "#2f2925" }}>
-                    –ü–ª–∞–Ω –Ω–∞ 3 –¥–Ω—è
-                  </div>
-                  <div style={{ color: "#665c52", fontSize: 14, marginBottom: 20, fontStyle: "italic" }}>
-                    {bodyIntakeResult.body_plan.focus}
-                  </div>
-
-                  {bodyIntakeResult.body_plan.days.slice(0, 3).map(d => (
-                    <div key={d.day} style={{
-                      border: "1px solid #d8cec1", borderRadius: 16, padding: "16px 18px",
-                      marginBottom: 10, background: "#faf6ef",
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                        <div style={{
-                          width: 32, height: 32, borderRadius: "50%", background: "#5f8b7a",
-                          color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
-                          fontWeight: 700, fontSize: 14, flexShrink: 0,
-                        }}>
-                          {d.day}
-                        </div>
-                        <div style={{ fontWeight: 700, fontSize: 16, color: "#2f2925" }}>
-                          {d.title}
-                        </div>
-                      </div>
-                      {d.actions?.map((a, i) => (
-                        <div key={i} style={{ color: "#5f574f", fontSize: 14, paddingLeft: 14, marginBottom: 3, lineHeight: 1.5 }}>
-                          ‚Ä¢ {a}
-                        </div>
-                      ))}
-                      {d.note && (
-                        <div style={{ color: "#665c52", fontSize: 13, fontStyle: "italic", marginTop: 8, lineHeight: 1.5 }}>
-                          {d.note}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-
-                  <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                    <button onClick={() => setBodyIntakeStep(1)} style={{
-                      flex: 1, height: 48, borderRadius: 14, border: "1px solid #d8cec1",
-                      background: "#ede7dc", color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
-                    }}>
-                      –ù–∞–∑–∞–¥
-                    </button>
-                    <button onClick={() => setBodyIntakeStep(3)} style={{
-                      flex: 2, height: 48, borderRadius: 14, border: 0,
-                      background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "inherit",
-                    }}>
-                      –ù–∞—á–∞—Ç—å –¥–Ω–µ–≤–Ω–∏–∫
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {/* Step 4: CTA to cabinet */}
-              {bodyIntakeStep === 3 && (
-                <>
-                  <div style={{ textAlign: "center", padding: "20px 0" }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif", marginBottom: 12, color: "#2f2925" }}>
-                      –ì–æ—Ç–æ–≤—ã –ø—Ä–æ–¥–æ–ª–∂–∏—Ç—å?
-                    </div>
-                    <div style={{ color: "#665c52", fontSize: 15, lineHeight: 1.6, marginBottom: 28 }}>
-                      –í –ª–∏—á–Ω–æ–º –∫–∞–±–∏–Ω–µ—Ç–µ –º–æ–∂–Ω–æ –≤–µ—Å—Ç–∏ –¥–Ω–µ–≤–Ω–∏–∫, —Å–º–æ—Ç—Ä–µ—Ç—å –∏—Å—Ç–æ—Ä–∏—é –∏ —É–ø—Ä–∞–≤–ª—è—Ç—å –¥–æ—Å—Ç—É–ø–æ–º.
-                    </div>
-                    <button onClick={() => { loadBodyCabinet(bodyIntakeResult?.continuation_code); }} style={{
-                      width: "100%", height: 52, borderRadius: 16, border: 0,
-                      background: "#5f8b7a", color: "#fff", fontWeight: 800, fontSize: 16, cursor: "pointer", marginBottom: 12, fontFamily: "inherit",
-                    }}>
-                      –ü–µ—Ä–µ–π—Ç–∏ –≤ –ª–∏—á–Ω—ã–π –∫–∞–±–∏–Ω–µ—Ç
-                    </button>
-                    <button onClick={() => { setBodyIntakeStage("idle"); setBodyIntakeResult(null); setBodyScreen("landing"); setMode(""); }} style={{
-                      width: "100%", height: 48, borderRadius: 14, border: "1px solid #d8cec1",
-                      background: "#ede7dc", color: "#2f2925", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
-                    }}>
-                      –ù–∞ –≥–ª–∞–≤–Ω—É—é
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {/* Debug ‚Äî always accessible at bottom via toggle */}
-              {(window.location.hostname === "localhost" || import.meta.env?.DEV) && (
-                <details style={{ marginTop: 20 }}>
-                  <summary style={{ cursor: "pointer", fontSize: 12, color: "#8d8378", fontWeight: 600, padding: 8 }}>
-                    –ò–Ω—Ñ–æ—Ä–º–∞—Ü–∏—è –¥–ª—è —Ä–∞–∑—Ä–∞–±–æ—Ç–∫–∏
-                  </summary>
-                  <pre style={{ fontSize: 11, color: "#5f574f", lineHeight: 1.5, whiteSpace: "pre-wrap", margin: "8px 0 0" }}>
-{JSON.stringify({
-  module: bodyIntakeResult.module || "body",
-  stage: "intake_completed",
-  session_id: bodyIntakeResult.session_id || null,
-  care_recommendation: bodyIntakeResult.care_recommendation,
-  triggered_red_flags: bodyIntakeResult.triggered_red_flags || [],
-  red_flag_care_level: bodyIntakeResult.red_flag_care_level || null,
-  bmi: bodyIntakeResult.bmi,
-  used_fallback: bodyIntakeResult.used_fallback || false,
-  model_used: bodyIntakeResult.model_used || null,
-}, null, 2)}
-                  </pre>
-                </details>
-              )}
-
-              {/* Detail expand ‚Äî BMI, care reason, JSON */}
-              <details style={{ marginTop: 12 }}>
-                <summary style={{ cursor: "pointer", fontSize: 13, color: "#8d8378", fontWeight: 600, padding: 8 }}>
-                  –ü–æ–¥—Ä–æ–±–Ω–µ–µ
-                </summary>
-                <div style={{ padding: "8px 0" }}>
-                  {bodyIntakeResult?.bmi && (
-                    <div style={{ padding: 12, borderRadius: 12, background: "#f6f0e7", marginBottom: 10, fontSize: 13, color: "#5f574f", lineHeight: 1.6 }}>
-                      –ü–æ –≤–≤–µ–¥–µ–Ω–Ω—ã–º –¥–∞–Ω–Ω—ã–º –ò–ú–¢ –ø—Ä–∏–º–µ—Ä–Ω–æ {bodyIntakeResult.bmi}. –≠—Ç–æ –æ—Ä–∏–µ–Ω—Ç–∏—Ä–æ–≤–æ—á–Ω—ã–π –ø–æ–∫–∞–∑–∞—Ç–µ–ª—å: –æ–Ω –ø–æ–º–æ–≥–∞–µ—Ç —É–≤–∏–¥–µ—Ç—å –æ–±—â—É—é –∫–∞—Ä—Ç–∏–Ω—É, –Ω–æ –Ω–µ –∑–∞–º–µ–Ω—è–µ—Ç –æ—Ü–µ–Ω–∫—É —Å–æ—Å—Ç–∞–≤–∞ —Ç–µ–ª–∞, –æ–±—ä–µ–º–∞ —Ç–∞–ª–∏–∏, —Å–∞–º–æ—á—É–≤—Å—Ç–≤–∏—è –∏ –∫–æ–Ω—Å—É–ª—å—Ç–∞—Ü–∏—é —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞.
-                    </div>
-                  )}
-                  {bodyIntakeResult?.care_recommendation && (
-                    <div style={{ padding: 12, borderRadius: 12, background: "#f6f0e7", marginBottom: 10, fontSize: 13, color: "#5f574f", lineHeight: 1.6 }}>
-                      <div style={{ fontWeight: 600, marginBottom: 4 }}>–£—Ä–æ–≤–µ–Ω—å —Ä–µ–∫–æ–º–µ–Ω–¥–∞—Ü–∏–∏</div>
-                      {bodyIntakeResult.care_recommendation.level === "self_care" && "–í –∞–Ω–∫–µ—Ç–µ –Ω–µ—Ç –ø—Ä–∏–∑–Ω–∞–∫–æ–≤, —Ç—Ä–µ–±—É—é—â–∏—Ö —Å—Ä–æ—á–Ω–æ–π –ø–æ–º–æ—â–∏; –º–æ–∂–Ω–æ –Ω–∞—á–∞—Ç—å —Å –º—è–≥–∫–æ–≥–æ —Å–∞–º–æ–Ω–∞–±–ª—é–¥–µ–Ω–∏—è."}
-                      {bodyIntakeResult.care_recommendation.level === "medical_consultation" && "–ï—Å—Ç—å –ø—Ä–∏–∑–Ω–∞–∫–∏ –∏–ª–∏ –æ–≥—Ä–∞–Ω–∏—á–µ–Ω–∏—è, –∫–æ—Ç–æ—Ä—ã–µ –ª—É—á—à–µ –æ–±—Å—É–¥–∏—Ç—å —Å–æ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–º –ø–µ—Ä–µ–¥ –Ω–∞–≥—Ä—É–∑–∫–∞–º–∏."}
-                      {bodyIntakeResult.care_recommendation.level === "urgent_help" && "–í—ã –æ—Ç–º–µ—Ç–∏–ª–∏ —Å–∏–º–ø—Ç–æ–º, –ø—Ä–∏ –∫–æ—Ç–æ—Ä–æ–º –ª—É—á—à–µ –Ω–µ –ø—Ä–æ–¥–æ–ª–∂–∞—Ç—å –ø—Ä–æ–≥—Ä–∞–º–º—É –∏ –æ–±—Ä–∞—Ç–∏—Ç—å—Å—è –∑–∞ —Å—Ä–æ—á–Ω–æ–π –ø–æ–º–æ—â—å—é."}
-                    </div>
-                  )}
-                  <button onClick={downloadBodyIntakeJSON} style={{
-                    padding: "8px 18px", borderRadius: 10, border: "1px solid #d8cec1",
-                    background: "#ede7dc", color: "#2f2925", fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
-                  }}>
-                    –°–∫–∞—á–∞—Ç—å JSON
-                  </button>
-                </div>
-              </details>
-            </section>
-          )}
-
-           {/* Health Cabinet */}
-           {activeModule === "body" && bodyScreen === "cabinet" && bodyCabinetData && (
-             <HealthCabinet
-               sessionId={bodyDiarySessionId}
-               accessToken={(getBodySession().sessionId === bodyDiarySessionId ? getBodySession().accessToken : null)}
-               displayName={bodyCabinetData.display_name || null}
-               profile={bodyCabinetData.profile}
-               wallet={bodyCabinetData.wallet}
-               todayLog={bodyCabinetData.today_log}
-               history={bodyCabinetData.history}
-               onNewDiary={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }}
-               onViewDiary={(log) => { clearToast(); setBodyDiaryDayData(log); setBodyScreen("diary_view"); }}
-               onLogout={() => { clearBodySession(); setBodyScreen("landing"); setBodyCabinetData(null); setBodyDiarySessionId(null); }}
-               onRotateCode={regenerateBodyContinuationCode}
-               onOpenHealthContext={() => { clearToast(); setBodyScreen("health_context"); }}
-               onOpenServiceRequests={() => { clearToast(); setBodyScreen("service_requests"); }}
-               onUpdateDisplayName={async (name) => {
-                 try {
-                   const pair = getBodySession();
-                   if (!pair.accessToken || pair.sessionId !== bodyDiarySessionId) {
-                     showToast("–°–µ—Å—Å–∏—è –Ω–µ–¥–µ–π—Å—Ç–≤–∏—Ç–µ–ª—å–Ω–∞. –í–æ–π–¥–∏—Ç–µ —Å–Ω–æ–≤–∞ –ø–æ –∫–æ–¥—É –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è.", "error");
-                     return;
-                   }
-                   const res = await fetch("/api/session", {
-                     method: "POST",
-                     headers: { "Content-Type": "application/json" },
-                     body: JSON.stringify({ action: "updateBodyDisplayName", session_id: bodyDiarySessionId, access_token: pair.accessToken, display_name: name }),
-                   });
-                   const data = await res.json();
-                   if (data.ok) {
-                     setBodyCabinetData(prev => ({ ...prev, display_name: data.display_name }));
-                     showToast("–ò–º—è —Å–æ—Ö—Ä–∞–Ω–µ–Ω–æ");
-                   } else {
-                     showToast(data.error || "–ù–µ —É–¥–∞–ª–æ—Å—å —Å–æ—Ö—Ä–∞–Ω–∏—Ç—å –∏–º—è", "error");
-                   }
-                 } catch {
-                   showToast("–û—à–∏–±–∫–∞ —Å–æ—Ö—Ä–∞–Ω–µ–Ω–∏—è –∏–º–µ–Ω–∏", "error");
-                 }
-               }}
-             />
-           )}
-
-          {/* Body onboarding */}
-          {activeModule === "body" && bodyScreen === "onboarding" && (
-            <BodyOnboarding
-              onComplete={() => setBodyScreen("cabinet")}
-              onSkip={() => setBodyScreen("cabinet")}
-            />
-          )}
-
-          {/* Body health context */}
-          {activeModule === "body" && bodyScreen === "health_context" && (
-            <BodyHealthContext
-              onComplete={() => { clearToast(); setBodyScreen("cabinet"); }}
-              onCancel={() => { clearToast(); setBodyScreen("cabinet"); }}
-            />
-          )}
-
-          {/* Body service requests */}
-          {activeModule === "body" && bodyScreen === "service_requests" && (
-            <BodyServiceRequests
-              onBack={() => setBodyScreen("cabinet")}
-            />
-          )}
-
-          {/* Body diary view (read-only past day) */}
-          {activeModule === "body" && bodyScreen === "diary_view" && bodyDiaryDayData && (
-            <BodyDayView
-              logDate={bodyDiaryDayData.date || bodyDiaryDayData.log_date}
-              onEdit={(day) => { setBodyDiaryDayData(day); setBodyScreen("diary_edit"); }}
-              onBack={() => setBodyScreen("cabinet")}
-            />
-          )}
-
-          {/* Body diary form */}
-          {activeModule === "body" && bodyScreen === "diary_edit" && bodyDiarySessionId && (
-            <BodyDiary
-              sessionId={bodyDiarySessionId}
-              dayData={bodyDiaryDayData}
-              onComplete={async (result) => {
-                await loadBodyCabinet();
-                setBodyDiaryDayData(null);
-                if (result?.ok && result?.saved) {
-                  showToast("–î–Ω–µ–≤–Ω–∏–∫ —Å–æ—Ö—Ä–∞–Ω—ë–Ω", "success");
-                } else {
-                  showToast(result?.error || "–î–Ω–µ–≤–Ω–∏–∫ —Å–æ—Ö—Ä–∞–Ω—ë–Ω –±–µ–∑ –∞–Ω–∞–ª–∏–∑–∞", "success");
-                }
-              }}
-              onCancel={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("cabinet"); }}
-            />
-          )}
-
-          {/* Body diary result */}
-          {activeModule === "body" && bodyScreen === "diary_result" && bodyDiaryResult && (
-            <section style={s.card} className="app-card">
-              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, color: "#2f2925" }}>
-                –ò—Ç–æ–≥ –¥–Ω—è
-              </div>
-              {bodyDiaryResult.ai_day_summary && (
-                <div style={{ fontSize: 15, lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#2f2925", marginBottom: 16 }}>
-                  {bodyDiaryResult.ai_day_summary}
-                </div>
-              )}
-              {bodyDiaryResult.ai_focus_tomorrow && (
-                <div style={{ padding: 14, borderRadius: 14, background: "#f0f5f1", border: "1px solid #c4d0c6", marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: "#2f2925", marginBottom: 4 }}>–§–æ–∫—É—Å –Ω–∞ –∑–∞–≤—Ç—Ä–∞</div>
-                  <div style={{ fontSize: 14, lineHeight: 1.6, color: "#5f574f" }}>
-                    {bodyDiaryResult.ai_focus_tomorrow}
-                  </div>
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button onClick={() => { clearToast(); setBodyDiaryDayData(null); setBodyScreen("diary_edit"); }} style={{
-                  padding: "12px 20px", borderRadius: 20, background: "#7D9A89",
-                  color: "#fff", fontWeight: 700, border: 0, cursor: "pointer", flex: 1, minWidth: 160,
-                }}>
-                  –ó–∞–ø–∏—Å–∞—Ç—å –µ—â—ë –¥–µ–Ω—å
-                </button>
-                <button onClick={() => { clearToast(); setBodyScreen("cabinet"); }} style={{
-                  padding: "12px 20px", borderRadius: 20, background: "#ede7dc",
-                  color: "#2f2925", fontWeight: 600, border: "1px solid #d8cec1", cursor: "pointer",
-                }}>
-                  –í –∫–∞–±–∏–Ω–µ—Ç
-                </button>
-              </div>
-            </section>
-          )}
-
-          {/* Diary history modal */}
-          {bodyDiaryHistoryOpen && (
-            <div style={{
-              position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1000,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }} onClick={() => setBodyDiaryHistoryOpen(false)}>
-              <div style={{
-                background: "#ffffff", borderRadius: 20, padding: 28, maxWidth: 640, width: "90%",
-                maxHeight: "80vh", overflowY: "auto",
-              }} onClick={(e) => e.stopPropagation()}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: "#2f2925" }}>–ú–æ–∏ –ø—Ä–æ—à–ª—ã–µ –¥–Ω–∏</div>
-                  <button onClick={() => setBodyDiaryHistoryOpen(false)} style={{ background: "none", border: 0, fontSize: 20, cursor: "pointer", color: "#8d8378" }}>‚úï</button>
-                </div>
-                {bodyDiaryHistoryDetail ? (
-                  <div>
-                    <button onClick={() => setBodyDiaryHistoryDetail(null)} style={{
-                      background: "none", border: 0, color: "#7D9A89", cursor: "pointer",
-                      fontWeight: 600, fontSize: 14, marginBottom: 16, display: "inline-flex", alignItems: "center", gap: 4,
-                    }}>
-                      ‚Üê –ù–∞–∑–∞–¥ –∫ —Å–ø–∏—Å–∫—É
-                    </button>
-                    <div style={{ fontSize: 14, color: "#2f2925", marginBottom: 8 }}>
-                      {bodyDiaryHistoryDetail.log_date}
-                    </div>
-                    {bodyDiaryHistoryDetail.ai_day_summary && (
-                      <div style={{ padding: 14, borderRadius: 12, background: "#f6f9f7", marginBottom: 12, fontSize: 14, lineHeight: 1.6 }}>
-                        {bodyDiaryHistoryDetail.ai_day_summary}
-                      </div>
-                    )}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13, color: "#5f574f" }}>
-                      {bodyDiaryHistoryDetail.steps != null && <div>üö∂ –®–∞–≥–∏: {bodyDiaryHistoryDetail.steps}</div>}
-                      {bodyDiaryHistoryDetail.workout_done && <div>üí™ –¢—Ä–µ–Ω–∏—Ä–æ–≤–∫–∞: {bodyDiaryHistoryDetail.workout_type || "–¥–∞"}{bodyDiaryHistoryDetail.workout_minutes ? ` (${bodyDiaryHistoryDetail.workout_minutes} –º–∏–Ω)` : ""}</div>}
-                      {bodyDiaryHistoryDetail.sleep_hours != null && <div>üò¥ –°–æ–Ω: {bodyDiaryHistoryDetail.sleep_hours} —á</div>}
-                      {bodyDiaryHistoryDetail.water_l != null && <div>üíß –í–æ–¥–∞: {bodyDiaryHistoryDetail.water_l} –ª</div>}
-                      {bodyDiaryHistoryDetail.energy_level != null && <div>‚ö° –≠–Ω–µ—Ä–≥–∏—è: {bodyDiaryHistoryDetail.energy_level}/10</div>}
-                      {bodyDiaryHistoryDetail.mood_level != null && <div>üòä –ù–∞—Å—Ç—Ä–æ–µ–Ω–∏–µ: {bodyDiaryHistoryDetail.mood_level}/10</div>}
-                    </div>
-                  </div>
-                ) : (
-                  bodyDiaryHistory?.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {bodyDiaryHistory.map((log, i) => (
-                        <button key={i} onClick={() => setBodyDiaryHistoryDetail(log)} style={{
-                          display: "flex", justifyContent: "space-between", alignItems: "center",
-                          padding: "14px 16px", borderRadius: 14, background: "#f6f0e7",
-                          border: "1px solid #e8e2d8", cursor: "pointer", width: "100%", textAlign: "left",
-                          fontFamily: "inherit", fontSize: 14, color: "#2f2925",
-                        }}>
-                          <span style={{ fontWeight: 600 }}>{log.log_date}</span>
-                          <span style={{ color: "#8d8378", fontSize: 13 }}>
-                            {log.ai_day_summary ? "‚úì –µ—Å—Ç—å –∏—Ç–æ–≥" : "‚Äî"}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: "center", padding: "30px 0", color: "#8d8378" }}>
-                      {bodyDiaryHistoryLoading ? "–ó–∞–≥—Ä—É–∑–∫–∞..." : "–ü–æ–∫–∞ –Ω–µ—Ç –∑–∞–ø–∏—Å–µ–π"}
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Default support card / body card before intake */}
-          {!(activeModule === "body" && bodyScreen !== "landing") && phase !== "cabinet" && phase !== "followup" && (
-          <section style={s.card} className="app-card">
-            <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "Georgia, \"PT Serif\", serif" }}>
-              {phase === "questions"
-                ? crisisMode ? "–°–Ω–∞—á–∞–ª–∞ –ø—Ä–æ–≤–µ—Ä–∏–º –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç—å" : `–†–∞—É–Ω–¥ —É—Ç–æ—á–Ω–µ–Ω–∏—è ${dialogDepth}`
-                : activeModule === "body"
-                  ? "–ì–æ—Ç–æ–≤—ã –Ω–∞—á–∞—Ç—å?"
-                  : "–° —á–µ–≥–æ –Ω–∞—á–∞—Ç—å?"}
-            </div>
-            {phase !== "questions" && (
-              <div style={{ color: "#7A7268", fontSize: 14, marginTop: 6 }}>
-                {activeModule === "body"
-                  ? "–ó–∞–ø–æ–ª–Ω–∏—Ç–µ –∫–æ—Ä–æ—Ç–∫—É—é –∞–Ω–∫–µ—Ç—É ‚Äî —ç—Ç–æ –∑–∞–π–º—ë—Ç 2 –º–∏–Ω—É—Ç—ã."
-                  : "–û–ø–∏—à–∏—Ç–µ —Å–æ—Å—Ç–æ—è–Ω–∏–µ —Å–≤–æ–∏–º–∏ —Å–ª–æ–≤–∞–º–∏."}
-              </div>
-            )}
-
-            {activeModule === "body" && localStorage.getItem("body_referral_source") === "alena_client" && bodyScreen === "landing" && (
-              <div style={{ marginTop: 16, padding: 14, borderRadius: 14, background: "#e8f0ea", border: "1px solid #c4d0c6" }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#2f2925", marginBottom: 2 }}>
-                  –í—ã –∑–∞–ø–æ–ª–Ω—è–µ—Ç–µ –∞–Ω–∫–µ—Ç—É –ø–æ –Ω–∞–ø—Ä–∞–≤–ª–µ–Ω–∏—é
-                </div>
-                <div style={{ fontSize: 15, color: "#2f2925", fontWeight: 600 }}>
-                  {localStorage.getItem("body_specialist_name") || "–ê–ª–µ–Ω–∞ –ñ—É–∫–æ–≤–∞"}
-                </div>
-              </div>
-            )}
-
-            {activeModule === "body" && savedBodyResult && bodyScreen === "landing" && (
-              <div style={{ marginTop: 16 }}>
-                <button onClick={() => {
-                  setBodyIntakeResult(savedBodyResult);
-                  setBodyIntakeStage("result");
-                  setBodyScreen("result");
-                  setBodyIntakeStep(0);
-                }} style={{
-                  padding: "14px 22px", borderRadius: 20, background: "#7D9A89",
-                  color: "#ffffff", fontWeight: 800, fontSize: 15, border: 0, cursor: "pointer", width: "100%",
-                }}>
-                  –í–µ—Ä–Ω—É—Ç—å—Å—è –∫ –ø–æ—Å–ª–µ–¥–Ω–µ–º—É –ø–ª–∞–Ω—É
-                </button>
-                <div style={{ color: "#8d8378", fontSize: 12, marginTop: 6, textAlign: "center" }}>
-                  –£ –≤–∞—Å —É–∂–µ –µ—Å—Ç—å –ø–ª–∞–Ω –æ—Ç {localStorage.getItem("body_last_created_at")
-                    ? new Date(localStorage.getItem("body_last_created_at")).toLocaleDateString("ru-RU")
-                    : "–ø—Ä–µ–¥—ã–¥—É—â–µ–≥–æ —Ä–∞–∑–∞"}
-                </div>
-              </div>
-            )}
-
-            {phase === "input" && !isContinuation && !crisisMode && mode !== "voice" && (
-              <InformationFlow key={activeModule} module={activeModule} engaged={Boolean(text.trim())} />
-            )}
-
-            <div style={s.inner}>
-              {mode === "voice" ? (
-                <div style={{ textAlign: "center", padding: "40px 20px" }}>
-                  <div style={{ fontSize: 58 }}>üéô</div>
-                  <h2 style={{ fontSize: 22, fontWeight: 700 }}>–ì–æ–ª–æ—Å–æ–≤–æ–π —Ä–µ–∂–∏–º</h2>
-
-                  <p style={{ color: "#7A7268", lineHeight: 1.6 }}>
-                    –ù–∞–∂–º–∏—Ç–µ "–ù–∞—á–∞—Ç—å –∑–∞–ø–∏—Å—å", —Ä–∞—Å—Å–∫–∞–∂–∏—Ç–µ –æ —Å–≤–æ–µ–º —Å–æ—Å—Ç–æ—è–Ω–∏–∏, –∑–∞—Ç–µ–º –æ—Å—Ç–∞–Ω–æ–≤–∏—Ç–µ –∑–∞–ø–∏—Å—å.
-                    –ú—ã —Ä–∞—Å—à–∏—Ñ—Ä—É–µ–º –≥–æ–ª–æ—Å –∏ –ø–µ—Ä–µ–Ω–µ—Å–µ–º —Ç–µ–∫—Å—Ç –≤ –æ–±—ã—á–Ω–æ–µ –ø–æ–ª–µ.
-                  </p>
-
-                  {!recording ? (
-                    <button style={s.wide} onClick={startRecording} disabled={transcribing}>
-                      {transcribing ? "–†–∞—Å—à–∏—Ñ—Ä–æ–≤—ã–≤–∞–µ–º..." : "–ù–∞—á–∞—Ç—å –∑–∞–ø–∏—Å—å"}
-                    </button>
-                  ) : (
-                    <button style={{ ...s.wide, background: "#B85C4A", color: "white" }} onClick={stopRecording}>
-                      –û—Å—Ç–∞–Ω–æ–≤–∏—Ç—å –∏ —Ä–∞—Å—à–∏—Ñ—Ä–æ–≤–∞—Ç—å
-                    </button>
-                  )}
-
-                  {voiceError && (
-                    <div style={s.error}>
-                      {voiceError}
-                    </div>
-                  )}
-
-                  <div style={{
-                    marginTop: 12,
-                    color: recordingTime > 45 ? "#B85C4A" : "#7A7268",
-                    fontSize: 14
-                  }}>
-                    {recording
-                      ? `–ó–∞–ø–∏—Å—å: ${recordingTime} —Å–µ–∫ / 60 —Å–µ–∫`
-                      : "–ú–∞–∫—Å–∏–º–∞–ª—å–Ω–∞—è –¥–ª–∏—Ç–µ–ª—å–Ω–æ—Å—Ç—å –∑–∞–ø–∏—Å–∏ ‚Äî 1 –º–∏–Ω—É—Ç–∞"}
-                  </div>
-                </div>
-              ) : phase === "input" ? (
-                <>
-                  <textarea
-                    style={s.textarea}
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder={isDedicatedSubdomain ? "–ù–∞–ø—Ä–∏–º–µ—Ä: —Ö–æ—á—É —Å–Ω–∏–∑–∏—Ç—å –≤–µ—Å, –Ω–∞–ª–∞–¥–∏—Ç—å –ø–∏—Ç–∞–Ω–∏–µ, –±–æ–ª—å—à–µ –¥–≤–∏–≥–∞—Ç—å—Å—è, –ª—É—á—à–µ —Å–ø–∞—Ç—å –∏ –ø–æ–Ω—è—Ç—å, —Å —á–µ–≥–æ –Ω–∞—á–∞—Ç—å‚Ä¶" : "–ù–∞–ø—Ä–∏–º–µ—Ä: –ø–æ—Å–ª–µ–¥–Ω–∏–µ –Ω–µ–¥–µ–ª–∏ –ø–ª–æ—Ö–æ —Å–ø–ª—é, —Ç—Ä–µ–≤–æ–∂—É—Å—å, –Ω–µ –º–æ–≥—É —Å–æ–±—Ä–∞—Ç—å—Å—è, —Å—Ç–∞–ª–æ —Ç—Ä—É–¥–Ω–æ –∑–∞–Ω–∏–º–∞—Ç—å—Å—è –æ–±—ã—á–Ω—ã–º–∏ –¥–µ–ª–∞–º–∏‚Ä¶"}
-                  />
-                  <button
-                    style={s.wide}
-                    onClick={isDedicatedSubdomain ? () => { setBodyIntakeStage("filling"); setBodyScreen("intake"); } : () => submitRound()}
-                    disabled={loading}
-                  >
-                      {loading
-                      ? loadingMessage || "–§–æ—Ä–º–∏—Ä—É–µ–º –≤–æ–ø—Ä–æ—Å—ã..."
-                      : isDedicatedSubdomain ? "–ü–µ—Ä–µ–π—Ç–∏ –∫ –∞–Ω–∫–µ—Ç–µ" : "–ù–∞—á–∞—Ç—å —Ä–∞–∑–±–æ—Ä"}
-                  </button>
-                </>
-              ) : phase === "questions" ? (
-                <>
-                  {crisisMode && APP_BRAND.isSupportPilot && (
-                    <div role="alert" aria-live="assertive" style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: "#fff1ed", border: "2px solid #b85c4a", color: "#4a2822", lineHeight: 1.55 }}>
-                      <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>–°–Ω–∞—á–∞–ª–∞ ‚Äî –≤–∞—à–∞ –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç—å</div>
-                      <div style={{ marginBottom: 12 }}>–ï—Å–ª–∏ –≤—ã –º–æ–∂–µ—Ç–µ –ø—Ä–∏—á–∏–Ω–∏—Ç—å —Å–µ–±–µ –≤—Ä–µ–¥ –∏–ª–∏ –Ω–µ —É–≤–µ—Ä–µ–Ω—ã, —á—Ç–æ –æ—Å—Ç–∞–Ω–µ—Ç–µ—Å—å –≤ –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç–∏, –ø–æ–∑–≤–æ–Ω–∏—Ç–µ —Å–µ–π—á–∞—Å 112 –∏–ª–∏ 103. –ü–µ—Ä–µ–π–¥–∏—Ç–µ —Ç—É–¥–∞, –≥–¥–µ –µ—Å—Ç—å –ª—é–¥–∏, –∏ –ø–æ–ø—Ä–æ—Å–∏—Ç–µ –±–ª–∏–∑–∫–æ–≥–æ –ø–æ–±—ã—Ç—å —Ä—è–¥–æ–º. –ù–µ –∂–¥–∏—Ç–µ –æ—Ç–≤–µ—Ç–∞ —Å–µ—Ä–≤–∏—Å–∞.</div>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        {["112", "103"].map((number) => (
-                          <a key={number} href={`tel:${number}`} aria-label={`–ü–æ–∑–≤–æ–Ω–∏—Ç—å ${number}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 112, minHeight: 48, padding: "10px 18px", borderRadius: 10, background: "#9f3425", color: "#fff", fontWeight: 800, textDecoration: "none" }}>
-                            –ü–æ–∑–≤–æ–Ω–∏—Ç—å {number}
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {questions?.map((q, index) => (
-                    <div key={index} style={s.questionCard}>
-                      <div style={s.questionText}>
-                        {index + 1}. {q}
-                      </div>
-
-                      <textarea
-                        style={s.answerInput}
-                        aria-label={`–û—Ç–≤–µ—Ç –Ω–∞ –≤–æ–ø—Ä–æ—Å ${index + 1}: ${q}`}
-                        value={answers[index] || ""}
-                        onChange={(e) =>
-                          setAnswers({
-                            ...answers,
-                            [index]: e.target.value,
-                          })
-                        }
-                        placeholder="–í–∞—à –æ—Ç–≤–µ—Ç..."
-                      />
-
-                      <button
-                        style={{
-                          ...s.secondary,
-                          marginTop: 10,
-                          width: "100%",
-                        }}
-                        onClick={() =>
-                          recordingQuestionIndex === index
-                            ? stopQuestionRecording()
-                            : startQuestionRecording(index)
-                        }
-                        disabled={
-                          questionTranscribingIndex !== null &&
-                          questionTranscribingIndex !== index
-                        }
-                      >
-                        {questionTranscribingIndex === index
-                          ? "–†–∞—Å—à–∏—Ñ—Ä–æ–≤—ã–≤–∞–µ–º..."
-                          : recordingQuestionIndex === index
-                            ? "–û—Å—Ç–∞–Ω–æ–≤–∏—Ç—å –∏ —Ä–∞—Å—à–∏—Ñ—Ä–æ–≤–∞—Ç—å"
-                            : "–û—Ç–≤–µ—Ç–∏—Ç—å –≥–æ–ª–æ—Å–æ–º"}
-                      </button>
-
-                      {recordingQuestionIndex === index && (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            color:
-                              questionRecordingTime > 45
-                                ? "#B85C4A"
-                                : "#7A7268",
-                            fontSize: 14,
-                          }}
-                        >
-                          –ó–∞–ø–∏—Å—å: {questionRecordingTime} —Å–µ–∫ / 60 —Å–µ–∫
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    style={s.wide}
-                    onClick={() => submitRound()}
-                    disabled={loading}
-                  >
-                    {loading
-                      ? loadingMessage || "–ê–Ω–∞–ª–∏–∑–∏—Ä—É–µ–º..."
-                      : crisisMode && APP_BRAND.isSupportPilot
-                        ? "–ü—Ä–æ–¥–æ–ª–∂–∏—Ç—å"
-                        : dialogDepth < 3
-                        ? "–ü—Ä–æ–¥–æ–ª–∂–∏—Ç—å —É—Ç–æ—á–Ω–µ–Ω–∏–µ"
-                        : "–ü–æ–ª—É—á–∏—Ç—å –ø—Ä–µ–¥–≤–∞—Ä–∏—Ç–µ–ª—å–Ω—ã–π –æ—Ç—á—ë—Ç"}
-                  </button>
-                </>
-              ) : null}
-
-              {error && <div style={s.error}>{error}</div>}
-            </div>
-
-            {phase === "report" && result && (
-              <div style={s.result}>
-                <h2 style={{ marginTop: 0, fontFamily: "Georgia, \"PT Serif\", serif", fontSize: 22 }}>–†–µ–∑—É–ª—å—Ç–∞—Ç —Ä–∞–∑–±–æ—Ä–∞</h2>
-
-                {APP_BRAND.isSupportPilot && crisisMode && (
-                  <div role="alert" aria-live="assertive" style={{ marginBottom: 16, padding: 16, borderRadius: 14, background: "#fff1ed", border: "2px solid #b85c4a", color: "#4a2822", lineHeight: 1.55 }}>
-                    <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>–ü–ª–∞–Ω –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç–∏ –∏ —Å—Ä–æ—á–Ω–∞—è –ø–æ–º–æ—â—å</div>
-                    <p style={{ margin: "0 0 12px" }}>{crisisBlock?.emergencyRecommended
-                      ? "–ë–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç—å —Å–µ–π—á–∞—Å –Ω–µ –ø–æ–¥—Ç–≤–µ—Ä–∂–¥–µ–Ω–∞ –∏–ª–∏ –µ—Å—Ç—å –Ω–µ–ø–æ—Å—Ä–µ–¥—Å—Ç–≤–µ–Ω–Ω–∞—è –æ–ø–∞—Å–Ω–æ—Å—Ç—å. –ü–æ–∑–≤–æ–Ω–∏—Ç–µ 112 –∏–ª–∏ 103 —Å–µ–π—á–∞—Å –∏ –ø–æ–ø—Ä–æ—Å–∏—Ç–µ —á–µ–ª–æ–≤–µ–∫–∞, –∫–æ—Ç–æ—Ä–æ–º—É –¥–æ–≤–µ—Ä—è–µ—Ç–µ, –æ—Å—Ç–∞–≤–∞—Ç—å—Å—è —Ä—è–¥–æ–º."
-                      : "–í—ã —Å–æ–æ–±—â–∏–ª–∏, —á—Ç–æ —Å–µ–π—á–∞—Å –≤ –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç–∏. –°–≤—è–∂–∏—Ç–µ—Å—å —Å–µ–≥–æ–¥–Ω—è —Å –±–ª–∏–∑–∫–∏–º —á–µ–ª–æ–≤–µ–∫–æ–º –∏ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–º. –ï—Å–ª–∏ –æ–ø–∞—Å–Ω–æ—Å—Ç—å –ø–æ—è–≤–∏—Ç—Å—è –∏–ª–∏ –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç—å —Å—Ç–∞–Ω–µ—Ç –Ω–µ—è—Å–Ω–æ–π ‚Äî –∑–≤–æ–Ω–∏—Ç–µ 112 –∏–ª–∏ 103."}</p>
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {["112", "103"].map((number) => (
-                        <a key={number} href={`tel:${number}`} aria-label={`–ü–æ–∑–≤–æ–Ω–∏—Ç—å ${number}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 112, minHeight: 48, padding: "10px 18px", borderRadius: 10, background: "#9f3425", color: "#fff", fontWeight: 800, textDecoration: "none" }}>
-                          –ü–æ–∑–≤–æ–Ω–∏—Ç—å {number}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {continuationCode && justFinishedSession && reportSource === "generated" && (
-                  <div style={{
-                    background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
-                    borderRadius: 16, padding: "18px", marginBottom: 16,
-                  }}>
-                    <div style={{ fontWeight: 700, fontSize: 16, color: "#2E2A25", marginBottom: 8 }}>
-                      –°–æ—Ö—Ä–∞–Ω–∏—Ç–µ –∫–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è
-                    </div>
-                    <div style={{ color: "#5F7D6C", fontSize: 14, lineHeight: 1.5, marginBottom: 12 }}>
-                      –û–Ω –ø–æ–Ω–∞–¥–æ–±–∏—Ç—Å—è, —á—Ç–æ–±—ã –≤–µ—Ä–Ω—É—Ç—å—Å—è –∫ —ç—Ç–æ–º—É —Ä–∞–∑–≥–æ–≤–æ—Ä—É –Ω–∞ –¥—Ä—É–≥–æ–º —É—Å—Ç—Ä–æ–π—Å—Ç–≤–µ –∏–ª–∏ –ø–æ—Å–ª–µ –æ—á–∏—Å—Ç–∫–∏ –±—Ä–∞—É–∑–µ—Ä–∞.
-                    </div>
-                    <div style={{
-                      background: "#ffffff", border: "1px solid rgba(125,154,137,.25)",
-                      borderRadius: 12, padding: "12px 16px", marginBottom: 14,
-                      display: "flex", justifyContent: "space-between", alignItems: "center",
-                    }}>
-                      <span style={{ fontWeight: 900, fontSize: 16, color: "#2E2A25", letterSpacing: 1, fontFamily: "monospace", wordBreak: "break-all" }}>
-                        {continuationCode}
-                      </span>
-                    </div>
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      <button
-                        style={{ ...s.secondary, flex: 1, minWidth: 140 }}
-                        onClick={() => { navigator.clipboard.writeText(continuationCode); showToast("–ö–æ–¥ —Å–∫–æ–ø–∏—Ä–æ–≤–∞–Ω"); }}
-                      >
-                        –°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å –∫–æ–¥
-                      </button>
-                      <button
-                        style={{ ...s.primary, flex: 1, minWidth: 160 }}
-                        onClick={() => { setJustFinishedSession(false); loadSupportCabinet(); }}
-                      >
-                        –ü–µ—Ä–µ–π—Ç–∏ –≤ –ª–∏—á–Ω—ã–π –∫–∞–±–∏–Ω–µ—Ç
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {publicCode && !(justFinishedSession && reportSource === "generated") && (
-                  <div style={{
-                    background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
-                    borderRadius: 16, padding: "12px 16px", marginBottom: 16,
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                  }}>
-                    <span style={{ color: "#5F7D6C", fontSize: 13 }}>
-                      –ö–æ–¥ –¥–∏–∞–ª–æ–≥–∞ –¥–ª—è –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è:
-                    </span>
-                    <span style={{ fontWeight: 900, fontSize: 18, color: "#2E2A25", letterSpacing: 1 }}>
-                      {publicCode}
-                    </span>
-                  </div>
-                )}
-
-                {usageBalance && usageBalance.visible && (() => {
-                  const available = Number(usageBalance.available_credits ?? 0);
-                  const reserved = Number(usageBalance.reserved_credits ?? 0);
-                  const total = Number(usageBalance.balance_total ?? 0);
-                  return (
-                    <div style={{ padding: "8px 12px", background: "#f0fdf4", borderRadius: 8, marginBottom: 16, fontSize: 13, color: "#166534" }}>
-                      –ë–∞–ª–∞–Ω—Å: {total.toLocaleString("ru-RU")} –∫—Ä–µ–¥–∏—Ç–æ–≤ ¬∑ –ó–∞—Ä–µ–∑–µ—Ä–≤–∏—Ä–æ–≤–∞–Ω–æ: {reserved.toLocaleString("ru-RU")} ¬∑ –î–æ—Å—Ç—É–ø–Ω–æ: {available.toLocaleString("ru-RU")}<br />
-                      <span style={{ fontSize: 11, color: "#6b7280" }}>–¢–µ—Å—Ç–æ–≤—ã–π –±–∞–ª–∞–Ω—Å. –î–µ–Ω—å–≥–∏ –Ω–µ —Å–ø–∏—Å—ã–≤–∞—é—Ç—Å—è.</span>
-                    </div>
-                  );
-                })()}
-
-                <div style={s.tabs} className="tabs">
-                  <button
-                    style={activeTab === "user" ? s.activeTab : s.tab}
-                    onClick={() => setActiveTab("user")}
-                  >
-                    –î–ª—è –≤–∞—Å
-                  </button>
-                  {expertData && (
-                    <button
-                      style={activeTab === "doctor" ? s.activeTab : s.tab}
-                      onClick={() => setActiveTab("doctor")}
-                    >
-                      –î–ª—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞
-                    </button>
-                  )}
-                  <button
-                    onClick={downloadReportPDF}
-                    style={{ ...s.tab, fontSize: 12, marginLeft: "auto" }}
-                    title="–°–∫–∞—á–∞—Ç—å PDF"
-                  >
-                    üìÑ PDF
-                  </button>
-                  <button
-                    onClick={downloadReportDOCX}
-                    style={{ ...s.tab, fontSize: 12 }}
-                    title="–°–∫–∞—á–∞—Ç—å DOCX"
-                  >
-                    üìù DOCX
-                  </button>
-                  {expertData && (
-                    <button
-                      style={{
-                        ...s.tab,
-                        fontSize: 11,
-                        background: activeTab === "debug" ? "#EDE3D8" : "transparent",
-                        borderColor: activeTab === "debug" ? "#B8A690" : "rgba(46,42,37,.12)",
-                      }}
-                      onClick={() => setActiveTab(activeTab === "debug" ? "user" : "debug")}
-                    >
-                      üõ† Debug
-                    </button>
-                  )}
-                </div>
-
-                <div style={s.reportBlock} className="report-block">
-                  {activeTab === "debug" && expertData && debugInfo ? (
-                    <div style={{ fontSize: 12, lineHeight: 1.6, color: "#5F5A52" }}>
-                      <div style={{ fontWeight: 700, marginBottom: 10, color: "#2E2A25" }}>
-                        –¢–µ—Ö–Ω–∏—á–µ—Å–∫–∞—è –∏–Ω—Ñ–æ—Ä–º–∞—Ü–∏—è (—Ç–æ–ª—å–∫–æ –¥–ª—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞)
-                      </div>
-                      <div style={{ display: "grid", gap: 8 }}>
-                        <div><b>Prompt version:</b> {debugInfo.prompt_version || "‚Äî"}</div>
-                        <div><b>Care level:</b> {debugInfo.care_recommendation?.level || "‚Äî"}</div>
-                        <div><b>Minimum level (backend):</b> {debugInfo.minimum_level || "‚Äî"}</div>
-                        <div><b>Quality check:</b> {debugInfo.quality_check?.pass ? "‚úÖ –ø—Ä–æ–π–¥–µ–Ω–∞" : "‚ùå –Ω–∞—Ä—É—à–µ–Ω–∞"}</div>
-                        {debugInfo.quality_check?.violations?.length > 0 && (
-                          <div><b>–ù–∞—Ä—É—à–µ–Ω–∏—è:</b> {debugInfo.quality_check.violations.join("; ")}</div>
-                        )}
-                        <div><b>Repair attempted:</b> {debugInfo.repair?.repairAttempted ? "–¥–∞" : "–Ω–µ—Ç"}</div>
-                        {debugInfo.repair?.repairAttempted && (
-                          <div><b>Repair result:</b> {debugInfo.repair.repairSucceeded ? "‚úÖ —É—Å–ø–µ—à–Ω–æ" : "‚ùå –Ω–µ —É–¥–∞–ª—Å—è"}</div>
-                        )}
-                        <details>
-                          <summary style={{ cursor: "pointer", fontWeight: 600, marginTop: 8 }}>Raw model response</summary>
-                          <pre style={{ background: "#F5F0E8", padding: 12, borderRadius: 8, marginTop: 6, fontSize: 11, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                            {debugInfo.raw_model_response || "‚Äî"}
-                          </pre>
-                        </details>
-                        <details>
-                          <summary style={{ cursor: "pointer", fontWeight: 600, marginTop: 4 }}>Parsed user_report</summary>
-                          <pre style={{ background: "#F5F0E8", padding: 12, borderRadius: 8, marginTop: 6, fontSize: 11, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                            {debugInfo.parsed_user_report || "‚Äî"}
-                          </pre>
-                        </details>
-                        <details>
-                          <summary style={{ cursor: "pointer", fontWeight: 600, marginTop: 4 }}>Parsed doctor_report</summary>
-                          <pre style={{ background: "#F5F0E8", padding: 12, borderRadius: 8, marginTop: 6, fontSize: 11, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                            {debugInfo.parsed_doctor_report || "‚Äî"}
-                          </pre>
-                        </details>
-                        {debugInfo.care_recommendation && (
-                          <details>
-                            <summary style={{ cursor: "pointer", fontWeight: 600, marginTop: 4 }}>Care recommendation</summary>
-                            <pre style={{ background: "#F5F0E8", padding: 12, borderRadius: 8, marginTop: 6, fontSize: 11, overflowX: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                              {JSON.stringify(debugInfo.care_recommendation, null, 2)}
-                            </pre>
-                          </details>
-                        )}
-                        {debugInfo.care_repair && (
-                          <div><b>Care repair:</b> {debugInfo.care_repair.repairAttempted ? (debugInfo.care_repair.repairSucceeded ? "‚úÖ" : "‚ùå") : "‚Äî"}</div>
-                        )}
-                      </div>
-                    </div>
-                  ) : activeTab === "user" ? (
-                    renderUserReport(userPart)
-                  ) : expertData ? (
-                    <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
-                      {doctorPart}
-                    </div>
-                  ) : (
-                    renderUserReport(userPart)
-                  )}
-                </div>
-
-                {careRecommendation && (
-                  <div style={{ marginTop: 20 }}>
-                    {/* URGENT_HELP block */}
-                    {careRecommendation.level === "urgent_help" && !(APP_BRAND.isSupportPilot && crisisMode) && (
-                      <div style={{
-                        background: "rgba(184,92,74,.12)", border: "2px solid #B85C4A",
-                        borderRadius: 18, padding: 20, marginBottom: 16,
-                      }}>
-                        <div style={{ fontSize: 18, fontWeight: 900, color: "#B85C4A", marginBottom: 10 }}>
-                          –ù—É–∂–Ω–∞ —Å—Ä–æ—á–Ω–∞—è –ø–æ–º–æ—â—å
-                        </div>
-                        <div style={{ color: "#2E2A25", lineHeight: 1.7, fontSize: 14, marginBottom: 16 }}>
-                          –ó–¥–µ—Å—å –Ω—É–∂–Ω–∞ —Å—Ä–æ—á–Ω–∞—è –ø–æ–º–æ—â—å —Å–µ–≥–æ–¥–Ω—è. –ü–æ–∂–∞–ª—É–π—Å—Ç–∞, –ø–æ–∑–≤–æ–Ω–∏—Ç–µ 112, –æ–±—Ä–∞—Ç–∏—Ç–µ—Å—å –≤ –±–ª–∏–∂–∞–π—à–µ–µ –ø—Ä–∏—ë–º–Ω–æ–µ –æ—Ç–¥–µ–ª–µ–Ω–∏–µ –∏–ª–∏ –ø–æ–ø—Ä–æ—Å–∏—Ç–µ –±–ª–∏–∑–∫–æ–≥–æ –ø–æ–º–æ—á—å –≤–∞–º –¥–æ–±—Ä–∞—Ç—å—Å—è –¥–æ –ø–æ–º–æ—â–∏. –ù–µ –æ—Å—Ç–∞–≤–∞–π—Ç–µ—Å—å —Å–µ–π—á–∞—Å –æ–¥–∏–Ω.
-                        </div>
-                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                          <a href="tel:112" style={{
-                            display: "inline-block", background: "#B85C4A", color: "white",
-                            borderRadius: 12, padding: "12px 20px", fontWeight: 700, fontSize: 15,
-                            textDecoration: "none", cursor: "pointer",
-                          }}>
-                            –ü–æ–∑–≤–æ–Ω–∏—Ç—å 112
-                          </a>
-                          <button style={{
-                            border: "1px solid #B85C4A", background: "transparent", color: "#B85C4A",
-                            borderRadius: 12, padding: "12px 20px", fontWeight: 600, fontSize: 14,
-                            cursor: "pointer",
-                          }} onClick={() => {
-                            showToast("–ü–æ–ø—Ä–æ—Å–∏—Ç–µ –Ω–∞—Ö–æ–¥—è—â–µ–≥–æ—Å—è —Ä—è–¥–æ–º —á–µ–ª–æ–≤–µ–∫–∞ –ø–æ–º–æ—á—å –≤–∞–º –¥–æ–±—Ä–∞—Ç—å—Å—è –¥–æ –ø–æ–º–æ—â–∏. –ù–µ –æ—Å—Ç–∞–≤–∞–π—Ç–µ—Å—å –æ–¥–Ω–∏.");
-                          }}>
-                            –ü–æ–ø—Ä–æ—Å–∏—Ç—å –±–ª–∏–∑–∫–æ–≥–æ –±—ã—Ç—å —Ä—è–¥–æ–º
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* PROFESSIONAL_CONTACT block */}
-                    {careRecommendation.level === "professional_contact" && (
-                      <div style={{
-                        background: "#F5F0E8", border: "1px solid rgba(46,42,37,.15)",
-                        borderRadius: 18, padding: 20, marginBottom: 16,
-                      }}>
-                        <div style={{ fontSize: 17, fontWeight: 700, color: "#2E2A25", marginBottom: 8 }}>
-                          –†–µ–∫–æ–º–µ–Ω–¥—É–µ–º —Å–≤—è–∑–∞—Ç—å—Å—è —Å–æ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–º
-                        </div>
-                        {careRecommendation.timeframe && (
-                          <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
-                            {careRecommendation.timeframe === "today" ? "–°–≤—è–∑–∞—Ç—å—Å—è —Å–µ–≥–æ–¥–Ω—è" :
-                             careRecommendation.timeframe === "within_days" ? "–°–≤—è–∑–∞—Ç—å—Å—è –≤ –±–ª–∏–∂–∞–π—à–∏–µ –¥–Ω–∏" :
-                             "–°–≤—è–∑–∞—Ç—å—Å—è –≤ –±–ª–∏–∂–∞–π—à–µ–µ –≤—Ä–µ–º—è"}
-                          </div>
-                        )}
-                        {careRecommendation.specialist_types?.length > 0 && (
-                          <div style={{ fontSize: 13, color: "#5F7D6C", marginBottom: 14, lineHeight: 1.5 }}>
-                            {careRecommendation.specialist_types.map(st => ({
-                              psychologist: "–ø—Å–∏—Ö–æ–ª–æ–≥", clinical_psychologist: "–∫–ª–∏–Ω–∏—á–µ—Å–∫–∏–π –ø—Å–∏—Ö–æ–ª–æ–≥",
-                              psychotherapist: "–ø—Å–∏—Ö–æ—Ç–µ—Ä–∞–ø–µ–≤—Ç", psychiatrist: "–ø—Å–∏—Ö–∏–∞—Ç—Ä",
-                              general_physician: "—Ç–µ—Ä–∞–ø–µ–≤—Ç", neurologist: "–Ω–µ–≤—Ä–æ–ª–æ–≥",
-                              emergency_service: "—ç–∫—Å—Ç—Ä–µ–Ω–Ω–∞—è —Å–ª—É–∂–±–∞", crisis_service: "–∫—Ä–∏–∑–∏—Å–Ω–∞—è —Å–ª—É–∂–±–∞",
-                              orthopedist: "–æ—Ä—Ç–æ–ø–µ–¥", cardiologist: "–∫–∞—Ä–¥–∏–æ–ª–æ–≥", gastroenterologist: "–≥–∞—Å—Ç—Ä–æ—ç–Ω—Ç–µ—Ä–æ–ª–æ–≥",
-                            }[st] || st)).join(", ")}
-                          </div>
-                        )}
-                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => setShowConsultPrep(true)}>
-                            –ü–æ–¥–≥–æ—Ç–æ–≤–∏—Ç—å—Å—è –∫ –ø–µ—Ä–≤–æ–π –∫–æ–Ω—Å—É–ª—å—Ç–∞—Ü–∏–∏
-                          </button>
-                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
-                            setShowSelfAssessment(true);
-                            setShowSupportToolkit(true);
-                          }}>
-                            –ü—Ä–æ–¥–æ–ª–∂–∏—Ç—å —Ä–∞–∑–≥–æ–≤–æ—Ä –∑–¥–µ—Å—å
-                          </button>
-                          {careRecommendation.level === "professional_contact" && (
-                            <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px", borderColor: "#B85C4A", color: "#B85C4A" }}
-                              onClick={() => {
-                                showToast("–ï—Å–ª–∏ —Å–æ—Å—Ç–æ—è–Ω–∏–µ —É—Ö—É–¥—à–∞–µ—Ç—Å—è –∏–ª–∏ –µ—Å—Ç—å —Ä–∏—Å–∫ ‚Äî –∑–≤–æ–Ω–∏—Ç–µ 112 –∏–ª–∏ 103");
-                              }}>
-                              –ö–æ–≥–¥–∞ –Ω—É–∂–Ω–∞ —Å—Ä–æ—á–Ω–∞—è –ø–æ–º–æ—â—å
-                            </button>
-                          )}
-                        </div>
-                        {careRecommendation.interim_support?.length > 0 && (
-                          <div style={{ marginTop: 14, fontSize: 13, color: "#7A7268", lineHeight: 1.6 }}>
-                            <div style={{ fontWeight: 600, marginBottom: 4 }}>–î–æ –∫–æ–Ω—Å—É–ª—å—Ç–∞—Ü–∏–∏:</div>
-                            <ul style={{ margin: 0, paddingLeft: 18 }}>
-                              {careRecommendation.interim_support.map((s, i) => (
-                                <li key={i}>{s}</li>
-                              ))}
-                            </ul>
-                            <div style={{ marginTop: 6, fontStyle: "italic" }}>
-                              –≠—Ç–∏ —à–∞–≥–∏ –Ω–µ –∑–∞–º–µ–Ω—è—Ç –ø—Ä–æ—Ñ–µ—Å—Å–∏–æ–Ω–∞–ª—å–Ω—É—é –ø–æ–º–æ—â—å, –Ω–æ –º–æ–≥—É—Ç –ø–æ–º–æ—á—å –ø–µ—Ä–µ–∂–∏—Ç—å –±–ª–∏–∂–∞–π—à–∏–µ —á–∞—Å—ã –∏–ª–∏ –¥–Ω–∏ –±–µ–∑–æ–ø–∞—Å–Ω–µ–µ.
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* MEDICAL_CONSULTATION block (body module) */}
-                    {careRecommendation.level === "medical_consultation" && (
-                      <div style={{
-                        background: "#F5F0E8", border: "1px solid rgba(46,42,37,.15)",
-                        borderRadius: 18, padding: 20, marginBottom: 16,
-                      }}>
-                        <div style={{ fontSize: 17, fontWeight: 700, color: "#2E2A25", marginBottom: 8 }}>
-                          –†–µ–∫–æ–º–µ–Ω–¥—É–µ–º –æ–±—Ä–∞—Ç–∏—Ç—å—Å—è –∫ –≤—Ä–∞—á—É
-                        </div>
-                        {careRecommendation.timeframe && (
-                          <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
-                            {careRecommendation.timeframe === "today" ? "–û–±—Ä–∞—Ç–∏—Ç—å—Å—è —Å–µ–≥–æ–¥–Ω—è" :
-                             careRecommendation.timeframe === "within_days" ? "–û–±—Ä–∞—Ç–∏—Ç—å—Å—è –≤ –±–ª–∏–∂–∞–π—à–∏–µ –¥–Ω–∏" :
-                             "–û–±—Ä–∞—Ç–∏—Ç—å—Å—è –≤ –±–ª–∏–∂–∞–π—à–µ–µ –≤—Ä–µ–º—è"}
-                          </div>
-                        )}
-                        {careRecommendation.specialist_types?.length > 0 && (
-                          <div style={{ fontSize: 13, color: "#5F7D6C", marginBottom: 14, lineHeight: 1.5 }}>
-                            {careRecommendation.specialist_types.map(st => ({
-                              psychologist: "–ø—Å–∏—Ö–æ–ª–æ–≥", clinical_psychologist: "–∫–ª–∏–Ω–∏—á–µ—Å–∫–∏–π –ø—Å–∏—Ö–æ–ª–æ–≥",
-                              psychotherapist: "–ø—Å–∏—Ö–æ—Ç–µ—Ä–∞–ø–µ–≤—Ç", psychiatrist: "–ø—Å–∏—Ö–∏–∞—Ç—Ä",
-                              general_physician: "—Ç–µ—Ä–∞–ø–µ–≤—Ç", neurologist: "–Ω–µ–≤—Ä–æ–ª–æ–≥",
-                              emergency_service: "—ç–∫—Å—Ç—Ä–µ–Ω–Ω–∞—è —Å–ª—É–∂–±–∞", crisis_service: "–∫—Ä–∏–∑–∏—Å–Ω–∞—è —Å–ª—É–∂–±–∞",
-                              orthopedist: "–æ—Ä—Ç–æ–ø–µ–¥", cardiologist: "–∫–∞—Ä–¥–∏–æ–ª–æ–≥", gastroenterologist: "–≥–∞—Å—Ç—Ä–æ—ç–Ω—Ç–µ—Ä–æ–ª–æ–≥",
-                            }[st] || st)).join(", ")}
-                          </div>
-                        )}
-                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
-                            showToast("–°–∏–º–ø—Ç–æ–º—ã, —Ç—Ä–µ–±—É—é—â–∏–µ —Å—Ä–æ—á–Ω–æ–≥–æ –≤–Ω–∏–º–∞–Ω–∏—è: –±–æ–ª—å –≤ –≥—Ä—É–¥–∏, –æ–¥—ã—à–∫–∞, —Å–∏–ª—å–Ω–∞—è –≥–æ–ª–æ–≤–Ω–∞—è –±–æ–ª—å, —Å–ª–∞–±–æ—Å—Ç—å –≤ –∫–æ–Ω–µ—á–Ω–æ—Å—Ç–∏ ‚Äî –∑–≤–æ–Ω–∏—Ç–µ 112");
-                          }}>
-                            –ö–æ–≥–¥–∞ –Ω—É–∂–Ω–∞ —Å—Ä–æ—á–Ω–∞—è –ø–æ–º–æ—â—å
-                          </button>
-                        </div>
-                        {careRecommendation.interim_support?.length > 0 && (
-                          <div style={{ marginTop: 14, fontSize: 13, color: "#7A7268", lineHeight: 1.6 }}>
-                            <div style={{ fontWeight: 600, marginBottom: 4 }}>–î–æ –≤–∏–∑–∏—Ç–∞ –∫ –≤—Ä–∞—á—É:</div>
-                            <ul style={{ margin: 0, paddingLeft: 18 }}>
-                              {careRecommendation.interim_support.map((s, i) => (
-                                <li key={i}>{s}</li>
-                              ))}
-                            </ul>
-                            <div style={{ marginTop: 6, fontStyle: "italic" }}>
-                              –≠—Ç–æ –≤—Ä–µ–º–µ–Ω–Ω—ã–µ –º–µ—Ä—ã, –Ω–µ –∑–∞–º–µ–Ω—è—é—â–∏–µ –º–µ–¥–∏—Ü–∏–Ω—Å–∫—É—é –∫–æ–Ω—Å—É–ª—å—Ç–∞—Ü–∏—é.
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* SELF_SUPPORT / SELF_CARE block */}
-                    {(careRecommendation.level === "self_support" || careRecommendation.level === "self_care") && (
-                      <div style={{
-                        background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
-                        borderRadius: 18, padding: 20, marginBottom: 16,
-                      }}>
-                        <div style={{ fontSize: 17, fontWeight: 700, color: "#2E2A25", marginBottom: 8 }}>
-                          –ß—Ç–æ –¥–µ–ª–∞—Ç—å –¥–∞–ª—å—à–µ
-                        </div>
-                        <div style={{ color: "#2E2A25", lineHeight: 1.7, fontSize: 14, marginBottom: 12 }}>
-                          –°–µ–π—á–∞—Å –º–æ–∂–Ω–æ –Ω–∞—á–∞—Ç—å —Å –ø–æ–¥–¥–µ—Ä–∂–∫–∏ –±–ª–∏–∑–∫–∏—Ö –∏ –Ω–µ—Å–∫–æ–ª—å–∫–∏—Ö –ø—Ä–æ—Å—Ç—ã—Ö —à–∞–≥–æ–≤. –ï—Å–ª–∏ —Å–æ—Å—Ç–æ—è–Ω–∏–µ –Ω–µ –Ω–∞—á–Ω—ë—Ç —É–º–µ–Ω—å—à–∞—Ç—å—Å—è –∏–ª–∏ —Å—Ç–∞–Ω–µ—Ç —Å–∏–ª—å–Ω–µ–µ, —Å—Ç–æ–∏—Ç –æ–±—Ä–∞—Ç–∏—Ç—å—Å—è –∫ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç—É.
-                        </div>
-                        {careRecommendation.interim_support?.length > 0 && (
-                          <ul style={{ color: "#5F7D6C", fontSize: 13, lineHeight: 1.6, margin: "0 0 12px", paddingLeft: 18 }}>
-                            {careRecommendation.interim_support.map((s, i) => (
-                              <li key={i}>{s}</li>
-                            ))}
-                          </ul>
-                        )}
-                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px" }} onClick={() => {
-                            setShowSelfAssessment(true);
-                            setShowSupportToolkit(true);
-                          }}>
-                            –ü–æ—Å–º–æ—Ç—Ä–µ—Ç—å –ø–æ–¥–¥–µ—Ä–∂–∏–≤–∞—é—â–∏–µ –ø—Ä–∞–∫—Ç–∏–∫–∏
-                          </button>
-                          <button style={{ ...s.secondary, fontSize: 13, padding: "10px 16px", borderColor: "#B85C4A", color: "#B85C4A" }}
-                            onClick={() => {
-                              showToast("–ï—Å–ª–∏ —Å–æ—Å—Ç–æ—è–Ω–∏–µ —É—Ö—É–¥—à–∞–µ—Ç—Å—è –∏–ª–∏ –µ—Å—Ç—å —Ä–∏—Å–∫ ‚Äî –∑–≤–æ–Ω–∏—Ç–µ 112 –∏–ª–∏ 103");
-                            }}>
-                            –ö–æ–≥–¥–∞ –Ω—É–∂–Ω–∞ —Å—Ä–æ—á–Ω–∞—è –ø–æ–º–æ—â—å
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Consultation prep modal */}
-                {showConsultPrep && (
-                  <div style={s.overlay} onClick={() => setShowConsultPrep(false)}>
-                    <div style={s.modal} onClick={(e) => e.stopPropagation()}>
-                      <div style={s.modalTitle}>–ü–æ–¥–≥–æ—Ç–æ–≤–∏—Ç—å—Å—è –∫ –ø–µ—Ä–≤–æ–π –∫–æ–Ω—Å—É–ª—å—Ç–∞—Ü–∏–∏</div>
-                      <p style={{ color: "#7A7268", fontSize: 14, lineHeight: 1.6, marginBottom: 16 }}>
-                        –ß—Ç–æ –≤–∞–∂–Ω–æ —Ä–∞—Å—Å–∫–∞–∑–∞—Ç—å —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç—É:
-                      </p>
-                      <div style={{ background: "#FAF6EF", borderRadius: 14, padding: 16, marginBottom: 16, fontSize: 13, lineHeight: 1.7, color: "#2E2A25" }}>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
-                          <li>–ß—Ç–æ –ø—Ä–æ–∏–∑–æ—à–ª–æ</li>
-                          <li>–ö–∞–∫ –¥–∞–≤–Ω–æ —ç—Ç–æ –ø—Ä–æ–¥–æ–ª–∂–∞–µ—Ç—Å—è</li>
-                          <li>–ß—Ç–æ –ø—Ä–æ–∏—Å—Ö–æ–¥–∏—Ç —Å–æ —Å–Ω–æ–º</li>
-                          <li>–ö–∞–∫–∏–µ –µ—Å—Ç—å —Ç–µ–ª–µ—Å–Ω—ã–µ —Å–∏–º–ø—Ç–æ–º—ã</li>
-                          <li>–ß—Ç–æ –∏–∑–º–µ–Ω–∏–ª–æ—Å—å –≤ —Ä–∞–±–æ—Ç–µ –∏ –ø–æ–≤—Å–µ–¥–Ω–µ–≤–Ω–æ–π –∂–∏–∑–Ω–∏</li>
-                          <li>–ë—ã–ª–∏ –ª–∏ –º—ã—Å–ª–∏ –æ —Å–º–µ—Ä—Ç–∏ –∏–ª–∏ —Å–∞–º–æ–ø–æ–≤—Ä–µ–∂–¥–µ–Ω–∏–∏</li>
-                          <li>–ö–∞–∫–∏–µ –ª–µ–∫–∞—Ä—Å—Ç–≤–∞, –∞–ª–∫–æ–≥–æ–ª—å –∏–ª–∏ –¥—Ä—É–≥–∏–µ —Å—Ä–µ–¥—Å—Ç–≤–∞ –∏—Å–ø–æ–ª—å–∑—É—é—Ç—Å—è</li>
-                          <li>–ö—Ç–æ —Å–µ–π—á–∞—Å –º–æ–∂–µ—Ç –ø–æ–¥–¥–µ—Ä–∂–∞—Ç—å</li>
-                        </ul>
-                      </div>
-                      <button
-                        style={{ ...s.wide, background: "#7D9A89", color: "white" }}
-                        onClick={() => {
-                          const text = `–ß—Ç–æ –ø—Ä–æ–∏–∑–æ—à–ª–æ: ${text || "(–±—É–¥–µ—Ç –∑–∞–ø–æ–ª–Ω–µ–Ω–æ –ø—Ä–∏ —Ä–∞–∑–≥–æ–≤–æ—Ä–µ)"}
-      –ö–∞–∫ –¥–∞–≤–Ω–æ: ${conversationHistory?.length ? "–æ–±—Å—É–∂–¥–µ–Ω–æ –≤ –¥–∏–∞–ª–æ–≥–µ" : "‚Äî"}
-      –°–æ–Ω: ${userPart?.match(/—Å–æ–Ω/i) ? "–æ–±—Å—É–∂–¥–∞–ª—Å—è" : "‚Äî"}
-      –¢–µ–ª–µ—Å–Ω—ã–µ —Å–∏–º–ø—Ç–æ–º—ã: ${userPart?.match(/—Ç–µ–ª–µ—Å–Ω|–±–æ–ª|—Å–µ—Ä–¥—Ü|–≥–æ–ª–æ–≤/i) ? "–æ–±—Å—É–∂–¥–∞–ª–∏—Å—å" : "‚Äî"}
-      –ò–∑–º–µ–Ω–µ–Ω–∏—è –≤ –∂–∏–∑–Ω–∏: ${userPart?.match(/—Ä–∞–±–æ—Ç|—É—á—ë–±/i) ? "–æ–±—Å—É–∂–¥–∞–ª–∏—Å—å" : "‚Äî"}
-      –ú—ã—Å–ª–∏ –æ —Å–º–µ—Ä—Ç–∏: ${userPart?.match(/—Å–º–µ—Ä—Ç|–∂–∏—Ç—å/i) ? "–æ–±—Å—É–∂–¥–∞–ª–∏—Å—å" : "‚Äî"}
-      –õ–µ–∫–∞—Ä—Å—Ç–≤–∞/–∞–ª–∫–æ–≥–æ–ª—å: ${userPart?.match(/–ª–µ–∫–∞—Ä—Å—Ç–≤|–∞–ª–∫–æ–≥–æ–ª—å/i) ? "–æ–±—Å—É–∂–¥–∞–ª–∏—Å—å" : "‚Äî"}
-      –ü–æ–¥–¥–µ—Ä–∂–∫–∞: ${userPart?.match(/–ø–æ–¥–¥–µ—Ä–∂|–±–ª–∏–∑–∫/i) ? "–æ–±—Å—É–∂–¥–∞–ª–∞—Å—å" : "‚Äî"}`;
-                          navigator.clipboard.writeText(text);
-                          showToast("–ö—Ä–∞—Ç–∫–æ–µ –æ–ø–∏—Å–∞–Ω–∏–µ —Å–∫–æ–ø–∏—Ä–æ–≤–∞–Ω–æ");
-                        }}
-                      >
-                        –°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å –∫—Ä–∞—Ç–∫–æ–µ –æ–ø–∏—Å–∞–Ω–∏–µ
-                      </button>
-                      <button style={{ ...s.secondary, marginTop: 10 }} onClick={() => setShowConsultPrep(false)}>
-                        –ó–∞–∫—Ä—ã—Ç—å
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Message to close person modal */}
-
-                {activeModule === "support" && !showSelfAssessment && !showSupportToolkit && !showSpecialistIntent && (
-                  <div style={{ marginTop: 24, borderTop: "1px solid rgba(46,42,37,.1)", paddingTop: 20 }}>
-                    <div style={{ fontSize: 14, color: "#2E2A25", lineHeight: 1.6, marginBottom: 16, fontFamily: "Georgia, \"PT Serif\", serif" }}>
-                      –ö–∞–∫ –≤–∞–º –∫–∞–∂–µ—Ç—Å—è, –Ω–∞ —ç—Ç–æ–º —ç—Ç–∞–ø–µ –≤—ã —Å–º–æ–∂–µ—Ç–µ —Å–ø—Ä–∞–≤–ª—è—Ç—å—Å—è —Å —Å–æ—Å—Ç–æ—è–Ω–∏–µ–º –±–µ–∑ –ø–æ–¥–∫–ª—é—á–µ–Ω–∏—è —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞?
-                    </div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button style={{ ...s.wide, flex: "1 1 auto", minWidth: 140 }} onClick={() => { setCanManageWithoutSpecialist("yes"); setShowSelfAssessment(true); setShowSupportToolkit(true); }}>
-                        –î–∞, –ø–æ–∫–∞ –ø–æ–ø—Ä–æ–±—É—é —Å–∞–º(–∞)
-                      </button>
-                      <button style={{ ...s.secondary, flex: "1 1 auto", minWidth: 140 }} onClick={() => { setCanManageWithoutSpecialist("not_sure"); setShowSelfAssessment(true); setShowSupportToolkit(true); }}>
-                        –ù–µ —É–≤–µ—Ä–µ–Ω(–∞)
-                      </button>
-                      <button style={{ ...s.secondary, flex: "1 1 auto", minWidth: 140, borderColor: "#B85C4A", color: "#B85C4A" }} onClick={() => { setCanManageWithoutSpecialist("no"); setShowSelfAssessment(true); setShowSpecialistIntent(true); }}>
-                        –ù–µ—Ç, —Ö–æ—á—É –ø–æ–¥–∫–ª—é—á–∏—Ç—å —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {activeModule === "support" && showSpecialistIntent && !specialistIntentDone && (
-                  <div style={{ marginTop: 24, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", borderRadius: 14, padding: 20 }}>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: "#2E2A25", marginBottom: 12 }}>–ó–∞–ø—Ä–æ—Å –Ω–∞ –ø–æ–¥–∫–ª—é—á–µ–Ω–∏–µ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞</div>
-                    <p style={{ color: "#7A7268", lineHeight: 1.7, fontSize: 14, margin: "0 0 16px" }}>
-                      –≠—Ç–∞ –≤–æ–∑–º–æ–∂–Ω–æ—Å—Ç—å –≥–æ—Ç–æ–≤–∏—Ç—Å—è. –°–µ–π—á–∞—Å —Å–µ—Ä–≤–∏—Å —Ä–∞–±–æ—Ç–∞–µ—Ç –≤ –∑–∞–∫—Ä—ã—Ç–æ–º —Ç–µ—Å—Ç–æ–≤–æ–º —Ä–µ–∂–∏–º–µ –∏ –Ω–µ —è–≤–ª—è–µ—Ç—Å—è —Ç–µ–ª–µ–º–µ–¥–∏—Ü–∏–Ω—Å–∫–æ–π –ø–ª–∞—Ç—Ñ–æ—Ä–º–æ–π. –ú—ã —Å–æ—Ö—Ä–∞–Ω–∏–º –æ—Ç–º–µ—Ç–∫—É –≤ –≤–∞—à–µ–π –∞–Ω–æ–Ω–∏–º–Ω–æ–π —Å–µ—Å—Å–∏–∏, —á—Ç–æ–±—ã –≤ –±—É–¥—É—â–µ–º –º–æ–∂–Ω–æ –±—ã–ª–æ –≤–µ—Ä–Ω—É—Ç—å—Å—è –∫ —ç—Ç–æ–º—É —à–∞–≥—É.
-                    </p>
-                    <button
-                      style={{ ...s.wide, background: "#7D9A89", color: "white" }}
-                      onClick={() => {
-                        setSpecialistIntentDone(true);
-                        const newPlan = { ...(supportPlan || {}), specialist_request_intent: true, patient_self_assessment: { ...((supportPlan?.patient_self_assessment) || {}), can_manage_without_specialist: canManageWithoutSpecialist } };
-                        setSupportPlan(newPlan);
-                        saveSupportPlan(newPlan);
-                      }}
-                    >
-                      –û—Ç–º–µ—Ç–∏—Ç—å, —á—Ç–æ —Ö–æ—á—É –ø–æ–¥–∫–ª—é—á–∏—Ç—å —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–∞
-                    </button>
-                    {specialistIntentDone && (
-                      <div style={{ color: "#5F7D6C", fontSize: 13, marginTop: 12, lineHeight: 1.5, background: "#E2EBE4", borderRadius: 10, padding: 12 }}>
-                        –û—Ç–º–µ—Ç–∫–∞ —Å–æ—Ö—Ä–∞–Ω–µ–Ω–∞ –≤ –≤–∞—à–µ–π –∞–Ω–æ–Ω–∏–º–Ω–æ–π —Å–µ—Å—Å–∏–∏. –ï—Å–ª–∏ —Å–æ—Å—Ç–æ—è–Ω–∏–µ —É—Ö—É–¥—à–∞–µ—Ç—Å—è –∏–ª–∏ –µ—Å—Ç—å —Ä–∏—Å–∫ –ø—Ä–∏—á–∏–Ω–∏—Ç—å –≤—Ä–µ–¥ —Å–µ–±–µ –∏–ª–∏ –¥—Ä—É–≥–æ–º—É —á–µ–ª–æ–≤–µ–∫—É ‚Äî –∑–≤–æ–Ω–∏—Ç–µ 112 –∏–ª–∏ 103.
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {showSupportToolkit && activeModule === "support" && (
-                  <div style={{ marginTop: 24 }}>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: "#2E2A25", marginBottom: 12, fontFamily: "Georgia, \"PT Serif\", serif" }}>
-                      –ß—Ç–æ –º–æ–∂–Ω–æ –ø–æ–ø—Ä–æ–±–æ–≤–∞—Ç—å –¥–æ —Å–ª–µ–¥—É—é—â–µ–≥–æ —Ä–∞–∑–≥–æ–≤–æ—Ä–∞
-                    </div>
-                    <p style={{ color: "#7A7268", lineHeight: 1.6, fontSize: 13, margin: "0 0 16px" }}>
-                      –≠—Ç–æ –Ω–µ –ª–µ—á–µ–Ω–∏–µ, –Ω–µ —Ç–µ—Ä–∞–ø–∏—è –∏ –Ω–µ –∑–∞–º–µ–Ω–∞ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç—É. –ù–µ–º–µ–¥–∏–∫–∞–º–µ–Ω—Ç–æ–∑–Ω—ã–µ –ø–æ–¥–¥–µ—Ä–∂–∏–≤–∞—é—â–∏–µ –ø—Ä–∞–∫—Ç–∏–∫–∏ –Ω–∞ 24‚Äì72 —á–∞—Å–∞.
-                    </p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {PRACTICES.map((p) => {
-                        const alreadyAdded = supportPlan?.selected_practices?.some(sp => sp.id === p.id);
-                        return (
-                          <div key={p.id} style={{ border: "1px solid rgba(46,42,37,.1)", borderRadius: 12, padding: "12px 16px", background: "#FAF6EF" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                              <span style={{ fontSize: 14, fontWeight: 600, color: "#2E2A25", flex: 1 }}>{p.title}</span>
-                              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                                <button style={{ fontSize: 12, padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(46,42,37,.15)", background: "white", color: "#5F7D6C", cursor: "pointer" }} onClick={() => downloadPracticeFile(p.file)}>
-                                  –°–∫–∞—á–∞—Ç—å —Ç–µ–∫—Å—Ç
-                                </button>
-                                <button
-                                  style={{
-                                    fontSize: 12, padding: "4px 10px", borderRadius: 8, border: "1px solid rgba(46,42,37,.15)",
-                                    background: alreadyAdded ? "#E2EBE4" : "white", color: alreadyAdded ? "#5F7D6C" : "#7D9A89",
-                                    cursor: alreadyAdded ? "default" : "pointer", fontWeight: alreadyAdded ? 400 : 600,
-                                  }}
-                                  disabled={alreadyAdded}
-                                  onClick={() => addPracticeToPlan(p.id)}
-                                >
-                                  {alreadyAdded ? "‚úì –î–æ–±–∞–≤–ª–µ–Ω–æ" : "–î–æ–±–∞–≤–∏—Ç—å –≤ –º–æ–π –ø–ª–∞–Ω"}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  style={{ ...s.secondary, marginTop: 16 }}
-                  onClick={() => setSessionReviewOpen(!sessionReviewOpen)}
-                >
-                  –û—Ü–µ–Ω–∫–∞ —Å–µ—Å—Å–∏–∏
-                </button>
-
-                {sessionReviewOpen && (
-                  <div style={s.expertBox}>
-                    <h3 style={{ margin: "0 0 16px", fontSize: 18, fontFamily: "Georgia, \"PT Serif\", serif" }}>–û—Ü–µ–Ω–∫–∞ —Å–µ—Å—Å–∏–∏</h3>
-
-                    <label style={s.label}>–û—Ü–µ–Ω–∫–∞ –ø–∞—Ü–∏–µ–Ω—Ç–æ–º</label>
-                    <div style={{ marginBottom: 6, color: "#7A7268", fontSize: 13 }}>–ù–∞—Å–∫–æ–ª—å–∫–æ –ø–æ–ª–µ–∑–Ω—ã–º –±—ã–ª —Ä–∞–∑–±–æ—Ä? 1‚Äì5</div>
-                    <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <button
-                          key={n}
-                          style={{
-                            width: 44, height: 44, borderRadius: 12, border: "1px solid rgba(46,42,37,.12)",
-                            background: patientRating === n ? "#7D9A89" : "#FAF6EF",
-                            color: patientRating === n ? "white" : "#2E2A25",
-                            fontWeight: 800, fontSize: 18, cursor: "pointer",
-                          }}
-                          onClick={() => setPatientRating(n)}
-                        >
-                          {n}
-                        </button>
-                      ))}
-                    </div>
-
-                    <label style={s.label}>–ß—Ç–æ –±—ã–ª–æ –ø–æ–ª–µ–∑–Ω–æ?</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={patientUseful}
-                      onChange={(e) => setPatientUseful(e.target.value)}
-                      placeholder="–ù–∞–ø—Ä–∏–º–µ—Ä: –ø–æ–º–æ–≥–ª–æ —Å—Ç—Ä—É–∫—Ç—É—Ä–∏—Ä–æ–≤–∞—Ç—å –º—ã—Å–ª–∏, —Å—Ç–∞–ª–æ –ø–æ–Ω—è—Ç–Ω–æ, –∫ –∫–æ–º—É –æ–±—Ä–∞—Ç–∏—Ç—å—Å—è..."
-                    />
-
-                    <label style={s.label}>–ß—Ç–æ –±—ã–ª–æ –Ω–µ–ø–æ–Ω—è—Ç–Ω–æ –∏–ª–∏ –±–µ—Å–ø–æ–ª–µ–∑–Ω–æ?</label>
-                    <textarea
-                      style={s.answerInput}
-                      value={patientUnclear}
-                      onChange={(e) => setPatientUnclear(e.target.value)}
-                      placeholder="–ù–∞–ø—Ä–∏–º–µ—Ä: –≤–æ–ø—Ä–æ—Å—ã –±—ã–ª–∏ —Å–ª–∏—à–∫–æ–º –æ–±—â–∏–º–∏, –∑–∞–∫–ª—é—á–µ–Ω–∏–µ –Ω–µ–ø–æ–Ω—è—Ç–Ω–æ..."
-                    />
-
-                    <button
-                      style={{ ...s.wide, marginTop: 12 }}
-                      onClick={savePatientFeedback}
-                    >
-                      –°–æ—Ö—Ä–∞–Ω–∏—Ç—å –æ—Ç–∑—ã–≤
-                    </button>
-
-
-                  </div>
-                )}
-
-                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                  {reportSource === "cabinet" && (
-                    <button
-                      style={{ ...s.secondary, flex: 1 }}
-                      onClick={() => { goToSupportCabinet(); setReportSource(null); }}
-                    >
-                      ‚Üê –ù–∞–∑–∞–¥ –≤ –∫–∞–±–∏–Ω–µ—Ç
-                    </button>
-                  )}
-                  <button
-                    style={{ ...s.secondary, flex: 1 }}
-                    onClick={handleReset}
-                  >
-                    –ù–∞—á–∞—Ç—å –∑–∞–Ω–æ–≤–æ
-                  </button>
-                </div>
-              </div>
-            )}
-          </section>
-          ) /* ends !(body && intake not idle) guard */}
-
-          {/* Support Client Cabinet */}
-          {phase === "cabinet" && supportCabinet && (() => {
-            const careNextStep = getCareNextStep(supportCabinet.latest_report?.careRecommendation || supportCabinet.latest_report?.supportPlan?.care_recommendation);
-            const latestSession = supportCabinet.sessions?.[0];
-            const latestDate = latestSession?.createdAt
-              ? new Date(latestSession.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
-              : "‚Äî";
-            const wallet = !APP_BRAND.isSupportPilot && supportCabinet.wallet?.visible ? supportCabinet.wallet : null;
-
-            return (
-              <section style={{ width: "100%" }} className="app-card-support">
-                {/* Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, flexWrap: "wrap", gap: 10 }}>
-                  <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 15, fontWeight: 600, color: "#2E2A25" }}>
-                      –õ–∏—á–Ω—ã–π –∫–∞–±–∏–Ω–µ—Ç{supportDisplayName ? ` ${supportDisplayName}` : ""}
-                    </span>
-                    {wallet && (
-                      <span style={{ fontSize: 13, color: "#5F7D6C", fontWeight: 600 }}>
-                        –ë–∞–ª–∞–Ω—Å {Number(wallet.balance_total ?? 0).toLocaleString("ru-RU")} ¬∑ –¥–æ—Å—Ç—É–ø–Ω–æ {Number(wallet.available_credits ?? 0).toLocaleString("ru-RU")}
-                      </span>
-                    )}
-                    <button
-                      style={{ ...s.secondary, fontSize: 13, padding: "6px 12px" }}
-                      onClick={() => { goToSupportLanding(); setSupportCabinet(null); clearSupportSession(); }}
-                    >
-                      –í—ã–π—Ç–∏
-                    </button>
-                  </div>
-                </div>
-
-                <PatientMedicationOrders module="support" />
-                <MedicationCard cards={supportCabinet.medication_cards} />
-
-                {/* ROW 1: –ü–æ—Å–ª–µ–¥–Ω–∏–π —Ä–∞–∑–≥–æ–≤–æ—Ä + –°–ª–µ–¥—É—é—â–∏–π —à–∞–≥ */}
-                {latestSession && (
-                  <div style={{
-                    display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16,
-                    marginBottom: 24,
-                  }}>
-                    {/* –ü–æ—Å–ª–µ–¥–Ω–∏–π —Ä–∞–∑–≥–æ–≤–æ—Ä */}
-                    <div style={{
-                      background: "#E2EBE4", border: "1px solid rgba(125,154,137,.3)",
-                      borderRadius: 16, padding: 20,
-                    }}>
-                      <div style={{ fontSize: 12, color: "#5F7D6C", marginBottom: 4 }}>–ü–æ—Å–ª–µ–¥–Ω–∏–π —Ä–∞–∑–≥–æ–≤–æ—Ä</div>
-                      <div style={{ fontWeight: 700, fontSize: 16, color: "#2E2A25", marginBottom: 4 }}>{latestDate}</div>
-                      <div style={{
-                        display: "inline-block", fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
-                        background: latestSession.status === "followup" ? "#EDE3D8" : "rgba(255,255,255,.5)",
-                        color: latestSession.status === "followup" ? "#8B6B4A" : "#5F7D6C",
-                        marginBottom: 12,
-                      }}>
-                        {latestSession.status === "followup" ? "–ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏–µ" : "–ø–µ—Ä–≤–æ–µ –æ–±—Ä–∞—â–µ–Ω–∏–µ"}
-                      </div>
-                      <div style={{ fontSize: 13, color: "#5F574F", marginBottom: 14 }}>{latestSession.summary?.slice(0, 120)}{latestSession.summary?.length > 120 ? "‚Ä¶" : ""}</div>
-                      {APP_BRAND.isSupportPilot && supportCabinet.latest_report?.crisisBlock && (
-                        <div role="alert" style={{ marginBottom: 12, padding: 12, borderRadius: 12, background: "#fff1ed", border: "2px solid #b85c4a", color: "#4a2822", fontSize: 13, lineHeight: 1.5 }}>
-                          <strong>–ë–ª–æ–∫ –±–µ–∑–æ–ø–∞—Å–Ω–æ—Å—Ç–∏ —Å–æ—Ö—Ä–∞–Ω—ë–Ω.</strong> –ï—Å–ª–∏ –≤—ã —Å–µ–π—á–∞—Å –º–æ–∂–µ—Ç–µ –±—ã—Ç—å –≤ –æ–ø–∞—Å–Ω–æ—Å—Ç–∏ –∏–ª–∏ –Ω–µ —É–≤–µ—Ä–µ–Ω—ã, –∑–≤–æ–Ω–∏—Ç–µ 112 –∏–ª–∏ 103 –∏ –ø–æ–ø—Ä–æ—Å–∏—Ç–µ –¥–æ–≤–µ—Ä–µ–Ω–Ω–æ–≥–æ —á–µ–ª–æ–≤–µ–∫–∞ –ø–æ–±—ã—Ç—å —Ä—è–¥–æ–º.
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                            {["112", "103"].map((number) => <a key={number} href={`tel:${number}`} aria-label={`–ü–æ–∑–≤–æ–Ω–∏—Ç—å ${number}`} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 104, minHeight: 48, padding: "8px 14px", borderRadius: 9, background: "#9f3425", color: "#fff", fontWeight: 800, textDecoration: "none" }}>–ü–æ–∑–≤–æ–Ω–∏—Ç—å {number}</a>)}
-                          </div>
-                        </div>
-                      )}
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button style={{ ...s.primary, fontSize: 13, padding: "8px 14px", flex: 1 }} onClick={startSupportFollowUp}>
-                          –ü—Ä–æ–¥–æ–ª–∂–∏—Ç—å —Ä–∞–∑–≥–æ–≤–æ—Ä
-                        </button>
-                        <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px", flex: 1 }} onClick={() => openSupportReport(latestSession.sessionId)}>
-                          –û—Ç–∫—Ä—ã—Ç—å –æ—Ç—á—ë—Ç
-                        </button>
-                      </div>
-                      {APP_BRAND.isSupportPilot && (
-                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(46,42,37,.1)" }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#5F7D6C", marginBottom: 6 }}>–ö–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è</div>
-                          {regeneratedCode ? (
-                            <div style={{ fontFamily: "monospace", fontWeight: 800, fontSize: 13, wordBreak: "break-all", marginBottom: 8 }}>{regeneratedCode}</div>
-                          ) : (
-                            <div style={{ fontSize: 12, color: "#7A7268", marginBottom: 8 }}>–°–æ–∑–¥–∞–π—Ç–µ –∫–æ–¥, —á—Ç–æ–±—ã –æ—Ç–∫—Ä—ã—Ç—å –±–µ—Å–µ–¥—ã –Ω–∞ –¥—Ä—É–≥–æ–º —É—Å—Ç—Ä–æ–π—Å—Ç–≤–µ. –°–æ–∑–¥–∞–Ω–∏–µ –∑–∞–º–µ–Ω–∏—Ç –ø—Ä–µ–∂–Ω–∏–π –∫–æ–¥.</div>
-                          )}
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            <button style={{ ...s.secondary, fontSize: 12, minHeight: 42 }} onClick={regenerateSupportContinuationCode}>–°–æ–∑–¥–∞—Ç—å –Ω–æ–≤—ã–π –∫–æ–¥ –ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏—è</button>
-                            {regeneratedCode && <button style={{ ...s.secondary, fontSize: 12, minHeight: 42 }} onClick={() => { navigator.clipboard.writeText(regeneratedCode); showToast("–ö–æ–¥ —Å–∫–æ–ø–∏—Ä–æ–≤–∞–Ω"); }}>–°–∫–æ–ø–∏—Ä–æ–≤–∞—Ç—å –∫–æ–¥</button>}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* –ü–æ–≥–æ–≤–æ—Ä–∏–º? ‚Äî Quick AI Chat */}
-                    <div style={{
-                      background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
-                      borderRadius: 16, padding: 20, display: "flex", flexDirection: "column",
-                    }}>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 6 }}>–ü–æ–≥–æ–≤–æ—Ä–∏–º?</div>
-                      <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
-                        –ú–æ–∂–Ω–æ –ø—Ä–æ—Å—Ç–æ –∑–∞–¥–∞—Ç—å –≤–æ–ø—Ä–æ—Å –∏–ª–∏ —Ä–∞—Å—Å–∫–∞–∑–∞—Ç—å, —á—Ç–æ –ø—Ä–æ–∏–∑–æ—à–ª–æ —Å–µ–≥–æ–¥–Ω—è.
-                      </div>
-
-                      {/* Current session messages (only new messages from this session) */}
-                      {quickChatMessages.length > 0 && (
-                        <div ref={quickChatContainerRef} onScroll={handleQuickChatScroll} style={{ marginBottom: 12, maxHeight: 240, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-                          {quickChatMessages.map((msg) => (
-                            <div key={msg.id} style={{
-                              alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                              maxWidth: "85%",
-                              padding: "8px 12px",
-                              borderRadius: 12,
-                              fontSize: 13,
-                              lineHeight: 1.5,
-                              background: msg.role === "user" ? "#7D9A89" : "#f0f5f1",
-                              color: msg.role === "user" ? "white" : "#2E2A25",
-                            }}>
-                              {msg.ai_response?.answer || msg.message_text}
-                              {msg.ai_response?.safety_note && (
-                                <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(184,92,74,.1)", borderRadius: 8, color: "#B85C4A", fontSize: 12 }}>
-                                  {msg.ai_response.safety_note}
-                                </div>
-                              )}
-                              {/* CTA buttons for navigation/handoff/error intents */}
-                              {(msg.ai_response?.cta === "service_request" || msg.ai_response?.intent_type === "handoff") && (
-                                <div style={{ marginTop: 8 }}>
-                                  <button style={{ fontSize: 12, padding: "6px 12px", background: "#7D9A89", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }} onClick={() => openSupportRequestForSession()}>
-                                    –°–≤—è–∑–∞—Ç—å—Å—è —Å–æ —Å–ø–µ—Ü–∏–∞–ª–∏—Å—Ç–æ–º
-                                  </button>
-                                </div>
-                              )}
-                              {msg.ai_response?.suggest_followup && (
-                                <div style={{ marginTop: 8 }}>
-                                  <button style={{ fontSize: 12, padding: "6px 12px", background: "#E2EBE4", color: "#5F7D6C", border: "1px solid rgba(125,154,137,.3)", borderRadius: 8, cursor: "pointer" }} onClick={startSupportFollowUp}>
-                                    –ü—Ä–æ–¥–æ–ª–∂–∏—Ç—å —Ä–∞–∑–≥–æ–≤–æ—Ä
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                          {quickChatLoading && (
-                            <div style={{ alignSelf: "flex-start", padding: "8px 12px", borderRadius: 12, background: "#f0f5f1", fontSize: 13, color: "#7A7268" }}>
-                              –¢–æ—á–∫–∞ –û–ø–æ—Ä—ã –æ—Ç–≤–µ—á–∞–µ—Ç‚Ä¶
-                            </div>
-                          )}
-                          {quickChatHasNewResponse && quickChatScrolledUp && (
-                            <button
-                              onClick={() => scrollToQuickChatBottom(true)}
-                              style={{ alignSelf: "center", padding: "6px 14px", borderRadius: 20, background: "#7D9A89", color: "white", border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", marginTop: 4 }}
-                            >
-                              –ù–æ–≤—ã–π –æ—Ç–≤–µ—Ç ‚Üì
-                            </button>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Input */}
-                      <textarea
-                        ref={quickChatInputRef}
-                        style={{ ...s.answerInput, width: "100%", minHeight: 60, maxHeight: 120, marginBottom: 8, resize: "vertical" }}
-                        value={quickChatInput}
-                        onChange={(e) => setQuickChatInput(e.target.value)}
-                        placeholder="–ß—Ç–æ —É –≤–∞—Å —Å–µ–≥–æ–¥–Ω—è? –ú–æ–∂–Ω–æ —Å–ø—Ä–æ—Å–∏—Ç—å –æ —á—ë–º —É–≥–æ–¥–Ω–æ‚Ä¶"
-                         rows={2}
-                         onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); sendQuickChatMessage(); } }}
-                       />
-                       {renderSupportCabinetVoice("quick_chat", "–†–∞—Å—Å–∫–∞–∑–∞—Ç—å –≥–æ–ª–æ—Å–æ–º")}
-                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 11, color: "#8a7e72" }}>‚åò/Ctrl + Enter ‚Äî –æ—Ç–ø—Ä–∞–≤–∏—Ç—å</span>
-                        <button
-                          style={{ ...s.primary, fontSize: 13, padding: "10px 20px", opacity: quickChatLoading || !quickChatInput.trim() ? 0.5 : 1 }}
-                          disabled={quickChatLoading || !quickChatInput.trim()}
-                          onClick={() => sendQuickChatMessage()}
-                        >
-                          –û—Ç–ø—Ä–∞–≤–∏—Ç—å
-                        </button>
-                      </div>
-
-                      {/* Show/Hide previous conversation */}
-                      <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-                        <button
-                          style={{ background: "none", border: "none", fontSize: 12, color: "#7A7268", cursor: "pointer", textDecoration: "underline", textAlign: "left", padding: 0 }}
-                          onClick={async () => {
-                            if (quickChatShowHistory) {
-                              setQuickChatShowHistory(false);
-                            } else {
-                              await loadSupportChat();
-                              setQuickChatShowHistory(true);
-                            }
-                          }}
-                        >
-                          {quickChatShowHistory ? "–°–∫—Ä—ã—Ç—å –ø—Ä–µ–¥—ã–¥—É—â–∏–π —Ä–∞–∑–≥–æ–≤–æ—Ä" : "–ü–æ–∫–∞–∑–∞—Ç—å –ø—Ä–µ–¥—ã–¥—É—â–∏–π —Ä–∞–∑–≥–æ–≤–æ—Ä"}
-                        </button>
-
-                        {quickChatShowHistory && quickChatMessages.length > 0 && (
-                          <div style={{ maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: "8px 0" }}>
-                            {quickChatMessages.map((msg) => (
-                              <div key={msg.id} style={{
-                                alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                                maxWidth: "85%",
-                                padding: "8px 12px",
-                                borderRadius: 12,
-                                fontSize: 12,
-                                lineHeight: 1.4,
-                                background: msg.role === "user" ? "#7D9A89" : "#f0f5f1",
-                                color: msg.role === "user" ? "white" : "#2E2A25",
-                              }}>
-                                {msg.ai_response?.answer || msg.message_text}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ marginTop: 6 }}>
-                        <button style={{ background: "none", border: "none", fontSize: 12, color: "#7A7268", cursor: "pointer", textDecoration: "underline" }} onClick={startSupportFollowUp}>
-                          –ù—É–∂–µ–Ω –ø–æ–¥—Ä–æ–±–Ω—ã–π —Ä–∞–∑–±–æ—Ä? –ü—Ä–æ–¥–æ–ª–∂–∏—Ç—å —Ä–∞–∑–≥–æ–≤–æ—Ä ‚Üí
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* ROW: –ò—Å—Ç–æ—Ä–∏—è —Ä–∞–∑–≥–æ–≤–æ—Ä–æ–≤ */}
-                {supportCabinet.sessions?.length > 0 && (
-                  <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>–ò—Å—Ç–æ—Ä–∏—è —Ä–∞–∑–≥–æ–≤–æ—Ä–æ–≤</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {supportCabinet.sessions.map((sess) => {
-                        const dateStr = sess.createdAt
-                          ? new Date(sess.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
-                          : "‚Äî";
-                        return (
-                          <div key={sess.sessionId} style={{
-                            display: "flex", justifyContent: "space-between", alignItems: "center",
-                            flexWrap: "wrap", gap: 10,
-                            padding: "12px 16px", borderRadius: 12, background: "#ffffff",
-                            border: "1px solid rgba(46,42,37,.08)",
-                          }}>
-                            <div style={{ flex: 1, minWidth: 200 }}>
-                              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                                <span style={{ fontWeight: 700, fontSize: 14, color: "#2E2A25" }}>‚Ññ{sess.order}</span>
-                                <span style={{ fontSize: 12, color: "#7A7268" }}>{dateStr}</span>
-                                <span style={{
-                                  fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
-                                  background: sess.status === "followup" ? "#EDE3D8" : "#E2EBE4",
-                                  color: sess.status === "followup" ? "#8B6B4A" : "#5F7D6C",
-                                }}>
-                                  {sess.status === "followup" ? "–ø—Ä–æ–¥–æ–ª–∂–µ–Ω–∏–µ" : "–ø–µ—Ä–≤–æ–µ"}
-                                </span>
-                              </div>
-                              <div style={{ fontSize: 13, color: "#5F574F", marginTop: 4, maxWidth: 500 }}>{sess.summary}</div>
-                            </div>
-                            <button style={{ ...s.secondary, fontSize: 13, padding: "8px 14px", flexShrink: 0 }} onClick={() => openSupportSessionView(sess.sessionId)}>
-                              –û—Ç–∫—Ä—ã—Ç—å
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* ROW: –ö–∞–∫ –≤—ã —Å–µ–≥–æ–¥–Ω—è? ‚Äî Daily check-in */}
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 4 }}>–ö–∞–∫ –≤—ã —Å–µ–±—è —á—É–≤—Å—Ç–≤—É–µ—Ç–µ —Å–µ–≥–æ–¥–Ω—è?</div>
-                  <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 14 }}>–û—Ç–º–µ—Ç—å—Ç–µ –æ–±—â–µ–µ —Å–æ—Å—Ç–æ—è–Ω–∏–µ ‚Äî —ç—Ç–æ –ø–æ–º–æ–∂–µ—Ç —É–≤–∏–¥–µ—Ç—å –∏–∑–º–µ–Ω–µ–Ω–∏—è —Å–æ –≤—Ä–µ–º–µ–Ω–µ–º.</div>
-
-                  {/* Wellbeing scale -5 to +5 */}
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#2E2A25", marginBottom: 8 }}>–û–±—â–µ–µ —Å–æ—Å—Ç–æ—è–Ω–∏–µ</div>
-                    <div style={{ display: "inline-block" }}>
-                      <div style={{ display: "flex", gap: 4 }}>
-                        {[-5,-4,-3,-2,-1,0,1,2,3,4,5].map((v) => {
-                          const isSelected = checkinWellbeing === v;
-                          const isNeg = v < 0;
-                          const isPos = v > 0;
-                          let bg = "#FAF6EF";
-                          let color = "#7A7268";
-                          let border = "1px solid rgba(46,42,37,.1)";
-                          if (isSelected) {
-                            if (isNeg) { bg = "#E8D8D0"; color = "#6B4A3A"; border = "1px solid #C4A090"; }
-                            else if (isPos) { bg = "#D0E8D8"; color = "#3A6B4A"; border = "1px solid #90C4A0"; }
-                            else { bg = "#E2E0DB"; color = "#4A4A4A"; border = "1px solid #B0AFA8"; }
-                          }
-                          return (
-                            <button
-                              key={v}
-                              onClick={() => setCheckinWellbeing(v)}
-                              style={{
-                                width: 38, height: 38, borderRadius: 10, background: bg, color,
-                                border, fontWeight: 700, fontSize: 14, cursor: "pointer",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                              }}
-                            >
-                              {v > 0 ? `+${v}` : v}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                        <span style={{ fontSize: 11, color: "#8a7e72" }}>–û—á–µ–Ω—å —Ç—è–∂–µ–ª–æ</span>
-                        <span style={{ fontSize: 11, color: "#8a7e72" }}>–û–±—ã—á–Ω–æ</span>
-                        <span style={{ fontSize: 11, color: "#8a7e72" }}>–û—á–µ–Ω—å —Ö–æ—Ä–æ—à–æ</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Anxiety scale 0-10 */}
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#2E2A25", marginBottom: 8 }}>–ù–∞–ø—Ä—è–∂–µ–Ω–∏–µ / —Ç—Ä–µ–≤–æ–≥–∞</div>
-                    <div style={{ display: "inline-block" }}>
-                      <div style={{ display: "flex", gap: 4 }}>
-                        {[0,1,2,3,4,5,6,7,8,9,10].map((v) => {
-                          const isSelected = checkinAnxiety === v;
-                          let bg = "#FAF6EF";
-                          let color = "#7A7268";
-                          let border = "1px solid rgba(46,42,37,.1)";
-                          if (isSelected) {
-                            const intensity = v / 10;
-                            bg = `rgba(184,140,92,${0.15 + intensity * 0.35})`;
-                            color = "#5A4A3A";
-                            border = "1px solid #C4A080";
-                          }
-                          return (
-                            <button
-                              key={v}
-                              onClick={() => setCheckinAnxiety(v)}
-                              style={{
-                                width: 34, height: 34, borderRadius: 8, background: bg, color,
-                                border, fontWeight: 600, fontSize: 13, cursor: "pointer",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                              }}
-                            >
-                              {v}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                        <span style={{ fontSize: 11, color: "#8a7e72" }}>–°–æ–≤—Å–µ–º –Ω–µ—Ç</span>
-                        <span style={{ fontSize: 11, color: "#8a7e72" }}>–û—á–µ–Ω—å —Å–∏–ª—å–Ω–æ</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Optional comment */}
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 6 }}>–•–æ—Ç–∏—Ç–µ –¥–æ–±–∞–≤–∏—Ç—å –ø–∞—Ä—É —Å–ª–æ–≤?</div>
-                    <textarea
-                      style={{ ...s.answerInput, minHeight: 50 }}
-                      value={checkinComment}
-                      onChange={(e) => setCheckinComment(e.target.value)}
-                      placeholder="–ß—Ç–æ —Å–µ–≥–æ–¥–Ω—è –±–æ–ª—å—à–µ –≤—Å–µ–≥–æ –≤–ª–∏—è–µ—Ç –Ω–∞ –≤–∞—à–µ —Å–æ—Å—Ç–æ—è–Ω–∏–µ?"
-                      maxLength={1000}
-                      onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); saveSupportCheckin(); } }}
-                    />
-                  </div>
-
-                  <button
-                    style={{ ...s.primary, fontSize: 13, padding: "10px 18px", opacity: checkinSaving ? 0.6 : 1 }}
-                    disabled={checkinSaving || checkinWellbeing === null}
-                    onClick={saveSupportCheckin}
-                  >
-                    {checkinToday ? (checkinSaving ? "–°–æ—Ö—Ä–∞–Ω–µ–Ω–∏–µ..." : "–û–±–Ω–æ–≤–∏—Ç—å –æ—Ç–º–µ—Ç–∫—É") : (checkinSaving ? "–°–æ—Ö—Ä–∞–Ω–µ–Ω–∏–µ..." : "–°–æ—Ö—Ä–∞–Ω–∏—Ç—å")}
-                  </button>
-                  {checkinToday && (
-                    <div style={{ fontSize: 12, color: "#5F7D6C", marginTop: 8 }}>
-                      –°–µ–≥–æ–¥–Ω—è –≤—ã —É–∂–µ –æ—Ç–º–µ—Ç–∏–ª–∏: {checkinToday.wellbeing_score > 0 ? "+" : ""}{checkinToday.wellbeing_score}{checkinToday.anxiety_score !== null ? `, –Ω–∞–ø—Ä—è–∂–µ–Ω–∏–µ ${checkinToday.anxiety_score}/10` : ""}
-                    </div>
-                  )}
-
-                  {/* Dynamic chart ‚Äî show when 2+ days */}
-                  {checkinHistory.length >= 2 && (() => {
-                    const periods = [7, 30, 90];
-                    const chartData = checkinHistory.slice(-30);
-                    const chartW = 360;
-                    const chartH = 100;
-                    const padX = 30;
-                    const padY = 10;
-
-                    // Wellbeing chart: -5 to +5
-                    const wbPoints = chartData.map((d, i) => {
-                      const x = padX + (i / (chartData.length - 1)) * (chartW - padX * 2);
-                      const y = padY + ((5 - d.wellbeing_score) / 10) * (chartH - padY * 2);
-                      return `${x},${y}`;
-                    }).join(" ");
-
-                    // Anxiety chart: 0 to 10
-                    const axPoints = chartData.map((d, i) => {
-                      if (d.anxiety_score === null || d.anxiety_score === undefined) return null;
-                      const x = padX + (i / (chartData.length - 1)) * (chartW - padX * 2);
-                      const y = padY + ((10 - d.anxiety_score) / 10) * (chartH - padY * 2);
-                      return `${x},${y}`;
-                    }).filter(Boolean).join(" ");
-
-                    const zeroY = padY + (5 / 10) * (chartH - padY * 2);
-
-                    return (
-                      <div style={{ marginTop: 16 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: "#2E2A25", marginBottom: 12 }}>–î–∏–Ω–∞–º–∏–∫–∞ —Å–æ—Å—Ç–æ—è–Ω–∏—è</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-                          {/* Wellbeing chart */}
-                          <div style={{ background: "#fff", border: "1px solid rgba(46,42,37,.08)", borderRadius: 12, padding: 12 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: "#5F7D6C", marginBottom: 8 }}>–û–±—â–µ–µ —Å–æ—Å—Ç–æ—è–Ω–∏–µ</div>
-                            <svg viewBox={`0 0 ${chartW} ${chartH}`} width="100%" height={chartH}>
-                              <line x1={padX} y1={zeroY} x2={chartW - padX} y2={zeroY} stroke="#E2E0DB" strokeWidth="1" strokeDasharray="4" />
-                              <text x={4} y={zeroY + 4} fontSize="9" fill="#8a7e72">0</text>
-                              <text x={4} y={padY + 4} fontSize="9" fill="#8a7e72">+5</text>
-                              <text x={4} y={chartH - padY + 4} fontSize="9" fill="#8a7e72">-5</text>
-                              <polyline fill="none" stroke="#7D9A89" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={wbPoints} />
-                              {chartData.map((d, i) => {
-                                const x = padX + (i / (chartData.length - 1)) * (chartW - padX * 2);
-                                const y = padY + ((5 - d.wellbeing_score) / 10) * (chartH - padY * 2);
-                                return <circle key={i} cx={x} cy={y} r="3" fill="#7D9A89" />;
-                              })}
+Y™Áäx-ÆÈ‹j◊ù¢Îi∫⁄+äßj[hëÈ‹¢ÈÌ€ç˚ﬂ§Ëµ©h∫⁄n∂XßzÕZ[\‹ùX[]ôP€€ùô\úÿ][€àúõ€Hãã“X[]ôP€€ùô\úÿ][€ãöúﬁé¬ö[\‹ù[ôõ‹õX][€ëõ›»úõ€Hãã“[ôõ‹õX][€ëõ›Àöúﬁé¬ö[\‹ùôXX›»\ŸTôYã\ŸT›]K\ŸQYôôX›€€\€ô[ùHúõ€HúôXX›é¬ö[\‹ù»‹ôX]Uõ⁄XŸTôX€‹ô[ôÀ\’\ÿXõUõ⁄XŸPõÿàHúõ€Hãã€Xã›õ⁄XŸTôX€‹ô[ôÀöú»é¬ö[\‹ù»\[ôõ⁄XŸU^Húõ€Hãã‹›\‹ùõ⁄XŸKöú»é¬ö[\‹ù»õ‹õX[^ôP€€ùô\úÿ][€í\›‹ûKõ‹õX[^ôTŸ\‹⁄[€ë]Z[À^òX›\Ÿ\îô\‹ù^òX›ÿ›‹îô\‹ù^òX›^\ùôYYòX⁄ÀùZ[€€ùô\úÿ][€îZ\ú»Húõ€Hããã€Xãÿ€€ùô\úÿ][€ãöú»é¬ö[\‹ùõŸR[ùZŸHúõ€Hãã–õŸR[ùZŸKöúﬁé¬ö[\‹ùõŸQX\ûHúõ€Hãã–õŸQX\ûKöúﬁé¬ö[\‹ùX[ÿXö[ô]úõ€Hãã“X[ÿXö[ô]öúﬁé¬ö[\‹ùõŸS€òõÿ\ô[ô»úõ€Hãã–õŸS€òõÿ\ô[ôÀöúﬁé¬ö[\‹ùõŸQ^UöY]»úõ€Hãã–õŸQ^UöY]Àöúﬁé¬ö[\‹ùõŸRX[€€ù^úõ€Hãã–õŸRX[€€ù^öúﬁé¬ö[\‹ùõŸTŸ\ùöXŸTô\]Y\›»úõ€Hãã–õŸTŸ\ùöXŸTô\]Y\›Àöúﬁé¬ö[\‹ùYYXÿ][€êÿ\ôúõ€Hãã”YYXÿ][€êÿ\ôöúﬁé¬ö[\‹ù]Y[ùYYXÿ][€ì‹ô\ú»úõ€Hãã‘]Y[ùYYXÿ][€ì‹ô\úÀöúﬁé¬ö[\‹ù»ô]⁄⁄]€Y[ù⁄Ÿ[ãŸ]€Y[ù⁄Ÿ[àHúõ€Hãã€Xãÿ€Y[ù⁄Ÿ[ãöú»é¬ö[\‹ù»ÿ]ôPõŸTŸ\‹⁄[€ãÿ]ôPõŸQ\‹^Tô\›[ÿ]ôT›\‹ùŸ\‹⁄[€ãŸ]õŸTŸ\‹⁄[€ãŸ]›\‹ùŸ\‹⁄[€ã€X\êõŸTŸ\‹⁄[€ã€X\î›\‹ùŸ\‹⁄[€ã⁄]XÿŸ\‹’⁄Ÿ[ã⁄]Ÿ\‹⁄[€êXÿŸ\‹»Húõ€Hãã€Xã‹Ÿ\‹⁄[€êXÿŸ\‹Àöú»é¬ö[\‹ù€[öXÿ[€›[ò⁄[YZ[àúõ€Hãã‹YŸ\ÀÿYZ[ã–€[öXÿ[€›[ò⁄[YZ[ãöúﬁé¬ö[\‹ù^\ù[ùö]TYŸHúõ€Hãã‹YŸ\ÀŸ^\ù—^\ù[ùö]TYŸKöúﬁé¬ö[\‹ù^\ùÿXö[ô]úõ€Hãã‹YŸ\ÀŸ^\ù—^\ùÿXö[ô]öúﬁé¬ö[\‹ù‹X⁄X[\›ÿXö[ô]úõ€Hãã‹YŸ\À‹‹X⁄X[\›‘‹X⁄X[\›ÿXö[ô]öúﬁé¬ö[\‹ù»T–îêSëHúõ€Hãã€Xãÿ\úò[ôöú»é¬Çò€\‹»YZ[ë\úõ‹êõ›[ô\ûH^[ô»€€\€ô[ù¬à€€ú›ùX›‹äõ‹ H¬à›\\äõ‹ N¬à\Àú›]HH»\úõ‹éàù[\úõ‹í[ôõŒàù[N¬àBà›]X»Ÿ]\ö]ôY›]Qúõ€Q\úõ‹ä\úõ‹äH¬àô]\õà»\úõ‹àN¬àBà€€\€ô[ùYÿ]⁄
+\úõ‹ã\úõ‹í[ôõ H¬à\ÀúŸ]›]J»\úõ‹í[ôõ»JN¬à€€ú€€Kô\úõ‹äêYZ[ë\úõ‹êõ›[ô\ûHÿ]Y⁄àã\úõ‹ã\úõ‹í[ôõ N¬àBàô[ô\ä
+H¬àYà
+\Àú›]Kô\úõ‹äH¬àô]\õà
+à]à›[O^ﬁ»Y[ôŒàõ€ùò[Z[Nàõ[€õ‹‹XŸHãZ[íZY⁄àåLöãòX⁄Ÿ‹õ›[ôààÃLM»ã€€‹éààŸôXÿXÿHà_OÇàà›[O^ﬁ»€€‹éààŸòÿMXMHãX\ô⁄[êõ›€NàMà_O¥'¥b4.4,t.¥,4,à4,4-4/4.4/Kt/Ù,4/t-t.Ù.⁄èÇà]à›[O^ﬁ»òX⁄Ÿ‹õ›[ôàúôÿòJåŒKééåJHãY[ôŒàMãõ‹ô\îòY]\ŒàLãX\ô⁄[êõ›€NàMãõ‹ô\éàå\€€YôÿòJåŒKééå Hà_OÇà›õ€ô»›[O^ﬁ»€€‹éààŸòÿMXMHà_Oû›\Àú›]Kô\úõ‹èÀõY\‹ÿYŸH¥'t-t.4-Ù,¥-t`t`¥/t,4c»4/¥b4.4,t.¥,üO‹›õ€ôœÇàŸ]èÇàôH›[O^ﬁ»õ€ù⁄^ôNàLã€€‹éààŒMLÿéã⁄]T‹XŸNàúôK]‹ò\ãX^ZY⁄à›ô\ôõ›Œàò]]»ãòX⁄Ÿ‹õ›[ôàúôÿòJå HãY[ôŒàMãõ‹ô\îòY]\Œà_OÇà›\Àú›]Kô\úõ‹èÀú›X⁄»àüBà‹ôOÇàŸ]èÇà
+N¬àBàô]\õà\Àúõ‹Àò⁄[ô[é¬àBüBÇô^‹ùYò][ù[ò›[€à\
+
+H¬à€€ú›€[ŸKŸ][ŸWHH\ŸT›]Jù^äN¬à€€ú››^Ÿ]^HH\ŸT›]JàäN¬à€€ú›‹]Y\›[€úÀŸ]]Y\›[€ú◊HH\ŸT›]Jù[
+N¬à€€ú›ÿ[ú›Ÿ\úÀŸ][ú›Ÿ\ú◊HH\ŸT›]JﬂJN¬à€€ú›ÿ‹ö\⁄\”[ŸKŸ]‹ö\⁄\”[ŸWHH\ŸT›]Jò[ŸJN¬à€€ú›ÿ‹ö\⁄\–õÿ⁄ÀŸ]‹ö\⁄\–õÿ⁄◊HH\ŸT›]Jù[
+N¬à€€ú›‹ô\›[Ÿ]ô\›[HH\ŸT›]Jù[
+N¬à€€ú›‹\ŸKŸ]\ŸWHH\ŸT›]Jö[ú]äN¬à€€ú›‹›\‹ùÿ‹ôY[ãŸ]›\‹ùÿ‹ôY[óHH\ŸT›]Jõ[ô[ô»äN¬à€€ú›€ÿY[ôÀŸ]ÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›Ÿ\úõ‹ãŸ]\úõ‹óHH\ŸT›]JàäN¬à€€ú›ÿX›]ôUXãŸ]X›]ôUXóHH\ŸT›]Jù\Ÿ\àäN¬à€€ú›ÿ‹ö\⁄\”‹[ãŸ]‹ö\⁄\”‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›ÿXõ›]õ⁄ôX›‹[ãŸ]Xõ›]õ⁄ôX›‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›ÿ‹ö\⁄\’^Ÿ]‹ö\⁄\’^HH\ŸT›]JàäN¬à€€ú›ÿ‹ö\⁄\–€€ùX›Ÿ]‹ö\⁄\–€€ùX›HH\ŸT›]JàäN¬à€€ú›ÿ‹ö\⁄\‘›XõZ][ôÀŸ]‹ö\⁄\‘›XõZ][ô◊HH\ŸT›]Jò[ŸJN¬Çà€€ú›YYXTôX€‹ô\îôYàH\ŸTôYäù[
+N¬à€€ú›]Y[–⁄[ö‹‘ôYàH\ŸTôYä◊JN¬à€€ú›[Y\îôYàH\ŸTôYäù[
+N¬Çà€€ú›]ZX⁄–⁄]€€ùZ[ô\îôYàH\ŸTôYäù[
+N¬à€€ú›]ZX⁄–⁄][ú]ôYàH\ŸTôYäù[
+N¬Çà€€ú›‹ôX€‹ô[ôÀŸ]ôX€‹ô[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú››ò[úÿ‹öXö[ôÀŸ]ò[úÿ‹öXö[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú››õ⁄XŸQ\úõ‹ãŸ]õ⁄XŸQ\úõ‹óHH\ŸT›]JàäN¬à€€ú›‹ôX€‹ô[ô’[YKŸ]ôX€‹ô[ô’[YWHH\ŸT›]J
+N¬à€€ú››õ⁄XŸSÿúŸ\ùò][€úÀŸ]õ⁄XŸSÿúŸ\ùò][€ú◊HH\ŸT›]J◊JN¬à€€ú›õ⁄XŸS\Ÿ–€›[ù\îôYàH\ŸTôYä
+N¬à€€ú›Ÿ\‹⁄[€îôYàH\ŸTôYäù[
+N¬à€€ú››\ùŸ\‹⁄[€îõ€Z\ŸTôYàH\ŸTôYäù[
+N¬ÇàÀ»›\‹ùÿXö[ô]‹YX⁄]À]^[ú]\Ÿ\»Hÿ[YHò[úÿ‹öXôH[ô⁄[ùàÀ»ù]ŸY\»]»ôX€‹ô\à›]HŸ\\ò]Húõ€H[ùZŸK‹]Y\›[€ãÿ‹ö\⁄\»õ›‹ÀÇà€€ú›ÿXö[ô]õ⁄XŸTôX€‹ô\îôYàH\ŸTôYäù[
+N¬à€€ú›ÿXö[ô]õ⁄XŸT›ôX[TôYàH\ŸTôYäù[
+N¬à€€ú›ÿXö[ô]õ⁄XŸP⁄[ö‹‘ôYàH\ŸTôYä◊JN¬à€€ú›ÿXö[ô]õ⁄XŸU[Y\îôYàH\ŸTôYäù[
+N¬à€€ú›ÿXö[ô]õ⁄XŸRY€õ‹ôT›‹ôYàH\ŸTôYäò[ŸJN¬à€€ú›ÿÿXö[ô]õ⁄XŸTôX€‹ô[ôÀŸ]ÿXö[ô]õ⁄XŸTôX€‹ô[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿÿXö[ô]õ⁄XŸUò[úÿ‹öXö[ôÀŸ]ÿXö[ô]õ⁄XŸUò[úÿ‹öXö[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿÿXö[ô]õ⁄XŸU\ôŸ]Ÿ]ÿXö[ô]õ⁄XŸU\ôŸ]HH\ŸT›]Jù[
+N¬à€€ú›ÿÿXö[ô]õ⁄XŸU[YKŸ]ÿXö[ô]õ⁄XŸU[YWHH\ŸT›]J
+N¬à€€ú›ÿÿXö[ô]õ⁄XŸQ\úõ‹ãŸ]ÿXö[ô]õ⁄XŸQ\úõ‹óHH\ŸT›]JàäN¬Çà\ŸQYôôX›
+
+
+HOà
+
+HOà¬àÿXö[ô]õ⁄XŸRY€õ‹ôT›‹ôYãò›\úô[ùHùYN¬àYà
+ÿXö[ô]õ⁄XŸU[Y\îôYãò›\úô[ù
+H€X\í[ù\ùò[
+ÿXö[ô]õ⁄XŸU[Y\îôYãò›\úô[ù
+N¬àÿXö[ô]õ⁄XŸT›ôX[TôYãò›\úô[ùÀôŸ]òX⁄‹ 
+Kôõ‹ëXX⁄
+
+òX⁄ HOàòX⁄Àú›‹
+
+JN¬àYà
+ÿXö[ô]õ⁄XŸTôX€‹ô\îôYãò›\úô[ùÀú›]HOOHúôX€‹ô[ô»äH¬àÿXö[ô]õ⁄XŸTôX€‹ô\îôYãò›\úô[ùú›‹
+
+N¬àBàK◊JN¬Çà€€ú›‹Ÿ\‹⁄[€îô]öY]”‹[ãŸ]Ÿ\‹⁄[€îô]öY]”‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›‹]Y[ùò][ôÀŸ]]Y[ùò][ô◊HH\ŸT›]J
+N¬à€€ú›‹]Y[ù\ŸYù[Ÿ]]Y[ù\ŸYù[HH\ŸT›]JàäN¬à€€ú›‹]Y[ù[ò€X\ãŸ]]Y[ù[ò€X\óHH\ŸT›]JàäN¬à€€ú›Ÿÿ›‹ëôYYòX⁄ÀŸ]ÿ›‹ëôYYòX⁄◊HH\ŸT›]J¬à‹õ€ô‘]Y\›[€úŒààãàZ\‹⁄[ô‘]Y\›[€úŒààãàòY]Y\›[€ï€‹ô[ôŒààãà€‹úôX›Y\Ÿ\îô\‹ùààãà€‹úôX›Yÿ›‹îô\‹ùààãàõ›ÿ€€\]NààãàŸ[ô\ò[€€[Y[ùààãàJN¬Çà€€ú›ÿ€€ùô\úÿ][€í\›‹ûKŸ]€€ùô\úÿ][€í\›‹ûWHH\ŸT›]J◊JN¬à€€ú›ŸX[Ÿ—\Ÿ]X[Ÿ—\HH\ŸT›]J
+N¬Çà€€ú›‹Ÿ\‹⁄[€ì[Ÿ[‹[ãŸ]Ÿ\‹⁄[€ì[Ÿ[‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›€ÿY[ô‘Ÿ\‹⁄[€ãŸ]ÿY[ô‘Ÿ\‹⁄[€óHH\ŸT›]Jò[ŸJN¬ÇàÀ»[õ€û[[›\»€€ù[ùX][€à‹ôY[ùX[\‹¬à€€ú›ÿ€€ù[ùX][€ê€ŸKŸ]€€ù[ùX][€ê€ŸWHH\ŸT›]Jù[
+N¬à€€ú›ÿ€€ù[ùX][€ê€ŸR[ú]Ÿ]€€ù[ùX][€ê€ŸR[ú]HH\ŸT›]JàäN¬à€€ú›ÿ€€ù[ùX][€ê€ŸQ\úõ‹ãŸ]€€ù[ùX][€ê€ŸQ\úõ‹óHH\ŸT›]JàäN¬à€€ú›‹ôYŸ[ô\ò]Y€ŸKŸ]ôYŸ[ô\ò]Y€ŸWHH\ŸT›]Jù[
+N¬à€€ú›‹Ÿ\‹⁄[€ë]KŸ]Ÿ\‹⁄[€ë]WHH\ŸT›]Jù[
+N¬à€€ú›‹Ÿ\‹⁄[€íYŸ]Ÿ\‹⁄[€íYHH\ŸT›]Jù[
+N¬à€€ú›‹XõX–€ŸKŸ]XõX–€ŸWHH\ŸT›]Jù[
+N¬à€€ú›⁄\–€€ù[ùX][€ãŸ]\–€€ù[ùX][€óHH\ŸT›]Jò[ŸJN¬à€€ú›‹ô]ö[›\‘]Y[ùô\‹ùŸ]ô]ö[›\‘]Y[ùô\‹ùHH\ŸT›]JàäN¬à€€ú›‹ô]ö[›\—ÿ›‹îô\‹ùŸ]ô]ö[›\—ÿ›‹îô\‹ùHH\ŸT›]JàäN¬à€€ú›⁄€YU\⁄‹ÀŸ]€YU\⁄‹◊HH\ŸT›]JàäN¬à€€ú›‹ô\€›\òŸQòX›‹úÀŸ]ô\€›\òŸQòX›‹ú◊HH\ŸT›]JàäN¬à€€ú›ŸXùY“[ôõÀŸ]XùY“[ôõ◊HH\ŸT›]Jù[
+N¬à€€ú›ÿÿ\ôTôX€€[Y[ô][€ãŸ]ÿ\ôTôX€€[Y[ô][€óHH\ŸT›]Jù[
+N¬à€€ú›‹⁄›–€€ú›[ô\Ÿ]⁄›–€€ú›[ô\HH\ŸT›]Jò[ŸJN¬ÇÇàÀ»›\‹ùÿXö[ô]Uîà€€ú›‹›\‹ùÿXö[ô]Ÿ]›\‹ùÿXö[ô]HH\ŸT›]Jù[
+N¬à€€ú›‹›\‹ù]ôS‹[ãŸ]›\‹ù]ôS‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›‹]Y[ù[ùö]][€úÀŸ]]Y[ù[ùö]][€ú◊HH\ŸT›]J◊JN¬à€€ú›‹]Y[ù[ùö]][€ú”ÿY[ôÀŸ]]Y[ù[ùö]][€ú”ÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›‹]Y[ù[ùö]S[Ÿ[‹[ãŸ]]Y[ù[ùö]S[Ÿ[‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›‹]Y[ù[ùö]P‹ôX]YŸ]]Y[ù[ùö]P‹ôX]YHH\ŸT›]Jù[
+N¬à€€ú›€X]⁄ô\]Y\›Ÿ[ô[ôÀŸ]X]⁄ô\]Y\›Ÿ[ô[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿÿXö[ô]ÿY[ôÀŸ]ÿXö[ô]ÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›Ÿõ€›’\[ú›Ÿ\úÀŸ]õ€›’\[ú›Ÿ\ú◊HH\ŸT›]JﬂJN¬à€€ú›‹ô\‹ù€›\òŸKŸ]ô\‹ù€›\òŸWHH\ŸT›]Jù[
+N»À»ôŸ[ô\ò]YàòÿXö[ô]Çà€€ú›⁄ù\›ö[ö\⁄YŸ\‹⁄[€ãŸ]ù\›ö[ö\⁄YŸ\‹⁄[€óHH\ŸT›]Jò[ŸJN¬àÀ»›\‹ùÿXö[ô]^[ôYôX]\ô\¬à€€ú›‹›\‹ùöY]⁄[ô‘Ÿ\‹⁄[€ãŸ]›\‹ùöY]⁄[ô‘Ÿ\‹⁄[€óHH\ŸT›]Jù[
+N¬à€€ú›‹›\‹ùöY]⁄[ô‘Ÿ\‹⁄[€ë]KŸ]›\‹ùöY]⁄[ô‘Ÿ\‹⁄[€ë]WHH\ŸT›]Jù[
+N¬à€€ú›‹›\‹ùŸ\‹⁄[€ìÿY[ôÀŸ]›\‹ùŸ\‹⁄[€ìÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›‹›\‹ùô]‘ô\]Y\›‹[ãŸ]›\‹ùô]‘ô\]Y\›‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›‹›\‹ùô\]Y\›Ÿ\‹⁄[€íYŸ]›\‹ùô\]Y\›Ÿ\‹⁄[€íYHH\ŸT›]Jù[
+N¬à€€ú›‹›\‹ùô]‘ô\]Y\›Ÿ]›\‹ùô]‘ô\]Y\›HH\ŸT›]J»Ÿ\ùöXŸWÿ€ŸNààãôX\€€éààãY\‹ÿYŸNààãôYô\úôYŸ]Nààã[YWŸúõ€Nààã[YW›Œààã€€[Y[ùàààJN¬à€€ú›‹›\‹ùô\]Y\››XõZ][ôÀŸ]›\‹ùô\]Y\››XõZ][ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿXÿŸ\‹—^[ôYŸ]XÿŸ\‹—^[ôYHH\ŸT›]Jò[ŸJN¬à€€ú›‹õŸö[Q^[ôYŸ]õŸö[Q^[ôYHH\ŸT›]Jò[ŸJN¬àÀ»Z[H⁄X⁄ÀZ[à›]Bà€€ú›ÿ⁄X⁄⁄[ïŸ^KŸ]⁄X⁄⁄[ïŸ^WHH\ŸT›]Jù[
+N¬à€€ú›ÿ⁄X⁄⁄[í\›‹ûKŸ]⁄X⁄⁄[í\›‹ûWHH\ŸT›]J◊JN¬à€€ú›ÿ⁄X⁄⁄[ïŸ[ôZ[ôÀŸ]⁄X⁄⁄[ïŸ[ôZ[ô◊HH\ŸT›]Jù[
+N¬à€€ú›ÿ⁄X⁄⁄[ê[ûY]KŸ]⁄X⁄⁄[ê[ûY]WHH\ŸT›]Jù[
+N¬à€€ú›ÿ⁄X⁄⁄[ê€€[Y[ùŸ]⁄X⁄⁄[ê€€[Y[ùHH\ŸT›]JàäN¬à€€ú›ÿ⁄X⁄⁄[îÿ]ö[ôÀŸ]⁄X⁄⁄[îÿ]ö[ô◊HH\ŸT›]Jò[ŸJN¬àÀ»òX›XŸ\»›]Bà€€ú›‹›\‹ùòX›XŸ\ÀŸ]›\‹ùòX›XŸ\◊HH\ŸT›]J◊JN¬à€€ú›‹òX›XŸQ]Z[Ÿ^KŸ]òX›XŸQ]Z[Ÿ^WHH\ŸT›]Jù[
+N¬àÀ»]ZX⁄»⁄]›]Bà€€ú›‹]ZX⁄–⁄]Y\‹ÿYŸ\ÀŸ]]ZX⁄–⁄]Y\‹ÿYŸ\◊HH\ŸT›]J◊JN¬à€€ú›‹]ZX⁄–⁄][ú]Ÿ]]ZX⁄–⁄][ú]HH\ŸT›]JàäN¬à€€ú›‹]ZX⁄–⁄]ÿY[ôÀŸ]]ZX⁄–⁄]ÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›‹]ZX⁄–⁄]^[ôYŸ]]ZX⁄–⁄]^[ôYHH\ŸT›]Jò[ŸJN¬à€€ú›‹]ZX⁄–⁄]⁄›“\›‹ûKŸ]]ZX⁄–⁄]⁄›“\›‹ûWHH\ŸT›]Jò[ŸJN¬à€€ú›‹]ZX⁄–⁄]ÿ‹õ€Y\Ÿ]]ZX⁄–⁄]ÿ‹õ€Y\HH\ŸT›]Jò[ŸJN¬à€€ú›‹]ZX⁄–⁄]\”ô]‘ô\‹€úŸKŸ]]ZX⁄–⁄]\”ô]‘ô\‹€úŸWHH\ŸT›]Jò[ŸJN¬àÀ»õ€›À]\[ú›Ÿ\ôY‹X‹»õ‹àRHY\à€€ú›Ÿõ€››\[ú›Ÿ\ôY‹X‹ÀŸ]õ€››\[ú›Ÿ\ôY‹X‹◊HH\ŸT›]Jù[
+N¬àÀ»\‹^Hò[YBà€€ú›‹›\‹ù\‹^Sò[YKŸ]›\‹ù\‹^Sò[YWHH\ŸT›]Jù[
+N¬à€€ú›Ÿ\‹^Sò[YR[ú]Ÿ]\‹^Sò[YR[ú]HH\ŸT›]JàäN¬Çà€€ú›ÿX›]ôS[Ÿ[KŸ]X›]ôS[Ÿ[WHH\ŸT›]J
+
+HOà¬àYà
+PT–îêSëö\‘›\‹ù[›	âà\[Ÿà⁄[ô›»OOHù[ôYö[ôYäH¬à€€ú›‹›H⁄[ô›Àõÿÿ][€ãö‹›ò[YN¬àYà
+‹›OOHöX[ùÿ⁄ÿK[‹‹öKõ€õ[ôHà‹›ú›\ù’⁄]
+öX[àäJHô]\õàòõŸHé¬à€€ú›\ò[\»Hô]»TìŸX\ò⁄\ò[\ ⁄[ô›Àõÿÿ][€ãúŸX\ò⁄
+N¬àYà
+\ò[\ÀôŸ]
+õ[Ÿ[HäHOOHòõŸHäHô]\õàòõŸHé¬àBàô]\õàú›\‹ùé¬àJN¬à€€ú››\ÿYŸPò[[òŸKŸ]\ÿYŸPò[[òŸWHH\ŸT›]Jù[
+N¬ÇàÀ»õŸH[ùZŸH›]Bà€€ú›ÿõŸR[ùZŸT›YŸKŸ]õŸR[ùZŸT›YŸWHH\ŸT›]JöYHäN»À»YHö[[ô»[ò[^ö[ô»ô\›[à€€ú›ÿõŸR[ùZŸTô\›[Ÿ]õŸR[ùZŸTô\›[HH\ŸT›]Jù[
+N¬à€€ú›ÿõŸR[ùZŸT›\Ÿ]õŸR[ùZŸT›\HH\ŸT›]J
+N»À»\›[[X\ûKOX€ŸKè\[ãœX›BÇàÀ»õŸHÿ‹ôY[à›]HXX⁄[ôBà€€ú›ÿõŸTÿ‹ôY[ãŸ]õŸTÿ‹ôY[óHH\ŸT›]Jõ[ô[ô»äN»À»[ô[ô»[ùZŸHô\›[ÿXö[ô]X\ûWŸY]X\ûW‹ô\›[à€€ú›ÿõŸPÿXö[ô]]KŸ]õŸPÿXö[ô]]WHH\ŸT›]Jù[
+N¬à€€ú›ÿõŸPÿXö[ô]ÿY[ôÀŸ]õŸPÿXö[ô]ÿY[ô◊HH\ŸT›]Jò[ŸJN¬ÇàÀ»›\‹ù€€⁄]›]Bà€€ú›‹›\‹ù[ãŸ]›\‹ù[óHH\ŸT›]Jù[
+N¬à€€ú›‹⁄›‘Ÿ[ê\‹Ÿ\‹€Y[ùŸ]⁄›‘Ÿ[ê\‹Ÿ\‹€Y[ùHH\ŸT›]Jò[ŸJN¬à€€ú›ÿÿ[ìX[òYŸU⁄]›]‹X⁄X[\›Ÿ]ÿ[ìX[òYŸU⁄]›]‹X⁄X[\›HH\ŸT›]Jù[
+N¬à€€ú›‹⁄›‘›\‹ù€€⁄]Ÿ]⁄›‘›\‹ù€€⁄]HH\ŸT›]Jò[ŸJN¬à€€ú›‹⁄›‘‹X⁄X[\›[ù[ùŸ]⁄›‘‹X⁄X[\›[ù[ùHH\ŸT›]Jò[ŸJN¬à€€ú›‹‹X⁄X[\›[ù[ù€ôKŸ]‹X⁄X[\›[ù[ù€ôWHH\ŸT›]Jò[ŸJN¬Çà€€ú›êP’P—T»H¬à»YàòúôX][ô»ã]Nà¥%4bÙat,4/t.4-H8†$Õà4/4.4/t`Ù`à4/Ù`4.4`¥`4-t,¥/¥,Ù-Hãö[NàåKXúôX][ôÀõYã\ÿ‹ö\[€éà¥'4-t-4.Ù-t/t/t/¥-H4-4bÙat,4/t.4-H4`H4,t/¥.Ù-t-H4-4.Ù.4/t/tbÙ/4,¥bÙ-4/¥at/¥/4aÙ`¥/¥,tb»4/t-t/4/t/¥,Ù/à4`t/t.4-Ù.4`¥c4`¥-t.Ù-t`t/t/¥-H4/t,4/Ù`4cÙ-¥-t/t.4-Kàã\ò][€éàå¯†$ÕH4/4.4/t`Ù`àãÿ]Y€‹ûNàòúôX][ô»àKà»Yàô‹õ›[ô[ô»ã]Nà¥%Ù,4-Ù-t/4.Ù-t/t.4-Hx†$Õ8†$Ã¯†$Ã∏†$ÃHãö[NàåãY‹õ›[ô[ôÀõYã\ÿ‹ö\[€éà¥(¥-tat/t.4.¥,4-Ù,4-Ù-t/4.Ù-t/t.4c»4aÙ-t`4-t-»4/¥`4,Ù,4/tb»4aÙ`Ù,¥`t`¥,à4-4.Ùc»4,¥/¥-Ù,¥`4,4bt-t/t.4c»4,à4/t,4`t`¥/¥cÙbt.4.H4/4/¥/4-t/t`ãàã\ò][€éàçH4/4.4/t`Ù`àãÿ]Y€‹ûNàô‹õ›[ô[ô»àKà»Yàöò]◊‹ô[^][€àã]Nà¥'4cÙ,Ù.¥/¥-H4`4,4`t`t.Ù,4,t.Ù-t/t.4-H4.Ù.4a¥,4.4aÙ-t.Ùc¥`t`¥.ãö[NàåÀZò]À\ô[^][€ãõYã\ÿ‹ö\[€éà¥(t/tcÙ`¥.4-H4/t,4/Ù`4cÙ-¥-t/t.4c»4`H4.Ù.4a¥,4aÙ-t.Ùc¥`t`¥.4.4b4-t.àã\ò][€éàå¯†$ÕH4/4.4/t`Ù`àãÿ]Y€‹ûNàô‹õ›[ô[ô»àKà»Yàú€Y\‹ô\ã]Nà¥'Ù`4,4.¥`¥.4.¥,4/Ù-t`4-t-4`t/t/¥/ãö[Nàå\€Y\\ô\õYã\ÿ‹ö\[€éà¥'4cÙ,Ù.¥,4c»4/Ù/¥-4,Ù/¥`¥/¥,¥.¥,4.¥/à4`t/t`»4/Ù`4.4`¥`4-t,¥/¥,Ù-H4.4.Ù.4,t-t`t`t/¥/t/t.4a¥-Kàã\ò][€éàåL8†$ÃMH4/4.4/t`Ù`àãÿ]Y€‹ûNàú€Y\àKà»YàõôX⁄◊‹⁄›[\ú◊‹›ô]⁄ã]Nà¥'4cÙ,Ù.¥,4c»4`4,4`t`¥cÙ-¥.¥,4b4-t.4.4/Ù.Ù-ta»ãö[NàåK[ôX⁄À\⁄›[\úÀ\›ô]⁄õYã\ÿ‹ö\[€éà¥(t/tcÙ`¥.4-H4/4bÙb4-taÙ/t/¥,Ù/à4/t,4/Ù`4cÙ-¥-t/t.4c»4,à4,¥-t`4at/t-t.H4aÙ,4`t`¥.4`¥-t.Ù,àã\ò][€éàçH4/4.4/t`Ù`àãÿ]Y€‹ûNàòX›]ö]HàKà»YàôX\ûHã]Nà¥%4/t-t,¥/t.4.à4`t/¥`t`¥/¥cÙ/t.4c»4/t,»4-4/tc»ãö[NàåãYX\ûKõYã\ÿ‹ö\[€éà¥&¥`4,4`¥.¥.4-H4-t-¥-t-4/t-t,¥/tbÙ-H4-Ù,4/Ù.4`t.4-4.Ùc»4/¥`¥`t.Ù-t-¥.4,¥,4/t.4c»4.4-Ù/4-t/t-t/t.4.Kàã\ò][€éàçH4/4.4/t`Ù`à4,à4-4-t/tcãÿ]Y€‹ûNàöõ›\õò[[ô»àKà»Yàåç‹[àã]Nà¥'Ù.Ù,4/Hç4aÙ,4`t,4,t-t-»4`Ùat`Ù-4b4-t/t.4c»ãö[NàåÀLç\[ãõYã\ÿ‹ö\[€éà¥'Ù/¥b4,4,Ù/¥,¥bÙ.H4/Ù.Ù,4/H4/t,4,t.Ù.4-¥,4.tb4.4-H4`t`Ù`¥.¥.àã\ò][€éà∏†%ãÿ]Y€‹ûNàúõ›][ôHàKà»Yàú⁄‹ù›ÿ[»ã]Nà¥&¥/¥`4/¥`¥.¥,4c»4/Ù`4/¥,Ù`Ù.Ù.¥,ãö[Nàù[\ÿ‹ö\[€éà¥'Ù`4/¥,Ù`Ù.Ù.¥,4/t,4`t,¥-t-¥-t/4,¥/¥-Ù-4`Ùat-H4-4.Ùc»4`t/4-t/tb»4/¥,t`t`¥,4/t/¥,¥.¥.4.4.Ùdt,Ù.¥/¥.H4a4.4-Ù.4aÙ-t`t.¥/¥.H4,4.¥`¥.4,¥/t/¥`t`¥.àã\ò][€éàåMx†$ÃÃ4/4.4/t`Ù`àãÿ]Y€‹ûNàòX›]ö]HàKàN¬Çàù[ò›[€à›€õÿYòX›XŸQö[Jö[JH¬à€€ú›[ò⁄‹àHÿ›[Y[ùò‹ôX]Q[[Y[ù
+òHäN¬à[ò⁄‹ãöôYàH‹›\‹ù\òX›XŸ\À…Ÿö[_X¬à[ò⁄‹ãô›€õÿYHö[N¬à[ò⁄‹ãò€X⁄ 
+N¬àBÇàù[ò›[€à›€õÿYõŸR[ùZŸRî””ä
+H¬àYà
+XõŸR[ùZŸTô\›[
+Hô]\õé¬à€€ú›]HH¬à[Y\›[\àô]»]J
+Kù“T”‘›ö[ô 
+KàŸ\‹⁄[€ó⁄YàõŸR[ùZŸTô\›[úŸ\‹⁄[€ó⁄Yù[à[ùZŸNàõŸR[ùZŸTô\›[ö[ùZŸWÿ[ú›Ÿ\ú»ù[àõZNàõŸR[ùZŸTô\›[òõZKàÿ\ôW‹ôX€€[Y[ô][€éàõŸR[ùZŸTô\›[òÿ\ôW‹ôX€€[Y[ô][€ãàöYŸŸ\ôY‹ôYŸõY‹ŒàõŸR[ùZŸTô\›[ùöYŸŸ\ôY‹ôYŸõY‹»◊KàôYŸõY◊ÿÿ\ôW€]ô[àõŸR[ùZŸTô\›[úôYŸõY◊ÿÿ\ôW€]ô[ù[à\Ÿ\ó‹ô\‹ùàõŸR[ùZŸTô\›[ù\Ÿ\ó‹ô\‹ùàõŸW‹[éàõŸR[ùZŸTô\›[òõŸW‹[ãà\ŸYŸò[òX⁄ŒàõŸR[ùZŸTô\›[ù\ŸYŸò[òX⁄»ò[ŸKà[Ÿ[›\ŸYàõŸR[ùZŸTô\›[õ[Ÿ[›\ŸYù[àN¬à€€ú›õÿàHô]»õÿä“î””ãú›ö[ô⁄YûJ]Kù[äWK»\Nàò\Xÿ][€ã⁄ú€€ààJN¬à€€ú›\õHTìò‹ôX]SÿöôX›Tì
+õÿäN¬à€€ú›HHÿ›[Y[ùò‹ôX]Q[[Y[ù
+òHäN¬àKöôYàH\õ¬àKô›€õÿYHõŸKZ[ùZŸKI€ô]»]J
+Kù“T”‘›ö[ô 
+Kú€XŸJL
+_Köú€€ò¬àKò€X⁄ 
+N¬àTìúô]õ⁄ŸSÿöôX›Tì
+\õ
+N¬àBÇà\ﬁ[ò»ù[ò›[€à›€õÿYô\‹ùä
+H¬à€€ú›»Yò][àú‘àHH]ÿZ][\‹ù
+öú‹àäN¬à€€ú›ÿ»Hô]»ú‘ä
+N¬à€€ú›\Ÿ\àH\Ÿ\î\ù∏†%é¬à€€ú›ÿ›‹àHÿ›‹î\ù∏†%é¬à]HHå¬àÿÀúŸ]õ€ù⁄^ôJM
+N¬àÿÀù^
+¥'¥`¥aÙdt`à4-4.Ùc»4,¥,4`HãåJN¬àH
+œH¬àÿÀúŸ]õ€ù⁄^ôJL
+N¬à€€ú›\Ÿ\ì[ô\»HÿÀú‹]^‘⁄^ôJ\Ÿ\ãúô\XŸJœOOUT—Tó‘ëT‘ïOOKŸÀàäKùö[J
+KMÃ
+N¬à\Ÿ\ì[ô\Àôõ‹ëXX⁄
+
+[ôJHOà¬àYà
+HàçÕJH»ÿÀòYYŸJ
+N»HHå»BàÿÀù^
+[ôKåJN¬àH
+œHN¬àJN¬àH
+œHL¬àÿÀúŸ]õ€ù⁄^ôJM
+N¬àÿÀù^
+¥'¥`¥aÙdt`à4-4.Ùc»4`t/Ù-ta¥.4,4.Ù.4`t`¥,ãåJN¬àH
+œH¬àÿÀúŸ]õ€ù⁄^ôJL
+N¬à€€ú›ÿ›‹ì[ô\»HÿÀú‹]^‘⁄^ôJÿ›‹ãúô\XŸJœOOQ–’‘ó‘ëT‘ïOOKŸÀàäKùö[J
+KMÃ
+N¬àÿ›‹ì[ô\Àôõ‹ëXX⁄
+
+[ôJHOà¬àYà
+HàçÕJH»ÿÀòYYŸJ
+N»HHå»BàÿÀù^
+[ôKåJN¬àH
+œHN¬àJN¬àÿÀúÿ]ôJ›⁄]I‹XõX–€ŸHùÿ⁄ÿK[‹‹öHüKúò
+N¬àBÇàù[ò›[€à›€õÿYô\‹ù–÷
+
+H¬à€€ú›\Ÿ\àH\Ÿ\î\ù∏†%é¬à€€ú›ÿ›‹àHÿ›‹î\ù∏†%é¬à€€ú›[HQ–’TH[Çè[èXYèY]H⁄\úŸ]Hù]ãNèè]O¥'¥`¥aÙdt`à4(¥/¥aÙ.¥,4'¥/Ù/¥`4,›]Oè⁄XYÇèõŸH›[OHôõ€ùYò[Z[Nâ‘Ÿ\öYâÀŸ[‹ô⁄XKŸ\öYé€X^]⁄YçÃ€X\ô⁄[éç]]Œ€[ôKZZY⁄åKç»èÇèO¥'¥`¥aÙdt`à4-4.Ùc»4,¥,4`O⁄OÇâ›\Ÿ\ãúô\XŸJœOOUT—Tó‘ëT‘ïOOKŸÀàäKùö[J
+Kú‹]
+óàäKõX\
+Oàâ€O‹ò
+Köõ⁄[äóàä_Bèà›[OHõX\ô⁄[éåÃèÇèO¥'¥`¥aÙdt`à4-4.Ùc»4`t/Ù-ta¥.4,4.Ù.4`t`¥,⁄OÇâŸÿ›‹ãúô\XŸJœOOQ–’‘ó‘ëT‘ïOOKŸÀàäKùö[J
+Kú‹]
+óàäKõX\
+Oàâ€O‹ò
+Köõ⁄[äóàä_BèÿõŸOè⁄[ò¬à€€ú›õÿàHô]»õÿä⁄[K»\Nàò\Xÿ][€ã€\›€‹ôàJN¬à€€ú›\õHTìò‹ôX]SÿöôX›Tì
+õÿäN¬à€€ú›HHÿ›[Y[ùò‹ôX]Q[[Y[ù
+òHäN¬àKöôYàH\õ¬àKô›€õÿYH›⁄]I‹XõX–€ŸHùÿ⁄ÿK[‹‹öHüKôÿÿ¬àKò€X⁄ 
+N¬àTìúô]õ⁄ŸSÿöôX›Tì
+\õ
+N¬àBÇàù[ò›[€àYòX›XŸU‘[äòX›XŸRY
+H¬à€€ú›òX›XŸHHêP’P—TÀôö[ô
+OàöYOOHòX›XŸRY
+N¬àYà
+\òX›XŸJHô]\õé¬à€€ú››\úô[ùH›\‹ù[èÀúŸ[X›Y‹òX›XŸ\»◊N¬àYà
+›\úô[ùú€€YJOàöYOOHòX›XŸRY
+JHô]\õé¬à€€ú›\]YHÀããò›\úô[ù»YàòX›XŸKöY]NàòX›XŸKù]KŸ[X›Yÿ]àô]»]J
+Kù“T”‘›ö[ô 
+K›€õÿYYàò[ŸHWN¬à€€ú›ô]‘[àH»ããä›\‹ù[àﬂJKŸ[X›Y‹òX›XŸ\Œà\]YN¬àŸ]›\‹ù[äô]‘[äN¬àÿ]ôT›\‹ù[äô]‘[äN¬àÿ]ôT›\‹ùòX›XŸJòX›XŸRY
+N¬à⁄›’ÿ\›
+¥%4/¥,t,4,¥.Ù-t/t/à4,à4/Ù.Ù,4/Kà4'Ù`4.4`t.Ù-t-4`Ùc¥bt-t/4`4,4-Ù,Ù/¥,¥/¥`4-H4/4b»4`t/Ù`4/¥`t.4/4`Ù-4,4.Ù/¥`tc4.Ù.4/Ù/¥/Ù`4/¥,t/¥,¥,4`¥càäN¬àBÇàù[ò›[€àÿ]ôT›\‹ù[ä[äH¬à€€ú›‹H[à›\‹ù[é¬àYà
+\‹
+Hô]\õé¬àYà
+XõX–€ŸJH¬à€€ú›\]PõŸHH⁄]XÿŸ\‹’⁄Ÿ[ä¬àX›[€éàù\]T›\‹ù[àãXõX◊ÿ€ŸNàXõX–€ŸKŸ\‹⁄[€ó⁄YàŸ\‹⁄[€íY›\‹ù‹[éà‹àKŸ\‹⁄[€íY
+N¬àô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ\]PõŸJKàJKòÿ]⁄
+
+
+HOàﬂJN¬àBàÿÿ[›‹òYŸKúŸ]][Jùÿ⁄ÿW‹›\‹ù‹[àãî””ãú›ö[ô⁄YûJ‹
+JN¬àBÇà€€ú››ÿ\›Ÿ]ÿ\›HH\ŸT›]J»Y\‹ÿYŸNààã\NààãŸ^NàJN¬à€€ú›ÿ\›[Y\îôYàH\ŸTôYäù[
+N¬ÇàÀ»]]ÀY\€Z\‹»ÿ\›Yù\à»ŸX€€ô¬à\ŸQYôôX›
+
+
+HOà¬àYà
+ÿ\›õY\‹ÿYŸJH¬àYà
+ÿ\›[Y\îôYãò›\úô[ù
+H€X\ï[Y[›]
+ÿ\›[Y\îôYãò›\úô[ù
+N¬àÿ\›[Y\îôYãò›\úô[ùHŸ][Y[›]
+
+
+HOà¬àŸ]ÿ\›
+»Y\‹ÿYŸNààã\NààãŸ^NàJN¬àKÃ
+N¬àBàô]\õà
+
+HOà»Yà
+ÿ\›[Y\îôYãò›\úô[ù
+H€X\ï[Y[›]
+ÿ\›[Y\îôYãò›\úô[ù
+N»N¬àK›ÿ\›öŸ^WJN¬Çàù[ò›[€à€X\ïÿ\›
+
+H¬àYà
+ÿ\›[Y\îôYãò›\úô[ù
+H€X\ï[Y[›]
+ÿ\›[Y\îôYãò›\úô[ù
+N¬àŸ]ÿ\›
+»Y\‹ÿYŸNààã\NààãŸ^NàJN¬àBÇàÀ»ò]öYÿ]H»õŸHÿXö[ô]úõ€H[ûH€‹ö‹‹XŸHÿ‹ôY[Çàù[ò›[€à€’–õŸPÿXö[ô]
+
+H¬àYà
+X›]ôS[Ÿ[HOOHòõŸHäHô]\õé¬àYà
+õŸTÿ‹ôY[àOOHòÿXö[ô]äHô]\õé»À»[ôXYH\ôBàÀ»€€ôö\õHYà[àX\ûWŸY]⁄][úÿ]ôY⁄[ôŸ\¬àYà
+õŸTÿ‹ôY[àOOHôX\ûWŸY]äH¬àYà
+]⁄[ô›Àò€€ôö\õJ¥$¥-t`4/t`Ù`¥c4`tc»4,à4.¥,4,t.4/t-t`è»4't-t`t/¥at`4,4/tdt/t/tbÙ-H4.4-Ù/4-t/t-t/t.4c»4/4/¥,Ù`Ù`à4/Ù/¥`¥-t`4cÙ`¥c4`tcÀàäJHô]\õé¬àBà€X\ïÿ\›
+
+N¬àŸ]õŸQX\ûQ^Q]Jù[
+N¬àŸ]õŸTÿ‹ôY[äòÿXö[ô]äN¬àBÇàÀ»›\‹ùò]öYÿ][€éà€»»[ô[ô»
+õ»Ÿ€›]
+Bàù[ò›[€à€’‘›\‹ù[ô[ô 
+H¬àŸ]›\‹ùÿ‹ôY[äõ[ô[ô»äN¬àŸ]\ŸJö[ú]äN¬àŸ]›\‹ùô]‘ô\]Y\›‹[äò[ŸJN¬àŸ]›\‹ùöY]⁄[ô‘Ÿ\‹⁄[€äù[
+N¬àŸ]›\‹ùöY]⁄[ô‘Ÿ\‹⁄[€ë]Jù[
+N¬àBÇàÀ»›\‹ùò]öYÿ][€éà€»»ÿXö[ô]àù[ò›[€à€’‘›\‹ùÿXö[ô]
+
+H¬àŸ]›\‹ùÿ‹ôY[äòÿXö[ô]äN¬àŸ]\ŸJòÿXö[ô]äN¬àŸ]›\‹ùô]‘ô\]Y\›‹[äò[ŸJN¬àŸ]›\‹ùöY]⁄[ô‘Ÿ\‹⁄[€äù[
+N¬àŸ]›\‹ùöY]⁄[ô‘Ÿ\‹⁄[€ë]Jù[
+N¬àBÇàÀ»YZ[à[ô[›]Bà€€ú›ÿYZ[î\‹›€‹ôŸ]YZ[î\‹›€‹ôHH\ŸT›]JàäN¬à€€ú›ÿYZ[ê]]YŸ]YZ[ê]]YHH\ŸT›]Jò[ŸJN¬à€€ú›ÿYZ[îô]öY]‹ÀŸ]YZ[îô]öY]‹◊HH\ŸT›]J◊JN¬à€€ú›ÿYZ[ï›[Ÿ]YZ[ï›[HH\ŸT›]J
+N¬à€€ú›ÿYZ[ëö[\ãŸ]YZ[ëö[\óHH\ŸT›]Jò[äN¬à€€ú›ÿYZ[ë[ùãŸ]YZ[ë[ùóHH\ŸT›]Jò[äN¬à€€ú›ÿYZ[ë^\ùö[\ãŸ]YZ[ë^\ùö[\óHH\ŸT›]Jò[äN¬à€€ú›ÿYZ[ìÿY[ôÀŸ]YZ[ìÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿYZ[êX›[€ìÿY[ôÀŸ]YZ[êX›[€ìÿY[ô◊HH\ŸT›]Jù[
+N¬à€€ú›ŸY][ô‘ô]öY]ÀŸ]Y][ô‘ô]öY]◊HH\ŸT›]Jù[
+N¬à€€ú›ÿ€‹úôX›[€ëõ‹õKŸ]€‹úôX›[€ëõ‹õWHH\ŸT›]J¬à‹õ€ô◊‹]Y\›[€úŒààãZ\‹⁄[ô◊‹]Y\›[€úŒààãòY‹]Y\›[€ó›€‹ô[ôŒààãà€‹úôX›Y›\Ÿ\ó‹ô\‹ùààã€‹úôX›YŸÿ›‹ó‹ô\‹ùààãàõ›ÿ€€›\]Nààã€‹úôX›[€óÿ€€[Y[ùààãàõ⁄XŸWÿXÿ›\òXﬁNààãõ⁄XŸW›\ŸYù[ô\‹Œààãõ⁄XŸW⁄[ôõY[òŸYààãàõ⁄XŸWÿ€€ôö\õYYà◊Kõ⁄XŸWÿ€€[Y[ùààãàJN¬ÇàÀ»^\ù›]Bà€€ú›Ÿ^\ù]KŸ]^\ù]WHH\ŸT›]J
+
+HOà¬àûH¬à€€ú›ÿ]ôYHÿÿ[›‹òYŸKôŸ]][Jùÿ⁄ÿWŸ^\ùäN¬à€€ú›Ÿ\‹⁄[€ê€ŸHHŸ\‹⁄[€î›‹òYŸKôŸ]][Jùÿ⁄ÿWŸ^\ùÿXÿŸ\‹◊ÿ€ŸHäN¬àô]\õàÿ]ôY	âàŸ\‹⁄[€ê€ŸH»î””ãú\úŸJÿ]ôY
+Hàù[¬àHÿ]⁄»ô]\õàù[»BàJN¬à€€ú›Ÿ^\ù[Ÿ[‹[ãŸ]^\ù[Ÿ[‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›Ÿ^\ù€ŸR[ú]Ÿ]^\ù€ŸR[ú]HH\ŸT›]JàäN¬à€€ú›Ÿ^\ùŸŸ⁄[ô“[ãŸ]^\ùŸŸ⁄[ô“[óHH\ŸT›]Jò[ŸJN¬à€€ú›‹⁄›‘ôY⁄\›\ëõ‹õKŸ]⁄›‘ôY⁄\›\ëõ‹õWHH\ŸT›]Jò[ŸJN¬à€€ú›‹ôY⁄\›\ëõ‹õKŸ]ôY⁄\›\ëõ‹õWHH\ŸT›]J¬àò[YNààã[XZ[ààã[Y‹ò[Nààãõ€NàúﬁX⁄€Ÿ⁄\›ã‹X⁄X[Nààã⁄]Nààã‹ôÿ[ö^ò][€éààãàJN¬à€€ú›‹ôY⁄\›\îŸ[ô[ôÀŸ]ôY⁄\›\îŸ[ô[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›‹ôY⁄\›ò][€îô\›[Ÿ]ôY⁄\›ò][€îô\›[HH\ŸT›]Jù[
+N»À»»XÿŸ\‹◊ÿ€ŸK^\ùBÇàÀ»‹ôÿ[ö^ò][€à›]Bà€€ú›€‹ôÿ[ö^ò][€úÀŸ]‹ôÿ[ö^ò][€ú◊HH\ŸT›]J◊JN¬à€€ú›€‹ô—õ‹õS‹[ãŸ]‹ô—õ‹õS‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›€‹ô—õ‹õKŸ]‹ô—õ‹õWHH\ŸT›]J»ò[YNààã€YŒààã\Nàúö]ò]Wÿ€[öX»ã⁄]Nààã€€[Y[ùàààJN¬Çà€€ú›‹ô’\SXô[»H¬àö]ò]Wÿ€[öXŒà¥)Ù,4`t`¥/t,4c»4.¥.Ù.4/t.4.¥,ãà›]Wÿ€[öXŒà¥$Ù/¥`t`Ù-4,4`4`t`¥,¥-t/t/t,4c»4.¥.Ù.4/t.4.¥,ãàô\ŸX\ò⁄⁄[ú›]][€éà¥'t,4`ÙaÙ/t/¥-H4`ÙaÙ`4-t-¥-4-t/t.4-Hãà\›à¥(¥-t`t`àãàN¬à€€ú›€‹ô—õ‹õQY]YŸ]‹ô—õ‹õQY]YHH\ŸT›]Jù[
+N¬à€€ú›€‹ô—]Z[Ÿ]‹ô—]Z[HH\ŸT›]Jù[
+N¬à€€ú›€‹ô—^\ùÀŸ]‹ô—^\ù◊HH\ŸT›]J◊JN¬à€€ú›€‹ô–Y^\ù‹[ãŸ]‹ô–Y^\ù‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›€‹ô–Y^\ùYŸ]‹ô–Y^\ùYHH\ŸT›]JàäN¬à€€ú›€‹ô–Y^\ùõ€KŸ]‹ô–Y^\ùõ€WHH\ŸT›]Jôÿ›‹àäN¬ÇàÀ»^H]Y[ù»›]H
+^\ù[ô[
+Bà€€ú›€^T]Y[ùÀŸ]^T]Y[ù◊HH\ŸT›]J◊JN¬à€€ú›€^T]Y[ù”ÿY[ôÀŸ]^T]Y[ù”ÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›‹]Y[ù[Ÿ[‹[ãŸ]]Y[ù[Ÿ[‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›‹]Y[ù[Ÿ[€ŸKŸ]]Y[ù[Ÿ[€ŸWHH\ŸT›]JàäN¬ÇàÀ»[ùö]H[ö»›]Bà€€ú›⁄[ùö]S[ö‹ÀŸ][ùö]S[ö‹◊HH\ŸT›]J◊JN¬à€€ú›⁄[ùö]S[ö”[Ÿ[‹[ãŸ][ùö]S[ö”[Ÿ[‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›⁄[ùö]S[ö”Xô[Ÿ][ùö]S[ö”Xô[HH\ŸT›]JàäN¬à€€ú›⁄[ùö]S[ö–‹ôX]YŸ][ùö]S[ö–‹ôX]YHH\ŸT›]Jù[
+N¬ÇàÀ»[ùö]H⁄Ÿ[àúõ€HTìà€€ú›⁄[ùö]U⁄Ÿ[ãŸ][ùö]U⁄Ÿ[óHH\ŸT›]J
+
+HOà¬àûH¬à€€ú›HH⁄[ô›Àõÿÿ][€ãú]ò[YKõX]⁄
+◊ó Œú›\ù[ùö]JW ÿK^åNWJ K⁄JN¬àô]\õàH»VÃWHà
+ÿÿ[›‹òYŸKôŸ]][Jùÿ⁄ÿW⁄[ùö]W›⁄Ÿ[àäHù[
+N¬àHÿ]⁄»ô]\õàù[»BàJN¬à€€ú›⁄[ùö]R[ôõÀŸ][ùö]R[ôõ◊HH\ŸT›]Jù[
+N¬à€€ú›⁄[ùö]P⁄X⁄⁄[ôÀŸ][ùö]P⁄X⁄⁄[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›⁄[ùö]T‹X⁄X[\›]]Ÿ][ùö]T‹X⁄X[\›]]HH\ŸT›]J»ÿY[ôŒàò[ŸK]][ùXÿ]Yàò[ŸK\úõ‹éàù[JN¬à€€ú›€€òõÿ\ô[ô—õ‹õKŸ]€òõÿ\ô[ô—õ‹õWHH\ŸT›]J»ò[YNààã€€ùX›Ÿ[XZ[ààã€€ùX›‹€ôNààã€€[Y[ùàààJN¬à€€ú›€€òõÿ\ô[ô‘›XõZ][ôÀŸ]€òõÿ\ô[ô‘›XõZ][ô◊HH\ŸT›]Jò[ŸJN¬ÇàÀ»ò[Y]H[ùö]H⁄Ÿ[à€à[›[ùàôXX›ù\ŸQYôôX›
+
+
+HOà¬àYà
+[ùö]U⁄Ÿ[äH¬àÿÿ[›‹òYŸKúŸ]][Jùÿ⁄ÿW⁄[ùö]W›⁄Ÿ[àã[ùö]U⁄Ÿ[äN¬àŸ][ùö]P⁄X⁄⁄[ô ùYJN¬àô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàùò[Y]R[ùö]U⁄Ÿ[àã⁄Ÿ[éà[ùö]U⁄Ÿ[àJKàJBàù[ä
+äHOàãöú€€ä
+JBàù[ä
+
+HOà¬àYà
+ùò[Y	âàö[ùö]JH¬àŸ][ùö]R[ôõ »ò[YàùYKããôö[ùö]HJN¬àYà
+ö[ùö]Kô\ôX›[€àOOHú]Y[ù›◊‹‹X⁄X[\›äH¬àŸ][ùö]T‹X⁄X[\›]]
+»ÿY[ôŒàùYK]][ùXÿ]Yàò[ŸK\úõ‹éàù[JN¬àô]⁄
+ãÿ\K‹‹X⁄X[\›ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKà‹ôY[ùX[Œàúÿ[YK[‹öY⁄[àãàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàõYHàJKàJBàù[ä\ﬁ[ò»
+ô\‹€úŸJHOà
+»ô\‹€úŸK]Nà]ÿZ]ô\‹€úŸKöú€€ä
+HJJBàù[ä
+»ô\‹€úŸK]HJHOà¬àYà
+]Kõ⁄ H¬àŸ][ùö]T‹X⁄X[\›]]
+»ÿY[ôŒàò[ŸK]][ùXÿ]YàùYK\úõ‹éàù[JN¬àH[ŸHYà
+ô\‹€úŸKú›]\»OOHHô\‹€úŸKú›]\»OOH H¬àŸ][ùö]T‹X⁄X[\›]]
+»ÿY[ôŒàò[ŸK]][ùXÿ]Yàò[ŸK\úõ‹éàù[JN¬àH[ŸH¬àŸ][ùö]T‹X⁄X[\›]]
+»ÿY[ôŒàò[ŸK]][ùXÿ]Yàò[ŸK\úõ‹éà¥'t-H4`Ù-4,4.Ù/¥`tc4/Ù`4/¥,¥-t`4.4`¥c4,¥at/¥-4`t/Ù-ta¥.4,4.Ù.4`t`¥,ààJN¬àBàJBàòÿ]⁄
+
+
+HOàŸ][ùö]T‹X⁄X[\›]]
+»ÿY[ôŒàò[ŸK]][ùXÿ]Yàò[ŸK\úõ‹éà¥'t-H4`Ù-4,4.Ù/¥`tc4/Ù`4/¥,¥-t`4.4`¥c4,¥at/¥-4`t/Ù-ta¥.4,4.Ù.4`t`¥,ààJJN¬àBàH[ŸH¬àŸ][ùö]R[ôõ »ò[Yàò[ŸK\úõ‹éàô\úõ‹à¥(t`tbÙ.Ù.¥,4/t-t-4-t.t`t`¥,¥.4`¥-t.Ùc4/t,àJN¬àBàJBàòÿ]⁄
+
+
+HOàŸ][ùö]R[ôõ »ò[Yàò[ŸK\úõ‹éà¥'¥b4.4,t.¥,4/Ù`4/¥,¥-t`4.¥.4`t`tbÙ.Ù.¥.àJJBàôö[ò[J
+
+HOàŸ][ùö]P⁄X⁄⁄[ô ò[ŸJJN¬àBàK◊JN¬ÇàÀ»[ôH‹ôYèX[[òH»‹€›\òŸOX[[òH]Y\ûH\ò[\¬àôXX›ù\ŸQYôôX›
+
+
+HOà¬àûH¬à€€ú›\ò[\»Hô]»TìŸX\ò⁄\ò[\ ⁄[ô›Àõÿÿ][€ãúŸX\ò⁄
+N¬à€€ú›ôYàH\ò[\ÀôŸ]
+úôYàäN¬à€€ú›€›\òŸHH\ò[\ÀôŸ]
+ú€›\òŸHäN¬àYà
+ôYàOOHò[[òHà€›\òŸHOOHò[[òHäH¬àÿÿ[›‹òYŸKúŸ]][JòõŸW‹ôYô\úò[‹€›\òŸHãò[[òWÿ€Y[ùäN¬àÿÿ[›‹òYŸKúŸ]][JòõŸW‹‹X⁄X[\›⁄Yãò[[òWﬁöZ€›òHäN¬àÿÿ[›‹òYŸKúŸ]][JòõŸW‹‹X⁄X[\›€ò[YHã¥$4.Ù-t/t,4%¥`Ù.¥/¥,¥,äN¬àBàHÿ]⁄
+JHﬂBàK◊JN¬ÇàÀ»]]À[ÿYõŸHÿXö[ô]YàŸ\‹⁄[€à^\›»€à[›[ùàôXX›ù\ŸQYôôX›
+
+
+HOà¬àYà
+X›]ôS[Ÿ[HOOHòõŸHà	âàõŸTÿ‹ôY[àOOHõ[ô[ô»äH¬à€€ú›ÿ]ôYHŸ]õŸTŸ\‹⁄[€ä
+N¬àYà
+ÿ]ôYúŸ\‹⁄[€íY	âàÿ]ôYòXÿŸ\‹’⁄Ÿ[äH¬àÿYõŸPÿXö[ô]
+
+N¬àBàBàK◊JN¬ÇàÀ»€X\àõŸH€€ù[ùX][€à\úõ‹à⁄[àÿ‹ôY[à⁄[ôŸ\¬àôXX›ù\ŸQYôôX›
+
+
+HOà¬àŸ]õŸP€€ù[ùX][€ë\úõ‹äàäN¬àKÿõŸTÿ‹ôY[óJN¬Çà€€ú›ÿYZ[îô\UXãŸ]YZ[îô\UXóHH\ŸT›]Júô]öY]‹»äN¬à€€ú›ÿYZ[îô\]Y\›ÀŸ]YZ[îô\]Y\›◊HH\ŸT›]J◊JN¬à€€ú›ÿYZ[îô\Qö[\ãŸ]YZ[îô\Qö[\óHH\ŸT›]Jú[ô[ô»äN¬ÇàÀ»YZ[à‹ö\⁄\»ô\]Y\›»›]Bà€€ú›ÿYZ[ê‹ö\⁄\‘ô\]Y\›ÀŸ]YZ[ê‹ö\⁄\‘ô\]Y\›◊HH\ŸT›]J◊JN¬à€€ú›ÿYZ[ê‹ö\⁄\—ö[\ãŸ]YZ[ê‹ö\⁄\—ö[\óHH\ŸT›]Jõô]»äN¬à€€ú›ÿYZ[ê‹ö\⁄\”ÿY[ôÀŸ]YZ[ê‹ö\⁄\”ÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿYZ[ê‹ö\⁄\–X›[€ìÿY[ôÀŸ]YZ[ê‹ö\⁄\–X›[€ìÿY[ô◊HH\ŸT›]Jù[
+N¬à€€ú›ÿYZ[ë\ö”[ŸKŸ]YZ[ë\ö”[ŸWHH\ŸT›]JùYJN¬à€€ú›ÿYZ[îô]öY]‘⁄›’ò\⁄Ÿ]YZ[îô]öY]‘⁄›’ò\⁄HH\ŸT›]Jò[ŸJN¬à€€ú›Ÿ[]P€€ôö\õTô]öY]“YŸ][]P€€ôö\õTô]öY]“YHH\ŸT›]Jù[
+N¬à€€ú›Ÿ[]P€€ôö\õP€ŸKŸ][]P€€ôö\õP€ŸWHH\ŸT›]JàäN¬à€€ú›Ÿ[]P€€ôö\õT›\Ÿ][]P€€ôö\õT›\HH\ŸT›]J
+N¬à€€ú›Ÿ[]P€€ôö\õU\KŸ][]P€€ôö\õU\WHH\ŸT›]Jú€ŸùäN¬ÇàÀ»YZ[àõ€H
+›\\à»›\‹ù»õŸJBà€€ú›ÿYZ[îõ€KŸ]YZ[îõ€WHH\ŸT›]Jù[
+N¬àÀ»YZ[à›Xã\YŸHõ‹à‘Hò]öYÿ][€à
+ù[H\ö]ôHúõ€HTì
+Bà€€ú›ÿYZ[î›XîYŸKŸ]YZ[î›XîYŸWHH\ŸT›]Jù[
+N¬ÇàÀ»õŸH[ùZŸHYZ[à›]Bà€€ú›ÿõŸR[ùZŸTôX€‹ôÀŸ]õŸR[ùZŸTôX€‹ô◊HH\ŸT›]J◊JN¬à€€ú›ÿõŸR[ùZŸU›[Ÿ]õŸR[ùZŸU›[HH\ŸT›]J
+N¬à€€ú›ÿõŸR[ùZŸSÿY[ôÀŸ]õŸR[ùZŸSÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸR[ùZŸQ]Z[Ÿ]õŸR[ùZŸQ]Z[HH\ŸT›]Jù[
+N¬à€€ú›ÿõŸR[ùZŸQ]Z[‹[ãŸ]õŸR[ùZŸQ]Z[‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸR[ùZŸT⁄›—[]YŸ]õŸR[ùZŸT⁄›—[]YHH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸR[ùZŸQ[]P€€ôö\õKŸ]õŸR[ùZŸQ[]P€€ôö\õWHH\ŸT›]Jù[
+N¬à€€ú›ÿõŸR[ùZŸT€›\òŸQö[\ãŸ]õŸR[ùZŸT€›\òŸQö[\óHH\ŸT›]Jò[äN¬Çà€€ú›ÿõŸP€ŸP€‹YYŸ]õŸP€ŸP€‹YYHH\ŸT›]Jò[ŸJN¬ÇàÀ»õŸHX\ûH›]Bà€€ú›ÿõŸQX\ûTŸ\‹⁄[€íYŸ]õŸQX\ûTŸ\‹⁄[€íYHH\ŸT›]Jù[
+N¬à€€ú›ÿõŸP€€ù[ùX][€í[ú]Ÿ]õŸP€€ù[ùX][€í[ú]HH\ŸT›]JàäN¬à€€ú›ÿõŸP€€ù[ùX][€ë\úõ‹ãŸ]õŸP€€ù[ùX][€ë\úõ‹óHH\ŸT›]JàäN¬à€€ú›ÿõŸQX\ûS‹[ãŸ]õŸQX\ûS‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸQX\ûTô\›[Ÿ]õŸQX\ûTô\›[HH\ŸT›]Jù[
+N¬à€€ú›ÿõŸQX\ûQ^Q]KŸ]õŸQX\ûQ^Q]WHH\ŸT›]Jù[
+N¬à€€ú›ÿõŸQX\ûR\›‹ûKŸ]õŸQX\ûR\›‹ûWHH\ŸT›]Jù[
+N¬à€€ú›ÿõŸQX\ûR\›‹ûS‹[ãŸ]õŸQX\ûR\›‹ûS‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸQX\ûR\›‹ûSÿY[ôÀŸ]õŸQX\ûR\›‹ûSÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸQX\ûR\›‹ûQ]Z[Ÿ]õŸQX\ûR\›‹ûQ]Z[HH\ŸT›]Jù[
+N¬à€€ú›ÿõŸQX\ûTôX€‹ôÀŸ]õŸQX\ûTôX€‹ô◊HH\ŸT›]J◊JN¬à€€ú›ÿõŸQX\ûSÿY[ôÀŸ]õŸQX\ûSÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸQX\ûQ]Z[Ÿ]õŸQX\ûQ]Z[HH\ŸT›]Jù[
+N¬à€€ú›ÿõŸQX\ûQ]Z[‹[ãŸ]õŸQX\ûQ]Z[‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸQX\ûTŸ\‹⁄[€ëö[\ãŸ]õŸQX\ûTŸ\‹⁄[€ëö[\óHH\ŸT›]JàäN¬à€€ú›ÿõŸPYZ[ïXãŸ]õŸPYZ[ïXóHH\ŸT›]Jö[ùZŸHäN»À»[ùZŸHX\ûHò\⁄ô]öY]‹¬à€€ú›ÿõŸQ^\ùô]öY]‹ÀŸ]õŸQ^\ùô]öY]‹◊HH\ŸT›]J◊JN¬à€€ú›ÿõŸQ^\ùô]öY]‹”ÿY[ôÀŸ]õŸQ^\ùô]öY]‹”ÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸQ^\ùô]öY]—õ‹õS‹[ãŸ]õŸQ^\ùô]öY]—õ‹õS‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸQ^\ùô]öY]—õ‹õKŸ]õŸQ^\ùô]öY]—õ‹õWHH\ŸT›]Jù[
+N¬à€€ú›ÿõŸQ^\ùô]öY]‘ÿ]ö[ôÀŸ]õŸQ^\ùô]öY]‘ÿ]ö[ô◊HH\ŸT›]Jò[ŸJN¬ÇàÀ»YZ[à‹X⁄X[\›€òõÿ\ô[ôÀ€X]⁄›]Bà€€ú›€€òõÿ\ô[ô‘ô\]Y\›ÀŸ]€òõÿ\ô[ô‘ô\]Y\›◊HH\ŸT›]J◊JN¬à€€ú›€€òõÿ\ô[ô”ÿY[ôÀŸ]€òõÿ\ô[ô”ÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›€X]⁄ô\]Y\›ÀŸ]X]⁄ô\]Y\›◊HH\ŸT›]J◊JN¬à€€ú›€X]⁄ÿY[ôÀŸ]X]⁄ÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›€X]⁄^\ùŸ[X›‹ãŸ]X]⁄^\ùŸ[X›‹óHH\ŸT›]Jù[
+N»À»ô\]Y\›YôZ[ô»\‹⁄Y€ôYà€€ú›€X]⁄^\ù\›Ÿ]X]⁄^\ù\›HH\ŸT›]J◊JN¬à€€ú›€X]⁄\‹⁄Y€ö[ôÀŸ]X]⁄\‹⁄Y€ö[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸQ^‹ù[ô–ÿ\Ÿ\ÀŸ]õŸQ^‹ù[ô–ÿ\Ÿ\◊HH\ŸT›]Jò[ŸJN¬àÀ»õŸH€Y[ù\‹⁄Y€õY[ùà€€ú›ÿõŸP\‹⁄Y€õY[ùÀŸ]õŸP\‹⁄Y€õY[ù◊HH\ŸT›]J◊JN¬à€€ú›ÿõŸP\‹⁄Y€õY[ù”ÿY[ôÀŸ]õŸP\‹⁄Y€õY[ù”ÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸQ^\ùÀŸ]õŸQ^\ù◊HH\ŸT›]J◊JN¬à€€ú›ÿõŸP\‹⁄Y€ï\ôŸ]Ÿ]õŸP\‹⁄Y€ï\ôŸ]HH\ŸT›]Jù[
+N»À»õŸWÿ€Y[ù‹ôYàôZ[ô»\‹⁄Y€ôYà€€ú›ÿõŸP\‹⁄Y€ë^\ùYŸ]õŸP\‹⁄Y€ë^\ùYHH\ŸT›]JàäN¬à€€ú›ÿõŸP\‹⁄Y€ì‹ô“YŸ]õŸP\‹⁄Y€ì‹ô“YHH\ŸT›]Jù[
+N¬à€€ú›ÿõŸP\‹⁄Y€îÿ]ö[ôÀŸ]õŸP\‹⁄Y€îÿ]ö[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸP\‹⁄Y€í\‘ôX\‹⁄Y€ãŸ]õŸP\‹⁄Y€í\‘ôX\‹⁄Y€óHH\ŸT›]Jò[ŸJN¬à€€ú›ÿõŸP\‹⁄Y€ë^\ù‹ô‹ÀŸ]õŸP\‹⁄Y€ë^\ù‹ô‹◊HH\ŸT›]J◊JN¬ÇàÀ»ô\›‹ôHõŸH[ùZŸHô\›[úõ€Hÿÿ[›‹òYŸBà€€ú›‹ÿ]ôYõŸTô\›[Ÿ]ÿ]ôYõŸTô\›[HH\ŸT›]J
+
+HOà¬àûH¬à€€ú›ò]»Hÿÿ[›‹òYŸKôŸ]][JòõŸW€\›‹ô\›[äN¬àYà
+ò] Hô]\õàî””ãú\úŸJò] N¬àHÿ]⁄
+JHﬂBàô]\õàù[¬àJN¬ÇàÀ»òZ[ö[ô»XõH›]Bà€€ú››òZ[ö[ô‘Ÿ\‹⁄[€úÀŸ]òZ[ö[ô‘Ÿ\‹⁄[€ú◊HH\ŸT›]J◊JN¬à€€ú››òZ[ö[ô”ÿY[ôÀŸ]òZ[ö[ô”ÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú››òZ[ö[ô—ö[\ãŸ]òZ[ö[ô—ö[\óHH\ŸT›]J»›]\Œàò[ã^X›Yÿÿ\ŸW›\Nàò[ãZWŸ]X›Yÿÿ\ŸW›\Nàò[ãŸ\‹⁄[€ó⁄⁄[ôàò[ã[Ÿ[›\ŸYàò[ãXõX◊ÿ€ŸNàààJN¬à€€ú››òZ[ö[ô—Y]YŸ]òZ[ö[ô—Y]YHH\ŸT›]Jù[
+N¬à€€ú››òZ[ö[ô—Y]]KŸ]òZ[ö[ô—Y]]WHH\ŸT›]JﬂJN¬à€€ú››òZ[ö[ô”ô]‘õ›ÀŸ]òZ[ö[ô”ô]‘õ›◊HH\ŸT›]Jù[
+N¬à€€ú››òZ[ö[ô‘Ÿ\‹⁄[€ú—\úõ‹ãŸ]òZ[ö[ô‘Ÿ\‹⁄[€ú—\úõ‹óHH\ŸT›]Jù[
+N¬ÇàÀ»‹ôX]HòZ[ö[ô»úõ€Hô]öY]»›]Bà€€ú››òZ[ö[ô—õ‹õTô]öY]“YŸ]òZ[ö[ô—õ‹õTô]öY]“YHH\ŸT›]Jù[
+N¬à€€ú››òZ[ö[ô—õ‹õQ]KŸ]òZ[ö[ô—õ‹õQ]WHH\ŸT›]J»ÿŸ[ò\ö[◊‹^YYààã^X›Yÿÿ\ŸW›\NààãŸ\‹⁄[€ó⁄⁄[ôàö[ö]X[ã^\ùÿ€€[Y[ùààãXõX◊ÿ€ŸNàààJN¬à€€ú››òZ[ö[ô—õ‹õTXõX–€ŸP]]ÀŸ]òZ[ö[ô—õ‹õTXõX–€ŸP]]◊HH\ŸT›]Jò[ŸJN¬ÇàÀ»ò\⁄»€ŸùY[]H›]Bà€€ú››òZ[ö[ô‘⁄›’ò\⁄Ÿ]òZ[ö[ô‘⁄›’ò\⁄HH\ŸT›]Jò[ŸJN¬à€€ú››òZ[ö[ô‘Ÿ[X›[€ãŸ]òZ[ö[ô‘Ÿ[X›[€óHH\ŸT›]Jô]»Ÿ]
+
+JN¬à€€ú››òZ[ö[ô’ò\⁄€€ôö\õKŸ]òZ[ö[ô’ò\⁄€€ôö\õWHH\ŸT›]Jù[
+N¬à€€ú››òZ[ö[ô‘\õX[ô[ù€€ôö\õKŸ]òZ[ö[ô‘\õX[ô[ù€€ôö\õWHH\ŸT›]Jù[
+N¬à€€ú››òZ[ö[ô—[][€îôX\€€ãŸ]òZ[ö[ô—[][€îôX\€€óHH\ŸT›]JàäN¬à€€ú››òZ[ö[ô—[][€îôX\€€ê›\›€KŸ]òZ[ö[ô—[][€îôX\€€ê›\›€WHH\ŸT›]JàäN¬à€€ú››òZ[ö[ô–ù[–€€ôö\õKŸ]òZ[ö[ô–ù[–€€ôö\õWHH\ŸT›]Jù[
+N¬ÇàÀ»^[ôXõHô]öY]»ŸX›[€ú»›]Bà€€ú›Ÿ^[ôYŸX›[€úÀŸ]^[ôYŸX›[€ú◊HH\ŸT›]JﬂJN¬à€€ú›€[Ÿ[]KŸ][Ÿ[]WHH\ŸT›]Jù[
+N¬ÇàÀ»]X[]H[ú⁄Y⁄›]Bà€€ú›‹]X[]R[ú⁄Y⁄ÀŸ]]X[]R[ú⁄Y⁄◊HH\ŸT›]J◊JN¬à€€ú›‹]X[]T›]ÀŸ]]X[]T›]◊HH\ŸT›]J»ô]◊ÿ\õ›ôYÿ€›[ùà\›ÿ[ò[\⁄\◊ÿ]àù[ôX€€[Y[ôY›◊ÿ[ò[^ôNàò[ŸHJN¬à€€ú›‹]X[]SÿY[ôÀŸ]]X[]SÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›‹]X[]QŸ[ô\ò][ôÀŸ]]X[]QŸ[ô\ò][ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›‹]X[]TŸ[X›Yô]öY]“YÀŸ]]X[]TŸ[X›Yô]öY]“Y◊HH\ŸT›]J◊JN¬à€€ú›‹]X[]P€€ôö\õS‹[ãŸ]]X[]P€€ôö\õS‹[óHH\ŸT›]Jò[ŸJN¬à€€ú›‹]X[]Q]Z[[ú⁄Y⁄Ÿ]]X[]Q]Z[[ú⁄Y⁄HH\ŸT›]Jù[
+N¬ÇàÀ»Ÿ\‹⁄[€à[Y[[ôH›]Bà€€ú››[Y[[ôQ]KŸ][Y[[ôQ]WHH\ŸT›]Jù[
+N¬à€€ú››[Y[[ôSÿY[ôÀŸ][Y[[ôSÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú››[Y[[ôP€ŸKŸ][Y[[ôP€ŸWHH\ŸT›]Jù[
+N¬à€€ú››[Y[[ôPÿX⁄KŸ][Y[[ôPÿX⁄WHH\ŸT›]JﬂJN¬à€€ú››[Y[[ôUöY]ÀŸ][Y[[ôUöY]◊HH\ŸT›]Jõ\›äN»À»õ\›àô]Z[Çà€€ú››[Y[[ôS\ôŸTŸX›[€ãŸ][Y[[ôS\ôŸTŸX›[€óHH\ŸT›]Jù[
+N¬à€€ú›‹Ÿ\‹⁄[€ë]Z[—]KŸ]Ÿ\‹⁄[€ë]Z[—]WHH\ŸT›]Jù[
+N¬à€€ú›‹Ÿ\‹⁄[€ë]Z[”ÿY[ôÀŸ]Ÿ\‹⁄[€ë]Z[”ÿY[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›‹Ÿ\‹⁄[€ë]Z[–ÿX⁄KŸ]Ÿ\‹⁄[€ë]Z[–ÿX⁄WHH\ŸT›]JﬂJN¬à€€ú›‹Ÿ\‹⁄[€ë]Z[—\úõ‹ãŸ]Ÿ\‹⁄[€ë]Z[—\úõ‹óHH\ŸT›]Jù[
+N¬Çà€€ú›UPSUW‘’UT◊”PëS»H¬àô]Œà¥'t/¥,¥bÙ.Hãà[ô\ó‹ô]öY]Œà¥(4,4`t`t/4,4`¥`4.4,¥,4-t`¥`tc»ãàXÿŸ\Yà¥'Ù`4.4/tcÙ`à4.à4`4,4,t/¥`¥-Hãà\ùX[WÿXÿŸ\Yà¥'Ù`4.4/tcÙ`à4aÙ,4`t`¥.4aÙ/t/àãàôZôX›Yà¥'¥`¥.¥.Ù/¥/tdt/Hãà\ò⁄]ôYà¥$4`4at.4,àãàN¬Çà€€ú›UPSUW‘—UëTíUW”PëS»H¬à›Œà¥'t.4-Ù.¥.4.HãàYY][Nà¥(t`4-t-4/t.4.HãàY⁄à¥$¥bÙ`t/¥.¥.4.Hãà‹ö]Xÿ[à¥&¥`4.4`¥.4aÙ-t`t.¥.4.HãàN¬Çà€€ú›—T‘“S”ó““Së”PëS»H¬à[ö]X[à¥'Ù-t`4,¥.4aÙ/t,4c»4`t-t`t`t.4c»ãàõ€›◊›\à¥'Ù/¥,¥`¥/¥`4/t,4c»4`t-t`t`t.4c»ãàX\ûWÿ⁄X⁄Œà¥'Ù`4/¥,¥-t`4.¥,4-4/t-t,¥/t.4.¥,ãà›\‹ù›€€⁄]ÿ⁄X⁄Œà¥'Ù`4/¥,¥-t`4.¥,4/Ù`4,4.¥`¥.4.àãà‹ö\⁄\◊ÿ⁄X⁄Œà¥(t`4/¥aÙ/t/¥-H4/¥,t`4,4bt-t/t.4-Hãàÿ›‹ó‹ô]öY]Œà¥$¥`4,4aÙ-t,t/tbÙ.H4`4,4-Ù,t/¥`ãà›\éà¥%4`4`Ù,Ù/¥-HãàN¬Çà€€ú›–T—W’TW”PëS»H¬à[ûY]Nà¥(¥`4-t,¥/¥,Ù,ãà€Y\à¥(t/¥/Hãà\ô\‹⁄[€ó€ZŸNà¥%4-t/Ù`4-t`t`t.4,¥/tbÙ-H4/Ù`4.4-Ù/t,4.¥.ãà‹öYYéà¥(Ù`¥`4,4`¥,»4,Ù/¥`4-Hãàò][XNà¥(¥`4,4,¥/4,4`¥.4aÙ-t`t.¥.4.H4/¥/ÙbÙ`àãàõŸW›[ú⁄[€éà¥(¥-t.Ù-t`t/t/¥-H4/t,4/Ù`4cÙ-¥-t/t.4-HãàY€ZŸNà¥'t,4`4`Ùb4-t/t.4-H4,¥/t.4/4,4/t.4c»»4.4`t/Ù/¥.Ù/t.4`¥-t.Ùc4/tbÙ-H4a4`Ù/t.¥a¥.4.ãà›Xú›[òŸNà¥'Ù$4$à»4,¥-tbt-t`t`¥,¥,ãà[€⁄€à¥$4.Ù.¥/¥,Ù/¥.Ùcãàö\€\ó‹ôYŸõY‹Œà¥$t.4/Ù/¥.ÙcÙ`4/tbÙ-H4.¥`4,4`t/tbÙ-H4a4.Ù,4,Ù.ãàﬁX⁄‹⁄\◊‹ôYŸõY‹Œà¥'Ù`t.4at/¥`¥.4aÙ-t`t.¥.4-H4.¥`4,4`t/tbÙ-H4a4.Ù,4,Ù.ãàX›]W‹ﬁX⁄‹⁄\Œà¥'¥`t`¥`4bÙ.H4/Ù`t.4at/¥-»ãà›ZX⁄YW‹ö\⁄Œà¥(t`Ù.4a¥.4-4,4.Ùc4/tbÙ.H4`4.4`t.àãàŸ[ó⁄\õW‹ö\⁄Œà¥(4.4`t.à4`t,4/4/¥/Ù/¥,¥`4-t-¥-4-t/t.4c»ãàYYXÿ][€ó⁄\‹›YNà¥$¥/¥/Ù`4/¥`tb»4.Ù-t.¥,4`4`t`¥,àãàZ^Yà¥(t/4-tb4,4/t/tbÙ.H4`t.Ù`ÙaÙ,4.Hãà›\éà¥%4`4`Ù,Ù/¥-HãàN¬Çà€€ú›’UT◊”PëS»H¬àô]Œà¥'t/¥,¥bÙ.Hãàô]öY]ŸYà¥'Ù`4/¥`t/4/¥`¥`4-t/HãàôYY◊‹õ€\›\]Nà¥'t`Ù-¥/t/à4/¥,t/t/¥,¥.4`¥c4/Ù`4/¥/4/Ù`àãà\õ›ôYŸõ‹ó€X\õö[ôŒà¥'¥-4/¥,t`4-t/H4-4.Ùc»4/¥,t`ÙaÙ-t/t.4c»ãàôZôX›Yà¥'¥`¥.¥.Ù/¥/tdt/Hãà\ò⁄]ôYà¥$4`4at.4,àãàN¬Çà€€ú›⁄»H
+äHOà—T‘“S”ó““Së”PëS÷›óHé¬à€€ú››H
+äHOà–T—W’TW”PëS÷›óHé¬à€€ú››H
+äHOà’UT◊”PëS÷›óHé¬Çàù[ò›[€à⁄›’ÿ\›
+Y\‹ÿYŸK\HHú›XÿŸ\‹»äH¬àŸ]ÿ\›
+»Y\‹ÿYŸK\KŸ^Nà]Kõõ› 
+HJN¬àBÇà\ﬁ[ò»ù[ò›[€à[ôQ^\ùŸ⁄[ä
+H¬à€€ú›€ŸHH^\ù€ŸR[ú]ùö[J
+N¬àYà
+X€ŸJHô]\õé¬àŸ]^\ùŸŸ⁄[ô“[äùYJN¬àûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàõŸ⁄[àãXÿŸ\‹◊ÿ€ŸNà€ŸHJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄»	âà]Kô^\ù
+H¬àûH»Ÿ\‹⁄[€î›‹òYŸKúŸ]][Jùÿ⁄ÿWŸ^\ùÿXÿŸ\‹◊ÿ€ŸHã€ŸJN»Hÿ]⁄ﬂBàŸ]^\ù]J]Kô^\ù
+N¬àÿÿ[›‹òYŸKúŸ]][Jùÿ⁄ÿWŸ^\ùãî””ãú›ö[ô⁄YûJ]Kô^\ù
+JN¬àŸ]^\ù[Ÿ[‹[äò[ŸJN¬àŸ]^\ù€ŸR[ú]
+àäN¬à⁄›’ÿ\›
+4(4-t-¥.4/4`t/Ù-ta¥.4,4.Ù.4`t`¥,à	Ÿ]Kô^\ùõò[Y_X
+N¬àH[ŸH¬à⁄›’ÿ\›
+]Kô\úõ‹à¥&¥/¥-4`t/Ù-ta¥.4,4.Ù.4`t`¥,4/t-H4/t,4.t-4-t/Hãô\úõ‹àäN¬àBàHÿ]⁄¬à⁄›’ÿ\›
+¥'¥b4.4,t.¥,4/Ù/¥-4.¥.Ùc¥aÙ-t/t.4c»ãô\úõ‹àäN¬àHö[ò[H¬àŸ]^\ùŸŸ⁄[ô“[äò[ŸJN¬àBàBÇàù[ò›[€à[ôQ^\ùŸ€›]
+
+H¬àŸ]^\ù]Jù[
+N¬àûH»Ÿ\‹⁄[€î›‹òYŸKúô[[›ôR][Jùÿ⁄ÿWŸ^\ùÿXÿŸ\‹◊ÿ€ŸHäN»Hÿ]⁄ﬂBàÿÿ[›‹òYŸKúô[[›ôR][Jùÿ⁄ÿWŸ^\ùäN¬à⁄›’ÿ\›
+¥(4-t-¥.4/4`t/Ù-ta¥.4,4.Ù.4`t`¥,4,¥bÙ.¥.Ùc¥aÙ-t/HäN¬àBÇàÀ»8• 8• ^H]Y[ù»
+^\ù[ô[
+H8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• Çà\ﬁ[ò»ù[ò›[€àÿY^T]Y[ù 
+H¬àŸ]]Y[ù[Ÿ[‹[äùYJN¬àŸ]^T]Y[ù”ÿY[ô ùYJN¬àûH¬à€€ú›õŸHH»X›[€éàõ\›^T]Y[ù»àN¬àYà
+^\ù]JH¬àõŸKô^\ùÿ€ŸHH^\ù€ŸR[ú]
+]ÿZ]Ÿ]›‹ôY^\ù€ŸJ
+JHàé¬àBà€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJõŸJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄ H¬àŸ]^T]Y[ù ]Kú]Y[ù»◊JN¬àH[ŸH¬à⁄›’ÿ\›
+]Kô\úõ‹à¥'¥b4.4,t.¥,4-Ù,4,Ù`4`Ù-Ù.¥.ãô\úõ‹àäN¬àBàHÿ]⁄¬à⁄›’ÿ\›
+¥'¥b4.4,t.¥,4-Ù,4,Ù`4`Ù-Ù.¥.4/Ù,4a¥.4-t/t`¥/¥,àãô\úõ‹àäN¬àHö[ò[H¬àŸ]^T]Y[ù”ÿY[ô ò[ŸJN¬àBàBÇàù[ò›[€àŸ]›‹ôY^\ù€ŸJ
+H¬àûH¬à€€ú›Ÿ\‹⁄[€ê€ŸHHŸ\‹⁄[€î›‹òYŸKôŸ]][Jùÿ⁄ÿWŸ^\ùÿXÿŸ\‹◊ÿ€ŸHäN¬àYà
+Ÿ\‹⁄[€ê€ŸJHô]\õàŸ\‹⁄[€ê€ŸN¬à€€ú›^\ùHÿÿ[›‹òYŸKôŸ]][Jùÿ⁄ÿWŸ^\ùäN¬àô]\õà^\ù»î””ãú\úŸJ^\ù
+OÀòXÿŸ\‹◊ÿ€ŸHààààé¬àHÿ]⁄»ô]\õààé»BàBÇà\ﬁ[ò»ù[ò›[€à[ôP\‹⁄Y€î]Y[ù
+
+H¬à€€ú›€ŸHH]Y[ù[Ÿ[€ŸKùö[J
+Kù’\\êÿ\ŸJ
+N¬àYà
+X€ŸJHô]\õé¬àûH¬à€€ú›õŸHH»X›[€éàò\‹⁄Y€î]Y[ù—^\ùãXõX◊ÿ€ŸNà€ŸHN¬àYà
+^\ù]JH¬àõŸKô^\ùÿ€ŸHH^\ù€ŸR[ú]
+]ÿZ]Ÿ]›‹ôY^\ù€ŸJ
+JHàé¬àBà€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJõŸJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄ H¬à⁄›’ÿ\›
+¥'Ù,4a¥.4-t/t`à4/t,4-Ù/t,4aÙ-t/HäN¬àŸ]]Y[ù[Ÿ[€ŸJàäN¬àÿY^T]Y[ù 
+N¬àH[ŸH¬à⁄›’ÿ\›
+]Kô\úõ‹à¥'¥b4.4,t.¥,ãô\úõ‹àäN¬àBàHÿ]⁄¬à⁄›’ÿ\›
+¥'¥b4.4,t.¥,4/t,4-Ù/t,4aÙ-t/t.4c»ãô\úõ‹àäN¬àBàBÇà\ﬁ[ò»ù[ò›[€à[ôP‹ôX]R[ùö]S[ö 
+H¬àûH¬à€€ú›õŸHH»X›[€éàò‹ôX]Qÿ›‹í[ùö]S[ö»ãXô[à[ùö]S[ö”Xô[N¬àYà
+^\ù]JH¬àõŸKô^\ùÿ€ŸHH^\ù€ŸR[ú]
+]ÿZ]Ÿ]›‹ôY^\ù€ŸJ
+JHàé¬àBà€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJõŸJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄ H¬àŸ][ùö]S[ö–‹ôX]Y
+]Kö[ùö]W€[ö N¬à⁄›’ÿ\›
+¥(t`tbÙ.Ù.¥,4`t/¥-Ù-4,4/t,äN¬àŸ][ùö]S[ö”Xô[
+àäN¬àÿY[ùö]S[ö‹ 
+N¬àH[ŸH¬à⁄›’ÿ\›
+]Kô\úõ‹à¥'¥b4.4,t.¥,ãô\úõ‹àäN¬àBàHÿ]⁄¬à⁄›’ÿ\›
+¥'¥b4.4,t.¥,4`t/¥-Ù-4,4/t.4c»4`t`tbÙ.Ù.¥.ãô\úõ‹àäN¬àBàBÇà\ﬁ[ò»ù[ò›[€àÿY[ùö]S[ö‹ 
+H¬àûH¬à€€ú›õŸHH»X›[€éàõ\›ÿ›‹í[ùö]S[ö‹»àN¬àYà
+^\ù]JH¬àõŸKô^\ùÿ€ŸHH^\ù€ŸR[ú]
+]ÿZ]Ÿ]›‹ôY^\ù€ŸJ
+JHàé¬àBà€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJõŸJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄ H¬àŸ][ùö]S[ö‹ ]Kö[ùö]W€[ö‹»◊JN¬àBàHÿ]⁄ﬂBàBÇà\ﬁ[ò»ù[ò›[€à[ôQ\ÿXõR[ùö]S[ö [ö“Y
+H¬àûH¬à€€ú›õŸHH»X›[€éàô\ÿXõQÿ›‹í[ùö]S[ö»ã[ö◊⁄Yà[ö“YN¬àYà
+^\ù]JH¬àõŸKô^\ùÿ€ŸHH^\ù€ŸR[ú]
+]ÿZ]Ÿ]›‹ôY^\ù€ŸJ
+JHàé¬àBà€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJõŸJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄ H¬à⁄›’ÿ\›
+¥(t`tbÙ.Ù.¥,4/¥`¥.¥.Ùc¥aÙ-t/t,äN¬àÿY[ùö]S[ö‹ 
+N¬àH[ŸH¬à⁄›’ÿ\›
+]Kô\úõ‹à¥'¥b4.4,t.¥,ãô\úõ‹àäN¬àBàHÿ]⁄¬à⁄›’ÿ\›
+¥'¥b4.4,t.¥,ãô\úõ‹àäN¬àBàBÇàÀ»8• 8• YZ[à‹ôÿ[ö^ò][€ú»8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• 8• Çà\ﬁ[ò»ù[ò›[€àYZ[ìÿY‹ôÿ[ö^ò][€ú 
+H¬àûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàõ\›‹ôÿ[ö^ò][€ú»ãYZ[ó‹ŸX‹ô]àYZ[î\‹›€‹ôJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄ H¬àŸ]‹ôÿ[ö^ò][€ú ]Kõ‹ôÿ[ö^ò][€ú»◊JN¬àBàHÿ]⁄ﬂBàBÇà\ﬁ[ò»ù[ò›[€à[ôP‹ôX]S‹ôÿ[ö^ò][€ä
+H¬àYà
+[‹ô—õ‹õKõò[YKùö[J
+JH»⁄›’ÿ\›
+¥(Ù.¥,4-¥.4`¥-H4/t,4-Ù,¥,4/t.4-Hãô\úõ‹àäN»ô]\õé»BàûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ¬àX›[€éà‹ô—õ‹õQY]Y»ù\]S‹ôÿ[ö^ò][€àààò‹ôX]S‹ôÿ[ö^ò][€àãàYZ[ó‹ŸX‹ô]àYZ[î\‹›€‹ôàYà‹ô—õ‹õQY]Yàããõ‹ô—õ‹õKàJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄ H¬à⁄›’ÿ\›
+‹ô—õ‹õQY]Y»¥'¥`4,Ù,4/t.4-Ù,4a¥.4c»4/¥,t/t/¥,¥.Ù-t/t,àà¥'¥`4,Ù,4/t.4-Ù,4a¥.4c»4`t/¥-Ù-4,4/t,äN¬àŸ]‹ô—õ‹õS‹[äò[ŸJN¬àŸ]‹ô—õ‹õQY]Y
+ù[
+N¬àŸ]‹ô—õ‹õJ»ò[YNààã€YŒààã\Nàúö]ò]Wÿ€[öX»ã⁄]Nààã€€[Y[ùàààJN¬àYZ[ìÿY‹ôÿ[ö^ò][€ú 
+N¬àH[ŸH¬à⁄›’ÿ\›
+]Kô\úõ‹à¥'¥b4.4,t.¥,ãô\úõ‹àäN¬àBàHÿ]⁄¬à⁄›’ÿ\›
+¥'¥b4.4,t.¥,ãô\úõ‹àäN¬àBàBÇà\ﬁ[ò»ù[ò›[€àYZ[ìÿY‹ôÿ[ö^ò][€ë^\ù ‹ô“Y
+H¬àûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàõ\›‹ôÿ[ö^ò][€ë^\ù»ã‹ôÿ[ö^ò][€ó⁄Yà‹ô“YYZ[ó‹ŸX‹ô]àYZ[î\‹›€‹ôJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄ H¬àŸ]‹ô—^\ù ]KõY[Xô\ú»◊JN¬àBàHÿ]⁄ﬂBàBÇà\ﬁ[ò»ù[ò›[€à[ôPY^\ù”‹ô 
+H¬àYà
+[‹ô—]Z[ÀöY[‹ô–Y^\ùY
+Hô]\õé¬àûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ¬àX›[€éàòY^\ù”‹ôÿ[ö^ò][€àãàYZ[ó‹ŸX‹ô]àYZ[î\‹›€‹ôà‹ôÿ[ö^ò][€ó⁄Yà‹ô—]Z[öYà^\ù⁄Yà‹ô–Y^\ùYàõ€Nà‹ô–Y^\ùõ€KàJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄ H¬à⁄›’ÿ\›
+¥(t/Ù-ta¥.4,4.Ù.4`t`à4-4/¥,t,4,¥.Ù-t/HäN¬àŸ]‹ô–Y^\ù‹[äò[ŸJN¬àŸ]‹ô–Y^\ùY
+àäN¬àYZ[ìÿY‹ôÿ[ö^ò][€ë^\ù ‹ô—]Z[öY
+N¬àH[ŸH¬à⁄›’ÿ\›
+]Kô\úõ‹à¥'¥b4.4,t.¥,ãô\úõ‹àäN¬àBàHÿ]⁄¬à⁄›’ÿ\›
+¥'¥b4.4,t.¥,ãô\úõ‹àäN¬àBàBÇà\ﬁ[ò»ù[ò›[€à[ôTô[[›ôQ^\ùúõ€S‹ô ^\ùY
+H¬àYà
+[‹ô—]Z[ÀöY
+Hô]\õé¬àûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ¬àX›[€éàúô[[›ôQ^\ùúõ€S‹ôÿ[ö^ò][€àãàYZ[ó‹ŸX‹ô]àYZ[î\‹›€‹ôà‹ôÿ[ö^ò][€ó⁄Yà‹ô—]Z[öYà^\ù⁄Yà^\ùYàJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄ H¬à⁄›’ÿ\›
+¥(t/Ù-ta¥.4,4.Ù.4`t`à4`Ù-4,4.Ùdt/HäN¬àYZ[ìÿY‹ôÿ[ö^ò][€ë^\ù ‹ô—]Z[öY
+N¬àH[ŸH¬à⁄›’ÿ\›
+]Kô\úõ‹à¥'¥b4.4,t.¥,ãô\úõ‹àäN¬àBàHÿ]⁄¬à⁄›’ÿ\›
+¥'¥b4.4,t.¥,ãô\úõ‹àäN¬àBàBÇà\ﬁ[ò»ù[ò›[€àYZ[ì\›[^\ù 
+H¬àûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàõ\›[^\ù»ãYZ[ó‹ŸX‹ô]àYZ[î\‹›€‹ôJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àô]\õà]Kô^\ù»◊N¬àHÿ]⁄»ô]\õà◊N»BàBÇàù[ò›[€àô\Ÿ]ôY⁄\›\ëõ‹õJ
+H¬àŸ]ôY⁄\›\ëõ‹õJ»ò[YNààã[XZ[ààã[Y‹ò[Nààãõ€NàúﬁX⁄€Ÿ⁄\›ã‹X⁄X[Nààã⁄]Nààã‹ôÿ[ö^ò][€éàààJN¬àBÇà\ﬁ[ò»ù[ò›[€à[ôQ^\ùôY⁄\›\ä
+H¬à€€ú›àHôY⁄\›\ëõ‹õN¬àYà
+Yãõò[YHãõò[YKùö[J
+Kõ[ô›äH¬à⁄›’ÿ\›
+¥(Ù.¥,4-¥.4`¥-H4.4/4c»
+4/4.4/t.4/4`Ù/à4`t.4/4,¥/¥.Ù,
+Hãô\úõ‹àäN¬àô]\õé¬àBÇàŸ]ôY⁄\›\îŸ[ô[ô ùYJN¬àûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ¬àX›[€éàúôY⁄\›\àãàò[YNàãõò[YKùö[J
+Kàõ€Nàãúõ€Kà‹X⁄X[Nàãú‹X⁄X[H»ãú‹X⁄X[Kùö[J
+HààãàJKàJN¬à€€ú›^H]ÿZ]ô\Àù^
+
+N¬à]]N¬àûH¬à]HHî””ãú\úŸJ^
+N¬àHÿ]⁄¬à⁄›’ÿ\›
+4'¥b4.4,t.¥,4`t-t`4,¥-t`4,à	‹ô\Àú›]\ﬂH	‹ô\Àú›]\’^Xô\úõ‹àäN¬àô]\õé¬àBàYà
+\ô\Àõ⁄»Y]OÀõ⁄ H¬à⁄›’ÿ\›
+4'¥b4.4,t.¥,4`4-t,Ù.4`t`¥`4,4a¥.4.à	Ÿ]OÀô]Z[»]OÀô\úõ‹àô\Àú›]\’^Xô\úõ‹àäN¬àô]\õé¬àBàŸ]ôY⁄\›ò][€îô\›[
+]JN¬àŸ]^\ù]J]Kô^\ù
+N¬àÿÿ[›‹òYŸKúŸ]][Jùÿ⁄ÿWŸ^\ùãî””ãú›ö[ô⁄YûJ]Kô^\ù
+JN¬à⁄›’ÿ\›
+4(4-t-¥.4/4`t/Ù-ta¥.4,4.Ù.4`t`¥,4,4.¥`¥.4,¥.4`4/¥,¥,4/Nà	Ÿ]Kô^\ùõò[Y_X
+N¬àHÿ]⁄
+JH¬à⁄›’ÿ\›
+4'¥b4.4,t.¥,4/Ù/¥-4.¥.Ùc¥aÙ-t/t.4cŒà	ŸOÀõY\‹ÿYŸH¥/Ù`4/¥,¥-t`4c4`¥-K4-Ù,4/Ù`Ùbt-t/H4.Ù.4`t-t`4,¥-t`üXô\úõ‹àäN¬àHö[ò[H¬àŸ]ôY⁄\›\îŸ[ô[ô ò[ŸJN¬àBàBÇà\ﬁ[ò»ù[ò›[€àYZ[ìÿYô\]Y\› ö[\î›]\ H¬à€€ú››Hö[\î›]\»YZ[îô\Qö[\é¬àûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàõ\›ô\]Y\›»ã›]\Œà›[Z]àLJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄ H¬àŸ]YZ[îô\]Y\› ]Kúô\]Y\›»◊JN¬àBàHÿ]⁄ﬂBàBÇà\ﬁ[ò»ù[ò›[€àYZ[ï\]Tô\]Y\››]\ ô\]Y\›Y›]\ H¬àûH¬à]ÿZ]ô]⁄
+ãÿ\KŸ^\ù»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàù\]Tô\]Y\››]\»ãô\]Y\›⁄Yàô\]Y\›Y›]\ÀYZ[ó‹ŸX‹ô]àYZ[î\‹›€‹ôJKàJN¬à⁄›’ÿ\›
+¥(t`¥,4`¥`Ù`H4-Ù,4cÙ,¥.¥.4/¥,t/t/¥,¥.Ùdt/HäN¬àYZ[ìÿYô\]Y\› YZ[îô\Qö[\äN¬àHÿ]⁄¬à⁄›’ÿ\›
+¥'¥b4.4,t.¥,4/¥,t/t/¥,¥.Ù-t/t.4c»ãô\úõ‹àäN¬àBàBÇà€€ú›‹ôX€‹ô[ô‘]Y\›[€í[ô^Ÿ]ôX€‹ô[ô‘]Y\›[€í[ô^HH\ŸT›]Jù[
+N¬à€€ú›‹]Y\›[€îôX€‹ô[ô’[YKŸ]]Y\›[€îôX€‹ô[ô’[YWHH\ŸT›]J
+N¬à€€ú›‹]Y\›[€ïò[úÿ‹öXö[ô“[ô^Ÿ]]Y\›[€ïò[úÿ‹öXö[ô“[ô^HH\ŸT›]Jù[
+N¬Çà€€ú›]Y\›[€ìYYXTôX€‹ô\îôYàH\ŸTôYäù[
+N¬à€€ú›]Y\›[€ê]Y[–⁄[ö‹‘ôYàH\ŸTôYä◊JN¬à€€ú›]Y\›[€ï[Y\îôYàH\ŸTôYäù[
+N¬Çà€€ú›‹ö\⁄\”YYXTôX€‹ô\îôYàH\ŸTôYäù[
+N¬à€€ú›‹ö\⁄\–]Y[–⁄[ö‹‘ôYàH\ŸTôYä◊JN¬à€€ú›‹ö\⁄\’[Y\îôYàH\ŸTôYäù[
+N¬Çà€€ú›ÿ‹ö\⁄\‘ôX€‹ô[ôÀŸ]‹ö\⁄\‘ôX€‹ô[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿ‹ö\⁄\‘ôX€‹ô[ô’[YKŸ]‹ö\⁄\‘ôX€‹ô[ô’[YWHH\ŸT›]J
+N¬à€€ú›ÿ‹ö\⁄\’ò[úÿ‹öXö[ôÀŸ]‹ö\⁄\’ò[úÿ‹öXö[ô◊HH\ŸT›]Jò[ŸJN¬à€€ú›ÿ‹ö\⁄\’õ⁄XŸQ\úõ‹ãŸ]‹ö\⁄\’õ⁄XŸQ\úõ‹óHH\ŸT›]JàäN¬à€€ú›ÿ‹ö\⁄\’ÿ\õö[ôÀŸ]‹ö\⁄\’ÿ\õö[ô◊HH\ŸT›]JàäN¬à€€ú›ÿ‹ö\⁄\–€€ôö\õX][€ãŸ]‹ö\⁄\–€€ôö\õX][€óHH\ŸT›]JàäN¬à€€ú›ÿ‹ö\⁄\‘⁄›“Y⁄ö\⁄’ÿ\õö[ôÀŸ]‹ö\⁄\‘⁄›“Y⁄ö\⁄’ÿ\õö[ô◊HH\ŸT›]Jò[ŸJN¬Çà€€ú›‹ö\⁄\“Ÿ^]€‹ô»H¬à¥at/¥aÙ`»4`Ù/4-t`4-t`¥cãà¥/Ù/¥.¥/¥/taÙ.4`¥c4`H4`t/¥,t/¥.Hãà¥`t,4/4/¥`Ù,t.4.Hãà¥`t`Ù.4a¥.4-ãà¥`Ù,t.4`¥c4`t-t,tc»ãà¥/t-H4at/¥aÙ`»4-¥.4`¥cãà¥/Ù`4.4aÙ.4/t.4`¥c4`t-t,t-H4,¥`4-t-ãà¥/Ù/¥`4-t-Ù,4`¥cãà¥`¥,4,t.Ù-t`¥.¥.ãà¥/Ù/¥,¥-t`t.4`¥c4`tc»ãà¥/Ù`4bÙ,Ù/t`Ù`¥cãà¥/t,4,¥`4-t-4.4`¥c4.¥/¥/4`Àt`¥/àãà¥`Ù,t.4`¥c4.¥/¥,Ù/ãt`¥/àãà¥`Ù,Ù`4/¥-¥,4c¥`àãà¥/4-t/tc»4`Ù,tc4c¥`àãà¥,Ù/¥.Ù/¥`t,4/Ù`4.4.¥,4-ÙbÙ,¥,4c¥`àãàN¬Çà€€ú›õ€SX\H¬àﬁX⁄X]ö\›à¥'Ù`t.4at.4,4`¥`ãàﬁX⁄€Ÿ⁄\›à¥'Ù`t.4at/¥.Ù/¥,»ãàﬁX⁄›\ò\\›à¥'Ù`t.4at/¥`¥-t`4,4/Ù-t,¥`àãà€[öXÿ[‹ﬁX⁄€Ÿ⁄\›à¥&¥.Ù.4/t.4aÙ-t`t.¥.4.H4/Ù`t.4at/¥.Ù/¥,»ãàô]\õ€Ÿ⁄\›à¥'t-t,¥`4/¥.Ù/¥,»ãà›\éà¥%4`4`Ù,Ù/¥-HãàN¬Çàù[ò›[€à\–‹ö\⁄\‘ö\⁄ ò[YJH¬à€€ú››Ÿ\àH
+ò[YHàäKù”›Ÿ\êÿ\ŸJ
+N¬àô]\õà‹ö\⁄\“Ÿ^]€‹ôÀú€€YJ
+Ÿ^]€‹ô
+HOà›Ÿ\ãö[ò€Y\ Ÿ^]€‹ô
+JN¬àBÇà\ﬁ[ò»ù[ò›[€à›XõZ]‹ö\⁄\‘ô\]Y\›
+
+H¬àŸ]‹ö\⁄\’ÿ\õö[ô àäN¬àŸ]‹ö\⁄\–€€ôö\õX][€äàäN¬ÇàYà
+\–‹ö\⁄\‘ö\⁄ ‹ö\⁄\’^
+H	âàX‹ö\⁄\‘⁄›“Y⁄ö\⁄’ÿ\õö[ô H¬àŸ]‹ö\⁄\‘⁄›“Y⁄ö\⁄’ÿ\õö[ô ùYJN¬àŸ]‹ö\⁄\’ÿ\õö[ô ¥%t`t.Ù.4-t`t`¥c4`4.4`t.à4/Ù`4.4aÙ.4/t.4`¥c4,¥`4-t-4`t-t,t-H4.4.Ù.4-4`4`Ù,Ù/¥/4`»4aÙ-t.Ù/¥,¥-t.¥`»8†%4-Ù,¥/¥/t.4`¥-HLLà4.4.Ù.L»4.4/t-H4/¥`t`¥,4,¥,4.t`¥-t`tc4/¥-4/t.àäN¬àô]\õé¬àBÇàYà
+X‹ö\⁄\–€€ùX›ùö[J
+H	âàX‹ö\⁄\’^ùö[J
+JH¬àŸ]‹ö\⁄\’ÿ\õö[ô ¥'¥/Ù.4b4.4`¥-H4`t.4`¥`Ù,4a¥.4cà4.4.Ù.4`Ù.¥,4-¥.4`¥-H4.¥/¥/t`¥,4.¥`à4-4.Ùc»4`t,¥cÙ-Ù.à4%t`t.Ù.4/¥/Ù,4`t/t/à4/Ù`4cÙ/4/à4`t-t.taÙ,4`H8†%4-Ù,¥/¥/t.4`¥-HLLà4.4.Ù.LÀàäN¬àô]\õé¬àBÇàŸ]‹ö\⁄\‘›XõZ][ô ùYJN¬àûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\Kÿ‹ö\⁄\»ã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ¬àX›[€éàúÿ]ôHãà‹ö\⁄\◊›^à‹ö\⁄\’^à€€ùX›à‹ö\⁄\–€€ùX›àXõX◊ÿ€ŸNàXõX–€ŸHù[àŸ\‹⁄[€ó⁄YàŸ\‹⁄[€íYù[àY⁄‹ö\⁄◊Ÿ]X›Yà\–‹ö\⁄\‘ö\⁄ ‹ö\⁄\’^
+Kàö\⁄◊€X\öŸ\úŒà\–‹ö\⁄\‘ö\⁄ ‹ö\⁄\’^
+H»‹ö\⁄\“Ÿ^]€‹ôÀôö[\ä»Oà
+‹ö\⁄\’^àäKù”›Ÿ\êÿ\ŸJ
+Kö[ò€Y\  JHàù[àJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+]Kõ⁄ H¬àŸ]‹ö\⁄\–€€ôö\õX][€ä¥'¥,t`4,4bt-t/t.4-H4`t/¥at`4,4/t-t/t/ãà4%t`t.Ù.4-t`t`¥c4/t-t/Ù/¥`t`4-t-4`t`¥,¥-t/t/t,4c»4`Ù,Ù`4/¥-Ù,4-¥.4-Ù/t.4.4.Ù.4,t-t-Ù/¥/Ù,4`t/t/¥`t`¥.8†%4/t-H4-¥-4.4`¥-H4/¥`¥,¥-t`¥,4`t-t`4,¥.4`t,4-Ù,¥/¥/t.4`¥-HLLà4.4.Ù.LÀàäN¬àH[ŸH¬àŸ]‹ö\⁄\’ÿ\õö[ô ]Kô\úõ‹à¥'t-H4`Ù-4,4.Ù/¥`tc4`t/¥at`4,4/t.4`¥c4/¥,t`4,4bt-t/t.4-Kà4%t`t.Ù.4/¥/Ù,4`t/t/à4/Ù`4cÙ/4/à4`t-t.taÙ,4`H8†%4-Ù,¥/¥/t.4`¥-HLLà4.4.Ù.LÀàäN¬àBàHÿ]⁄
+JH¬à€€ú€€Kô\úõ‹äú›XõZ]‹ö\⁄\»\úõ‹àãJN¬àŸ]‹ö\⁄\’ÿ\õö[ô ¥'t-H4`Ù-4,4.Ù/¥`tc4`t/¥at`4,4/t.4`¥c4/¥,t`4,4bt-t/t.4-Kà4%t`t.Ù.4/¥/Ù,4`t/t/à4/Ù`4cÙ/4/à4`t-t.taÙ,4`H8†%4-Ù,¥/¥/t.4`¥-HLLà4.4.Ù.LÀàäN¬àHö[ò[H¬àŸ]‹ö\⁄\‘›XõZ][ô ò[ŸJN¬àBàBÇàù[ò›[€à€€ù[ùYQúõ€P‹ö\⁄\ 
+H¬àŸ]‹ö\⁄\–€€ôö\õX][€äàäN¬àŸ]‹ö\⁄\’ÿ\õö[ô àäN¬ÇàYà
+‹ö\⁄\’[Y\îôYãò›\úô[ù
+H¬à€X\í[ù\ùò[
+‹ö\⁄\’[Y\îôYãò›\úô[ù
+N¬àBàYà
+‹ö\⁄\”YYXTôX€‹ô\îôYãò›\úô[ù	âà‹ö\⁄\‘ôX€‹ô[ô H¬à‹ö\⁄\”YYXTôX€‹ô\îôYãò›\úô[ùú›‹
+
+N¬àBàYà
+‹ö\⁄\’^ùö[J
+JH¬àŸ]^
+‹ö\⁄\’^
+N¬àŸ][ŸJù^äN¬àBàŸ]‹ö\⁄\”‹[äò[ŸJN¬àŸ]‹ö\⁄\’^
+àäN¬àŸ]‹ö\⁄\–€€ùX›
+àäN¬àŸ]‹ö\⁄\‘ôX€‹ô[ô ò[ŸJN¬àŸ]‹ö\⁄\‘ôX€‹ô[ô’[YJ
+N¬àŸ]‹ö\⁄\’ò[úÿ‹öXö[ô ò[ŸJN¬àŸ]‹ö\⁄\’õ⁄XŸQ\úõ‹äàäN¬àŸ]‹ö\⁄\’ÿ\õö[ô àäN¬àŸ]‹ö\⁄\‘⁄›“Y⁄ö\⁄’ÿ\õö[ô ò[ŸJN¬àBÇàù[ò›[€à[ôP‹ö\⁄\–€‹ŸJ
+H¬àYà
+‹ö\⁄\’[Y\îôYãò›\úô[ù
+H¬à€X\í[ù\ùò[
+‹ö\⁄\’[Y\îôYãò›\úô[ù
+N¬àBàYà
+‹ö\⁄\”YYXTôX€‹ô\îôYãò›\úô[ù	âà‹ö\⁄\‘ôX€‹ô[ô H¬à‹ö\⁄\”YYXTôX€‹ô\îôYãò›\úô[ùú›‹
+
+N¬àBàŸ]‹ö\⁄\”‹[äò[ŸJN¬àŸ]‹ö\⁄\‘›XõZ][ô ò[ŸJN¬àŸ]‹ö\⁄\’^
+àäN¬àŸ]‹ö\⁄\–€€ùX›
+àäN¬àŸ]‹ö\⁄\‘ôX€‹ô[ô ò[ŸJN¬àŸ]‹ö\⁄\‘ôX€‹ô[ô’[YJ
+N¬àŸ]‹ö\⁄\’ò[úÿ‹öXö[ô ò[ŸJN¬àŸ]‹ö\⁄\’õ⁄XŸQ\úõ‹äàäN¬àŸ]‹ö\⁄\’ÿ\õö[ô àäN¬àŸ]‹ö\⁄\–€€ôö\õX][€äàäN¬àŸ]‹ö\⁄\‘⁄›“Y⁄ö\⁄’ÿ\õö[ô ò[ŸJN¬àBÇàÀ»›\‹ùÿXö[ô]Uî[\ú¬à\ﬁ[ò»ù[ò›[€àÿY›\‹ùÿXö[ô]
+[ù\ôY€ŸJH¬à€€ú›ÿ]ôYHŸ]›\‹ùŸ\‹⁄[€ä
+N¬à€€ú›XÿŸ\‹’⁄Ÿ[àHÿ]ôYòXÿŸ\‹’⁄Ÿ[é¬ÇàŸ]ÿXö[ô]ÿY[ô ùYJN¬àŸ]€€ù[ùX][€ê€ŸQ\úõ‹äàäN¬àŸ]\úõ‹äàäN¬àûH¬à]ÿXö[ô]]N¬à]YôôX›]ôTŸ\‹⁄[€íY¬à]YôôX›]ôPXÿŸ\‹’⁄Ÿ[é¬ÇàYà
+XÿŸ\‹’⁄Ÿ[à	âàÿ]ôYúŸ\‹⁄[€íY	âàJT–îêSëö\‘›\‹ù[›	âà[ù\ôY€ŸJJH¬àÀ»ÿ[YH]öXŸNà\ŸH›‹ôYXÿŸ\‹»⁄Ÿ[ãÇà€€ú›õŸHH»X›[€éàôŸ]ÿXö[ô]ãŸ\‹⁄[€íYàÿ]ôYúŸ\‹⁄[€íYXÿŸ\‹◊›⁄Ÿ[éàXÿŸ\‹’⁄Ÿ[àN¬à€€ú›ÿXö[ô]ô\»H]ÿZ]ô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã»Y]Ÿàî‘’ãXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKõŸNàî””ãú›ö[ô⁄YûJõŸJHJN¬àÿXö[ô]]HH]ÿZ]ÿXö[ô]ô\Àöú€€ä
+N¬àYà
+XÿXö[ô]ô\Àõ⁄»XÿXö[ô]]Kõ⁄ H¬àõ›»ô]»\úõ‹äÿXö[ô]]Kô\úõ‹à¥'t-H4`Ù-4,4.Ù/¥`tc4/¥`¥.¥`4bÙ`¥c4.¥,4,t.4/t-t`àäN¬àBàYôôX›]ôTŸ\‹⁄[€íYHÿXö[ô]]KúŸ\‹⁄[€ó⁄Yÿ]ôYúŸ\‹⁄[€íY¬àYôôX›]ôPXÿŸ\‹’⁄Ÿ[àHXÿŸ\‹’⁄Ÿ[é¬àH[ŸHYà
+[ù\ôY€ŸJH¬àÀ»‹õ‹‹ÀY]öXŸNà^⁄[ôŸH€€ù[ùX][€à€ŸHõ‹àXÿŸ\‹»⁄Ÿ[ã[àÿYÿXö[ô]Çà€€ú›^⁄[ôŸTô\»H]ÿZ]ô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàô^⁄[ôŸP€€ù[ùX][€ê‹ôY[ùX[ã[Ÿ[Nàú›\‹ùã€€ù[ùX][€óÿ€ŸNà[ù\ôY€ŸHJKàJN¬à€€ú›^⁄[ôŸQ]HH]ÿZ]^⁄[ôŸTô\Àöú€€ä
+N¬àYà
+Y^⁄[ôŸTô\Àõ⁄»Y^⁄[ôŸQ]Kõ⁄ H¬àõ›»ô]»\úõ‹ä^⁄[ôŸQ]Kô\úõ‹à¥'t-H4`Ù-4,4.Ù/¥`tc4/¥`¥.¥`4bÙ`¥c4`4,4-Ù,Ù/¥,¥/¥`à4'Ù`4/¥,¥-t`4c4`¥-H4.¥/¥-4/Ù`4/¥-4/¥.Ù-¥-t/t.4cÀàäN¬àBàYôôX›]ôTŸ\‹⁄[€íYH^⁄[ôŸQ]KúŸ\‹⁄[€ó⁄Y¬àYôôX›]ôPXÿŸ\‹’⁄Ÿ[àH^⁄[ôŸQ]KòXÿŸ\‹◊›⁄Ÿ[é¬àÿ]ôT›\‹ùŸ\‹⁄[€äYôôX›]ôTŸ\‹⁄[€íYYôôX›]ôPXÿŸ\‹’⁄Ÿ[äN¬àÀ»õ›»ÿYù[ÿXö[ô]⁄]ÿ[]‹‹X⁄X[\›‹ô\]Y\›¬à€€ú›ÿXö[ô]ô\»H]ÿZ]ô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàôŸ]ÿXö[ô]ãŸ\‹⁄[€íYàYôôX›]ôTŸ\‹⁄[€íYXÿŸ\‹◊›⁄Ÿ[éàYôôX›]ôPXÿŸ\‹’⁄Ÿ[àJKàJN¬àÿXö[ô]]HH]ÿZ]ÿXö[ô]ô\Àöú€€ä
+N¬àYà
+XÿXö[ô]ô\Àõ⁄»XÿXö[ô]]Kõ⁄ H¬àÀ»ò[òX⁄»»^⁄[ôŸHÿXö[ô]]BàÿXö[ô]]HH»ããô^⁄[ôŸQ]KòÿXö[ô]⁄ŒàùYKXõX◊ÿ€ŸNà^⁄[ôŸQ]KúXõX◊ÿ€ŸKŸ\‹⁄[€ó⁄Yà^⁄[ôŸQ]KúŸ\‹⁄[€ó⁄YN¬àBàH[ŸH¬àÀ»õ»›‹ôY⁄Ÿ[à[ôõ»€ŸNà⁄›»[Ÿ[ÇàŸ]Ÿ\‹⁄[€ì[Ÿ[‹[äùYJN¬àŸ]ÿXö[ô]ÿY[ô ò[ŸJN¬àô]\õé¬àBÇàŸ]›\‹ùÿXö[ô]
+¬àŸ\‹⁄[€úŒàÿXö[ô]]KúŸ\‹⁄[€ú»◊Kà]\›‹ô\‹ùàÿXö[ô]]Kõ]\›‹ô\‹ùù[àXõX◊ÿ€ŸNàÿXö[ô]]KúXõX◊ÿ€ŸHàãàÿ[]àÿXö[ô]]Kùÿ[]ù[à‹X⁄X[\›àÿXö[ô]]Kú‹X⁄X[\›ù[àŸ\ùöXŸW‹ô\]Y\›ŒàÿXö[ô]]KúŸ\ùöXŸW‹ô\]Y\›»◊KàX]⁄‹ô\]Y\›ŒàT–îêSëö\‘›\‹ù[›»ÿXö[ô]]KõX]⁄‹ô\]Y\›»◊Hà◊Kà[úôXY€Y\‹ÿYŸWÿ€›[ùàÿXö[ô]]Kù[úôXY€Y\‹ÿYŸWÿ€›[ùà\‹^W€ò[YNàÿXö[ô]]Kô\‹^W€ò[YHù[àYYXÿ][€óÿÿ\ôŒàÿXö[ô]]KõYYXÿ][€óÿÿ\ô»◊KàJN¬àŸ]›\‹ù\‹^Sò[YJÿXö[ô]]Kô\‹^W€ò[YHù[
+N¬àŸ]Ÿ\‹⁄[€íY
+YôôX›]ôTŸ\‹⁄[€íY
+N¬àŸ]XõX–€ŸJÿXö[ô]]KúXõX◊ÿ€ŸH[ù\ôY€ŸHÿ]ôYúŸ\‹⁄[€íY
+N¬àŸ]\ŸJòÿXö[ô]äN¬àŸ]›\‹ùÿ‹ôY[äòÿXö[ô]äN¬àÀ»‹[€ò[ÿY»8†%õ€ãXõÿ⁄⁄[ô¬àÿY›\‹ù⁄X⁄⁄[ú 
+Kòÿ]⁄
+
+
+HOàﬂJN¬àÿY›\‹ùòX›XŸ\ 
+Kòÿ]⁄
+
+
+HOàﬂJN¬àÿY]Y[ù[ùö]][€ú 
+Kòÿ]⁄
+
+
+HOàﬂJN¬àÀ»€â›]]À[ÿY⁄]8†%⁄›»úô\⁄€€\‹Ÿ\ÇàŸ]]ZX⁄–⁄]Y\‹ÿYŸ\ ◊JN¬àŸ]]ZX⁄–⁄][ú]
+àäN¬àŸ]]ZX⁄–⁄]⁄›“\›‹ûJò[ŸJN¬àô]\õàùYN¬àHÿ]⁄
+JH¬à€€ú›\Ÿ»HKõY\‹ÿYŸHàé¬à]\Ÿ\ì\Ÿ»H¥'t-H4`Ù-4,4.Ù/¥`tc4/¥`¥.¥`4bÙ`¥c4.¥,4,t.4/t-t`ãà4'Ù/¥/Ù`4/¥,t`Ù.t`¥-H4-tbtdH4`4,4-Ààé¬àYà
+T–îêSëö\‘›\‹ù[›	âà\ŸÀö[ò€Y\ ¥`t`¥,4`4/¥.H4,¥-t`4`t.4.äJH¬à\Ÿ\ì\Ÿ»H\ŸŒ¬àH[ŸHYà
+\ŸÀö[ò€Y\ ¥.¥/¥-4/Ù`4/¥-4/¥.Ù-¥-t/t.4c»äH\ŸÀö[ò€Y\ ò€€ù[ùX][€àäH\ŸÀö[ò€Y\ çHäH\ŸÀö[ò€Y\ ç»äJH¬à\Ÿ\ì\Ÿ»H¥'Ù`4/¥,¥-t`4c4`¥-H4.¥/¥-4/Ù`4/¥-4/¥.Ù-¥-t/t.4cÀàé¬àH[ŸHYà
+\ŸÀö[ò€Y\ ôô]⁄äH\ŸÀö[ò€Y\ ìô]€‹ö—\úõ‹àäH\ŸÀö[ò€Y\ õô]€‹ö»äJH¬à\Ÿ\ì\Ÿ»H¥'t-H4`Ù-4,4.Ù/¥`tc4`t,¥cÙ-Ù,4`¥c4`tc»4`H4`t-t`4,¥.4`t/¥/à4'Ù/¥/Ù`4/¥,t`Ù.t`¥-H4-tbtdH4`4,4-Ààé¬àBàŸ]€€ù[ùX][€ê€ŸQ\úõ‹ä\Ÿ\ì\Ÿ N¬àYà
+JT–îêSëö\‘›\‹ù[›	âà\ŸÀö[ò€Y\ ¥`t`¥,4`4/¥.H4,¥-t`4`t.4.äJJH⁄›’ÿ\›
+\Ÿ\ì\ŸÀô\úõ‹àäN¬àô]\õàò[ŸN¬àHö[ò[H¬àŸ]ÿXö[ô]ÿY[ô ò[ŸJN¬àBàBÇà\ﬁ[ò»ù[ò›[€àÿYõŸPÿXö[ô]
+[ù\ôY€ŸK‹[€ú»HﬂJH¬à€€ú›ôYô\ê€ŸHH‹[€úÀúôYô\ê€ŸHOOHùYN¬à€€ú›ÿ]ôYHŸ]õŸTŸ\‹⁄[€ä
+N¬à€€ú›XÿŸ\‹’⁄Ÿ[àHÿ]ôYòXÿŸ\‹’⁄Ÿ[é¬ÇàŸ]õŸPÿXö[ô]ÿY[ô ùYJN¬àŸ]õŸP€€ù[ùX][€ë\úõ‹äàäN¬àŸ]\úõ‹äàäN¬àûH¬à]ÿXö[ô]]N¬à]YôôX›]ôTŸ\‹⁄[€íY¬à]YôôX›]ôPXÿŸ\‹’⁄Ÿ[é¬ÇàÀ»[à^X⁄]H\Ÿ\ãY[ù\ôY€€ù[ùX][€à€ŸH\»ô]ô\à⁄[[ùBàÀ»›ô\úöY[àûHHô]ö[›\€H›‹ôY‹ôY[ùX[Z\ãÇàYà
+JôYô\ê€ŸH	âà[ù\ôY€ŸJH	âàXÿŸ\‹’⁄Ÿ[à	âàÿ]ôYúŸ\‹⁄[€íY
+H¬à€€ú›Hô]»]J
+N¬à€€ú›€Y[ùŸ^HH	ŸôŸ]ù[YX\ä
+_KI‘›ö[ô ôŸ][€ù
+
+H
+»JKúY›\ù
+ãåä_KI‘›ö[ô ôŸ]]J
+JKúY›\ù
+ãåä_X¬à€€ú›õŸHH»X›[€éàôŸ]õŸPÿXö[ô]ãŸ\‹⁄[€íYàÿ]ôYúŸ\‹⁄[€íYXÿŸ\‹’⁄Ÿ[ã€Y[ùŸ^HN¬à€€ú›ÿXö[ô]ô\»H]ÿZ]ô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJõŸJKàJN¬àÿXö[ô]]HH]ÿZ]ÿXö[ô]ô\Àöú€€ä
+N¬àYà
+XÿXö[ô]ô\Àõ⁄»XÿXö[ô]]Kõ⁄ H¬àõ›»ô]»\úõ‹äÿXö[ô]]Kô\úõ‹à¥'t-H4`Ù-4,4.Ù/¥`tc4/¥`¥.¥`4bÙ`¥c4.¥,4,t.4/t-t`àäN¬àBàYôôX›]ôTŸ\‹⁄[€íYHÿ]ôYúŸ\‹⁄[€íY¬àYôôX›]ôPXÿŸ\‹’⁄Ÿ[àHXÿŸ\‹’⁄Ÿ[é¬àH[ŸHYà
+[ù\ôY€ŸJH¬à€€ú›^⁄[ôŸTô\»H]ÿZ]ô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàô^⁄[ôŸP€€ù[ùX][€ê‹ôY[ùX[ã[Ÿ[NàòõŸHã€€ù[ùX][€óÿ€ŸNà[ù\ôY€ŸHJKàJN¬à€€ú›^⁄[ôŸQ]HH]ÿZ]^⁄[ôŸTô\Àöú€€ä
+N¬àYà
+Y^⁄[ôŸTô\Àõ⁄»Y^⁄[ôŸQ]Kõ⁄ H¬àõ›»ô]»\úõ‹ä^⁄[ôŸQ]Kô\úõ‹à¥'t-H4`Ù-4,4.Ù/¥`tc4/¥`¥.¥`4bÙ`¥c4/Ù`4/¥a4.4.Ùcà4'Ù`4/¥,¥-t`4c4`¥-H4.¥/¥-4/Ù`4/¥-4/¥.Ù-¥-t/t.4cÀàäN¬àBàYôôX›]ôTŸ\‹⁄[€íYH^⁄[ôŸQ]KúŸ\‹⁄[€ó⁄Y¬àYôôX›]ôPXÿŸ\‹’⁄Ÿ[àH^⁄[ôŸQ]KòXÿŸ\‹◊›⁄Ÿ[é¬àÿ]ôPõŸTŸ\‹⁄[€äYôôX›]ôTŸ\‹⁄[€íYYôôX›]ôPXÿŸ\‹’⁄Ÿ[äN¬Çà€€ú›àHô]»]J
+N¬à€€ú›€Y[ùŸ^LàH	ŸãôŸ]ù[YX\ä
+_KI‘›ö[ô ãôŸ][€ù
+
+H
+»JKúY›\ù
+ãåä_KI‘›ö[ô ãôŸ]]J
+JKúY›\ù
+ãåä_X¬à€€ú›ÿXö[ô]ô\»H]ÿZ]ô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàôŸ]õŸPÿXö[ô]ãŸ\‹⁄[€íYàYôôX›]ôTŸ\‹⁄[€íYXÿŸ\‹’⁄Ÿ[éàYôôX›]ôPXÿŸ\‹’⁄Ÿ[ã€Y[ùŸ^Nà€Y[ùŸ^LàJKàJN¬àÿXö[ô]]HH]ÿZ]ÿXö[ô]ô\Àöú€€ä
+N¬àYà
+XÿXö[ô]ô\Àõ⁄»XÿXö[ô]]Kõ⁄ H¬àõ›»ô]»\úõ‹äÿXö[ô]]Kô\úõ‹à¥'t-H4`Ù-4,4.Ù/¥`tc4-Ù,4,Ù`4`Ù-Ù.4`¥c4.¥,4,t.4/t-t`àäN¬àBàH[ŸH¬àŸ]õŸPÿXö[ô]ÿY[ô ò[ŸJN¬àô]\õé¬àBÇàŸ]õŸPÿXö[ô]]JÿXö[ô]]JN¬àŸ]õŸQX\ûTŸ\‹⁄[€íY
+YôôX›]ôTŸ\‹⁄[€íY
+N¬ÇàÀ»⁄X⁄»Yà€òõÿ\ô[ô»\»ôYYYàûH¬à]⁄Ÿ[é¬àûH»⁄Ÿ[àH]ÿZ]Ÿ]€Y[ù⁄Ÿ[äòõŸHãúŸ\‹⁄[€àäN»Hÿ]⁄ﬂBà€€ú›ú»H»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààN¬àYà
+⁄Ÿ[äHú÷»ê]]‹ö^ò][€àóHHôX\ô\à	›⁄Ÿ[üX¬à€€ú›€òîô\»H]ÿZ]ô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒàúÀàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàôŸ]õŸS€òõÿ\ô[ô»ãŸ\‹⁄[€ó⁄YàYôôX›]ôTŸ\‹⁄[€íYXÿŸ\‹◊›⁄Ÿ[éàYôôX›]ôPXÿŸ\‹’⁄Ÿ[àJKàJN¬à€€ú›€òë]HH]ÿZ]€òîô\Àöú€€ä
+N¬àYà
+€òë]Kõ⁄»	âà[€òë]Kõ€òõÿ\ô[ôœÀö[ùõ◊ÿ€€\]Y
+H¬àŸ]õŸTÿ‹ôY[äõ€òõÿ\ô[ô»äN¬àH[ŸH¬àŸ]õŸTÿ‹ôY[äòÿXö[ô]äN¬àBàHÿ]⁄¬àŸ]õŸTÿ‹ôY[äòÿXö[ô]äN¬àBàHÿ]⁄
+JH¬àŸ]õŸP€€ù[ùX][€ë\úõ‹äKõY\‹ÿYŸH¥'t-H4`Ù-4,4.Ù/¥`tc4/¥`¥.¥`4bÙ`¥c4/Ù`4/¥a4.4.Ùcà4'Ù`4/¥,¥-t`4c4`¥-H4.¥/¥-4/Ù`4/¥-4/¥.Ù-¥-t/t.4cÀàäN¬à⁄›’ÿ\›
+KõY\‹ÿYŸH¥'t-H4`Ù-4,4.Ù/¥`tc4/¥`¥.¥`4bÙ`¥c4/Ù`4/¥a4.4.Ùcàãô\úõ‹àäN¬àHö[ò[H¬àŸ]õŸPÿXö[ô]ÿY[ô ò[ŸJN¬àBàBÇà\ﬁ[ò»ù[ò›[€àôYŸ[ô\ò]T›\‹ù€€ù[ùX][€ê€ŸJ
+H¬à€€ú›ÿ]ôYHŸ]›\‹ùŸ\‹⁄[€ä
+N¬àYà
+\ÿ]ôYúŸ\‹⁄[€íY\ÿ]ôYòXÿŸ\‹’⁄Ÿ[äH¬à⁄›’ÿ\›
+¥'t`Ù-¥-t/H4.¥/¥-4-4/¥`t`¥`Ù/Ù,4.à4`4,4-Ù,Ù/¥,¥/¥`4`Ààãô\úõ‹àäN¬àô]\õé¬àBàŸ]ÿY[ô ùYJN¬àûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàúôYŸ[ô\ò]P€€ù[ùX][€ê‹ôY[ùX[ã[Ÿ[Nàú›\‹ùãŸ\‹⁄[€ó⁄Yàÿ]ôYúŸ\‹⁄[€íYXÿŸ\‹◊›⁄Ÿ[éàÿ]ôYòXÿŸ\‹’⁄Ÿ[àJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+\ô\Àõ⁄»Y]Kõ⁄ H¬àõ›»ô]»\úõ‹ä]Kô\úõ‹à¥'t-H4`Ù-4,4.Ù/¥`tc4`t/¥-Ù-4,4`¥c4/t/¥,¥bÙ.H4.¥/¥-4/Ù`4/¥-4/¥.Ù-¥-t/t.4c»äN¬àBàŸ]ôYŸ[ô\ò]Y€ŸJ]Kò€€ù[ùX][€óÿ€ŸJN¬àŸ]€€ù[ùX][€ê€ŸJù[
+N¬àHÿ]⁄
+JH¬à⁄›’ÿ\›
+KõY\‹ÿYŸH¥'t-H4`Ù-4,4.Ù/¥`tc4`t/¥-Ù-4,4`¥c4/t/¥,¥bÙ.H4.¥/¥-4/Ù`4/¥-4/¥.Ù-¥-t/t.4c»ãô\úõ‹àäN¬àHö[ò[H¬àŸ]ÿY[ô ò[ŸJN¬àBàBÇà\ﬁ[ò»ù[ò›[€àôYŸ[ô\ò]PõŸP€€ù[ùX][€ê€ŸJ
+H¬à€€ú›ÿ]ôYHŸ]õŸTŸ\‹⁄[€ä
+N¬àYà
+\ÿ]ôYúŸ\‹⁄[€íY\ÿ]ôYòXÿŸ\‹’⁄Ÿ[äH¬àõ›»ô]»\úõ‹ä¥'t`Ù-¥-t/H4.¥/¥-4-4/¥`t`¥`Ù/Ù,4.à4/Ù`4/¥a4.4.ÙcãàäN¬àBà€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàúôYŸ[ô\ò]P€€ù[ùX][€ê‹ôY[ùX[ã[Ÿ[NàòõŸHãŸ\‹⁄[€ó⁄Yàÿ]ôYúŸ\‹⁄[€íYXÿŸ\‹◊›⁄Ÿ[éàÿ]ôYòXÿŸ\‹’⁄Ÿ[àJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+\ô\Àõ⁄»Y]Kõ⁄ H¬àõ›»ô]»\úõ‹ä]Kô\úõ‹à¥'t-H4`Ù-4,4.Ù/¥`tc4`t/¥-Ù-4,4`¥c4/t/¥,¥bÙ.H4.¥/¥-4/Ù`4/¥-4/¥.Ù-¥-t/t.4c»äN¬àBàô]\õà]Kò€€ù[ùX][€óÿ€ŸN¬àBÇà\ﬁ[ò»ù[ò›[€à‹[î›\‹ùô\‹ù
+\ôŸ]Ÿ\‹⁄[€íY
+H¬à€€ú›ÿ]ôYHŸ]›\‹ùŸ\‹⁄[€ä
+N¬àYà
+\ÿ]ôYúŸ\‹⁄[€íY\ÿ]ôYòXÿŸ\‹’⁄Ÿ[äH¬à⁄›’ÿ\›
+¥'t`Ù-¥-t/H4.¥/¥-4-4/¥`t`¥`Ù/Ù,4.à4`4,4-Ù,Ù/¥,¥/¥`4`Ààãô\úõ‹àäN¬àô]\õé¬àBà€€ú›⁄YH\ôŸ]Ÿ\‹⁄[€íYÿ]ôYúŸ\‹⁄[€íY¬àŸ]ÿY[ô ùYJN¬àûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàôŸ]ô\‹ùãŸ\‹⁄[€íYà⁄YXÿŸ\‹◊›⁄Ÿ[éàÿ]ôYòXÿŸ\‹’⁄Ÿ[àJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+\ô\Àõ⁄»Y]Kõ⁄ H¬àõ›»ô]»\úõ‹ä]Kô\úõ‹à¥'t-H4`Ù-4,4.Ù/¥`tc4/¥`¥.¥`4bÙ`¥c4/¥`¥aÙdt`àäN¬àBà€€ú›»H]KúŸ\‹⁄[€é¬àŸ]Ÿ\‹⁄[€íY
+ÀúŸ\‹⁄[€íYÀúŸ\‹⁄[€ó⁄Y
+N¬àŸ]XõX–€ŸJÀúXõX–€ŸHÀúXõX◊ÿ€ŸJN¬àŸ]^
+Àú]Y[ù⁄[ú]Àú]Y[ù›^àäN¬àŸ]€€ùô\úÿ][€í\›‹ûJÀò€€ùô\úÿ][€í\›‹ûHÀò€€ùô\úÿ][€ó⁄\›‹ûH◊JN¬àŸ]X[Ÿ—\
+ÀôX[Ÿ—\
+N¬àŸ]ô]ö[›\‘]Y[ùô\‹ù
+Àúô]ö[›\‘]Y[ùô\‹ùÀù\Ÿ\ó‹ô\‹ùàäN¬àŸ]ô]ö[›\—ÿ›‹îô\‹ù
+àäN¬àŸ]€YU\⁄‹ Àö€YU\⁄‹»àäN¬àŸ]ô\€›\òŸQòX›‹ú Àúô\€›\òŸQòX›‹ú»àäN¬àÀ»€Y[ù\ÿYôNà€õH\Ÿ\ó‹ô\‹ùõ»ÿ›‹ó‹ô\‹ùàŸ]ô\›[
+Àù\Ÿ\ó‹ô\‹ùàäN¬àŸ]ô\‹ù€›\òŸJòÿXö[ô]äN¬àŸ]ù\›ö[ö\⁄YŸ\‹⁄[€äò[ŸJN¬àYà
+›\‹ùÿXö[ô]Àùÿ[]
+H¬àŸ]\ÿYŸPò[[òŸJ»ããú›\‹ùÿXö[ô]ùÿ[][Ÿ[Nàú›\‹ùàJN¬àBàŸ]X›]ôUXäù\Ÿ\àäN¬àŸ]\ŸJúô\‹ùäN¬àŸ]›\‹ùÿ‹ôY[äúô\‹ùäN¬àHÿ]⁄
+JH¬à⁄›’ÿ\›
+KõY\‹ÿYŸH¥'t-H4`Ù-4,4.Ù/¥`tc4/¥`¥.¥`4bÙ`¥c4/¥`¥aÙdt`àãô\úõ‹àäN¬àHö[ò[H¬àŸ]ÿY[ô ò[ŸJN¬àBàBÇàù[ò›[€à›\ù›\‹ùõ€›’\
+
+H¬à€€ú›ÿ]ôYHŸ]›\‹ùŸ\‹⁄[€ä
+N¬àYà
+\ÿ]ôYúŸ\‹⁄[€íY\ÿ]ôYòXÿŸ\‹’⁄Ÿ[äH¬à⁄›’ÿ\›
+¥'t`Ù-¥-t/H4.¥/¥-4-4/¥`t`¥`Ù/Ù,4.à4`4,4-Ù,Ù/¥,¥/¥`4`Ààãô\úõ‹àäN¬àô]\õé¬àBà€€ú›]\›H›\‹ùÿXö[ô]ÀúŸ\‹⁄[€úœÀñÃN¬à€€ú›]\›ô\‹ùH›\‹ùÿXö[ô]Àõ]\›‹ô\‹ùﬂN¬àŸ]Ÿ\‹⁄[€íY
+ÿ]ôYúŸ\‹⁄[€íY
+N¬àŸ]XõX–€ŸJ]\›ÀúXõX–€ŸH›\‹ùÿXö[ô]ÀúXõX◊ÿ€ŸHÿ]ôYúŸ\‹⁄[€íY
+N¬àYà
+T–îêSëö\‘›\‹ù[›	âà]\›ô\‹ùò‹ö\⁄\–õÿ⁄œÀú›]\»OOHúÿYô]Wÿ⁄X⁄◊⁄[ó‹õŸ‹ô\‹»äH¬à€€ú›ÿYô]T]Y\›[€ú»H]\›ô\‹ùò‹ö\⁄\–õÿ⁄Àú]Y\›[€ú»¬à¥$¥b»4`t-t.taÙ,4`H4,à4,t-t-Ù/¥/Ù,4`t/t/¥`t`¥.»4%t`t`¥c4.Ù.4`4.4`t.ã4aÙ`¥/à4,¥b»4/Ù`4.4aÙ.4/t.4`¥-H4`t-t,t-H4,¥`4-t-4,à4,t.Ù.4-¥,4.tb4-t-H4,¥`4-t/4cœ»ãà¥%t`t`¥c4.Ù.4`»4,¥,4`H4`t-t.taÙ,4`H4/t,4/4-t`4-t/t.4-H4.4.Ù.4.¥/¥/t.¥`4-t`¥/tbÙ.H4/Ù.Ù,4/H4/Ù`4.4aÙ.4/t.4`¥c4`t-t,t-H4,¥`4-t-»ãà¥$¥b»4`t-t.taÙ,4`H4/¥-4.4/KÙ/¥-4/t,»4&¥`¥/à4/4/¥-¥-t`à4/Ù/¥,tbÙ`¥c4`4cÙ-4/¥/4.4.Ù.4/Ù/¥,Ù/¥,¥/¥`4.4`¥c4`H4,¥,4/4.»ãà¥&¥/¥/4`»4,¥b»4/4/¥-¥-t`¥-H4/Ù/¥-Ù,¥/¥/t.4`¥c4.4.Ù.4/t,4/Ù.4`t,4`¥c4/Ù`4cÙ/4/à4`t-t.taÙ,4`O»ãàN¬àŸ]^
+]\›ô\‹ùò‹ö\⁄\–õÿ⁄Àö[ö]X[€Y\‹ÿYŸH]\›Àú›[[X\ûHàäN¬àŸ]\–€€ù[ùX][€äò[ŸJN¬àŸ]ô]ö[›\‘]Y[ùô\‹ù
+àäN¬àŸ]ô]ö[›\—ÿ›‹îô\‹ù
+àäN¬àŸ]€€ùô\úÿ][€í\›‹ûJﬁ»õ€Nàò\‹⁄\›[ùã]Y\›[€úŒàÿYô]T]Y\›[€ú»WJN¬àŸ]X[Ÿ—\
+JN¬àŸ][ú›Ÿ\ú ﬂJN¬àŸ]]Y\›[€ú ÿYô]T]Y\›[€ú N¬àŸ]ô\›[
+ù[
+N¬àŸ]‹ö\⁄\”[ŸJùYJN¬àŸ]‹ö\⁄\–õÿ⁄ ]\›ô\‹ùò‹ö\⁄\–õÿ⁄ N¬àŸ]\ŸJú]Y\›[€ú»äN¬àŸ]›\‹ùÿ‹ôY[äú]Y\›[€ú»äN¬àô]\õé¬àBàŸ]\–€€ù[ùX][€äùYJN¬àŸ]ô]ö[›\‘]Y[ùô\‹ù
+]\›ô\‹ùù\Ÿ\ó‹ô\‹ùàäN¬àŸ]ô]ö[›\—ÿ›‹îô\‹ù
+àäN¬àŸ]€YU\⁄‹ ]\›ô\‹ùö€YU\⁄‹»àäN¬àŸ]ô\€›\òŸQòX›‹ú ]\›ô\‹ùúô\€›\òŸQòX›‹ú»àäN¬àŸ]›\‹ù[ä]\›ô\‹ùú›\‹ù[àù[
+N¬àŸ]€€ùô\úÿ][€í\›‹ûJ◊JN¬àŸ]X[Ÿ—\
+
+N¬àŸ][ú›Ÿ\ú ﬂJN¬àŸ]]Y\›[€ú ù[
+N¬àŸ]ô\›[
+ù[
+N¬àŸ]‹ö\⁄\”[ŸJò[ŸJN¬àŸ]‹ö\⁄\–õÿ⁄ ù[
+N¬àŸ]õ€›’\[ú›Ÿ\ú ﬂJN¬àŸ]\ŸJôõ€››\äN¬àŸ]›\‹ùÿ‹ôY[äôõ€››\äN¬àÿY›\‹ùòX›XŸ\ 
+N¬àBÇà\ﬁ[ò»ù[ò›[€à›XõZ]õ€›’\
+
+H¬à€€ú›ÿ]ôYHŸ]›\‹ùŸ\‹⁄[€ä
+N¬àYà
+\ÿ]ôYúŸ\‹⁄[€íY\ÿ]ôYòXÿŸ\‹’⁄Ÿ[äH¬à⁄›’ÿ\›
+¥'t`Ù-¥-t/H4.¥/¥-4-4/¥`t`¥`Ù/Ù,4.à4`4,4-Ù,Ù/¥,¥/¥`4`Ààãô\úõ‹àäN¬àô]\õé¬àBà€€ú›[ú›Ÿ\ú»Hõ€›’\[ú›Ÿ\úŒ¬à€€ú›\‘›ùX›\ôYH[ú›Ÿ\úÀô[ò[ZX‹œÀùö[J
+H[ú›Ÿ\úÀõô]◊ÿ€€òŸ\õúœÀùö[J
+H[ú›Ÿ\úÀùöYYÀùö[J
+N¬à€€ú›\—úôYU^H[ú›Ÿ\úÀôúôYW›^Àùö[J
+N¬àYà
+Z\‘›ùX›\ôY	âàZ\—úôYU^
+H¬à⁄›’ÿ\›
+¥%Ù,4/Ù/¥.Ù/t.4`¥-H4at/¥`¥c»4,tb»4/¥-4/t/à4/Ù/¥.Ù-H4.4.Ù.4/t,4/Ù.4b4.4`¥-H4`t,¥/¥,t/¥-4/tbÙ.H4`¥-t.¥`t`ãàãô\úõ‹àäN¬àô]\õé¬àBÇàŸ]ÿY[ô ùYJN¬àŸ]\úõ‹äàäN¬àûH¬àÀ»‹ôX]HHô]»Ÿ\‹⁄[€àõ‹àHõ€›À]\[öŸY»Hÿ[YH›€ô\ã›ÿ[]à€€ú›‹ôX]Tô\»H]ÿZ]ô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ¬àX›[€éàò‹ôX]Qõ€›’\Ÿ\‹⁄[€àãàô]ö[›\‘Ÿ\‹⁄[€íYàÿ]ôYúŸ\‹⁄[€íYàXÿŸ\‹◊›⁄Ÿ[éàÿ]ôYòXÿŸ\‹’⁄Ÿ[ãàJKàJN¬à€€ú›‹ôX]Q]HH]ÿZ]‹ôX]Tô\Àöú€€ä
+N¬àYà
+X‹ôX]Tô\Àõ⁄»X‹ôX]Q]Kõ⁄ H¬àõ›»ô]»\úõ‹ä‹ôX]Q]Kô\úõ‹à¥'t-H4`Ù-4,4.Ù/¥`tc4/t,4aÙ,4`¥c4/Ù`4/¥-4/¥.Ù-¥-t/t.4-HäN¬àBÇàÿ]ôT›\‹ùŸ\‹⁄[€ä‹ôX]Q]KúŸ\‹⁄[€íY‹ôX]Q]KòXÿŸ\‹◊›⁄Ÿ[äN¬àŸ]Ÿ\‹⁄[€íY
+‹ôX]Q]KúŸ\‹⁄[€íY
+N¬àŸ]XõX–€ŸJ‹ôX]Q]KúXõX◊ÿ€ŸJN¬àŸ\‹⁄[€îôYãò›\úô[ùH»Ÿ\‹⁄[€íYà‹ôX]Q]KúŸ\‹⁄[€íYXÿŸ\‹’⁄Ÿ[éà‹ôX]Q]KòXÿŸ\‹◊›⁄Ÿ[àN¬Çà€€ú›õ€›’\\ù»H◊N¬àYà
+[ú›Ÿ\úÀô[ò[ZX‹œÀùö[J
+JHõ€›’\\ùÀú\⁄
+4(t`¥,4.Ù/à4.Ù-t,ÙaÙ-K4`¥cÙ-¥-t.Ù-t-H4.4.Ù.4/Ù`4.4/4-t`4/t/à4`¥,4.à4-¥-Nà	ÿ[ú›Ÿ\úÀô[ò[ZX‹ﬂX
+N¬àYà
+[ú›Ÿ\úÀõô]◊ÿ€€òŸ\õúœÀùö[J
+JHõ€›’\\ùÀú\⁄
+4'Ù/¥cÙ,¥.4.Ù/¥`tc4.Ù.4aÙ`¥/ãt`¥/à4/t/¥,¥/¥-K4aÙ`¥/à4/¥`t/¥,t-t/t/t/à4,t-t`t/Ù/¥.¥/¥.4`éà	ÿ[ú›Ÿ\úÀõô]◊ÿ€€òŸ\õúﬂX
+N¬àYà
+[ú›Ÿ\úÀùöYYÀùö[J
+JHõ€›’\\ùÀú\⁄
+4)Ù`¥/à4.4-»4/Ù`4-t-4.Ù/¥-¥-t/t/t/¥,Ù/à4`4,4/tc4b4-H4`Ù-4,4.Ù/¥`tc4/Ù/¥/Ù`4/¥,t/¥,¥,4`¥cà	ÿ[ú›Ÿ\úÀùöYYX
+N¬àYà
+[ú›Ÿ\úÀôúôYW›^Àùö[J
+JHõ€›’\\ùÀú\⁄
+4%4/¥/Ù/¥.Ù/t.4`¥-t.Ùc4/t/à4/¥`à4/Ù/¥.Ùc4-Ù/¥,¥,4`¥-t.ÙcŒóâÿ[ú›Ÿ\úÀôúôYW›^X
+N¬ÇàÀ»YòX›XŸH€€ù^õ‹àRBàYà
+›\‹ùòX›XŸ\Àõ[ô›à
+H¬à€€ú›òX›XŸP€€ù^H›\‹ùòX›XŸ\¬àôö[\äOàú›]\»OOHòX›]ôHäBàõX\
+OàH	‹ù]_H
+4`t`¥,4`¥`Ù`Nà	‹ù\Ÿ\ó‹›]\»OOHö[Yà»¥/Ù/¥/4/¥,Ù.Ù/àààù\Ÿ\ó‹›]\»OOHõõ›⁄[ù[à»¥/t-H4/Ù/¥-4/¥b4.Ù/àààù\Ÿ\ó‹›]\»OOHùöYYà»¥/Ù`4/¥,t/¥,¥,4.»àà¥/t-H4/Ù`4/¥,t/¥,¥,4.»üJX
+Bàöõ⁄[äóàäN¬àYà
+òX›XŸP€€ù^
+H¬àõ€›’\\ùÀú\⁄
+4(4,4/t-t-H4`4-t.¥/¥/4-t/t-4/¥,¥,4/t/tbÙ-H4/Ù`4,4.¥`¥.4.¥.óâ‹òX›XŸP€€ù^X
+N¬àBàBÇà€€ú›õ€›’\^Hõ€›’\\ùÀöõ⁄[äóóàäN¬ÇàÀ»ùZ[›ùX›\ôY[ú›Ÿ\ôY‹X‹»õ‹àRHY\à€€ú›[ú›Ÿ\ôY‹X‹»HﬂN¬àYà
+[ú›Ÿ\úÀô[ò[ZX‹œÀùö[J
+JH[ú›Ÿ\ôY‹X‹Àõ›ô\ò[ÿ⁄[ôŸHH[ú›Ÿ\úÀô[ò[ZX‹Àùö[J
+N¬àYà
+[ú›Ÿ\úÀõô]◊ÿ€€òŸ\õúœÀùö[J
+JH[ú›Ÿ\ôY‹X‹Àõô]◊ÿ€€òŸ\õú»H[ú›Ÿ\úÀõô]◊ÿ€€òŸ\õúÀùö[J
+N¬àYà
+[ú›Ÿ\úÀùöYYÀùö[J
+JH[ú›Ÿ\ôY‹X‹ÀùöYY‹òX›XŸ\»H[ú›Ÿ\úÀùöYYùö[J
+N¬àYà
+[ú›Ÿ\úÀôúôYW›^Àùö[J
+JH[ú›Ÿ\ôY‹X‹ÀôúôYW›^H[ú›Ÿ\úÀôúôYW›^ùö[J
+N¬àÀ»YòX›XŸH›]\Ÿ\¬àYà
+›\‹ùòX›XŸ\Àõ[ô›à
+H¬à[ú›Ÿ\ôY‹X‹ÀúòX›XŸW‹›]\Ÿ\»H›\‹ùòX›XŸ\¬àôö[\äOàú›]\»OOHòX›]ôHäBàõX\
+Oà
+»]Nàù]K›]\Œàù\Ÿ\ó‹›]\»JJN¬àBàŸ]õ€››\[ú›Ÿ\ôY‹X‹ [ú›Ÿ\ôY‹X‹ N¬ÇàŸ]^
+õ€›’\^
+N¬àŸ]€€ùô\úÿ][€í\›‹ûJ◊JN¬àŸ]X[Ÿ—\
+
+N¬àŸ][ú›Ÿ\ú ﬂJN¬àŸ]]Y\›[€ú ù[
+N¬àŸ]ô\›[
+ù[
+N¬àŸ]ô\‹ù€›\òŸJôŸ[ô\ò]YäN¬àŸ]ù\›ö[ö\⁄YŸ\‹⁄[€äò[ŸJN¬ÇàÀ»€€ù[ùYHöXH^\›[ô»[ò[^ôHõ›¬à]ÿZ]›XõZ]õ›[ô
+õ€›’\^
+N¬àHÿ]⁄
+JH¬à⁄›’ÿ\›
+KõY\‹ÿYŸH¥'t-H4`Ù-4,4.Ù/¥`tc4/t,4aÙ,4`¥c4/Ù`4/¥-4/¥.Ù-¥-t/t.4-Hãô\úõ‹àäN¬àHö[ò[H¬àŸ]ÿY[ô ò[ŸJN¬àBàBÇàÀ»‹[àH‹X⁄YöX»Ÿ\‹⁄[€àúõ€HÿXö[ô]
+Ÿ\‹⁄[€ó›öY] Bà\ﬁ[ò»ù[ò›[€à‹[î›\‹ùŸ\‹⁄[€ïöY] \ôŸ]Ÿ\‹⁄[€íY
+H¬à€€ú›ÿ]ôYHŸ]›\‹ùŸ\‹⁄[€ä
+N¬àYà
+\ÿ]ôYúŸ\‹⁄[€íY\ÿ]ôYòXÿŸ\‹’⁄Ÿ[äH¬à⁄›’ÿ\›
+¥'t`Ù-¥-t/H4.¥/¥-4-4/¥`t`¥`Ù/Ù,4.à4`4,4-Ù,Ù/¥,¥/¥`4`Ààãô\úõ‹àäN¬àô]\õé¬àBàŸ]›\‹ùŸ\‹⁄[€ìÿY[ô ùYJN¬àûH¬à€€ú›ô\»H]ÿZ]ô]⁄
+ãÿ\K‹Ÿ\‹⁄[€àã¬àY]Ÿàî‘’ãàXY\úŒà»ê€€ù[ùU\Héàò\Xÿ][€ã⁄ú€€ààKàõŸNàî””ãú›ö[ô⁄YûJ»X›[€éàôŸ]ô\‹ùãŸ\‹⁄[€íYà\ôŸ]Ÿ\‹⁄[€íYXÿŸ\‹◊›⁄Ÿ[éàÿ]ôYòXÿŸ\‹’⁄Ÿ[àJKàJN¬à€€ú›]HH]ÿZ]ô\Àöú€€ä
+N¬àYà
+\ô\Àõ⁄»Y]Kõ⁄ H¬àõ›»ô]»\úõ‹ä]Kô\úõ‹à¥'t-H4`Ù-4,4.Ù/¥`tc4/¥`¥.¥`4bÙ`¥c4`t-t`t`t.4càäN¬àBàŸ]›\‹ùöY]⁄[ô‘Ÿ\‹⁄[€ä\ôŸ]Ÿ\‹⁄[€íY
+N¬àŸ]›\‹ùöY]⁄[ô‘Ÿ\‹⁄[€ë]J]KúŸ\‹⁄[€äN¬àŸ]\ŸJúŸ\‹⁄[€ó›öY]»äN¬àŸ]›\‹ùÿ‹ôY[äúŸ\‹⁄[€ó›öY]»äN¬àHÿ]⁄
+JH¬à⁄›’ÿ\›
+KõY\‹ÿYŸH¥'t-H4`Ù-4,4.Ù/¥`tc4/¥`¥.¥`4bÙ`¥c4`t-t`t`t.4càãô\úõ‹àäN¬àHö[ò[H¬àŸ]›\‹ùŸ\‹⁄[€ìÿY[ô ò[ŸJN¬àBàBÇàÀ»›XõZ]Hô]»›\‹ùŸ\ùöXŸHô\]Y\›àù[ò›[€à‹[î›\‹ùô\]Y\›õ‹îŸ\‹⁄[€ä\ôŸ]Ÿ\‹⁄[€íYHŸ\‹⁄[€íY
+H¬àŸ]›\‹ùô\]Y\›Ÿ\‹⁄[€íY
+\ôŸ]Ÿ\‹⁄[€íYù[
+N¬à5˜~˜Í⁄$z{-ÆÈ‹j◊ù              })}
                             </svg>
                           </div>
                           {/* Anxiety chart */}
