@@ -9,6 +9,7 @@ import "./MyPracticeBusinessPilot.css";
 import { MyPracticeFinancialDemo, MyPracticePatientConnectionDemo } from "./MyPracticeBusinessPilot.jsx";
 import MyPracticeCatalogEditor from "./MyPracticeCatalogEditor.jsx";
 import MyPracticeCalendar from "./MyPracticeCalendar.jsx";
+import {MyPracticePaidBookingsDemo} from "./MyPracticePaidBookingDemo.jsx";
 import {initialScheduleDraft, restoreScheduleDraft, SCHEDULE_DRAFT_STORAGE_KEY} from "../../../lib/my-practice/schedule-draft.js";
 import {initialDraftCatalog,restoreDraftCatalog,countActiveOffers,DRAFT_STORAGE_KEY,updateDraftOffer} from "../../../lib/my-practice/catalog-draft.js";
 
@@ -16,7 +17,8 @@ import {initialDraftCatalog,restoreDraftCatalog,countActiveOffers,DRAFT_STORAGE_
 const TABS = [
   { id: "overview", label: "Обзор" },
   { id: "services", label: "Услуги" },
-  { id: "calendar", label: "Занятость" },
+  { id: "calendar", label: "Мой календарь" },
+  { id: "paid", label: "Платные приёмы" },
   { id: "manage", label: "Управление" },
   { id: "finance", label: "Финансы" },
   { id: "patients", label: "Пациенты" },
@@ -177,13 +179,13 @@ export default function MyPracticePilot({ standalone = false }) {
       <div>
         <p className="mp-eyebrow">Земляничные поляны · Моя практика</p>
         <h2 id="my-practice-title">Практика врача в одном пространстве</h2>
-        <p>Один специалист, несколько клиник, единый каталог услуг и календарь занятости.</p>
+        <p>Справочное расписание и отдельный сценарий платных приёмов через платформу.</p>
       </div>
       <span className="mp-badge">Учебный прототип</span>
     </header>
     <div className="mp-warning" role="note">
       <strong>Только вымышленные данные.</strong> Клиники, врач, цены и расписание демонстрационные.
-      Запись, оплата и медицинские действия отключены.
+      Реальная запись, оплата и медицинские действия отключены; платные приёмы доступны только как симуляция.
     </div>
     <div className="mp-doctor">
       <div className="mp-avatar" aria-hidden="true">В</div>
@@ -235,6 +237,9 @@ export default function MyPracticePilot({ standalone = false }) {
     </div>}
     {tab==="manage" && <div role="tabpanel" id="mp-panel-manage" aria-labelledby="mp-tab-manage">
       <MyPracticeCatalogEditor catalog={catalog} onChange={changeCatalog} onSave={saveDraft} onReset={resetDraft} dirty={dirty} storageMessage={storageMessage}/>
+    </div>}
+    {tab==="paid" && <div role="tabpanel" id="mp-panel-paid" aria-labelledby="mp-tab-paid">
+      <MyPracticePaidBookingsDemo catalog={catalog} schedule={schedule}/>
     </div>}
     {tab==="finance" && <div role="tabpanel" id="mp-panel-finance" aria-labelledby="mp-tab-finance">
       <MyPracticeFinancialDemo catalog={catalog}/>
