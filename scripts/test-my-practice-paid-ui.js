@@ -14,6 +14,9 @@ assert(pilot.includes("MyPracticePaidBookingsDemo catalog={catalog} schedule={sc
 assert(doctor.includes("beginPaidDemoHold("));
 assert(doctor.includes("simulatePaidDemoPayment("));
 assert(doctor.includes("cancelPaidDemoBooking("));
+assert(doctor.includes("const canStartNew="),"Patient can rebook after cancellation");
+assert(doctor.includes("data.bookings.find(b=>b.id===currentBookingId) ||"),"Reload restores active browser booking");
+assert(doctor.includes("<strong>Не является кассовым чеком"),"Receipt disclaimer must be visible");
 assert(doctor.includes('localStorage.setItem(PAID_DEMO_KEY'),"Same-browser storage only");
 assert(doctor.includes("не синхронизируются с другими устройствами"));
 assert(doctor.includes("не оформляются"),"Prominently disclose no real fiscal receipt");

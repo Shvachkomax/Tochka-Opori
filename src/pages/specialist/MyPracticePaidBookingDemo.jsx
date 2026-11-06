@@ -168,8 +168,10 @@ export function MyPracticePatientBookingDemo(){
  try{offer=offerFromLink(encoded||"");}catch(e){linkError=e.message;}
  const local=data.slots.find(s=>s.id===offer?.id);
  const effective=local||offer;
- const booking=data.bookings.find(b=>b.id===currentBookingId);
+ const booking=data.bookings.find(b=>b.id===currentBookingId) ||
+   [...data.bookings].reverse().find(b=>b.slotId===effective?.id && ["held","simulated_paid"].includes(getBookingStatus(b,Date.now())));
  const status=booking?getBookingStatus(booking,Date.now()):null;
+ const canStartNew=!booking || ["expired","cancelled","simulated_refunded"].includes(status);
  const patientAction=()=>{
    setMessage("");setError("");
    if(!effective)return;
@@ -209,7 +211,7 @@ export function MyPracticePatientBookingDemo(){
        <p>{dateLabel(effective.day)} · {effective.start}–{effective.end}</p>
        {quoteBox(effective.priceKopecks)}
        <p className="mp-paid-footnote">Расчёт вознаграждения платформы условный. Юридический исполнитель медицинской услуги не определён.</p>
-       {!booking&&<button type="button" className="mp-primary" onClick={patientAction} disabled={!isAvailable(data,effective.id)&&!!local}>
+       {canStartNew&&<button type="button" className="mp-primary" onClick={patientAction} disabled={!isAvailable(data,effective.id)&&!!local}>
          Учебное бронирование на 10 минут
        </button>}
        {booking&&<div className="mp-paid-patient-checkout">
@@ -219,7 +221,7 @@ export function MyPracticePatientBookingDemo(){
            <button type="button" className="mp-secondary" onClick={cancel}>Отменить бронь</button>
          </div>}
          {status==="simulated_paid"&&<div className="mp-paid-checkout-actions">
-           <p className="mp-paid-footnote">Учебное подтверждение №{booking.id.slice(-8)}. **Не является кассовым чеком или подтверждением реальной услуги.**</p>
+           <p className="mp-paid-footnote">Учебное подтверждение №{booking.id.slice(-8)}. <strong>Не является кассовым чеком или подтверждением реальной услуги.</strong></p>
            <button type="button" className="mp-secondary" onClick={cancel}>Имитировать возврат</button>
          </div>}
        </div>}
