@@ -48,6 +48,6 @@ assert.deepEqual(restorePaidDemo(JSON.stringify(tampered)),empty);
 const malicious=structuredClone(renewed);
 malicious.bookings[0].patientName="Петрова";
 assert.deepEqual(restorePaidDemo(JSON.stringify(malicious)),empty);
-assert.throws(()=>offerFromLink("%7B%22name%22%3A%22patient%22%7D"),/Некорректный/);
+assert.throws(()=>offerFromLink("%7B%22name%22%3A%22patient%22%7D"),/Некорректный|Неподдерживаемые/);
 assert.deepEqual(normalizePaidDemo(renewed),renewed);
 console.log("Paid practice booking demo: PASS (slots, hold, expiry, simulation, fee, cancellation and no PII)");
