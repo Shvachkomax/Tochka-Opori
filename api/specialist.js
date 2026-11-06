@@ -11,7 +11,7 @@ import { medicationRpcForClinicalArchive } from "../lib/clinical/medication-arch
 import { getPilotId, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { handlePartnerProgram } from "../lib/partners/program-handler.js";
 import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
-import { handleMyPracticeWorkspace, isMyPracticeServerEnabled } from "../lib/my-practice/workspace-handler.js";
+import { handleMyPracticeWorkspace, isMyPracticeServerEnabled, isSameOriginPracticeRequest } from "../lib/my-practice/workspace-handler.js";
 import { buildSpecialistClientList } from "../lib/specialist-client-list.js";
 import { normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
 import { buildSpecialistRequestContext } from "../lib/specialist/request-context.js";
@@ -75,6 +75,10 @@ function isAllowedOrigin(origin) {
 function requireOrigin(req, res) {
   const origin = req.headers.origin;
   if (isAllowedOrigin(origin)) return true;
+  // For synthetic feature-branch Preview, permit only same-origin browser POSTs.
+  if (process.env.MY_PRACTICE_REQUIRE_TEST_DB === "true"
+      && isMyPracticeServerEnabled(process.env)
+      && isSameOriginPracticeRequest(req.headers)) return true;
   res.status(403).json({ ok: false, error: "Origin not allowed" });
   return false;
 }
@@ -87,6 +91,9 @@ function assertCookieOrigin(req, res) {
   if (!hasCookie) return true; // Bearer-only path — no cookie to protect
   const origin = req.headers.origin;
   if (isAllowedOrigin(origin)) return true;
+  if (process.env.MY_PRACTICE_REQUIRE_TEST_DB === "true"
+      && isMyPracticeServerEnabled(process.env)
+      && isSameOriginPracticeRequest(req.headers)) return true;
   res.status(403).json({ ok: false, error: "Origin not allowed" });
   return false;
 }
