@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {emptyMyPracticeWorkspace,normalizeMyPracticeWorkspace,WorkspaceValidationError,isSafeMyPracticeVersion} from "../lib/my-practice/workspace-validation.js";
 const a="00000000-0000-4000-8000-000000000001",b="00000000-0000-4000-8000-000000000002";
 const basis={scope:"synthetic",catalog:[
- {organization_id:a,offers:[{id:"demo-a",name:"Консультация",priceRub:4500,minutes:60,format:"offline",status:"active"}]},
+ {organization_id:a,offers:[{id:"demo-a",name:"Учебная консультация",priceRub:4500,minutes:60,format:"offline",status:"active"}]},
  {organization_id:b,offers:[{id:"demo-b",name:"Повторная консультация",priceRub:2800,minutes:30,format:"online",status:"active"}]}
 ],schedule:[
  {id:"evt-a",organization_id:a,kind:"busy",source:"manual",day:"2026-11-10",start:"10:00",end:"12:00",reason:"clinic"},
