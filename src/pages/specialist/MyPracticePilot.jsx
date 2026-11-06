@@ -1,16 +1,17 @@
 import React, { useMemo, useState } from "react";
 import {
-  DEMO_DOCTOR, DEMO_CLINICS, DEMO_BUSY_BLOCKS,
-  filterOffers, addDaysUTC, busyBlocksForWeek, canPublishBookingLink, rubles,
+  DEMO_DOCTOR, DEMO_CLINICS,
+  filterOffers, canPublishBookingLink, rubles,
 } from "../../../lib/my-practice/pilot-data.js";
 import "./MyPracticePilot.css";
 import "./MyPracticeBusinessPilot.css";
 import { MyPracticeFinancialDemo, MyPracticePatientConnectionDemo } from "./MyPracticeBusinessPilot.jsx";
 import MyPracticeCatalogEditor from "./MyPracticeCatalogEditor.jsx";
+import MyPracticeCalendar from "./MyPracticeCalendar.jsx";
+import {initialScheduleDraft, restoreScheduleDraft, SCHEDULE_DRAFT_STORAGE_KEY} from "../../../lib/my-practice/schedule-draft.js";
 import {initialDraftCatalog,restoreDraftCatalog,countActiveOffers,DRAFT_STORAGE_KEY,updateDraftOffer} from "../../../lib/my-practice/catalog-draft.js";
 
 // Чистый визуальный прототип. Никаких запросов к API, личных или медицинских данных.
-const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const TABS = [
   { id: "overview", label: "Обзор" },
   { id: "services", label: "Услуги" },
@@ -19,9 +20,6 @@ const TABS = [
   { id: "finance", label: "Финансы" },
   { id: "patients", label: "Пациенты" },
 ];
-const formatDay = day => new Intl.DateTimeFormat("ru-RU", {
-  day:"numeric", month:"short", timeZone:"UTC",
-}).format(new Date(day + "T12:00:00Z"));
 
 function ClinicCard({ clinic, onServices }) {
   return (
@@ -127,54 +125,27 @@ function OfferCard({ offer, onSaveEdit }) {
   );
 }
 
-function Calendar({ monday, setMonday, clinic, setClinic }) {
-  const blocks = useMemo(() => busyBlocksForWeek(DEMO_BUSY_BLOCKS, monday, clinic), [monday, clinic]);
-  const clinicsById = new Map(DEMO_CLINICS.map(c => [c.id, c]));
-  return (
-    <section aria-label="Демонстрационный календарь занятости" data-testid="my-practice-calendar">
-      <div className="mp-calendar-controls">
-        <div className="mp-week-nav">
-          <button type="button" onClick={() => setMonday(addDaysUTC(monday,-7))} aria-label="Предыдущая неделя">‹</button>
-          <strong>{formatDay(monday)} — {formatDay(addDaysUTC(monday,6))}</strong>
-          <button type="button" onClick={() => setMonday(addDaysUTC(monday,7))} aria-label="Следующая неделя">›</button>
-        </div>
-        <label className="mp-field">Место приёма
-          <select value={clinic} onChange={event=>setClinic(event.target.value)}>
-            <option value="all">Все клиники</option>
-            {DEMO_CLINICS.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </label>
-      </div>
-      <div className="mp-calendar-scroll">
-        <div className="mp-week-grid">
-          {DAYS.map((label,index)=>{
-            const day = addDaysUTC(monday,index);
-            const dayBlocks = blocks.filter(b=>b.day===day);
-            return <div className="mp-day" key={day} data-testid={"my-practice-day-"+day}>
-              <div className="mp-day-head"><strong>{label}</strong><span>{formatDay(day)}</span></div>
-              {dayBlocks.length ? dayBlocks.map(b=>{
-                const place=clinicsById.get(b.clinicId);
-                return <div key={b.id} className="mp-busy" style={{borderLeftColor:place?.color||"#89978f"}}>
-                  <strong>{b.start}–{b.end}</strong>
-                  <span>{place?.name||"Демо-клиника"}</span>
-                  <small>Занят · демо</small>
-                </div>;
-              }) : <p className="mp-no-block">Нет сведений о занятости</p>}
-            </div>;
-          })}
-        </div>
-      </div>
-      <p className="mp-footnote">Это занятость, а не свободные слоты. Пустое время не означает доступную запись. Синхронизации с клиниками нет.</p>
-    </section>
-  );
-}
-
 export default function MyPracticePilot() {
   const [tab,setTab] = useState("overview");
   const [catalog,setCatalog] = useState(() => {
     try {return restoreDraftCatalog(sessionStorage.getItem(DRAFT_STORAGE_KEY));}
     catch {return initialDraftCatalog();}
   });
+  const [schedule,setSchedule] = useState(() => {
+    try {return restoreScheduleDraft(sessionStorage.getItem(SCHEDULE_DRAFT_STORAGE_KEY),catalog);}
+    catch {return initialScheduleDraft();}
+  });
+  const [scheduleDirty,setScheduleDirty] = useState(false);
+  const [scheduleMessage,setScheduleMessage] = useState("");
+  const changeSchedule = next => {setSchedule(next);setScheduleDirty(true);setScheduleMessage("");};
+  const saveSchedule = () => {
+    try {sessionStorage.setItem(SCHEDULE_DRAFT_STORAGE_KEY,JSON.stringify(schedule));setScheduleDirty(false);setScheduleMessage("Тестовое расписание сохранено только в этой вкладке.");}
+    catch {setScheduleMessage("Не удалось сохранить в браузере; изменения останутся до закрытия страницы.");}
+  };
+  const resetSchedule = () => {
+    try {sessionStorage.removeItem(SCHEDULE_DRAFT_STORAGE_KEY);} catch {}
+    setSchedule(initialScheduleDraft());setScheduleDirty(false);setScheduleMessage("Исходное учебное расписание восстановлено.");
+  };
   const [dirty,setDirty] = useState(false);
   const [storageMessage,setStorageMessage] = useState("");
   const changeCatalog = next => { setCatalog(next); setDirty(true); setStorageMessage(""); };
@@ -223,7 +194,7 @@ export default function MyPracticePilot() {
     <div className="mp-stats" aria-label="Показатели учебной практики">
       <div><strong>{DEMO_CLINICS.length}</strong><span>места приёма</span></div>
       <div><strong>{countActiveOffers(catalog)}</strong><span>услуг в каталоге</span></div>
-      <div><strong>{DEMO_BUSY_BLOCKS.length}</strong><span>блоков занятости</span></div>
+      <div><strong>{schedule.length}</strong><span>событий календаря</span></div>
     </div>
     <div className="mp-tabs" role="tablist" aria-label="Разделы моей практики">
       {TABS.map(t=><button key={t.id} type="button" role="tab"
@@ -270,8 +241,10 @@ export default function MyPracticePilot() {
       <MyPracticePatientConnectionDemo/>
     </div>}
     {tab==="calendar" && <div role="tabpanel" id="mp-panel-calendar" aria-labelledby="mp-tab-calendar">
-      <div className="mp-section-title"><h3>Общая занятость</h3><p>Без фамилий пациентов, диагнозов и медицинских сведений.</p></div>
-      <Calendar monday={monday} setMonday={setMonday} clinic={calendarClinic} setClinic={setCalendarClinic}/>
+      <div className="mp-section-title"><h3>Общий календарь</h3><p>Редактируемые учебные записи и занятость — без реальных персональных или медицинских данных.</p></div>
+      <MyPracticeCalendar catalog={catalog} entries={schedule} onChange={changeSchedule}
+        onSave={saveSchedule} onReset={resetSchedule} dirty={scheduleDirty} storageMessage={scheduleMessage}
+        monday={monday} setMonday={setMonday} clinic={calendarClinic} setClinic={setCalendarClinic}/>
     </div>}
   </section>;
 }
