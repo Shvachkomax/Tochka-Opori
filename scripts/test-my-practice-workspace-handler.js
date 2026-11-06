@@ -9,6 +9,7 @@ assert(isMyPracticeServerEnabled(env));
 assert(!isMyPracticeServerEnabled({...env,VERCEL_ENV:"production"}));
 assert(!isMyPracticeServerEnabled({...env,SUPABASE_URL:"https://blwogrdezfhprdpdnxtn.supabase.co"}));
 assert(!isMyPracticeServerEnabled({...env,MY_PRACTICE_SERVER_ENABLED:"false"}));
+assert(!isMyPracticeServerEnabled({...env,MY_PRACTICE_ALLOWED_SUPABASE_REF:"blwogrdezfhprdpdnxtn",SUPABASE_URL:"https://blwogrdezfhprdpdnxtn.supabase.co"}));
 assert(isSameOriginPracticeRequest(headers));
 assert(!isSameOriginPracticeRequest({...headers,origin:"https://other-preview.vercel.app"}));
 assert(!isSameOriginPracticeRequest({...headers,origin:undefined}));

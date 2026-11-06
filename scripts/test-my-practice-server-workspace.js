@@ -21,6 +21,7 @@ invalid(x=>x.catalog[0].offers[0].notes="diagnosis");
 invalid(x=>x.catalog[0].offers[0].priceRub=-5);
 invalid(x=>x.catalog[0].offers[0].id="demo-b");
 invalid(x=>x.catalog[0].offers[0].name="X");
+invalid(x=>x.catalog[0].offers[0].name="Петров Михаил, диагноз тревога");
 invalid(x=>x.schedule[0].patientName="Пётр Петров");
 invalid(x=>x.schedule[1].patientAlias="Пётр Петров");
 invalid(x=>x.schedule[1].serviceId="demo-a");
