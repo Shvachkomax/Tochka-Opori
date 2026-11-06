@@ -52,7 +52,7 @@
     "test:clinical-medication-rpc-routing": "node scripts/test-clinical-medication-rpc-routing.js",
     "check:database-architecture": "node scripts/check-database-architecture.js",
     "test:database-architecture": "node scripts/test-database-architecture.js",
-    "test:my-practice": "node scripts/test-my-practice-pilot.js && node scripts/test-my-practice-catalog.js && node scripts/test-my-practice-commission.js && node scripts/test-my-practice-schedule.js && node scripts/test-my-practice-server-workspace.js && node scripts/test-my-practice-workspace-handler.js && node scripts/test-my-practice-server-ui.js"
+    "test:my-practice": "node scripts/test-my-practice-pilot.js && node scripts/test-my-practice-catalog.js && node scripts/test-my-practice-commission.js && node scripts/test-my-practice-schedule.js && node scripts/test-my-practice-server-workspace.js && node scripts/test-my-practice-workspace-handler.js && node scripts/test-my-practice-server-ui.js && node scripts/test-my-practice-preview-db-gate.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
