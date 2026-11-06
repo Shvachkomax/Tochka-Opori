@@ -35,7 +35,7 @@ window.addEventListener('unhandledrejection', function (e) {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     {import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && window.location.pathname.replace(/\/+$/, '') === '/specialist/my-practice/demo'
-      ? <MyPracticePilot />
+      ? <MyPracticePilot standalone />
       : window.location.pathname.replace(/\/+$/, '') === '/specialist/knowledge/demo'
       ? <ClinicalKnowledgeDemo />
       : window.location.pathname.replace(/\/+$/, '') === '/specialist/knowledge'

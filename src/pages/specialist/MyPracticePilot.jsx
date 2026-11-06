@@ -4,6 +4,7 @@ import {
   filterOffers, canPublishBookingLink, rubles,
 } from "../../../lib/my-practice/pilot-data.js";
 import "./MyPracticePilot.css";
+import SpecialistPageNavigation from "./SpecialistPageNavigation.jsx";
 import "./MyPracticeBusinessPilot.css";
 import { MyPracticeFinancialDemo, MyPracticePatientConnectionDemo } from "./MyPracticeBusinessPilot.jsx";
 import MyPracticeCatalogEditor from "./MyPracticeCatalogEditor.jsx";
@@ -125,7 +126,7 @@ function OfferCard({ offer, onSaveEdit }) {
   );
 }
 
-export default function MyPracticePilot() {
+export default function MyPracticePilot({ standalone = false }) {
   const [tab,setTab] = useState("overview");
   const [catalog,setCatalog] = useState(() => {
     try {return restoreDraftCatalog(sessionStorage.getItem(DRAFT_STORAGE_KEY));}
@@ -171,6 +172,7 @@ export default function MyPracticePilot() {
     changeCatalog(next);
   };
   return <section className="my-practice-pilot" data-testid="my-practice-pilot" aria-labelledby="my-practice-title">
+    {standalone && <SpecialistPageNavigation />}
     <header className="mp-header">
       <div>
         <p className="mp-eyebrow">Земляничные поляны · Моя практика</p>
