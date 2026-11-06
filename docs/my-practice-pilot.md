@@ -62,7 +62,7 @@
 - Следующая задача: серверная схема врач ↔ клиника ↔ услуга ↔ запись; атомарное резервирование, права доступа и синхронизация с МИС при наличии соглашений. Не превращать ручной демо-календарь в самостоятельное медицинское расписание.
 
 ## Серверный черновик — шаг 6 (защищённая основа)
-- SQL: `supabase/migrations/20261106081000_my_practice_synthetic_workspaces.sql` — отдельная таблица в уже существующей тестовой базе, без новой Supabase.
+- SQL: `supabase/migrations/20261106053005_my_practice_synthetic_workspaces.sql` — отдельная таблица в уже существующей тестовой базе, без новой Supabase.
 - Таблица `my_practice_synthetic_workspaces`: один JSONB workspace на врача, scope=synthetic, числовая версия оптимистической блокировки.
 - RLS включён, нет прав/политик anon/authenticated; только service_role с серверной проверкой сессии и membership.
 - Действия в `/api/specialist`: `getMyPracticeWorkspace`, `saveMyPracticeWorkspace`. Запросы разрешены только same-origin, только Preview и только при совпадении разрешённого Supabase ref с SUPABASE_URL.
