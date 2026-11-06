@@ -29,7 +29,7 @@ function ClinicCard({ clinic, onServices }) {
       <div>
         <h4>{clinic.name}</h4>
         <p>{clinic.address}</p>
-        <p className="mp-muted">Юридический исполнитель — клиника · {clinic.offers.filter(o=>o.status!=="archived").length} услуги</p>
+        <p className="mp-muted">Справочное место работы · {clinic.offers.filter(o=>o.status!=="archived").length} учебных услуг</p>
         <button type="button" onClick={() => onServices(clinic.id)} className="mp-text-btn">Посмотреть услуги</button>
       </div>
     </article>
@@ -204,7 +204,7 @@ export default function MyPracticePilot({ standalone = false }) {
         className={tab===t.id?"mp-tab active":"mp-tab"} onClick={()=>setTab(t.id)}>{t.label}</button>)}
     </div>
     {tab==="overview" && <div role="tabpanel" id="mp-panel-overview" aria-labelledby="mp-tab-overview">
-      <div className="mp-section-title"><h3>Места приёма</h3><p>Каждая клиника остаётся самостоятельным исполнителем медицинских услуг.</p></div>
+      <div className="mp-section-title"><h3>Места приёма</h3><p>Места приёма здесь только справочные. Они не дают врачу права продавать медицинскую услугу от имени клиники.</p></div>
       <div className="mp-two-col">{catalog.map(c=><ClinicCard clinic={c} key={c.id} onServices={switchToClinic}/>)}</div>
       <div className="mp-next">
         <h4>Как подключить врача</h4>
@@ -213,7 +213,7 @@ export default function MyPracticePilot({ standalone = false }) {
       </div>
     </div>}
     {tab==="services" && <div role="tabpanel" id="mp-panel-services" aria-labelledby="mp-tab-services">
-      <div className="mp-section-title"><h3>Каталог услуг</h3><p>Стоимость и продолжительность зависят от места приёма.</p></div>
+      <div className="mp-section-title"><h3>Каталог услуг</h3><p>Это информационный каталог. Сделки через платформу оформляются отдельно — в разделе «Платные приёмы».</p></div>
       <div className="mp-filters">
         <label className="mp-field">Клиника<select value={clinicFilter} onChange={e=>setClinicFilter(e.target.value)}>
           <option value="all">Все клиники</option>
@@ -243,7 +243,7 @@ export default function MyPracticePilot({ standalone = false }) {
       <MyPracticePatientConnectionDemo/>
     </div>}
     {tab==="calendar" && <div role="tabpanel" id="mp-panel-calendar" aria-labelledby="mp-tab-calendar">
-      <div className="mp-section-title"><h3>Общий календарь</h3><p>Редактируемые учебные записи и занятость — без реальных персональных или медицинских данных.</p></div>
+      <div className="mp-section-title"><h3>Общий календарь</h3><p>Справочные блоки работы и учебные внешние записи, без платежей и комиссии.</p></div>
       <MyPracticeCalendar catalog={catalog} entries={schedule} onChange={changeSchedule}
         onSave={saveSchedule} onReset={resetSchedule} dirty={scheduleDirty} storageMessage={scheduleMessage}
         monday={monday} setMonday={setMonday} clinic={calendarClinic} setClinic={setCalendarClinic}/>

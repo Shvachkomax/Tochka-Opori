@@ -42,9 +42,9 @@ export function MyPracticeFinancialDemo({catalog}) {
       <div className="mp-business-split">
         <div><span>Стоимость приёма</span><strong>{formatPracticeRubles(quote.priceKopecks)}</strong></div>
         <div><span>Комиссия платформы · 20%</span><strong>{formatPracticeRubles(quote.platformFeeKopecks)}</strong></div>
-        <div><span>Доля организации · 80%</span><strong>{formatPracticeRubles(quote.organizationShareKopecks)}</strong></div>
+        <div><span>Исполнителю услуги · 80%</span><strong>{formatPracticeRubles(quote.organizationShareKopecks)}</strong></div>
       </div>
-      <p className="mp-footnote">«Доля организации» — остаток для юридического исполнителя услуги. Это не автоматический личный гонорар врача и не сумма после налогов/эквайринга.</p>
+      <p className="mp-footnote">«Доля исполнителя» — расчётный остаток для юридически уполномоченного исполнителя (ИП или медицинской организации). Не является автоматическим личным гонораром врача; налоги и эквайринг не вычтены.</p>
       <div className="mp-business-scenario">
         <h4>Проверка финансовых состояний (симуляция)</h4>
         <label className="mp-field mp-field-block">Состояние сделки
@@ -70,7 +70,7 @@ export function MyPracticeFinancialDemo({catalog}) {
         </div>
       </div>
     </> : <p className="mp-muted">Активных услуг нет. Добавьте учебную услугу в разделе «Управление».</p>}
-    <p className="mp-footnote">Реальная комиссия должна возникать только после подтверждения оплаты сервером, выполнения услуги и условий расчёта. При возврате — обратная запись по исходной ставке. При оплате напрямую в клинике автоматической комиссии у платформы нет без договорной сверки.</p>
+    <p className="mp-footnote">20% относятся к отдельной транзакции в разделе «Платные приёмы», но не к событиям справочного календаря. Реальная комиссия должна возникать только после подтверждения оплаты сервером, выполнения услуги и условий расчёта. При возврате — обратная запись по исходной ставке. При оплате напрямую в клинике автоматической комиссии у платформы нет без договорной сверки.</p>
   </section>;
 }
 

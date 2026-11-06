@@ -4,6 +4,7 @@ import App from './App.jsx'
 import ClinicalKnowledgeDemo from './pages/specialist/ClinicalKnowledgeDemo.jsx'
 import ClinicalKnowledge from './pages/specialist/ClinicalKnowledge.jsx'
 import MyPracticePilot from './pages/specialist/MyPracticePilot.jsx'
+import { MyPracticePatientBookingDemo } from './pages/specialist/MyPracticePaidBookingDemo.jsx'
 import './style.css'
 
 window.addEventListener('error', function (e) {
@@ -34,7 +35,9 @@ window.addEventListener('unhandledrejection', function (e) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && window.location.pathname.replace(/\/+$/, '') === '/specialist/my-practice/demo'
+    {import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && window.location.pathname.replace(/\/+$/, '') === '/specialist/my-practice/booking-demo'
+      ? <MyPracticePatientBookingDemo />
+      : import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && window.location.pathname.replace(/\/+$/, '') === '/specialist/my-practice/demo'
       ? <MyPracticePilot standalone />
       : window.location.pathname.replace(/\/+$/, '') === '/specialist/knowledge/demo'
       ? <ClinicalKnowledgeDemo />
