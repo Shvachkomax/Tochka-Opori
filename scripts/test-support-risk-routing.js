@@ -24,6 +24,10 @@ const { isAnMedSupportFeatureEnabled } = await import("../lib/security/module-av
 assert.equal(isAnMedSupportFeatureEnabled("support", { brand: "anmed", supportOnly: "false" }), true);
 assert.equal(isAnMedSupportFeatureEnabled("body", { brand: "anmed", supportOnly: "false" }), false, "crisis routing does not run in Health/Body");
 assert.equal(isAnMedSupportFeatureEnabled("support", { brand: "pneumointegration", supportOnly: "false" }), false, "AnMed-specific routing remains inactive in Pneumointegration");
+assert.equal(isAnMedSupportFeatureEnabled("support", { brand: "pneumointegration", supportOnly: "false", enableEnhancedSupport: "true" }), true, "explicit partner opt-in enables the shared Support safety flow");
+assert.equal(isAnMedSupportFeatureEnabled("support", { brand: "pneumointegration", supportOnly: "false", enableEnhancedSupport: "false" }), false, "explicit opt-out keeps Pneumointegration isolated");
+assert.equal(isAnMedSupportFeatureEnabled("body", { brand: "pneumointegration", supportOnly: "false", enableEnhancedSupport: "true" }), false, "opt-in never exposes Body/Health in support-only pilot");
+assert.equal(isAnMedSupportFeatureEnabled("support", { brand: "kgmu", supportOnly: "false", enableEnhancedSupport: "false" }), true, "KGMU keeps existing shared Support behavior");
 
 const selfHarmPattern = /реж.*себ|самоповреж|причин.*себе.*вред/iu;
 const suicidalIntentPattern = /суицидальн|план.*покончить|таблетк.*собрал|прощальн.*письм/iu;

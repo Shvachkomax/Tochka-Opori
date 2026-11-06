@@ -1,0 +1,53 @@
+name: Pilot Integration Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "lib/security/**"
+      - "api/**"
+      - "scripts/**"
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/pilot-integration-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safety-and-build:
+    name: Pilot isolation, access and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Checkout exact pull request commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+      - name: Check partner and organization isolation
+        run: |
+          node scripts/test-pilot-isolation.js
+          node scripts/test-deployment-scope.js
+          node scripts/test-specialist-memberships.js
+          node scripts/test-specialist-access-policy.js
+          node scripts/test-usage-auth.js
+          node scripts/test-usage-session-owner.js
+          node scripts/test-expert-code-auth.js
+          node scripts/test-bound-review-session.js
+      - name: Check Support crisis, sessions and cabinet
+        run: |
+          node scripts/test-support-risk-routing.js
+          node scripts/test-analyze-session-access.js
+          node scripts/test-cabinet-defects.js
+          node scripts/test-session-access-pair.js
+      - name: Production build (without secrets or deployment)
+        run: npm run build
