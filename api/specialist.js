@@ -11,6 +11,7 @@ import { medicationRpcForClinicalArchive } from "../lib/clinical/medication-arch
 import { getPilotId, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { handlePartnerProgram } from "../lib/partners/program-handler.js";
 import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
+import { handleMyPracticeWorkspace } from "../lib/my-practice/workspace-handler.js";
 import { buildSpecialistClientList } from "../lib/specialist-client-list.js";
 import { normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
 import { buildSpecialistRequestContext } from "../lib/specialist/request-context.js";
@@ -190,6 +191,9 @@ export default async function handler(req, res) {
         return await handleLogout(req, res);
       case "listClients":
         return await handleListClients(req, res);
+      case "getMyPracticeWorkspace":
+      case "saveMyPracticeWorkspace":
+        return await handleMyPracticeWorkspace(req, res, { authorizeSpecialist, getSupabase });
       case "getPartnerProgram":
         return await handlePartnerProgram(req, res, { authorizeSpecialist, validateSpecialistContext, getSupabase, getPilotId });
       case "getClientOverview":
