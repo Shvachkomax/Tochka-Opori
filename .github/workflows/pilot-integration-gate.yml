@@ -4,10 +4,11 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "lib/security/**"
+      - "lib/**"
       - "api/**"
       - "scripts/**"
       - "src/**"
+      - "vite.config.js"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/pilot-integration-gate.yml"
@@ -49,5 +50,16 @@ jobs:
           node scripts/test-analyze-session-access.js
           node scripts/test-cabinet-defects.js
           node scripts/test-session-access-pair.js
+      - name: Health voice and privacy-safe AI usage (synthetic, no cloud calls)
+        run: |
+          npm run test:health-live
+          npm run test:ai-telemetry
+          node scripts/test-live-owner.js
+          node scripts/test-three-organization-access.js
       - name: Production build (without secrets or deployment)
         run: npm run build
+
+      - name: Install Chromium for synthetic browser test
+        run: npx playwright install --with-deps chromium
+      - name: Health voice browser lifecycle (mock API and media)
+        run: npm run e2e:health-live

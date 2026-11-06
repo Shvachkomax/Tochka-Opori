@@ -1,3 +1,5 @@
+import { createLiveHandler } from '../lib/voice/health-live.js';
+import { resolveLiveOwner } from '../lib/voice/live-owner.js';
 import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import crypto from "crypto";
 import { getSupabase } from "../lib/supabase.js";
@@ -347,6 +349,14 @@ export default async function handler(req, res) {
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  if (req.body?.action === 'healthLive') {
+    return createLiveHandler({
+      module: 'body',
+      resolveOwner: (id, token) => resolveLiveOwner(getSupabase(), id, token),
+      buildContext: owner => buildAiChatContext({ supabase: getSupabase(), ownerId: owner.ownerId }),
+    })(req, res);
   }
 
   const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 60, prefix: "session:" });
