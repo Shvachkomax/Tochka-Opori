@@ -5,10 +5,10 @@ const server=await createServer({server:{host:'127.0.0.1',port:5177,strictPort:t
 await server.listen();let browser;
 try{
  browser=await chromium.launch({headless:true});
- const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const page=await browser.newPage();const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error('Browser error:',e.message);});
  await page.route('**/__practice',route=>route.fulfill({contentType:'text/html',body:`<div id="root"></div><script type="module">
 import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;
-import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';import Practice from '/src/pages/specialist/MyPracticePilot.jsx';
+import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';const {default:Practice}=await import('/src/pages/specialist/MyPracticePilot.jsx');
 const root=ReactDOM.createRoot(document.getElementById('root'));window.renderPractice=scope=>root.render(React.createElement(Practice,{key:scope,storageScope:scope,doctor:{name:scope}}));window.renderPractice('doctor-a:anmed');</script>`}));
  await page.goto('http://127.0.0.1:5177/__practice');
  await page.getByTestId('my-practice-places').waitFor();
