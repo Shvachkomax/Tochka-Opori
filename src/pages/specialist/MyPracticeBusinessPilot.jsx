@@ -28,7 +28,7 @@ export function MyPracticeFinancialDemo({catalog}) {
     </div>
     <div className="mp-warning" role="note">
       <strong>Финансовая модель — демонстрация.</strong> Не принимаем платежи, не начисляем комиссию, не платим врачу и не создаём проводки.
-      Это не существующая партнёрская программа 25% за AI-трафик.
+      Это отдельный расчёт от партнёрской доли врача за AI-трафик пациента.
     </div>
     <div className="mp-business-filters">
       <label className="mp-field mp-field-block">Услуга из чернового каталога

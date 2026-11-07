@@ -28,8 +28,9 @@ try {
       if (mode === "missing") return route.fulfill({ status: 503, json: { ok: false, error: "Партнёрская программа ещё не включена." } });
       if (mode === "slow" && body.module === "support") await new Promise(resolve => { releaseSlow = resolve; });
       return route.fulfill({ json: { ok: true,
-        summary: { rate_bps:2000, base_credits: body.module === "body" ? 400 : 22000, earned_credits: body.module === "body" ? 100 : 4400, contributing_patients: 1 },
-        history: mode === "empty" ? [] : [{ id: "synthetic-entry", created_at: "2026-10-27T08:00:00Z", base_delta: 400, credit_delta: 100 }],
+        summary: { rate_bps:2000, base_credits: body.module === "body" ? 400 : 22000, earned_credits: body.module === "body" ? 80 : 4400, contributing_patients: 1 },
+        patients: [{patient_ref:"a".repeat(32),base_credits:400,earned_credits:80,rate_bps:2000}],
+        history: mode === "empty" ? [] : [{ id: "synthetic-entry", created_at: "2026-10-27T08:00:00Z", base_delta: 400, credit_delta: 80 }],
       } });
     }
     return route.fulfill({ json: { ok: true, clients: [], requests: [], invitations: [] } });
@@ -38,6 +39,8 @@ try {
   const section = page.getByTestId("partner-program");
   await section.getByRole("button", { name: /Партнёрская программа/ }).click();
   await section.getByText(/4\s400 ед\./).waitFor();
+  await section.getByText("№ aaaaaaaa", {exact:true}).waitFor();
+  await section.getByRole("cell", {name:"20%",exact:true}).waitFor();
   await page.screenshot({ path: "/tmp/partner-program-desktop.png", fullPage: true });
   mode = "slow";
   await section.getByRole("button", { name: "Обновить начисления" }).click();
