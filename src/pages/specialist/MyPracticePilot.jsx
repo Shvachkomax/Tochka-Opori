@@ -235,7 +235,7 @@ export default function MyPracticePilot({ standalone = false }) {
       <div className="mp-next">
         <h4>Как подключить врача</h4>
         <p>Места работы — личные заметки, не реквизиты исполнителя. Платные предложения и подтверждение лицензии оформляются отдельно.</p>
-        <button type="button" className="mp-primary" onClick={()=>setTab("calendar")}>Посмотреть учебное расписание</button>
+        <button type="button" className="mp-primary" onClick={()=>setTab("calendar")}>Расписание</button>
       </div>
     </div>}
     {tab==="services" && <div role="tabpanel" id="mp-panel-services" aria-labelledby="mp-tab-services">
