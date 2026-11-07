@@ -11,6 +11,7 @@ import { medicationRpcForClinicalArchive } from "../lib/clinical/medication-arch
 import { getPilotId, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { handlePartnerProgram } from "../lib/partners/program-handler.js";
 import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
+import { handleMyPracticeWorkspace, isMyPracticeServerEnabled, isSameOriginPracticeRequest } from "../lib/my-practice/workspace-handler.js";
 import { buildSpecialistClientList } from "../lib/specialist-client-list.js";
 import { normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
 import { buildSpecialistRequestContext } from "../lib/specialist/request-context.js";
@@ -74,6 +75,10 @@ function isAllowedOrigin(origin) {
 function requireOrigin(req, res) {
   const origin = req.headers.origin;
   if (isAllowedOrigin(origin)) return true;
+  // For synthetic feature-branch Preview, permit only same-origin browser POSTs.
+  if (process.env.MY_PRACTICE_REQUIRE_TEST_DB === "true"
+      && isMyPracticeServerEnabled(process.env)
+      && isSameOriginPracticeRequest(req.headers)) return true;
   res.status(403).json({ ok: false, error: "Origin not allowed" });
   return false;
 }
@@ -86,6 +91,9 @@ function assertCookieOrigin(req, res) {
   if (!hasCookie) return true; // Bearer-only path — no cookie to protect
   const origin = req.headers.origin;
   if (isAllowedOrigin(origin)) return true;
+  if (process.env.MY_PRACTICE_REQUIRE_TEST_DB === "true"
+      && isMyPracticeServerEnabled(process.env)
+      && isSameOriginPracticeRequest(req.headers)) return true;
   res.status(403).json({ ok: false, error: "Origin not allowed" });
   return false;
 }
@@ -135,6 +143,16 @@ const loginLimiter = rateLimit({
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   applyCors(req, res);
+
+  // This preview branch must not use inherited Production credentials.
+  if (process.env.MY_PRACTICE_REQUIRE_TEST_DB === "true" && !isMyPracticeServerEnabled(process.env)) {
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(503).json({
+      ok: false,
+      error: "Кабинет врача заблокирован до подключения проверенной учебной базы.",
+      code: "MY_PRACTICE_TEST_DB_REQUIRED",
+    });
+  }
 
   // Strictly prohibit all specialist data access in the isolated
   // build-only medical staging shell until staging credentials,
@@ -190,6 +208,9 @@ export default async function handler(req, res) {
         return await handleLogout(req, res);
       case "listClients":
         return await handleListClients(req, res);
+      case "getMyPracticeWorkspace":
+      case "saveMyPracticeWorkspace":
+        return await handleMyPracticeWorkspace(req, res, { authorizeSpecialist, getSupabase });
       case "getPartnerProgram":
         return await handlePartnerProgram(req, res, { authorizeSpecialist, validateSpecialistContext, getSupabase, getPilotId });
       case "getClientOverview":
