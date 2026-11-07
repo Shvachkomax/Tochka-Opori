@@ -28,7 +28,7 @@ try {
       if (mode === "missing") return route.fulfill({ status: 503, json: { ok: false, error: "Партнёрская программа ещё не включена." } });
       if (mode === "slow" && body.module === "support") await new Promise(resolve => { releaseSlow = resolve; });
       return route.fulfill({ json: { ok: true,
-        summary: { base_credits: body.module === "body" ? 400 : 22000, earned_credits: body.module === "body" ? 100 : 5500, contributing_patients: 1 },
+        summary: { rate_bps:2000, base_credits: body.module === "body" ? 400 : 22000, earned_credits: body.module === "body" ? 100 : 4400, contributing_patients: 1 },
         history: mode === "empty" ? [] : [{ id: "synthetic-entry", created_at: "2026-10-27T08:00:00Z", base_delta: 400, credit_delta: 100 }],
       } });
     }
@@ -37,7 +37,7 @@ try {
   await page.goto(`http://127.0.0.1:${port}/specialist`);
   const section = page.getByTestId("partner-program");
   await section.getByRole("button", { name: /Партнёрская программа/ }).click();
-  await section.getByText(/5\s500 ед\./).waitFor();
+  await section.getByText(/4\s400 ед\./).waitFor();
   await page.screenshot({ path: "/tmp/partner-program-desktop.png", fullPage: true });
   mode = "slow";
   await section.getByRole("button", { name: "Обновить начисления" }).click();
@@ -46,7 +46,7 @@ try {
   await section.getByRole("button", { name: /Партнёрская программа/ }).click();
   await section.getByText("400 ед.", { exact: true }).waitFor();
   releaseSlow?.();
-  assert.equal(await section.getByText(/5\s500 ед\./).count(), 0, "old module response never leaks into new context");
+  assert.equal(await section.getByText(/4\s400 ед\./).count(), 0, "old module response never leaks into new context");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "/tmp/partner-program-mobile.png", fullPage: true });
   const dimensions = await section.evaluate(el => ({ scroll: el.scrollWidth, width: el.clientWidth }));

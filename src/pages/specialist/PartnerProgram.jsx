@@ -41,7 +41,7 @@ export default function PartnerProgram({ module, organizationId, styles }) {
       Партнёрская программа <span aria-hidden="true">{open ? "▴" : "▾"}</span>
     </button>
     <p style={{ fontSize: 14, color: "#625A50", lineHeight: 1.5, marginBottom: 0 }}>
-      Ваша доля — 25% от использования сервиса прикреплёнными пациентами.
+      Доля по новым списаниям — {result ? `${result.summary.rate_bps / 100}%` : "загружается"} от расхода кредитов прикреплёнными пациентами.
     </p>
     {open && <div id="partner-program-content" style={{ marginTop: 16 }}>
       <p style={{ fontSize: 13, lineHeight: 1.5, color: "#625A50" }}>
@@ -62,6 +62,15 @@ export default function PartnerProgram({ module, organizationId, styles }) {
           </div>)}
         </div>
         <p style={{ fontSize: 12, color: "#625A50", lineHeight: 1.5 }}>Итоги за всё время с момента включения программы, с учётом возвратов. Дробные доли накапливаются до целой единицы. Выплаты в рублях пока недоступны.</p>
+        <p>Расход 20 000 кредитов даёт 4 000 тестовых кредитов врачу. Подарок и автопополнение сами по себе начислений не создают. Старые операции сохраняют прежнюю ставку.</p>
+        <h4>Начисления по пациентам</h4>
+        <p style={{fontSize:12}}>Условные номера · до 200 строк по пациентам и ставкам. Итоги выше включают всех. Тестовые кредиты не подлежат выплате или обмену на рубли.</p>
+        <div style={{overflowX:"auto"}}><table style={{width:"100%",fontSize:13}}>
+          <thead><tr>{["Пациент","Расход","Ставка","Ваша доля"].map(x=><th key={x} scope="col">{x}</th>)}</tr></thead>
+          <tbody>{(result.patients||[]).map(row=><tr key={`${row.patient_ref}:${row.rate_bps}`}>
+            <td>№ {row.patient_ref.slice(0,8)}</td><td>{format(row.base_credits)}</td><td>{row.rate_bps/100}%</td><td>{format(row.earned_credits)}</td>
+          </tr>)}</tbody>
+        </table></div>
         <h4 style={{ marginBottom: 12 }}>Последние начисления и возвраты</h4>
         {result.history.length === 0 ? <p>Начислений пока нет. Они появятся после использования сервиса прикреплёнными пациентами.</p> :
           <div style={{ overflowX: "auto" }}>

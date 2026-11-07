@@ -57,6 +57,11 @@ jobs:
           npm run test:ai-telemetry
           node scripts/test-live-owner.js
           node scripts/test-three-organization-access.js
+      - name: Partner usage, refill and settlement accounting
+        run: |
+          npm run test:partner-accounting
+          npm run test:partner-database
+          npm run test:partner-api
       - name: Production build (without secrets or deployment)
         run: npm run build
 
@@ -66,6 +71,9 @@ jobs:
         run: |
           npm run e2e:health-live
           LIVE_TEST_MODULE=support npm run e2e:health-live
+
+      - name: Partner cabinet browser test
+        run: npm run test:partner-browser
 
       - name: Integrated practice browser contexts and synthetic bookings
         run: node scripts/e2e-my-practice-integration.mjs

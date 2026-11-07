@@ -1,3 +1,4 @@
+import {debitCreditsForSession} from "../lib/usage/debit.js";
 import { createLiveHandler } from '../lib/voice/health-live.js';
 import { resolveLiveOwner } from '../lib/voice/live-owner.js';
 import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
@@ -3189,6 +3190,9 @@ async function handleSendBodyAiMessage(req, res) {
       console.log("[chat] step=8 assistant saved, total_duration:", Date.now() - startTime, "ms");
     }
 
+    const chatDebit = await debitCreditsForSession({sessionId:session_id,module:"body",resourceType:"body_chat",
+      requestId:`body-usage-${assistantMsgId}`,inputTokens:result.input_tokens,outputTokens:result.output_tokens,
+      model:result.model_used,provider:"openai"});
     return res.status(200).json({
       ok: true,
       message: {
@@ -3201,7 +3205,7 @@ async function handleSendBodyAiMessage(req, res) {
         confidence: aiConfidence,
         created_at: new Date().toISOString(),
       },
-      credits_charged: 1,
+      credits_charged: chatDebit.charged ? chatDebit.amount : 0,
     });
   } catch (error) {
     console.error("handleSendBodyAiMessage error:", error.message);
@@ -5648,7 +5652,10 @@ async function handleSendSupportMessage(req, res) {
       created_at: new Date().toISOString(),
     });
 
-    return res.status(200).json({ ok: true, response: parsed });
+    const chatDebit = await debitCreditsForSession({sessionId:owner.sessionId,module:"support",resourceType:"support_chat",
+      requestId:`support-usage-${requestId}`,inputTokens:aiResult.input_tokens,outputTokens:aiResult.output_tokens,
+      model:aiResult.model_used,provider:"openai"});
+    return res.status(200).json({ ok: true, response: parsed, credits_charged:chatDebit.charged?chatDebit.amount:0 });
   } catch (error) {
     console.error("handleSendSupportMessage error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка отправки." });
