@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:api": "node --env-file=.env.local local-api-server.js",
     "dev:all": "concurrently \"npm run dev:api\" \"npm run dev\"",
-    "build": "node scripts/check-database-architecture.js && vite build",
+    "build": "npm run test:my-practice && npm run test:specialist-navigation && node scripts/check-database-architecture.js && vite build",
     "preview": "vite preview",
     "e2e:phase11c1": "node scripts/e2e-phase11c1-browser.mjs",
     "e2e:service-requests": "node scripts/e2e-service-requests-browser.mjs",
@@ -55,7 +55,9 @@
     "test:health-live": "node scripts/test-health-live.js",
     "e2e:health-live": "node scripts/e2e-health-live.mjs",
     "test:ai-telemetry": "node scripts/test-ai-telemetry.js && node scripts/test-ai-usage-flow.js && node scripts/test-openai-usage-path.js && node scripts/test-langfuse-preview-smoke.js",
-    "test:live-budget": "node scripts/test-live-budget.js && node scripts/test-live-relay.js && node scripts/test-live-pcm.js"
+    "test:live-budget": "node scripts/test-live-budget.js && node scripts/test-live-relay.js && node scripts/test-live-pcm.js",
+    "test:my-practice": "node scripts/test-my-practice-pilot.js && node scripts/test-my-practice-catalog.js && node scripts/test-my-practice-commission.js && node scripts/test-my-practice-schedule.js && node scripts/test-my-practice-server-workspace.js && node scripts/test-my-practice-workspace-handler.js && node scripts/test-my-practice-server-ui.js && node scripts/test-my-practice-preview-db-gate.js && node scripts/test-my-practice-paid-bookings.js && node scripts/test-my-practice-paid-ui.js && node scripts/test-my-practice-places.js",
+    "test:specialist-navigation": "node scripts/test-specialist-navigation.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

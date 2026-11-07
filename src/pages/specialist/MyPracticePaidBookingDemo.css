@@ -1,0 +1,37 @@
+.mp-paid,.mp-paid-patient{color:#303b34;font:13px Inter,system-ui,sans-serif}
+.mp-paid *,.mp-paid-patient *{box-sizing:border-box}
+.mp-paid h4{font-size:14px;margin:0 0 14px}.mp-paid-form{border:1px solid #e1e8e0;padding:15px;border-radius:13px;background:#fafbf8;margin:14px 0}
+.mp-paid-warning{border-left:3px solid #bd8e73;background:#f8f6f2;border-radius:8px;padding:11px 13px;color:#6b6b63;font-size:12px;line-height:1.6}
+.mp-paid-inputs{display:grid;grid-template-columns:2fr repeat(3,1fr);gap:10px;margin-bottom:9px}
+.mp-paid-inputs label{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:11px;color:#606f62}
+.mp-paid-inputs select,.mp-paid-inputs input{height:39px;width:100%;padding:7px 8px;border:1px solid #dfe6df;border-radius:8px;color:#384a3c;background:#fff;font:12px Inter,system-ui,sans-serif}
+.mp-paid-quote{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0}
+.mp-paid-quote span{display:flex;flex-direction:column;gap:7px;background:#fff;border:1px solid #e3ebe4;padding:12px;border-radius:9px}
+.mp-paid-quote small{font-size:10px;color:#728073}.mp-paid-quote strong{font-size:clamp(14px,2vw,20px);color:#3c6048;overflow-wrap:anywhere}
+.mp-paid-footnote{font-size:11px;line-height:1.55;color:#778378}
+.mp-paid-section-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:20px 0 12px}
+.mp-paid-section-heading h4{margin:0}.mp-paid-list{display:grid;gap:11px}
+.mp-paid-slot{border:1px solid #e3e9e2;border-radius:12px;background:#fff;padding:13px}
+.mp-paid-slot-head{display:flex;justify-content:space-between;gap:12px}
+.mp-paid-slot-head strong{font-size:13px}.mp-paid-slot-head p{font-size:12px;margin:5px 0;color:#566b5a}.mp-paid-slot-head small{font-size:10px;color:#8d988e}
+.mp-paid-slot-actions,.mp-paid-checkout-actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:12px}
+.mp-paid-slot-actions a{color:#426f56;font-size:12px;text-decoration:underline}
+.mp-paid-booking-list{margin-top:11px;border-top:1px solid #eef0ec;padding-top:6px}
+.mp-paid-booking-list>div{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:7px 0;font-size:11px}
+.mp-paid-booking-list small{color:#829083}
+.mp-paid-booking-list button{margin-left:auto;border:1px solid #e3d2cd;border-radius:7px;background:#fff6f4;color:#a05e50;padding:5px 9px;font-size:11px}
+.mp-paid-error,.mp-paid-notice{padding:10px 12px;border-radius:9px;margin:12px 0;line-height:1.55;font-size:12px}
+.mp-paid-error{background:#fff1ee;color:#9e4e4b}.mp-paid-notice{background:#edf6ee;color:#4b7353}
+.mp-paid-patient{max-width:820px;margin:30px auto;padding:27px;border:1px solid #e0e7df;background:#fff;border-radius:20px}
+.mp-paid-patient-heading p{font-size:11px;color:#a45e51;text-transform:uppercase;letter-spacing:.08em}
+.mp-paid-patient-heading h1{font-size:clamp(21px,3vw,29px);margin:0 0 16px}
+.mp-paid-patient-card{border:1px solid #e3e9e1;border-radius:13px;padding:18px;margin:14px 0}
+.mp-paid-patient-card h2{font-size:18px;margin:0 0 4px}.mp-paid-patient-card h3{font-size:15px;margin:18px 0 6px}
+.mp-paid-patient-card p{font-size:12px;color:#637367;line-height:1.5}.mp-paid-patient .mp-paid-eyebrow{font-size:10px;color:#a56d59;text-transform:uppercase}
+.mp-paid-patient-checkout{background:#fafbf8;padding:14px;border-radius:10px;margin:13px 0}
+.mp-paid button,.mp-paid-patient button{font:600 12px Inter,system-ui,sans-serif;cursor:pointer}
+.mp-paid button:focus-visible,.mp-paid-patient button:focus-visible,.mp-paid select:focus-visible,.mp-paid input:focus-visible{outline:3px solid #a86b61;outline-offset:2px}
+.mp-paid button:disabled,.mp-paid-patient button:disabled{opacity:.5;cursor:not-allowed}
+.mp-paid-patient .mp-primary{background:#426a56;color:#fff;border:0;border-radius:9px;padding:10px 14px}
+.mp-paid-patient .mp-secondary{background:#fff;border:1px solid #dae6da;color:#50705b;border-radius:9px;padding:9px 12px}
+@media(max-width:720px){.mp-paid-inputs{grid-template-columns:repeat(2,minmax(0,1fr))}.mp-paid-inputs label:first-child{grid-column:span 2}.mp-paid-quote{grid-template-columns:1fr}.mp-paid-patient{padding:15px;margin:12px}}
