@@ -33,7 +33,7 @@ export default function StrawberryWelcome({
       <div className="strawberry-entry__atmosphere" aria-hidden="true" />
       <header className="strawberry-entry__header">
         <a className="strawberry-entry__brand" href="/strawberry-support" aria-label="Земляничные поляны — Поддержка. На главную">
-          <img src="/strawberry-support-mark.webp" alt="" width="45" height="52" />
+          <img src="/strawberry-support-mark-v2.webp" alt="" width="68" height="72" />
           <span>
             <span className="strawberry-entry__brand-name">Земляничные поляны</span>
             <span className="strawberry-entry__brand-caption">ПОДДЕРЖКА</span>

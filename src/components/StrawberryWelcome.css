@@ -34,8 +34,8 @@
   margin:0 auto;
   display:flex;align-items:flex-start;justify-content:space-between;gap:22px;
 }
-.strawberry-entry__brand{display:inline-flex;align-items:center;gap:13px;flex:none;min-width:0}
-.strawberry-entry__brand img{width:48px;height:52px;object-fit:contain;mix-blend-mode:multiply;opacity:.85}
+.strawberry-entry__brand{display:inline-flex;align-items:center;gap:9px;flex:none;min-width:0}
+.strawberry-entry__brand img{width:68px;height:72px;object-fit:contain;mix-blend-mode:normal;opacity:1;flex-shrink:0}
 .strawberry-entry__brand-name{display:block;font:italic normal clamp(21px,2.25vw,32px)/1.15 Georgia,"Times New Roman",serif;letter-spacing:-.035em;color:#4d5748;white-space:nowrap}
 .strawberry-entry__brand-caption{display:block;text-align:center;font-size:10px;letter-spacing:.35em;line-height:1.9;color:#8f9489;margin-top:3px}
 .strawberry-entry__nav{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:clamp(10px,2vw,28px);padding-top:14px}
@@ -61,7 +61,7 @@
 .strawberry-entry__footer{position:relative;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;width:min(100%,1470px);margin:0 auto;padding:18px clamp(26px,7.7vw,122px) 24px;color:#a4a99f;font-size:11px}
 @media(max-width:850px){
   .strawberry-entry__header{padding:20px 22px;flex-wrap:wrap}
-  .strawberry-entry__brand img{width:37px;height:45px}
+  .strawberry-entry__brand img{width:50px;height:58px}
   .strawberry-entry__brand-name{font-size:22px}
   .strawberry-entry__nav{gap:14px;padding:0}
   .strawberry-entry__nav button{font-size:12px}
