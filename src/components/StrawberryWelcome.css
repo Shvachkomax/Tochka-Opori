@@ -1,0 +1,86 @@
+/* Экран 01. Изоляция всех селекторов исключает влияние на Health и текущий Support. */
+.strawberry-entry{
+  --se-ink:#4a5045;
+  --se-soft:#7d8279;
+  --se-leaf:#879b7d;
+  box-sizing:border-box;
+  isolation:isolate;
+  position:relative;
+  min-height:100vh;
+  min-height:100dvh;
+  background:#fff;
+  color:var(--se-ink);
+  overflow:hidden;
+  font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+}
+.strawberry-entry *, .strawberry-entry *::before, .strawberry-entry *::after{box-sizing:border-box}
+.strawberry-entry button{font:inherit;cursor:pointer}
+.strawberry-entry a{color:inherit;text-decoration:none}
+.strawberry-entry button:focus-visible,.strawberry-entry a:focus-visible{outline:2px solid #6e8268;outline-offset:4px}
+.strawberry-entry__atmosphere{
+  position:absolute;z-index:-1;
+  top:0;right:0;bottom:0;
+  width:min(57%,865px);
+  background-image:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.65) 10%,rgba(255,255,255,0) 36%),url("/strawberry-support-window.webp");
+  background-repeat:no-repeat;
+  background-size:100% 100%,cover;
+  background-position:center,right center;
+  opacity:.94;
+  pointer-events:none;
+}
+.strawberry-entry__header{
+  width:min(100%,1470px);
+  padding:30px clamp(26px,7.7vw,122px);
+  margin:0 auto;
+  display:flex;align-items:flex-start;justify-content:space-between;gap:22px;
+}
+.strawberry-entry__brand{display:inline-flex;align-items:center;gap:13px;flex:none;min-width:0}
+.strawberry-entry__brand img{width:48px;height:52px;object-fit:contain;mix-blend-mode:multiply;opacity:.85}
+.strawberry-entry__brand-name{display:block;font:italic normal clamp(21px,2.25vw,32px)/1.15 Georgia,"Times New Roman",serif;letter-spacing:-.035em;color:#4d5748;white-space:nowrap}
+.strawberry-entry__brand-caption{display:block;text-align:center;font-size:10px;letter-spacing:.35em;line-height:1.9;color:#8f9489;margin-top:3px}
+.strawberry-entry__nav{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:clamp(10px,2vw,28px);padding-top:14px}
+.strawberry-entry__nav button{background:none;border:0;padding:4px 0;color:#696e67;font-size:13px;font-weight:400;white-space:nowrap}
+.strawberry-entry__nav button:hover{color:#313a31}
+.strawberry-entry__nav .strawberry-entry__urgent{color:#aa6e69}
+.strawberry-entry__main{position:relative;width:min(100%,1470px);margin:0 auto;padding:clamp(80px,12.2vh,144px) clamp(26px,11.8vw,189px) 72px}
+.strawberry-entry__eyebrow{font-size:11px;letter-spacing:.18em;color:#939b8b;margin:0 0 29px}
+.strawberry-entry h1{font:normal clamp(42px,4.8vw,74px)/1.19 Georgia,"Times New Roman",serif;letter-spacing:-.032em;color:#434b40;margin:0 0 28px;max-width:810px}
+.strawberry-entry__intro{font-size:clamp(16px,1.4vw,20px);line-height:1.9;color:#767d73;max-width:690px;margin:0 0 33px}
+.strawberry-entry__actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+.strawberry-entry__action{display:inline-flex;align-items:center;justify-content:center;gap:18px;padding:12px 27px;min-height:53px;border:0;border-radius:999px;font-size:15px!important;white-space:nowrap;transition:background .15s ease}
+.strawberry-entry__action--primary{background:#8c9e81;color:#fff}
+.strawberry-entry__action--primary:hover:not(:disabled){background:#748d6c}
+.strawberry-entry__action--primary:disabled{opacity:.67;cursor:wait}
+.strawberry-entry__action--quiet{background:rgba(246,245,242,.91);color:#515a4d}
+.strawberry-entry__action--quiet:hover{background:#efeee8}
+.strawberry-entry__resume{border:0;background:none;color:#777d72;padding:0;margin-top:30px;font-size:14px!important;text-align:left}
+.strawberry-entry__resume:hover{color:#465043}
+.strawberry-entry__error{color:#a23c32;max-width:660px;font-size:14px}
+.strawberry-entry__features{display:flex;gap:30px;flex-wrap:wrap;margin-top:clamp(84px,12vh,150px);font-size:12px;color:#858d7f}
+.strawberry-entry__features span::before{content:"•";display:inline-block;color:#98a58d;margin-right:11px}
+.strawberry-entry__footer{position:relative;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;width:min(100%,1470px);margin:0 auto;padding:18px clamp(26px,7.7vw,122px) 24px;color:#a4a99f;font-size:11px}
+@media(max-width:850px){
+  .strawberry-entry__header{padding:20px 22px;flex-wrap:wrap}
+  .strawberry-entry__brand img{width:37px;height:45px}
+  .strawberry-entry__brand-name{font-size:22px}
+  .strawberry-entry__nav{gap:14px;padding:0}
+  .strawberry-entry__nav button{font-size:12px}
+  .strawberry-entry__main{padding:85px 24px 40px}
+  .strawberry-entry h1{font-size:clamp(36px,8.1vw,56px)}
+  .strawberry-entry__intro{font-size:17px;line-height:1.68;max-width:590px}
+  .strawberry-entry__atmosphere{width:88%;opacity:.31;top:170px;bottom:50px}
+  .strawberry-entry__features{margin-top:80px;gap:10px 25px}
+  .strawberry-entry__footer{padding:30px 24px;font-size:10px}
+}
+@media(max-width:500px){
+  .strawberry-entry__header{gap:14px}
+  .strawberry-entry__nav{width:100%;justify-content:space-between}
+  .strawberry-entry__nav button{font-size:11px}
+  .strawberry-entry__main{padding-top:62px}
+  .strawberry-entry__eyebrow{font-size:9px}
+  .strawberry-entry__actions{align-items:stretch;flex-direction:column;max-width:320px}
+  .strawberry-entry__action{width:100%;min-height:50px}
+  .strawberry-entry__features{margin-top:58px;flex-direction:column;gap:4px}
+  .strawberry-entry__atmosphere{top:215px;right:-160px;width:110%;opacity:.20}
+}
+@media(prefers-reduced-motion:reduce){.strawberry-entry__action{transition:none}}

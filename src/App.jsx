@@ -1,4 +1,5 @@
 import InformationFlow from "./InformationFlow.jsx";
+import StrawberryWelcome from "./components/StrawberryWelcome.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -60,6 +61,8 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [phase, setPhase] = useState("input");
   const [supportScreen, setSupportScreen] = useState("landing");
+  // Route-scoped design rollout: first screen only, old Support remains unchanged.
+  const [strawberryEntryStep, setStrawberryEntryStep] = useState("welcome");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("user");
@@ -4836,9 +4839,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   // Keep the AnMed pilot's presentation separate from the module selection.
   useEffect(() => {
-    document.title = APP_BRAND.isSupportPilot
-      ? APP_BRAND.title
-      : isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.title;
+    document.title = !APP_BRAND.isSupportPilot && window.location.pathname === "/strawberry-support"
+      ? "Земляничные поляны — Поддержка (тест)"
+      : APP_BRAND.isSupportPilot
+        ? APP_BRAND.title
+        : isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.title;
   }, [isDedicatedSubdomain]);
 
   const s = {
@@ -9851,6 +9856,51 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     inviteInfo.invite_kind === "patient_specialist" &&
     ["specialist_to_patient", "patient_to_specialist"].includes(inviteInfo.direction)
   );
+
+  // Gradual screen-by-screen migration. Only /strawberry-support shows screen 01.
+  // Invitations, partner brands, Health and the existing root Support bypass this route.
+  const strawberryRoute = typeof window !== "undefined" &&
+    ["/strawberry-support", "/strawberry-support/"].includes(window.location.pathname);
+  const showStrawberryEntry = strawberryRoute &&
+    !APP_BRAND.isSupportPilot && activeModule === "support" &&
+    supportScreen === "landing" && phase === "input" &&
+    strawberryEntryStep === "welcome" &&
+    !inviteChecking && !inviteToken && !inviteInfo?.valid;
+  if (showStrawberryEntry) {
+    return (
+      <StrawberryWelcome
+        onStartVoice={async () => {
+          await ensureStartSession();
+          setMode("voice");
+          setStrawberryEntryStep("intake");
+        }}
+        onWrite={() => {
+          setMode("text");
+          setStrawberryEntryStep("intake");
+        }}
+        onResume={() => {
+          setStrawberryEntryStep("intake");
+          const saved = getSupportSession();
+          if (saved.sessionId && saved.accessToken) {
+            loadSupportCabinet();
+          } else {
+            setSessionModalOpen(true);
+          }
+        }}
+        onAbout={() => {
+          setStrawberryEntryStep("intake");
+          setAboutProjectOpen(true);
+        }}
+        onCrisis={() => {
+          setStrawberryEntryStep("intake");
+          setCrisisOpen(true);
+        }}
+        onSpecialist={() => {
+          window.location.href = "/specialist";
+        }}
+      />
+    );
+  }
 
   return (
     <div style={s.page} className="app-page">
