@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+let Processor;
+const context=vm.createContext({Float32Array,Int16Array,Math,AudioWorkletProcessor:class{constructor(){this.port={sent:[],postMessage(data){this.sent.push(data);}};}},registerProcessor(_name,cls){Processor=cls;}});
+vm.runInContext(await readFile(new URL('../public/audio/live-pcm.js',import.meta.url),'utf8'),context);
+const p=new Processor(),input=new Float32Array(128).fill(.5);
+for(let i=0;i<19;i++)p.process([[input]],[[new Float32Array(128)]]);
+assert.equal(new Int16Array(p.port.sent[0].pcm)[0],16384);
+p.port.onmessage({data:{type:'pause',value:true}});
+for(let i=0;i<20;i++)p.process([[input]],[[new Float32Array(128)]]);
+assert.equal(p.port.sent.length,1);
+const samples=new Int16Array([32767,-32768,16384]);p.port.onmessage({data:{pcm:samples.buffer}});
+const out=new Float32Array(4);p.process([],[[out]]);assert.deepEqual([...out],[32767/32768,-1,.5,0]);
+p.port.onmessage({data:{pcm:samples.buffer}});p.port.onmessage({data:{type:'clear'}});p.process([],[[out]]);assert.deepEqual([...out],[0,0,0,0]);
+p.port.onmessage({data:{pcm:new Int16Array(48001).buffer}});assert.equal(p.port.sent.at(-1).error,'playback_overflow');
+console.log('PASS: actual PCM processor capture, pause, playback, silence, clear and bounded buffer.');

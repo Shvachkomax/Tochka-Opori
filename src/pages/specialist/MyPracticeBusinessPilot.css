@@ -1,0 +1,16 @@
+
+/* «Моя практика»: отдельные демонстрационные вкладки доходов и связи с пациентом */
+.mp-business-filters{max-width:450px}.mp-business-split{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+.mp-business-split>div{padding:15px 12px;border:1px solid #e8ebe6;border-radius:11px;background:#fff;display:flex;flex-direction:column;gap:7px;min-width:0}
+.mp-business-split span{font-size:11px;color:#728179;line-height:1.45}
+.mp-business-split strong{font-size:clamp(16px,2.7vw,23px);color:#3b5549;line-height:1.2;overflow-wrap:anywhere}
+.mp-business-scenario{padding:16px;margin-top:18px;background:#fafaf8;border:1px solid #e8ebe6;border-radius:12px}
+.mp-business-scenario h4{font-size:13px;margin:0 0 12px}
+.mp-business-scenario .mp-field{max-width:450px!important}
+.mp-result{display:flex;flex-direction:column;gap:6px;background:#eff5f0;border:1px solid #dfebe0;border-radius:9px;padding:11px 13px;color:#43654e;font-size:12px}
+.mp-result strong{font-size:15px}.mp-result small{color:#6e7c73;line-height:1.5}
+.mp-link-flow{display:flex;flex-direction:column;gap:9px}
+.mp-link-step{display:flex;gap:13px;background:white;border:1px solid #e8ebe6;padding:12px 13px;border-radius:11px}
+.mp-link-step>span{width:26px;height:26px;flex:0 0 26px;border-radius:50%;background:#f0f2ec;color:#667969;display:grid;place-items:center;font-size:12px;font-weight:750}
+.mp-link-step strong{font-size:13px}.mp-link-step p{font-size:12px;color:#778079;margin:5px 0 0;line-height:1.5}
+@media(max-width:580px){.mp-business-split{grid-template-columns:minmax(0,1fr)}}
