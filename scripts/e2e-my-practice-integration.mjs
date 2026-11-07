@@ -16,7 +16,7 @@ const root=ReactDOM.createRoot(document.getElementById('root'));window.renderPra
  await page.getByTestId('mp-place-name').fill('Учебное место АнМед');
  await page.getByTestId('mp-place-form').getByRole('button',{name:'Сохранить место',exact:true}).click();
  await page.getByTestId('mp-save-places').click();
- await page.getByRole('button',{name:'Платные приёмы',exact:true}).click();
+ await page.getByRole('tab',{name:'Платные приёмы',exact:true}).click();
  await page.getByRole('button',{name:'Создать учебный слот',exact:true}).click();
  await page.locator('.mp-paid-slot').waitFor();
  const link=await page.getByRole('link',{name:'Посмотреть страницу пациента'}).getAttribute('href');
@@ -24,13 +24,13 @@ const root=ReactDOM.createRoot(document.getElementById('root'));window.renderPra
  await page.evaluate(()=>window.renderPractice('doctor-b:kgmu'));
  await page.getByTestId('my-practice-places').waitFor();
  assert.equal(await page.getByText('Учебное место АнМед',{exact:true}).count(),0);
- await page.getByRole('button',{name:'Платные приёмы',exact:true}).click();
+ await page.getByRole('tab',{name:'Платные приёмы',exact:true}).click();
  assert.equal(await page.locator('.mp-paid-slot').count(),0);
  await page.evaluate(()=>window.renderPractice('doctor-a:anmed'));
  await page.getByText('Учебное место АнМед',{exact:true}).waitFor();
  await page.getByTestId('mp-delete-place-demo-clinic-a').click();
  await page.getByText(/Очистите их в разделе/).waitFor();
- await page.getByRole('button',{name:'Платные приёмы',exact:true}).click();
+ await page.getByRole('tab',{name:'Платные приёмы',exact:true}).click();
  await page.locator('.mp-paid-slot').waitFor();
  assert.deepEqual(errors,[]);
  console.log('PASS integrated practice: doctor/context draft separation, paid link scope, restored slots and deletion guard');
