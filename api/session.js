@@ -351,11 +351,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  if (req.body?.action === 'healthLive') {
+  if (['healthLive', 'supportLive'].includes(req.body?.action)) {
+    const liveModule = req.body.action === 'supportLive' ? 'support' : 'body';
     return createLiveHandler({
-      module: 'body',
-      resolveOwner: (id, token) => resolveLiveOwner(getSupabase(), id, token),
-      buildContext: owner => buildAiChatContext({ supabase: getSupabase(), ownerId: owner.ownerId }),
+      module: liveModule,
+      resolveOwner: (id, token) => resolveLiveOwner(getSupabase(), id, token, liveModule),
+      buildContext: owner => liveModule === 'support'
+        ? buildSupportChatContext(getSupabase(), owner.ownerId)
+        : buildAiChatContext({ supabase: getSupabase(), ownerId: owner.ownerId }),
     })(req, res);
   }
 

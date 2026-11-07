@@ -28,3 +28,12 @@ for (const pilot of ['anmed', 'kgmu', 'pneumointegration']) {
   }
 }
 console.log('Live ownership PASS: strict token, no legacy bypass, exact pilot, matching canonical owner, fail closed.');
+
+// Support gets the same strict owner, pilot and token checks without body_clients.
+delete process.env.PILOT_ID;
+const supportSession={...session,module:'support'};
+assert.deepEqual(await resolveLiveOwner(db(supportSession),'fixture',token,'support'),{ownerId:'owner',sessionId:'fixture'});
+assert.equal(await resolveLiveOwner(db(supportSession),'fixture','wrong','support'),null);
+assert.equal(await resolveLiveOwner(db({...supportSession,legacy_access:true}),'fixture',token,'support'),null);
+assert.equal(await resolveLiveOwner(db(supportSession),'fixture',token,'body'),null);
+console.log('Support Live strict ownership PASS');

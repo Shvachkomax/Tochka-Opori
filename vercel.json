@@ -1,7 +1,7 @@
 {
   "rewrites": [
     {
-      "source": "/((?!api/.*|support-practices/.*).*)",
+      "source": "/((?!api/.*|audio/.*|support-practices/.*).*)",
       "destination": "/index.html"
     }
   ],
@@ -11,6 +11,9 @@
     },
     "api/transcribe.js": {
       "includeFiles": "node_modules/opusscript/build/**"
+    },
+    "api/live-socket.js": {
+      "maxDuration": 300
     }
   }
 }

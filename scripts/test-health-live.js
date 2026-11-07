@@ -12,26 +12,21 @@ process.env.HEALTH_LIVE_ENABLED = 'true';
 process.env.OPENAI_API_KEY = 'test-only';
 const { createLiveHandler, liveConfiguration } = await import('../lib/voice/health-live.js');
 const { generateClientToken } = await import('../lib/security/client-token.js');
-let calls = 0, upstreamOk = true;
+let calls = 0, reserveOk = true;
+const budget = { redeem: async () => ({ok:true}), reserve: async () => {
+  calls++; return reserveOk ? {ok:true,id:'fixture',reserved_credits:20000,reserved_microusd:1000000} : {ok:false,code:'BUDGET_EXHAUSTED'};
+}, finish: async () => ({ok:true}) };
+process.env.LIVE_BUDGET_RELAY_ENABLED = 'true';
 function makeHandler(module = 'body') { return createLiveHandler({
-  module,
+  module, budgetFactory: () => budget,
+  signTicket: payload => { assert.equal(payload.config.delegation.type,'client'); assert.equal(payload.config.client,undefined); return 'opaque-ticket'; },
   resolveOwner: async (id, token) => id === 'health-test' && token === 'owned' ? { ownerId: 'fixture' } : null,
   buildContext: async () => ({ profile: { goal: 'Наладить сон' } }),
-  upstreamFetch: async (url, options) => {
-    calls++;
-    if (url.includes('/models/')) return { ok: upstreamOk };
-    const body = JSON.parse(options.body);
-    assert.equal(body.session.model, 'gpt-live-1');
-    assert.equal(body.session.store, false);
-    assert.equal(body.session.delegation.responses.model, 'gpt-5.5');
-    assert.deepEqual(body.session.client.data_channel.allowed_client_events, ['session.close']);
-    return { ok: upstreamOk, status: 403, json: async () => ({ session: { id: 'live_test', secret: 'must-not-leak' }, transport: { sdp: 'answer' } }) };
-  },
 }); }
 let handler = makeHandler();
 let ip = 0;
 async function call(extra = {}, module = 'body', headers = {}) {
-  const req = { method: 'POST', url: '/api/session', headers: { authorization: `Bearer ${generateClientToken('analyze', module).token}`, 'x-forwarded-for': `test-${ip++}`, ...headers }, body: { session_id: 'health-test', access_token: 'owned', live_action: 'create', consent: true, sdp: 'v=0\r\nfixture', ...extra } };
+  const req = { method: 'POST', url: '/api/session', headers: { authorization: `Bearer ${generateClientToken('analyze', module).token}`, 'x-forwarded-for': `test-${ip++}`, ...headers }, body: { session_id: 'health-test', access_token: 'owned', live_action: 'create', consent: true, transport: 'server_ws', sdp: 'v=0\r\nfixture', ...extra } };
   const res = { status(c) { this.code = c; return this; }, setHeader(){}, json(d){ this.data = d; return this; } };
   await handler(req, res); return res;
 }
@@ -41,7 +36,7 @@ assert.equal((await call({}, 'body', { origin: 'https://evil.example' })).code, 
 assert.equal((await call({}, 'body', { authorization: 'Bearer invalid' })).code, 401);
 assert.equal(calls, 0);
 assert.equal((await call({ consent: false })).code, 400);
-assert.equal((await call({ sdp: 'x'.repeat(65000) })).code, 400);
+assert.equal((await call({ transport: 'webrtc' })).code, 400);
 assert.equal(calls, 0);
 process.env.VERCEL_ENV = 'production';
 assert.equal((await call()).code, 503);
@@ -56,17 +51,16 @@ assert.equal((await call()).code, 503);
 process.env.HEALTH_LIVE_ENABLED = 'true';
 const created = await call({ model: 'untrusted', instructions: 'untrusted' });
 assert.equal(created.code, 201);
-assert.equal(created.data.max_seconds, 300);
+assert.equal(created.data.max_seconds, 180);
 assert.equal(JSON.stringify(created.data).includes('must-not-leak'), false);
 assert.equal((await call({ live_action: 'check' })).code, 200);
-upstreamOk = false;
-assert.equal((await call({ live_action: 'check' })).code, 503);
-assert.equal((await call()).code, 502);
+reserveOk=false; assert.equal((await call()).code,402); reserveOk=true;
+process.env.LIVE_BUDGET_RELAY_ENABLED='false'; assert.equal((await call()).code,503); process.env.LIVE_BUDGET_RELAY_ENABLED='true';
 const config = liveConfiguration({ comment: 'my email is test@example.com' });
 assert.equal(JSON.stringify(config.input).includes('test@example.com'), false);
 assert.deepEqual(config.delegation.responses.tools, []);
 assert.ok(config.instructions.includes('Не ставь диагнозы'));
-upstreamOk = true;
+
 process.env.SUPPORT_LIVE_ENABLED = 'true';
 handler = makeHandler('support');
 assert.equal((await call({}, 'body')).code, 403);
