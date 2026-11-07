@@ -11,7 +11,6 @@ import {formatPracticeRubles,quotePracticeCommission} from "../../../lib/my-prac
 import SpecialistPageNavigation from "./SpecialistPageNavigation.jsx";
 import "./MyPracticePaidBookingDemo.css";
 
-const SEED_SERVICE_IDS=new Set(["a-first","a-return","b-first","b-online","c-return"]);
 const dateLabel=d=>new Intl.DateTimeFormat("ru-RU",{dateStyle:"medium",timeZone:"UTC"}).format(new Date(d+"T12:00:00Z"));
 const nowDay=()=>{
   const d=new Date();d.setDate(d.getDate()+4);
@@ -68,7 +67,7 @@ function linkFor(slot){
 }
 export function MyPracticePaidBookingsDemo({catalog,schedule}){
  const {data,error,setError,update}=usePaidDemoStore();
- const options=useMemo(()=>catalog.flatMap(c=>c.offers.filter(o=>o.status!=="archived"&&SEED_SERVICE_IDS.has(o.id))
+ const options=useMemo(()=>catalog.flatMap(c=>c.offers.filter(o=>o.status!=="archived")
    .map(o=>({id:o.id,clinicId:c.id,clinic:c.name,...o}))),[catalog]);
  const [serviceId,setServiceId]=useState("a-first");
  const [day,setDay]=useState(nowDay);
@@ -135,7 +134,7 @@ export function MyPracticePaidBookingsDemo({catalog,schedule}){
          <div className="mp-paid-slot-head"><div>
            <strong>{offerName(catalog,slot)}</strong>
            <p>{dateLabel(slot.day)} · {slot.start}–{slot.end}</p>
-           <small>Справочное место: {DEMO_CLINICS.find(c=>c.id===slot.clinicId)?.name}</small>
+           <small>Справочное место: {catalog.find(c=>c.id===slot.clinicId)?.name||"Удалённое место"}</small>
          </div><strong>{formatPracticeRubles(slot.priceKopecks)}</strong></div>
          <p className="mp-paid-footnote">{active?statusName(getBookingStatus(active,Date.now())):"Нет активной учебной брони"}</p>
          <div className="mp-paid-slot-actions">

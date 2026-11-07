@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
-import {DEMO_CLINICS, addDaysUTC, rubles} from "../../../lib/my-practice/pilot-data.js";
+import {addDaysUTC, rubles} from "../../../lib/my-practice/pilot-data.js";
 import {
   PATIENT_ALIASES, BOOKING_STATUSES, BUSY_REASONS, addScheduleEntry,
   updateScheduleEntry, removeScheduleEntry, entriesForWeek, endForDuration,
@@ -25,8 +25,8 @@ function newEvent(kind,day,clinicId,catalog){
     patientAlias:"demo-p1",serviceId:offer?.id||"",reason:"clinic",
   };
 }
-function clinicName(clinicId){
-  return DEMO_CLINICS.find(c=>c.id===clinicId)?.name||"Неизвестное место";
+function clinicName(clinicId,catalog){
+  return catalog.find(c=>c.id===clinicId)?.name||"Неизвестное место";
 }
 function bookingLabel(entry,catalog){
   const c=catalog.find(c=>c.id===entry.clinicId);
@@ -106,7 +106,7 @@ function ScheduleForm({draft,setDraft,editingId,catalog,entries,onChange,onClose
       </label>
       <label className="mp-field mp-field-block">Место приёма
         <select value={draft.clinicId} onChange={e=>changeClinic(e.target.value)} data-testid="mp-event-clinic">
-          {DEMO_CLINICS.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          {catalog.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </label>
       <label className="mp-field mp-field-block">Дата
@@ -169,7 +169,8 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
     return [day,visible.filter(e=>e.day===day)];
   })),[monday,visible]);
   const startNew=(kind,day=monday)=>{
-    const selectedClinic=clinic==="all"?DEMO_CLINICS[0].id:clinic;
+    if(!catalog.length)return;
+    const selectedClinic=clinic==="all"?catalog[0]?.id:clinic;
     setDraft(newEvent(kind,day,selectedClinic,catalog));
     setEditId(null);setNotice("");
   };
@@ -189,12 +190,12 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
       <label className="mp-field">Место приёма
         <select value={clinic} onChange={e=>{setClinic(e.target.value);close();}}>
           <option value="all">Все клиники</option>
-          {DEMO_CLINICS.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          {catalog.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </label>
       <div className="mp-schedule-new">
-        <button className="mp-primary" type="button" onClick={()=>startNew("booking")} data-testid="mp-add-booking">+ Запись</button>
-        <button className="mp-secondary" type="button" onClick={()=>startNew("busy")} data-testid="mp-add-busy">+ Занятость</button>
+        <button className="mp-primary" type="button" onClick={()=>startNew("booking")} disabled={!catalog.length} data-testid="mp-add-booking">+ Запись</button>
+        <button className="mp-secondary" type="button" onClick={()=>startNew("busy")} disabled={!catalog.length} data-testid="mp-add-busy">+ Занятость</button>
       </div>
     </div>
     <div className="mp-schedule-legend" aria-label="Обозначения календаря">
@@ -218,7 +219,7 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
                 data-testid={"mp-schedule-event-"+e.id}>
                 <strong>{e.start}–{e.end}</strong>
                 <span>{name}</span>
-                <small>{clinicName(e.clinicId)}</small>
+                <small>{clinicName(e.clinicId,catalog)}</small>
                 <small>{e.kind==="busy"?"Блок занятости":BOOKING_STATUSES[e.status]}</small>
                 {e.kind==="booking"&&<small>{PATIENT_ALIASES.find(p=>p.id===e.patientAlias)?.label||"Учебный пациент"}</small>}
                 <button className="mp-schedule-event-edit" type="button" onClick={()=>edit(e)}
@@ -226,7 +227,7 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
               </div>;
             })}
             {!current.length&&<p className="mp-no-block">Нет сведений о занятости</p>}
-            <button className="mp-schedule-day-add" type="button" onClick={()=>startNew("booking",day)}
+            <button className="mp-schedule-day-add" type="button" onClick={()=>startNew("booking",day)} disabled={!catalog.length}
               aria-label={"Добавить учебную запись на "+formatDay(day)}>+ Добавить</button>
           </div>;
         })}

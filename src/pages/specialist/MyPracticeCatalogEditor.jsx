@@ -38,7 +38,7 @@ export default function MyPracticeCatalogEditor({catalog,onChange,onSave,onReset
       <span>{countActiveOffers(catalog)} активных учебных услуг</span>
     </div>
     <label className="mp-field mp-field-block">Выберите клинику
-      <select data-testid="my-practice-editor-clinic" value={selected.id} onChange={e=>changeClinic(e.target.value)}>
+      <select data-testid="my-practice-editor-clinic" value={selected?.id||""} onChange={e=>changeClinic(e.target.value)} disabled={!selected}>
         {catalog.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
       </select>
     </label>
@@ -46,6 +46,7 @@ export default function MyPracticeCatalogEditor({catalog,onChange,onSave,onReset
     <div className="mp-editor-layout">
       <form onSubmit={saveOffer} className="mp-editor-form" data-testid="my-practice-offer-form">
         <h4>{editId?"Изменить услугу":"Добавить услугу"}</h4>
+        {!selected&&<p className="mp-muted">Для создания услуги сначала добавьте место работы на вкладке «Обзор».</p>}
         <label className="mp-field mp-field-block">Название услуги
           <input required maxLength={100} minLength={3} value={fields.name}
             onChange={e=>setFields({...fields,name:e.target.value})}
@@ -68,13 +69,13 @@ export default function MyPracticeCatalogEditor({catalog,onChange,onSave,onReset
         </div>
         {error&&<p className="mp-editor-error" role="alert">{error}</p>}
         <div className="mp-editor-actions">
-          <button type="submit" className="mp-primary">{editId?"Сохранить изменение":"Добавить в черновик"}</button>
+          <button type="submit" className="mp-primary" disabled={!selected}>{editId?"Сохранить изменение":"Добавить в черновик"}</button>
           {editId&&<button type="button" className="mp-secondary" onClick={resetForm}>Отменить</button>}
         </div>
       </form>
       <div className="mp-editor-list">
-        <h4>Услуги: {selected.name}</h4>
-        {selected.offers.map(offer=><div key={offer.id} className={"mp-editor-offer "+(offer.status==="archived"?"mp-archived":"")}>
+        <h4>Услуги: {selected?.name||"Место не выбрано"}</h4>
+        {(selected?.offers||[]).map(offer=><div key={offer.id} className={"mp-editor-offer "+(offer.status==="archived"?"mp-archived":"")}>
           <div><strong>{offer.name}</strong><p>{offer.format==="online"?"Дистанционно*":"Очно"} · {offer.minutes} мин · {offer.priceRub.toLocaleString("ru-RU")} ₽</p>
           {offer.status==="archived"&&<small>В архиве</small>}</div>
           <div className="mp-editor-offer-actions">
@@ -84,12 +85,12 @@ export default function MyPracticeCatalogEditor({catalog,onChange,onSave,onReset
             </button>
           </div>
         </div>)}
-        {!selected.offers.length&&<p className="mp-muted">Услуг пока нет.</p>}
+        {!selected?.offers.length&&<p className="mp-muted">Услуг пока нет.</p>}
       </div>
     </div>
     <div className="mp-editor-footer">
       <button type="button" className="mp-primary" onClick={onSave} disabled={!dirty} data-testid="my-practice-save-draft">Сохранить черновик в браузере</button>
-      <button type="button" className="mp-secondary" onClick={()=>{onReset();resetForm();}} data-testid="my-practice-reset-draft">Вернуть исходные демоданные</button>
+      <button type="button" className="mp-secondary" onClick={()=>{if(window.confirm("Вернуть исходные учебные места, услуги и календарь? Текущие несохранённые изменения будут потеряны.")){onReset();resetForm();}}} data-testid="my-practice-reset-draft">Вернуть исходные демоданные</button>
     </div>
     {storageMessage&&<p role="status" className="mp-editor-note">{storageMessage}</p>}
     <p className="mp-footnote">Сохранение не отправляет данные в Supabase и не публикует их для пациентов. Не вводите настоящие персональные данные. * Дистанционный приём возможен только при наличии правовых оснований.</p>

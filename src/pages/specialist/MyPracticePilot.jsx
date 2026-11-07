@@ -9,6 +9,7 @@ import "./MyPracticeBusinessPilot.css";
 import { MyPracticeFinancialDemo, MyPracticePatientConnectionDemo } from "./MyPracticeBusinessPilot.jsx";
 import MyPracticeCatalogEditor from "./MyPracticeCatalogEditor.jsx";
 import MyPracticeCalendar from "./MyPracticeCalendar.jsx";
+import MyPracticePlacesEditor from "./MyPracticePlacesEditor.jsx";
 import {MyPracticePaidBookingsDemo} from "./MyPracticePaidBookingDemo.jsx";
 import {initialScheduleDraft, restoreScheduleDraft, SCHEDULE_DRAFT_STORAGE_KEY} from "../../../lib/my-practice/schedule-draft.js";
 import {initialDraftCatalog,restoreDraftCatalog,countActiveOffers,DRAFT_STORAGE_KEY,updateDraftOffer} from "../../../lib/my-practice/catalog-draft.js";
@@ -136,7 +137,7 @@ export default function MyPracticePilot({ standalone = false }) {
   });
   const [schedule,setSchedule] = useState(() => {
     try {return restoreScheduleDraft(sessionStorage.getItem(SCHEDULE_DRAFT_STORAGE_KEY),catalog);}
-    catch {return initialScheduleDraft();}
+    catch {return initialScheduleDraft(catalog);}
   });
   const [scheduleDirty,setScheduleDirty] = useState(false);
   const [scheduleMessage,setScheduleMessage] = useState("");
@@ -147,18 +148,40 @@ export default function MyPracticePilot({ standalone = false }) {
   };
   const resetSchedule = () => {
     try {sessionStorage.removeItem(SCHEDULE_DRAFT_STORAGE_KEY);} catch {}
-    setSchedule(initialScheduleDraft());setScheduleDirty(false);setScheduleMessage("Исходное учебное расписание восстановлено.");
+    setSchedule(initialScheduleDraft(catalog));setScheduleDirty(false);setScheduleMessage("Исходное учебное расписание восстановлено.");
   };
   const [dirty,setDirty] = useState(false);
   const [storageMessage,setStorageMessage] = useState("");
   const changeCatalog = next => { setCatalog(next); setDirty(true); setStorageMessage(""); };
+  const changePlaces = (nextCatalog,nextSchedule) => {
+    changeCatalog(nextCatalog);
+    if(nextSchedule){setSchedule(nextSchedule);setScheduleDirty(true);setScheduleMessage("");}
+    if(clinicFilter!=="all"&&!nextCatalog.some(c=>c.id===clinicFilter))setClinicFilter("all");
+    if(calendarClinic!=="all"&&!nextCatalog.some(c=>c.id===calendarClinic))setCalendarClinic("all");
+  };
+  const savePlaces = () => {
+    try{
+      sessionStorage.setItem(DRAFT_STORAGE_KEY,JSON.stringify(catalog));
+      sessionStorage.setItem(SCHEDULE_DRAFT_STORAGE_KEY,JSON.stringify(schedule));
+      setDirty(false);setScheduleDirty(false);
+      setStorageMessage("Учебные места работы, услуги и расписание сохранены в этом браузере.");
+      setScheduleMessage("Расписание сохранено вместе со справочником.");
+    }catch{setStorageMessage("Не удалось записать черновик в браузере.");}
+  };
   const saveDraft = () => {
     try { sessionStorage.setItem(DRAFT_STORAGE_KEY,JSON.stringify(catalog)); setDirty(false); setStorageMessage("Тестовый черновик сохранён только в этом браузере."); }
     catch { setStorageMessage("Браузер не разрешил локальное сохранение. Черновик остаётся только на экране."); }
   };
   const resetDraft = () => {
-    try {sessionStorage.removeItem(DRAFT_STORAGE_KEY);} catch {}
-    setCatalog(initialDraftCatalog());setDirty(false);setStorageMessage("Исходные демоданные восстановлены.");
+    try{
+      sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+      sessionStorage.removeItem(SCHEDULE_DRAFT_STORAGE_KEY);
+    }catch{}
+    setCatalog(initialDraftCatalog());setDirty(false);
+    setSchedule(initialScheduleDraft());setScheduleDirty(false);
+    setClinicFilter("all");setCalendarClinic("all");
+    setStorageMessage("Исходный учебный каталог и календарь восстановлены.");
+    setScheduleMessage("Исходное учебное расписание восстановлено.");
   };
   const [clinicFilter,setClinicFilter] = useState("all");
   const [formatFilter,setFormatFilter] = useState("all");
@@ -196,7 +219,7 @@ export default function MyPracticePilot({ standalone = false }) {
       </div>
     </div>
     <div className="mp-stats" aria-label="Показатели учебной практики">
-      <div><strong>{DEMO_CLINICS.length}</strong><span>места приёма</span></div>
+      <div><strong>{catalog.length}</strong><span>места приёма</span></div>
       <div><strong>{countActiveOffers(catalog)}</strong><span>услуг в каталоге</span></div>
       <div><strong>{schedule.length}</strong><span>событий календаря</span></div>
     </div>
@@ -206,11 +229,12 @@ export default function MyPracticePilot({ standalone = false }) {
         className={tab===t.id?"mp-tab active":"mp-tab"} onClick={()=>setTab(t.id)}>{t.label}</button>)}
     </div>
     {tab==="overview" && <div role="tabpanel" id="mp-panel-overview" aria-labelledby="mp-tab-overview">
-      <div className="mp-section-title"><h3>Места приёма</h3><p>Места приёма здесь только справочные. Они не дают врачу права продавать медицинскую услугу от имени клиники.</p></div>
-      <div className="mp-two-col">{catalog.map(c=><ClinicCard clinic={c} key={c.id} onServices={switchToClinic}/>)}</div>
+      <MyPracticePlacesEditor catalog={catalog} schedule={schedule} onChange={changePlaces}
+        onSave={savePlaces} dirty={dirty||scheduleDirty} storageMessage={storageMessage}
+        onServices={switchToClinic}/>
       <div className="mp-next">
         <h4>Как подключить врача</h4>
-        <p>Согласование с клиниками → проверка услуг и цен → запись через канал клиники → календарь реальной занятости.</p>
+        <p>Места работы — личные заметки, не реквизиты исполнителя. Платные предложения и подтверждение лицензии оформляются отдельно.</p>
         <button type="button" className="mp-primary" onClick={()=>setTab("calendar")}>Посмотреть учебное расписание</button>
       </div>
     </div>}
@@ -218,7 +242,7 @@ export default function MyPracticePilot({ standalone = false }) {
       <div className="mp-section-title"><h3>Каталог услуг</h3><p>Это информационный каталог. Сделки через платформу оформляются отдельно — в разделе «Платные приёмы».</p></div>
       <div className="mp-filters">
         <label className="mp-field">Клиника<select value={clinicFilter} onChange={e=>setClinicFilter(e.target.value)}>
-          <option value="all">Все клиники</option>
+          <option value="all">Все места</option>
           {catalog.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select></label>
         <label className="mp-field">Формат<select value={formatFilter} onChange={e=>setFormatFilter(e.target.value)}>
@@ -248,7 +272,7 @@ export default function MyPracticePilot({ standalone = false }) {
       <MyPracticePatientConnectionDemo/>
     </div>}
     {tab==="calendar" && <div role="tabpanel" id="mp-panel-calendar" aria-labelledby="mp-tab-calendar">
-      <div className="mp-section-title"><h3>Общий календарь</h3><p>Справочные блоки работы и учебные внешние записи, без платежей и комиссии.</p></div>
+      <div className="mp-section-title"><h3>Общий календарь</h3><p>Справочные блоки работы и учебные внешние записи по редактируемым местам, без платежей и комиссии.</p></div>
       <MyPracticeCalendar catalog={catalog} entries={schedule} onChange={changeSchedule}
         onSave={saveSchedule} onReset={resetSchedule} dirty={scheduleDirty} storageMessage={scheduleMessage}
         monday={monday} setMonday={setMonday} clinic={calendarClinic} setClinic={setCalendarClinic}/>
