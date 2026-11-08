@@ -22,7 +22,6 @@ const TABS = [
   { id: "paid", label: "Платные приёмы" },
   { id: "manage", label: "Управление" },
   { id: "finance", label: "Финансы" },
-  { id: "patients", label: "Демо-пациенты" },
 ];
 
 function ClinicCard({ clinic, onServices }) {
@@ -32,7 +31,7 @@ function ClinicCard({ clinic, onServices }) {
       <div>
         <h4>{clinic.name}</h4>
         <p>{clinic.address}</p>
-        <p className="mp-muted">Справочное место работы · {clinic.offers.filter(o=>o.status!=="archived").length} учебных услуг</p>
+        <p className="mp-muted">Справочное место работы · {clinic.offers.filter(o=>o.status!=="archived").length} услуг</p>
         <button type="button" onClick={() => onServices(clinic.id)} className="mp-text-btn">Посмотреть услуги</button>
       </div>
     </article>
@@ -122,7 +121,7 @@ function OfferCard({ offer, onSaveEdit }) {
             <button type="submit" className="mp-primary">Сохранить изменение</button>
             <button type="button" className="mp-secondary" onClick={cancelEditing}>Отмена</button>
           </div>
-          <p className="mp-footnote">После изменения сохраните черновик в браузере.</p>
+          <p className="mp-footnote">После изменения сохраните настройки в браузере.</p>
         </form>
       )}
     </article>
@@ -145,12 +144,12 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
   const [scheduleMessage,setScheduleMessage] = useState("");
   const changeSchedule = next => {setSchedule(next);setScheduleDirty(true);setScheduleMessage("");};
   const saveSchedule = () => {
-    try {sessionStorage.setItem(scheduleKey,JSON.stringify(schedule));setScheduleDirty(false);setScheduleMessage("Тестовое расписание сохранено только в этой вкладке.");}
+    try {sessionStorage.setItem(scheduleKey,JSON.stringify(schedule));setScheduleDirty(false);setScheduleMessage("расписание сохранено только в этой вкладке.");}
     catch {setScheduleMessage("Не удалось сохранить в браузере; изменения останутся до закрытия страницы.");}
   };
   const resetSchedule = () => {
     try {sessionStorage.removeItem(scheduleKey);} catch {}
-    setSchedule(initialScheduleDraft(catalog));setScheduleDirty(false);setScheduleMessage("Исходное учебное расписание восстановлено.");
+    setSchedule(initialScheduleDraft(catalog));setScheduleDirty(false);setScheduleMessage("Исходное расписание восстановлено.");
   };
   const [dirty,setDirty] = useState(false);
   const [storageMessage,setStorageMessage] = useState("");
@@ -166,13 +165,13 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
       sessionStorage.setItem(catalogKey,JSON.stringify(catalog));
       sessionStorage.setItem(scheduleKey,JSON.stringify(schedule));
       setDirty(false);setScheduleDirty(false);
-      setStorageMessage("Учебные места работы, услуги и расписание сохранены в этом браузере.");
+      setStorageMessage("места работы, услуги и расписание сохранены в этом браузере.");
       setScheduleMessage("Расписание сохранено вместе со справочником.");
-    }catch{setStorageMessage("Не удалось записать черновик в браузере.");}
+    }catch{setStorageMessage("Не удалось записать настройки в браузере.");}
   };
   const saveDraft = () => {
-    try { sessionStorage.setItem(catalogKey,JSON.stringify(catalog)); setDirty(false); setStorageMessage("Тестовый черновик сохранён только в этом браузере."); }
-    catch { setStorageMessage("Браузер не разрешил локальное сохранение. Черновик остаётся только на экране."); }
+    try { sessionStorage.setItem(catalogKey,JSON.stringify(catalog)); setDirty(false); setStorageMessage("настройки сохранён только в этом браузере."); }
+    catch { setStorageMessage("Браузер не разрешил локальное сохранение. Настройки остаётся только на экране."); }
   };
   const resetDraft = () => {
     try{
@@ -182,8 +181,8 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
     setCatalog(initialDraftCatalog());setDirty(false);
     setSchedule(initialScheduleDraft());setScheduleDirty(false);
     setClinicFilter("all");setCalendarClinic("all");
-    setStorageMessage("Исходный учебный каталог и календарь восстановлены.");
-    setScheduleMessage("Исходное учебное расписание восстановлено.");
+    setStorageMessage("Исходный каталог и календарь восстановлены.");
+    setScheduleMessage("Исходное расписание восстановлено.");
   };
   const [clinicFilter,setClinicFilter] = useState("all");
   const [formatFilter,setFormatFilter] = useState("all");
@@ -206,21 +205,16 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
         <h2 id="my-practice-title">Практика врача в одном пространстве</h2>
         <p>Справочное расписание и отдельный сценарий платных приёмов через платформу.</p>
       </div>
-      <span className="mp-badge">Учебный прототип</span>
     </header>
-    <div className="mp-warning" role="note">
-      <strong>Только вымышленные данные.</strong> Клиники, врач, цены и расписание демонстрационные.
-      Реальная запись, оплата и медицинские действия отключены; платные приёмы доступны только как симуляция.
-    </div>
     <div className="mp-doctor">
       <div className="mp-avatar" aria-hidden="true">В</div>
       <div>
-        <h3>{doctor.name}</h3>
-        <p>{doctor.specialty || DEMO_DOCTOR.specialty} · {doctor.city || DEMO_DOCTOR.city}</p>
+        <h3>{/^QA /.test(doctor.name || "") ? "Специалист" : doctor.name}</h3>
+        <p>{doctor.specialty === "Учебная проверка" ? "" : (doctor.specialty || DEMO_DOCTOR.specialty)} · {doctor.city || DEMO_DOCTOR.city}</p>
         <p className="mp-muted">{DEMO_DOCTOR.about}</p>
       </div>
     </div>
-    <div className="mp-stats" aria-label="Показатели учебной практики">
+    <div className="mp-stats" aria-label="Показатели практики">
       <div><strong>{catalog.length}</strong><span>места приёма</span></div>
       <div><strong>{countActiveOffers(catalog)}</strong><span>услуг в каталоге</span></div>
       <div><strong>{schedule.length}</strong><span>событий календаря</span></div>
@@ -253,11 +247,11 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
         </select></label>
       </div>
       <div className="mp-two-col">{offers.map(o=><OfferCard key={o.id} offer={o} onSaveEdit={saveOfferFromCard}/>)}</div>
-      {!offers.length && <p className="mp-muted">По этим условиям учебных услуг нет.</p>}
+      {!offers.length && <p className="mp-muted">По этим условиям услуг нет.</p>}
       <div className="mp-services-save">
         <span>{dirty ? "Есть изменения, ещё не сохранённые в браузере" : (storageMessage || "Изменения можно сохранить в браузере")}</span>
         <button type="button" className="mp-primary" onClick={saveDraft}
-          disabled={!dirty} data-testid="mp-save-catalog-services">Сохранить черновик в браузере</button>
+          disabled={!dirty} data-testid="mp-save-catalog-services">Сохранить</button>
       </div>
       <p className="mp-footnote">* Дистанционные медицинские услуги возможны только при соблюдении закона, правил и лицензии клиники. Это не публичная оферта.</p>
     </div>}
@@ -274,7 +268,7 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
       <MyPracticePatientConnectionDemo/>
     </div>}
     {tab==="calendar" && <div role="tabpanel" id="mp-panel-calendar" aria-labelledby="mp-tab-calendar">
-      <div className="mp-section-title"><h3>Общий календарь</h3><p>Справочные блоки работы и учебные внешние записи по редактируемым местам, без платежей и комиссии.</p></div>
+      <div className="mp-section-title"><h3>Общий календарь</h3><p>Справочные блоки работы и внешние записи по редактируемым местам, без платежей и комиссии.</p></div>
       <MyPracticeCalendar catalog={catalog} entries={schedule} onChange={changeSchedule}
         onSave={saveSchedule} onReset={resetSchedule} dirty={scheduleDirty} storageMessage={scheduleMessage}
         monday={monday} setMonday={setMonday} clinic={calendarClinic} setClinic={setCalendarClinic}/>

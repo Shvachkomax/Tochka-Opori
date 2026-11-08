@@ -31,7 +31,7 @@ function clinicName(clinicId,catalog){
 function bookingLabel(entry,catalog){
   const c=catalog.find(c=>c.id===entry.clinicId);
   const offer=c?.offers?.find(o=>o.id===entry.serviceId);
-  return offer?.name || "Учебная услуга";
+  return offer?.name || "услуга";
 }
 const badgeColor=entry=>entry.kind==="busy"?"busy":
   entry.status==="pending"?"pending":entry.status==="cancelled"?"cancelled":
@@ -84,11 +84,11 @@ function ScheduleForm({draft,setDraft,editingId,catalog,entries,onChange,onClose
         : addScheduleEntry(entries,draft,catalog);
       onChange(next);
       onClose();
-    }catch(err){setError(err.message||"Не удалось сохранить учебную запись.");}
+    }catch(err){setError(err.message||"Не удалось сохранить запись.");}
   };
   const remove=()=>{
     if(!editingId)return;
-    if(!window.confirm("Удалить это учебное событие из календаря?"))return;
+    if(!window.confirm("Удалить это событие из календаря?"))return;
     try{onChange(removeScheduleEntry(entries,editingId));onClose();}
     catch(err){setError(err.message||"Не удалось удалить событие.");}
   };
@@ -101,7 +101,7 @@ function ScheduleForm({draft,setDraft,editingId,catalog,entries,onChange,onClose
     <div className="mp-schedule-form-grid">
       <label className="mp-field mp-field-block">Тип
         <select value={draft.kind} onChange={e=>changeKind(e.target.value)} data-testid="mp-event-kind">
-          <option value="busy">Блок занятости</option><option value="booking">Учебная запись пациента</option>
+          <option value="busy">Блок занятости</option><option value="booking">запись пациента</option>
         </select>
       </label>
       <label className="mp-field mp-field-block">Место приёма
@@ -134,7 +134,7 @@ function ScheduleForm({draft,setDraft,editingId,catalog,entries,onChange,onClose
             {offers.map(o=><option key={o.id} value={o.id}>{o.name}{o.status==="archived"?" (в архиве)":""} · {rubles(o.priceRub)}</option>)}
           </select>
         </label>
-        <label className="mp-field mp-field-block">Пациент — только учебный псевдоним
+        <label className="mp-field mp-field-block">Пациент — только псевдоним
           <select value={draft.patientAlias} onChange={e=>setDraft({...draft,patientAlias:e.target.value})}
             data-testid="mp-event-patient">
             {PATIENT_ALIASES.map(p=><option key={p.id} value={p.id}>{p.label}</option>)}
@@ -180,7 +180,7 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
     setEditId(event.id);setNotice("");
   };
   const close=()=>{setDraft(null);setEditId(null);};
-  return <section data-testid="my-practice-calendar" aria-label="Редактируемый демонстрационный календарь врача" className="mp-schedule">
+  return <section data-testid="my-practice-calendar" aria-label="Редактируемый календарь врача" className="mp-schedule">
     <div className="mp-schedule-toolbar">
       <div className="mp-week-nav">
         <button type="button" onClick={()=>setMonday(addDaysUTC(monday,-7))} aria-label="Предыдущая неделя">‹</button>
@@ -221,14 +221,14 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
                 <span>{name}</span>
                 <small>{clinicName(e.clinicId,catalog)}</small>
                 <small>{e.kind==="busy"?"Блок занятости":BOOKING_STATUSES[e.status]}</small>
-                {e.kind==="booking"&&<small>{PATIENT_ALIASES.find(p=>p.id===e.patientAlias)?.label||"Учебный пациент"}</small>}
+                {e.kind==="booking"&&<small>{PATIENT_ALIASES.find(p=>p.id===e.patientAlias)?.label||"пациент"}</small>}
                 <button className="mp-schedule-event-edit" type="button" onClick={()=>edit(e)}
                   aria-label={"Изменить событие "+e.start+" в "+formatDay(day)}>Изменить</button>
               </div>;
             })}
             {!current.length&&<p className="mp-no-block">Нет сведений о занятости</p>}
             <button className="mp-schedule-day-add" type="button" onClick={()=>startNew("booking",day)} disabled={!catalog.length}
-              aria-label={"Добавить учебную запись на "+formatDay(day)}>+ Добавить</button>
+              aria-label={"Добавить запись на "+formatDay(day)}>+ Добавить</button>
           </div>;
         })}
       </div>
@@ -237,15 +237,14 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
       entries={entries} onChange={onChange} onClose={close}/>}
     {notice&&<p role="status" className="mp-editor-note">{notice}</p>}
     <div className="mp-services-save">
-      <span>{dirty?"Есть несохранённые изменения расписания":(storageMessage||"Календарь — только учебный черновик")}</span>
+      <span>{dirty?"Есть несохранённые изменения расписания":(storageMessage||"Изменения сохраняются в этой вкладке")}</span>
       <div className="mp-schedule-new">
         <button type="button" className="mp-primary" onClick={onSave} disabled={!dirty}
           data-testid="mp-schedule-save-draft">Сохранить расписание в браузере</button>
-        <button type="button" className="mp-secondary" onClick={()=>{if(window.confirm("Сбросить только учебное расписание?")){onReset();close();}}}
+        <button type="button" className="mp-secondary" onClick={()=>{if(window.confirm("Сбросить только расписание?")){onReset();close();}}}
           data-testid="mp-schedule-reset">Сбросить календарь</button>
       </div>
     </div>
-    <p className="mp-footnote">Это ручной учебный календарь. Пустые интервалы не являются доступными слотами.
-      Изменения не передаются в клиники и не подтверждают реальные приёмы. В реальной версии записи из клиник будут доступны только по согласованной интеграции.</p>
+    <p className="mp-footnote">Пустые интервалы не означают доступность для записи. Расписание не синхронизируется с системами клиник.</p>
   </section>;
 }

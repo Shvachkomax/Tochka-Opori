@@ -24,14 +24,11 @@ export function MyPracticeFinancialDemo({catalog}) {
   return <section className="mp-business" data-testid="my-practice-finance">
     <div className="mp-section-title">
       <h3>Комиссия платформы</h3>
-      <p>Договорная ставка для будущих платных услуг: <strong>20%</strong> (2 000 базисных пунктов). Сейчас это только расчёт, без денег.</p>
+      <p>Комиссия платформы: <strong>20%</strong> — расчёт без списания денег.</p>
     </div>
-    <div className="mp-warning" role="note">
-      <strong>Финансовая модель — демонстрация.</strong> Не принимаем платежи, не начисляем комиссию, не платим врачу и не создаём проводки.
-      Это отдельный расчёт от партнёрской доли врача за AI-трафик пациента.
-    </div>
+    <p className="mp-footnote">Расчёт без списания денег и выплат. Начисления за использование AI учитываются отдельно.</p>
     <div className="mp-business-filters">
-      <label className="mp-field mp-field-block">Услуга из чернового каталога
+      <label className="mp-field mp-field-block">Услуга из каталога
         <select data-testid="mp-finance-offer" value={chosen?.id||""} onChange={e=>setSelection(e.target.value)}
           disabled={!offers.length}>
           {offers.map(o=><option key={o.id} value={o.id}>{o.name} · {o.clinicName}</option>)}
@@ -46,7 +43,7 @@ export function MyPracticeFinancialDemo({catalog}) {
       </div>
       <p className="mp-footnote">«Доля исполнителя» — расчётный остаток для юридически уполномоченного исполнителя (ИП или медицинской организации). Не является автоматическим личным гонораром врача; налоги и эквайринг не вычтены.</p>
       <div className="mp-business-scenario">
-        <h4>Проверка финансовых состояний (симуляция)</h4>
+        <h4>Расчёт по состоянию сделки</h4>
         <label className="mp-field mp-field-block">Состояние сделки
           <select data-testid="mp-finance-stage" value={stage} onChange={e=>setStage(e.target.value)}>
             <option value="unpaid">Оплата не подтверждена</option>
@@ -69,7 +66,7 @@ export function MyPracticeFinancialDemo({catalog}) {
           <small>Оставшаяся расчётная комиссия после возврата: {formatPracticeRubles(result.net.platformFeeKopecks)}; сторнирование: {formatPracticeRubles(result.reversedFeeKopecks)}.</small>
         </div>
       </div>
-    </> : <p className="mp-muted">Активных услуг нет. Добавьте учебную услугу в разделе «Управление».</p>}
+    </> : <p className="mp-muted">Активных услуг нет. Добавьте услугу в разделе «Управление».</p>}
     <p className="mp-footnote">20% относятся к отдельной транзакции в разделе «Платные приёмы», но не к событиям справочного календаря. Реальная комиссия должна возникать только после подтверждения оплаты сервером, выполнения услуги и условий расчёта. При возврате — обратная запись по исходной ставке. При оплате напрямую в клинике автоматической комиссии у платформы нет без договорной сверки.</p>
   </section>;
 }

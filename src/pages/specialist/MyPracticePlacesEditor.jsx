@@ -23,7 +23,7 @@ export default function MyPracticePlacesEditor({
         ?updateDraftPlace(catalog,{placeId:editId,...form})
         :addDraftPlace(catalog,form);
       onChange(next);
-      setMessage(editId?"Название и адрес места обновлены в черновике.":"Место добавлено в справочный каталог.");
+      setMessage(editId?"Название и адрес места обновлены в справочнике.":"Место добавлено в справочный каталог.");
       close();
     }catch(ex){setError(ex.message||"Проверьте название места.");}
   };
@@ -32,19 +32,19 @@ export default function MyPracticePlacesEditor({
     try{
       let paidSlots=[];
       try{paidSlots=restorePaidDemo(localStorage.getItem(PAID_DEMO_KEY + ":" + storageScope)).slots;}
-      catch{throw Error("Не удалось проверить учебные платные слоты в браузере. Удаление отменено.");}
+      catch{throw Error("Не удалось проверить платные слоты в браузере. Удаление отменено.");}
       const linked=paidSlots.filter(s=>s.clinicId===place.id).length;
-      if(linked)throw Error("Для этого места есть "+linked+" платных демо-слотов. Очистите их в разделе «Платные приёмы» перед удалением.");
+      if(linked)throw Error("Для этого места есть "+linked+" платных слотов. Очистите их в разделе «Платные приёмы» перед удалением.");
       const count=place.offers.length;
       const events=schedule.filter(x=>x.clinicId===place.id).length;
-      const prompt="Удалить место «"+place.name+"» из учебного справочника?\n"
-        +"Связанные учебные услуги: "+count+"; события календаря: "+events+".\n"
+      const prompt="Удалить место «"+place.name+"» из справочника?\n"
+        +"Связанные услуги: "+count+"; события календаря: "+events+".\n"
         +"Они будут удалены вместе с местом. Продолжить?";
       if(!window.confirm(prompt))return;
       const next=removeDraftPlace(catalog,place.id,{schedule,paidSlots});
       onChange(next.catalog,next.schedule);
       if(editId===place.id)close();
-      setMessage("Место удалено вместе с его учебными услугами и событиями. Для сохранения после перезагрузки нажмите кнопку ниже.");
+      setMessage("Место удалено вместе с его услугами и событиями. Для сохранения после перезагрузки нажмите кнопку ниже.");
     }catch(ex){setError(ex.message||"Не удалось удалить место.");}
   };
   return <section data-testid="my-practice-places" className="mp-places" aria-label="Справочник мест работы врача">
@@ -59,7 +59,7 @@ export default function MyPracticePlacesEditor({
         <div>
           <h4>{place.name}</h4>
           <p>{place.address||"Адрес пока не указан"}</p>
-          <p className="mp-muted">{place.offers.length} учебных услуг · {schedule.filter(x=>x.clinicId===place.id).length} событий календаря</p>
+          <p className="mp-muted">{place.offers.length} услуг · {schedule.filter(x=>x.clinicId===place.id).length} событий календаря</p>
           <div className="mp-place-actions">
             <button type="button" onClick={()=>startEdit(place)} data-testid={"mp-edit-place-"+place.id}>Изменить</button>
             <button type="button" onClick={()=>onServices(place.id)}>Услуги</button>
@@ -78,7 +78,7 @@ export default function MyPracticePlacesEditor({
       </label>
       <label>Адрес или пояснение (необязательно)
         <input maxLength={120} value={form.address}
-          placeholder="Район или адрес учебного места"
+          placeholder="Район или адрес места"
           onChange={e=>setForm({...form,address:e.target.value})} data-testid="mp-place-address"/>
       </label>
       <div className="mp-place-actions">
@@ -92,8 +92,8 @@ export default function MyPracticePlacesEditor({
     <div className="mp-places-footer">
       <span>{dirty?"Есть несохранённые изменения справочника / расписания":(storageMessage||"Изменения остаются только в браузере")}</span>
       <button type="button" className="mp-primary" disabled={!dirty} onClick={onSave}
-        data-testid="mp-save-places">Сохранить справочник в браузере</button>
+        data-testid="mp-save-places">Сохранить</button>
     </div>
-    <p className="mp-footnote">Удаление места требует подтверждения и убирает связанные учебные услуги и события календаря. При наличии платных демо-слотов сначала очистите их отдельно. Не вводите настоящие персональные или медицинские сведения.</p>
+    <p className="mp-footnote">Удаление места требует подтверждения и убирает связанные услуги и события календаря. При наличии платных слотов сначала очистите их отдельно. Не вводите настоящие персональные или медицинские сведения.</p>
   </section>;
 }

@@ -19,7 +19,7 @@ assert(doctor.includes("data.bookings.find(b=>b.id===currentBookingId) ||"),"Rel
 assert(doctor.includes("<strong>Не является кассовым чеком"),"Receipt disclaimer must be visible");
 assert(doctor.includes('localStorage.setItem(storageKey'),"Same-browser storage only");
 assert(doctor.includes("не синхронизируются с другими устройствами"));
-assert(doctor.includes("не оформляются"),"Prominently disclose no real fiscal receipt");
+assert(doctor.includes("Деньги не списываются."),"Disclose payment simulation without technical labels");
 assert(model.includes("PAID_DEMO_HOLD_MS=10*60*1000"));
 assert(model.includes("quotePracticeCommission("));
 assert(!doctor.includes("createPayment")&&!doctor.includes("paymentUrl"),"No production payment integration");

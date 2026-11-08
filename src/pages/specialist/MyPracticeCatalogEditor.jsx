@@ -31,11 +31,11 @@ export default function MyPracticeCatalogEditor({catalog,onChange,onSave,onReset
   };
   return <section data-testid="my-practice-editor" className="mp-editor">
     <div className="mp-section-title"><h3>Редактор услуг врача</h3>
-      <p>Услуги привязаны к месту приёма. Все изменения — только учебный черновик в вашем браузере.</p>
+      <p>Услуги привязаны к месту приёма. Изменения сохраняются в этом браузере.</p>
     </div>
     <div className="mp-editor-status" role="note">
       <span>{dirty?"Есть несохранённые изменения":"Черновик без несохранённых изменений"}</span>
-      <span>{countActiveOffers(catalog)} активных учебных услуг</span>
+      <span>{countActiveOffers(catalog)} активных услуг</span>
     </div>
     <label className="mp-field mp-field-block">Выберите клинику
       <select data-testid="my-practice-editor-clinic" value={selected?.id||""} onChange={e=>changeClinic(e.target.value)} disabled={!selected}>
@@ -69,7 +69,7 @@ export default function MyPracticeCatalogEditor({catalog,onChange,onSave,onReset
         </div>
         {error&&<p className="mp-editor-error" role="alert">{error}</p>}
         <div className="mp-editor-actions">
-          <button type="submit" className="mp-primary" disabled={!selected}>{editId?"Сохранить изменение":"Добавить в черновик"}</button>
+          <button type="submit" className="mp-primary" disabled={!selected}>{editId?"Сохранить изменение":"Добавить услугу"}</button>
           {editId&&<button type="button" className="mp-secondary" onClick={resetForm}>Отменить</button>}
         </div>
       </form>
@@ -89,8 +89,8 @@ export default function MyPracticeCatalogEditor({catalog,onChange,onSave,onReset
       </div>
     </div>
     <div className="mp-editor-footer">
-      <button type="button" className="mp-primary" onClick={onSave} disabled={!dirty} data-testid="my-practice-save-draft">Сохранить черновик в браузере</button>
-      <button type="button" className="mp-secondary" onClick={()=>{if(window.confirm("Вернуть исходные учебные места, услуги и календарь? Текущие несохранённые изменения будут потеряны.")){onReset();resetForm();}}} data-testid="my-practice-reset-draft">Вернуть исходные демоданные</button>
+      <button type="button" className="mp-primary" onClick={onSave} disabled={!dirty} data-testid="my-practice-save-draft">Сохранить</button>
+      <button type="button" className="mp-secondary" onClick={()=>{if(window.confirm("Вернуть исходные места, услуги и календарь? Текущие несохранённые изменения будут потеряны.")){onReset();resetForm();}}} data-testid="my-practice-reset-draft">Вернуть исходные данные</button>
     </div>
     {storageMessage&&<p role="status" className="mp-editor-note">{storageMessage}</p>}
     <p className="mp-footnote">Сохранение не отправляет данные в Supabase и не публикует их для пациентов. Не вводите настоящие персональные данные. * Дистанционный приём возможен только при наличии правовых оснований.</p>

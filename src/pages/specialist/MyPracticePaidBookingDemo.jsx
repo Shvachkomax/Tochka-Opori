@@ -40,26 +40,26 @@ function usePaidDemoStore(storageScope = "public-demo"){
    localStorage.setItem(storageKey,JSON.stringify(next));
    setData(next);setError("");
    return next;
-  }catch(e){setError(e?.message||"Не удалось изменить учебные данные.");return null;}
+  }catch(e){setError(e?.message||"Не удалось изменить данные.");return null;}
  };
  return {data,error,setError,update,refresh};
 }
 function quoteBox(priceKopecks){
  const q=quotePracticeCommission(priceKopecks);
  return <div className="mp-paid-quote">
-   <span><small>Приём (демо)</small><strong>{formatPracticeRubles(q.priceKopecks)}</strong></span>
+   <span><small>Приём</small><strong>{formatPracticeRubles(q.priceKopecks)}</strong></span>
    <span><small>Платформа · 20%</small><strong>{formatPracticeRubles(q.platformFeeKopecks)}</strong></span>
    <span><small>Исполнитель · 80%</small><strong>{formatPracticeRubles(q.organizationShareKopecks)}</strong></span>
  </div>;
 }
 function offerName(catalog,slot){
  const c=catalog?.find(x=>x.id===slot.clinicId)||DEMO_CLINICS.find(x=>x.id===slot.clinicId);
- return c?.offers.find(o=>o.id===slot.serviceId)?.name || "Учебная консультация";
+ return c?.offers.find(o=>o.id===slot.serviceId)?.name || "консультация";
 }
 const statusName=(code)=>({
-  held:"Бронь ожидает учебной оплаты",expired:"Время брони истекло",
-  simulated_paid:"Учебная предоплата подтверждена",cancelled:"Бронь отменена",
-  simulated_refunded:"Учебный возврат отмечен",
+  held:"Бронь ожидает оплаты",expired:"Время брони истекло",
+  simulated_paid:"предоплата подтверждена",cancelled:"Бронь отменена",
+  simulated_refunded:"Расчёт возврата отмечен",
 })[code]||"Неизвестный статус";
 function linkFor(slot,storageScope){
  const url=new URL("/specialist/my-practice/booking-demo",window.location.origin);
@@ -85,24 +85,23 @@ export function MyPracticePaidBookingsDemo({catalog,schedule,storageScope = "pub
      id:generateId("paid"),clinicId:current.clinicId,serviceId:current.id,
      day,start,end,priceKopecks:current.priceRub*100,
    },schedule));
-   if(next)setNotice("Учебный платный слот создан. Его можно показать пациенту по ссылке.");
+   if(next)setNotice("платный слот создан. Его можно показать пациенту по ссылке.");
  };
  const copy=async(slot)=>{
    const url=linkFor(slot,storageScope);
-   try{await navigator.clipboard.writeText(url);setNotice("Демо-ссылка скопирована. Она не резервирует время и не принимает деньги.");}
+   try{await navigator.clipboard.writeText(url);setNotice("Ссылка скопирована. Деньги не списываются.");}
    catch{setNotice("Не удалось скопировать автоматически. Откройте ссылку ниже и скопируйте адрес.");}
  };
  const reset=()=>{
-   if(!window.confirm("Удалить все учебные платные слоты и записи в этом браузере?"))return;
-   update(()=>emptyPaidDemo());setNotice("Учебные записи удалены из этого браузера.");
+   if(!window.confirm("Удалить все платные слоты и записи в этом браузере?"))return;
+   update(()=>emptyPaidDemo());setNotice("записи удалены из этого браузера.");
  };
  return <section className="mp-paid" data-testid="my-practice-paid-bookings">
    <div className="mp-section-title"><h3>Мои платные приёмы</h3>
      <p>Коммерческая запись отдельно от справочного календаря врача.</p></div>
-   <p className="mp-paid-warning"><strong>Только демонстрация.</strong> Врач и клиники вымышленные, лицензии не проверены,
-     платежи и кассовые чеки не оформляются. Хранение только в этом браузере, без межустройственной синхронизации.</p>
+   <p className="mp-paid-warning">Деньги не списываются. Записи сохраняются в этом браузере и не передаются в клиники.</p>
    <form className="mp-paid-form" onSubmit={make} data-testid="mp-paid-new-slot">
-     <h4>1. Опубликовать учебный слот</h4>
+     <h4>1. Опубликовать слот</h4>
      <div className="mp-paid-inputs">
        <label>Услуга
          <select value={current?.id||""} onChange={e=>setServiceId(e.target.value)} required>
@@ -121,11 +120,11 @@ export function MyPracticePaidBookingsDemo({catalog,schedule,storageScope = "pub
      </div>
      <p className="mp-paid-footnote">Место приёма служит только справочной меткой. Оно не даёт права продавать услугу от имени клиники. В реальном сервисе исполнитель и лицензия проверяются до продажи.</p>
      {current&&quoteBox(current.priceRub*100)}
-     <button className="mp-primary" disabled={!current||!end} type="submit">Создать учебный слот</button>
+     <button className="mp-primary" disabled={!current||!end} type="submit">Создать слот</button>
    </form>
    <div className="mp-paid-section-heading">
-     <h4>2. Ссылки и учебные записи</h4>
-     <button type="button" className="mp-secondary" onClick={reset}>Очистить демоданные</button>
+     <h4>2. Ссылки и записи</h4>
+     <button type="button" className="mp-secondary" onClick={reset}>Очистить записи</button>
    </div>
    {!data.slots.length&&<p className="mp-muted">Платных слотов пока нет — создайте первый выше.</p>}
    <div className="mp-paid-list">
@@ -138,9 +137,9 @@ export function MyPracticePaidBookingsDemo({catalog,schedule,storageScope = "pub
            <p>{dateLabel(slot.day)} · {slot.start}–{slot.end}</p>
            <small>Справочное место: {catalog.find(c=>c.id===slot.clinicId)?.name||"Удалённое место"}</small>
          </div><strong>{formatPracticeRubles(slot.priceKopecks)}</strong></div>
-         <p className="mp-paid-footnote">{active?statusName(getBookingStatus(active,Date.now())):"Нет активной учебной брони"}</p>
+         <p className="mp-paid-footnote">{active?statusName(getBookingStatus(active,Date.now())):"Нет активной брони"}</p>
          <div className="mp-paid-slot-actions">
-           <button className="mp-secondary" type="button" onClick={()=>copy(slot)}>Копировать демо-ссылку</button>
+           <button className="mp-secondary" type="button" onClick={()=>copy(slot)}>Копировать ссылку</button>
            <a href={linkFor(slot,storageScope)} rel="noreferrer" target="_blank">Посмотреть страницу пациента</a>
          </div>
          {bookings.length>0&&<div className="mp-paid-booking-list">{bookings.map(b=><div key={b.id}>
@@ -148,7 +147,7 @@ export function MyPracticePaidBookingsDemo({catalog,schedule,storageScope = "pub
            <small>{b.status==="simulated_paid"?" · 20%: "+formatPracticeRubles(quotePracticeCommission(slot.priceKopecks).platformFeeKopecks):""}</small>
            {["held","simulated_paid"].includes(getBookingStatus(b,Date.now()))&&
              <button type="button" onClick={()=>update(s=>cancelPaidDemoBooking(s,b.id))}>
-               {b.status==="simulated_paid"?"Учебный возврат":"Отменить бронь"}
+               {b.status==="simulated_paid"?"возврат":"Отменить бронь"}
              </button>}
          </div>)}</div>}
        </article>;
@@ -156,7 +155,7 @@ export function MyPracticePaidBookingsDemo({catalog,schedule,storageScope = "pub
    </div>
    {notice&&<p role="status" className="mp-paid-notice">{notice}</p>}
    {error&&<p role="alert" className="mp-paid-error">{error}</p>}
-   <p className="mp-paid-footnote">Показанная комиссия 20% относится исключительно к будущей сделке через платформу, а не к справочным событиям календаря. Никаких налоговых, агентских или фискальных обязательств это демо не создаёт.</p>
+   <p className="mp-paid-footnote">Комиссия 20% рассчитывается для платного приёма. События справочного календаря не создают начислений.</p>
  </section>;
 }
 export function MyPracticePatientBookingDemo(){

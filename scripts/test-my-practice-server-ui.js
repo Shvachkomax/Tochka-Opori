@@ -7,8 +7,8 @@ const cabinet=repo("src/pages/specialist/SpecialistCabinet.jsx");
 const publicEntry=repo("src/main.jsx");
 const client=repo("src/pages/specialist/MyPracticeServerWorkspace.jsx");
 assert(cabinet.includes("!selectedClient && ("));
-assert(cabinet.includes('import.meta.env.VITE_ENABLE_MY_PRACTICE_SERVER_UI === "true"'));
-assert(cabinet.includes("<MyPracticeServerWorkspace key={expert.id}"));
+
+assert(!cabinet.includes("<MyPracticeServerWorkspace"),"Technical workspace editor must not be exposed in specialist cabinet");
 assert(!publicEntry.includes("MyPracticeServerWorkspace"),"Remote workspace must not be available on public demo route");
 assert(client.includes('credentials:"same-origin"'));
 assert(client.includes('callWorkspace("getMyPracticeWorkspace")'));

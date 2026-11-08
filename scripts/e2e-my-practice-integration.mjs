@@ -17,7 +17,7 @@ const root=ReactDOM.createRoot(document.getElementById('root'));window.renderPra
  await page.getByTestId('mp-place-form').getByRole('button',{name:'Сохранить место',exact:true}).click();
  await page.getByTestId('mp-save-places').click();
  await page.getByRole('tab',{name:'Платные приёмы',exact:true}).click();
- await page.getByRole('button',{name:'Создать учебный слот',exact:true}).click();
+ await page.getByRole('button',{name:'Создать слот',exact:true}).click();
  await page.locator('.mp-paid-slot').waitFor();
  const link=await page.getByRole('link',{name:'Посмотреть страницу пациента'}).getAttribute('href');
  assert.equal(new URL(link).searchParams.get('demoScope'),'doctor-a:anmed');

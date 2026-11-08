@@ -6,7 +6,6 @@ import { APP_BRAND } from "../../lib/appBrand.js";
 import PartnerProgram from "./PartnerProgram.jsx";
 import ClinicalTimelinePanel from "./ClinicalTimelinePanel.jsx";
 import MyPracticePilot from "./MyPracticePilot.jsx";
-import MyPracticeServerWorkspace from "./MyPracticeServerWorkspace.jsx";
 
 // ── Styles ────────────────────────────────────────────────
 
@@ -82,14 +81,7 @@ function SpecialistBrand() {
   );
 }
 
-function SpecialistPilotNotice() {
-  if (!APP_BRAND.isSupportPilot) return null;
-  return (
-    <div role="note" style={{ maxWidth: 800, margin: "0 auto 20px", padding: "12px 16px", borderRadius: 12, background: "#FFF1F1", border: "1px solid #E9B4B8", color: "#7D2530", fontSize: 14, lineHeight: 1.5 }}>
-      {APP_BRAND.pilotNotice}
-    </div>
-  );
-}
+function SpecialistPilotNotice() { return null; }
 
 // ── Component ─────────────────────────────────────────────
 
@@ -789,7 +781,7 @@ export default function SpecialistCabinet() {
             </p>
           </div>
 
-          <div style={S.small}>Сервис работает в режиме закрытого тестирования. Информация не является медицинской консультацией.</div>
+          <div style={S.small}>Информация сервиса не заменяет медицинскую консультацию.</div>
         </div>
 
         {toast.message && <Toast message={toast.message} type={toast.type} />}
@@ -822,9 +814,9 @@ export default function SpecialistCabinet() {
 
         {/* Identity card */}
         <div style={S.card}>
-          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{expert.name}</div>
+          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{/^QA /.test(expert.name || "") ? "Специалист" : expert.name}</div>
           <div style={{ fontSize: 13, color: "#7A7268" }}>
-            {expert.specialty && <span>{expert.specialty}</span>}
+            {expert.specialty && expert.specialty !== "Учебная проверка" && <span>{expert.specialty}</span>}
             {expert.city && <span> · {expert.city}</span>}
           </div>
           <div data-testid="active-specialist-context" style={{ fontSize: 13, color: "#5F7D6C", marginTop: 10, fontWeight: 600 }}>
@@ -836,9 +828,6 @@ export default function SpecialistCabinet() {
         {import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && !selectedClient && (
           <>
             <MyPracticePilot doctor={expert} key={`${expert.id}:${orgId || "private"}`} storageScope={`${expert.id}:${orgId || "private"}`} />
-            {import.meta.env.VITE_ENABLE_MY_PRACTICE_SERVER_UI === "true" && (
-              <MyPracticeServerWorkspace key={expert.id} />
-            )}
           </>
         )}
 
@@ -905,23 +894,13 @@ export default function SpecialistCabinet() {
           })()}
         </div>
 
-        {/* Synthetic clinical reference only; no API or patient-data access. */}
-        <div style={S.card} data-testid="clinical-library-demo-entry">
-          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Клиническая библиотека</div>
-          <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
-            Демонстрационный справочник на синтетических данных. Без клинического API и реальных списаний.
-          </div>
-          <a href="/specialist/knowledge/demo" data-testid="clinical-library-demo-link" style={{ color: "#B85C4A", fontWeight: 700 }}>
-            Открыть демоверсию библиотеки
-          </a>
-        </div>
 
-        <ClinicalTimelinePanel
+        {selectedClient && <ClinicalTimelinePanel
           key={`${expert.id}:${orgId || "private"}:${module}:${selectedClient || "demo"}`}
           module={module}
           organizationId={orgId}
           clientRef={selectedClient}
-        />
+        />}
 
         {!selectedClient && <PartnerProgram key={`${expert.id}:${orgId || "private"}:${module}`}
           module={module} organizationId={orgId} styles={S} />}
@@ -1094,7 +1073,7 @@ export default function SpecialistCabinet() {
           </div>
         )}
 
-        <div style={S.small}>Сервис работает в режиме закрытого тестирования. Информация не является медицинской консультацией.</div>
+        <div style={S.small}>Информация сервиса не заменяет медицинскую консультацию.</div>
       </div>
 
       {toast.message && <Toast message={toast.message} type={toast.type} />}

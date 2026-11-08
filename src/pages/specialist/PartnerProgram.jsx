@@ -45,7 +45,7 @@ export default function PartnerProgram({ module, organizationId, styles }) {
     </p>
     {open && <div id="partner-program-content" style={{ marginTop: 16 }}>
       <p style={{ fontSize: 13, lineHeight: 1.5, color: "#625A50" }}>
-        Сейчас действует тестовый учёт. Начисления в единицах не являются деньгами и не подлежат выплате.
+        Начисления в единицах не являются деньгами и не подлежат выплате.
         Оплата личных консультаций учитывается отдельно.
       </p>
       {loading && <p role="status">Загружаем начисления…</p>}
