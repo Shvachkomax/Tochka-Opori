@@ -6,6 +6,7 @@ import { APP_BRAND } from "../../lib/appBrand.js";
 import PartnerProgram from "./PartnerProgram.jsx";
 import ClinicalTimelinePanel from "./ClinicalTimelinePanel.jsx";
 import MyPracticePilot from "./MyPracticePilot.jsx";
+import PracticeBookingPanel from "./PracticeBookingPanel.jsx";
 
 // ── Styles ────────────────────────────────────────────────
 
@@ -828,6 +829,9 @@ export default function SpecialistCabinet() {
         {import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && !selectedClient && (
           <>
             <MyPracticePilot doctor={expert} key={`${expert.id}:${orgId || "private"}`} storageScope={`${expert.id}:${orgId || "private"}`} />
+            <div style={{ marginTop: 20 }}>
+              <PracticeBookingPanel />
+            </div>
           </>
         )}
 
