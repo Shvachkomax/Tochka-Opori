@@ -2,7 +2,7 @@
 // Run: node scripts/test-my-practice-fullcalendar.js
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import {freeIntervalsForDay, freeSlotsForDay, toCalendarResources, toCalendarEvents, isWorkingDay} from "../lib/my-practice/availability.js";
+import {freeIntervalsForDay, freeSlotsForDay, toCalendarEvents, isWorkingDay} from "../lib/my-practice/availability.js";
 import {addScheduleEntry, entriesForWeek} from "../lib/my-practice/schedule-draft.js";
 import {initialDraftCatalog} from "../lib/my-practice/catalog-draft.js";
 
@@ -21,7 +21,8 @@ for (const key of Object.keys(pkg.dependencies)) {
   assert.ok(!/premium|scheduler/i.test(key), `no Premium package allowed: ${key}`);
 }
 const calSrc = read("src/pages/specialist/MyPracticeCalendar.jsx");
-assert.ok(!/premium|scheduler|resourceTimeline/i.test(calSrc), "no Premium imports in calendar source");
+const importLines = calSrc.split("\n").filter((l) => l.trimStart().startsWith("import"));
+assert.ok(!/premium|scheduler/i.test(importLines.join("\n")), "no Premium imports in calendar source");
 assert.ok(calSrc.includes("@fullcalendar/react"), "calendar imports FullCalendar");
 assert.ok(calSrc.includes("locales/ru"), "RU locale is used");
 
@@ -45,19 +46,16 @@ assert.ok(!slots.includes("10:00"), "no slot starts inside busy block");
 const withCancelled = [...entries, {id:"b-1", clinicId: catalog[0].id, day: monday, start:"14:00", end:"15:00", kind:"booking", status:"cancelled", serviceId: catalog[0].offers[0].id, patientAlias:"demo-p1", source:"manual"}];
 assert.deepEqual(freeIntervalsForDay(monday, withCancelled), free, "cancelled booking stays free");
 
-// 5. Multi-clinic resources: one column per clinic, filter respected.
-const all = toCalendarResources(catalog, "all");
-assert.equal(all.length, catalog.length, "all clinics become resource columns");
-const one = toCalendarResources(catalog, catalog[1].id);
-assert.equal(one.length, 1, "clinic filter narrows resource columns");
-assert.equal(one[0].id, catalog[1].id);
-
-// 6. Events carry entry ids for the existing edit form and stay in the week.
+// 5. Multi-clinic without Premium: filter selects events; clinic name is in the title.
 const week = entriesForWeek(entries, monday, "all");
 const evts = toCalendarEvents(week, catalog, {includeFree: true, monday, days: 7});
 assert.ok(evts.some(e=>e.extendedProps?.entryId==="busy-1"), "busy entry maps to a calendar event");
 assert.ok(evts.some(e=>e.rendering==="background"), "free intervals render as background events");
 assert.ok(evts.every(e=>/^2026-11-/.test(e.start)), "all events are within the visible week");
+assert.ok(evts.filter(e=>e.extendedProps?.kind!=="free").every(e=>!e.resourceId), "no resourceId — resources are Premium");
+assert.ok(evts.some(e=>e.title.includes(catalog[0].name)), "clinic name is shown in event title");
+assert.ok(!calSrc.includes("resources={resources}") && !calSrc.includes("resourceId:"), "calendar does not use Premium resources");
+assert.ok(calSrc.includes("Выберите клинику"), "explicit clinic choice in the form when filter is all");
 
 // 7. Overlap rule intact: second overlapping entry is rejected by the same validator.
 entries = addScheduleEntry(entries, {kind:"booking", clinicId: catalog[0].id, day: monday, start:"13:00", end:"14:00", status:"pending", serviceId: catalog[0].offers[0].id, patientAlias:"demo-p1"}, catalog);

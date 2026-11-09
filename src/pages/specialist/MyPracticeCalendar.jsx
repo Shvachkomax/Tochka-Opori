@@ -14,7 +14,7 @@ import {
   PATIENT_ALIASES, BOOKING_STATUSES, BUSY_REASONS, addScheduleEntry,
   updateScheduleEntry, removeScheduleEntry, entriesForWeek, endForDuration,
 } from "../../../lib/my-practice/schedule-draft.js";
-import {toCalendarResources, toCalendarEvents, DEMO_WORKING_HOURS} from "../../../lib/my-practice/availability.js";
+import {toCalendarEvents, DEMO_WORKING_HOURS} from "../../../lib/my-practice/availability.js";
 import "./MyPracticeCalendar.css";
 
 const DAYS=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
@@ -116,7 +116,8 @@ function ScheduleForm({draft,setDraft,editingId,catalog,entries,onChange,onClose
         </select>
       </label>
       <label className="mp-field mp-field-block">Место приёма
-        <select value={draft.clinicId} onChange={e=>changeClinic(e.target.value)} data-testid="mp-event-clinic">
+        <select value={draft.clinicId} onChange={e=>changeClinic(e.target.value)} data-testid="mp-event-clinic" required>
+          {!draft.clinicId&&<option value="" disabled>— Выберите клинику —</option>}
           {catalog.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </label>
@@ -178,14 +179,17 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
   const apiRef=useRef(null);
 
   const visible=useMemo(()=>entriesForWeek(entries,monday,clinic),[entries,monday,clinic]);
-  const resources=useMemo(()=>toCalendarResources(catalog,clinic),[catalog,clinic]);
-  // FullCalendar needs events across the 7 visible days plus free intervals.
+  // Multi-clinic without Premium: the clinic filter selects visible events;
+  // each event title carries its clinic name. No resources/resourceId.
   const fcEvents=useMemo(()=>toCalendarEvents(visible,catalog,{includeFree:true,monday,days:7}),[visible,catalog,monday]);
 
   const startNew=(kind,day=monday)=>{
     if(!catalog.length)return;
-    const selectedClinic=clinic==="all"?catalog[0]?.id:clinic;
-    setDraft(newEvent(kind,day,selectedClinic,catalog));
+    // Explicit clinic choice: when the filter is "all" we must NOT silently
+    // pick the first clinic — the doctor chooses in the form.
+    const selectedClinic=clinic==="all"?"":clinic;
+    const base=newEvent(kind,day,selectedClinic||catalog[0]?.id,catalog);
+    setDraft({...base,clinicId:selectedClinic});
     setEditId(null);setNotice("");
   };
   const edit=event=>{
@@ -200,11 +204,13 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
     const day=(info.startStr||"").slice(0,10);
     const start=(info.startStr||"").slice(11,16) || "09:00";
     const end=(info.endStr||"").slice(11,16) || start;
-    const resourceId=info.resource?.id || (clinic==="all"?catalog[0]?.id:clinic);
-    if(!day||!resourceId)return;
-    const base=newEvent("booking",day,resourceId,catalog);
+    // No resources in the free build: the doctor always picks the clinic
+    // in the form. When the filter selects one clinic, prefill it.
+    const presetClinic=clinic==="all"?"":clinic;
+    if(!day)return;
+    const base=newEvent("booking",day,presetClinic||catalog[0]?.id,catalog);
     // Keep the selected interval; validation runs on save via schedule-draft.
-    setDraft({...base,start,end});
+    setDraft({...base,clinicId:presetClinic,start,end});
     setEditId(null);setNotice("");
   },[catalog,clinic]);
 
@@ -274,7 +280,7 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
         initialView={view}
         initialDate={monday}
         ref={apiRef}
-        resources={resources}
+        resources={undefined}
         events={fcEvents}
         headerToolbar={false}
         firstDay={1}
