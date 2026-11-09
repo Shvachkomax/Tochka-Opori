@@ -3,6 +3,7 @@ import StrawberryWelcome from "./components/StrawberryWelcome.jsx";
 import StrawberryConversation from "./components/StrawberryConversation.jsx";
 import StrawberryQuestions from "./components/StrawberryQuestions.jsx";
 import StrawberryReport from "./components/StrawberryReport.jsx";
+import StrawberryCabinet from "./components/StrawberryCabinet.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -10013,7 +10014,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         }}
         onOpenFullReport={() => setStrawberryEntryStep("legacy")}
         onOpenCabinet={() => {
-          setStrawberryEntryStep("legacy");
+          // Keep the new cabinet design active; backend retrieval is unchanged.
           loadSupportCabinet();
         }}
         onAbout={() => {
@@ -10025,6 +10026,67 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           setCrisisOpen(true);
         }}
         onSpecialist={() => { window.location.href = "/specialist"; }}
+      />
+    );
+  }
+
+
+  // Screen 05: direct visual-only preview does not access patient services.
+  if (typeof window !== "undefined" &&
+      ["/strawberry-support/cabinet-preview", "/strawberry-support/cabinet-preview/"].includes(window.location.pathname)) {
+    return <StrawberryCabinet preview />;
+  }
+
+  // Screen 05: live, authenticated cabinet backed by the existing Support state.
+  const strawberryCabinetActive = strawberryRoute &&
+    !APP_BRAND.isSupportPilot && activeModule === "support" &&
+    phase === "cabinet" && supportScreen === "cabinet" &&
+    Boolean(supportCabinet) && strawberryEntryStep !== "legacy" &&
+    !inviteChecking && !inviteToken && !inviteInfo?.valid;
+
+  if (strawberryCabinetActive) {
+    return (
+      <StrawberryCabinet
+        displayName={supportDisplayName}
+        sessions={supportCabinet.sessions}
+        wallet={supportCabinet.wallet}
+        quickChatInput={quickChatInput}
+        onChatChange={setQuickChatInput}
+        onChatSend={() => {
+          setStrawberryEntryStep("legacy");
+          // Show the live AI response in the original cabinet until the chat is restyled.
+          sendQuickChatMessage();
+        }}
+        chatBusy={quickChatLoading}
+        onFollowUp={() => {
+          setStrawberryEntryStep("legacy");
+          startSupportFollowUp();
+        }}
+        onOpenReport={(id) => {
+          setStrawberryEntryStep("legacy");
+          openSupportReport(id);
+        }}
+        onOpenHistory={() => setStrawberryEntryStep("legacy")}
+        onDiary={() => setStrawberryEntryStep("legacy")}
+        onSpecialistRequest={() => {
+          setStrawberryEntryStep("legacy");
+          openSupportRequestForSession();
+        }}
+        onFullCabinet={() => setStrawberryEntryStep("legacy")}
+        onExit={() => {
+          goToSupportLanding();
+          setStrawberryEntryStep("welcome");
+        }}
+        onAbout={() => {
+          setStrawberryEntryStep("legacy");
+          setAboutProjectOpen(true);
+        }}
+        onEmergency={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+        crisisBlock={supportCabinet.latest_report?.crisisBlock}
+        careRecommendation={supportCabinet.latest_report?.careRecommendation}
       />
     );
   }
