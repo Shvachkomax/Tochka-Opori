@@ -1,0 +1,38 @@
+/* Экран 03. Вопросы — без карточек и визуального шума. */
+.strawberry-questions__main{padding-top:clamp(50px,7vh,85px);padding-bottom:70px}
+.strawberry-questions__eyebrow{color:#849082;letter-spacing:.16em;font-size:10px;margin:0 0 22px}
+.strawberry-questions__eyebrow span{padding:0 7px}
+.strawberry-questions h1{font-size:clamp(37px,3.7vw,57px);max-width:700px}
+.strawberry-questions__lead{max-width:650px;margin-bottom:44px}
+.strawberry-questions__items{display:flex;flex-direction:column;gap:35px;width:min(100%,675px)}
+.strawberry-questions__item{padding:0;background:transparent}
+.strawberry-questions__number{font-size:11px;letter-spacing:.1em;color:#8a9687;margin:0 0 10px}
+.strawberry-questions__prompt{display:block;font:normal clamp(19px,2vw,24px)/1.48 Georgia,"Times New Roman",serif;color:#475047;margin:0 0 14px}
+.strawberry-questions__item textarea{display:block;width:100%;min-height:104px;padding:16px 18px;background:rgba(251,251,249,.74);border:1px solid rgba(103,122,104,.09);border-radius:16px;color:#444c44;outline:0;resize:vertical;font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+.strawberry-questions__item textarea::placeholder{color:#a1a99d}
+.strawberry-questions__item textarea:focus{background:#fff;border-color:rgba(101,132,107,.42)}
+.strawberry-questions__item textarea:disabled{opacity:.58}
+.strawberry-questions__item-tools{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin-top:8px}
+.strawberry-questions__voice{display:inline-flex;align-items:center;gap:9px;border:0;background:transparent;color:#7d8b7c;padding:7px 0;font-size:13px!important}
+.strawberry-questions__voice:hover{color:#4e6550}
+.strawberry-questions__voice:disabled{opacity:.48;cursor:not-allowed}
+.strawberry-questions__recording{font-size:12px;color:#ad756c}
+.strawberry-questions__footer-actions{max-width:670px;margin-top:43px}
+.strawberry-questions__footer-actions p{font-size:12px;color:#919b8f;margin:15px 0 0}
+.strawberry-questions__footer-actions .strawberry-entry__action:disabled{opacity:.5;cursor:wait}
+.strawberry-questions__safety{width:min(100%,685px);margin:0 0 38px;padding:24px 25px;background:rgba(255,244,241,.94);border-left:4px solid #b4554a;border-radius:5px;color:#7c302b}
+.strawberry-questions__safety strong{font-size:16px;display:block;margin:0 0 6px}
+.strawberry-questions__safety p{font-size:14px;line-height:1.6;margin:0 0 16px}
+.strawberry-questions__emergency-links{display:flex;gap:11px;flex-wrap:wrap;margin:10px 0 14px}
+.strawberry-questions__emergency-links a{display:inline-flex;align-items:center;justify-content:center;background:#a83f36;color:#fff;min-height:44px;border-radius:10px;padding:10px 17px;font-weight:650;font-size:14px}
+.strawberry-questions__emergency-links a:hover{background:#8f3029}
+.strawberry-questions__safety .strawberry-questions__safety-footnote{font-size:12px;margin:0}
+@media(max-width:640px){
+.strawberry-questions__main{padding-top:40px;padding-bottom:42px}
+.strawberry-questions__lead{margin-bottom:32px}
+.strawberry-questions__items{gap:27px}
+.strawberry-questions__prompt{font-size:20px}
+.strawberry-questions__item textarea{font-size:16px;min-height:104px}
+.strawberry-questions__footer-actions{margin-top:30px}
+.strawberry-questions__safety{padding:20px}
+}

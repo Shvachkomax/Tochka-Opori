@@ -1,6 +1,7 @@
 import InformationFlow from "./InformationFlow.jsx";
 import StrawberryWelcome from "./components/StrawberryWelcome.jsx";
 import StrawberryConversation from "./components/StrawberryConversation.jsx";
+import StrawberryQuestions from "./components/StrawberryQuestions.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -9925,6 +9926,53 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         }}
         onCrisis={() => {
           if (recording) stopRecording();
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+        onSpecialist={() => { window.location.href = "/specialist"; }}
+      />
+    );
+  }
+
+
+  // The third design screen is shown only for real AI question rounds in this preview.
+  const strawberryQuestionsActive =
+    strawberryRoute && !APP_BRAND.isSupportPilot &&
+    activeModule === "support" &&
+    phase === "questions" && supportScreen === "questions" &&
+    strawberryEntryStep === "intake" &&
+    !inviteChecking && !inviteToken && !inviteInfo?.valid;
+
+  if (strawberryQuestionsActive) {
+    return (
+      <StrawberryQuestions
+        questions={questions}
+        answers={answers}
+        onAnswer={(index, answer) => setAnswers(prev => ({ ...prev, [index]: answer }))}
+        dialogDepth={dialogDepth}
+        crisisMode={crisisMode}
+        onContinue={() => submitRound()}
+        loading={loading}
+        loadingMessage={loadingMessage}
+        error={error}
+        voiceError={voiceError}
+        recordingQuestionIndex={recordingQuestionIndex}
+        questionRecordingTime={questionRecordingTime}
+        questionTranscribingIndex={questionTranscribingIndex}
+        onStartRecording={startQuestionRecording}
+        onStopRecording={stopQuestionRecording}
+        onBack={() => {
+          if (crisisMode || recordingQuestionIndex !== null || questionTranscribingIndex !== null) return;
+          if (window.confirm("Начать разговор заново? Ответы на вопросы будут сброшены.")) {
+            handleReset();
+            setStrawberryEntryStep("welcome");
+          }
+        }}
+        onAbout={() => {
+          setStrawberryEntryStep("legacy");
+          setAboutProjectOpen(true);
+        }}
+        onCrisis={() => {
           setStrawberryEntryStep("legacy");
           setCrisisOpen(true);
         }}
