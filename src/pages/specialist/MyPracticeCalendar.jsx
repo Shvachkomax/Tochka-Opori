@@ -232,10 +232,12 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
     if(start&&start!==monday)setMonday(start);
   },[monday,setMonday]);
 
-  const gotoPrev=()=>apiRef.current?.prev();
-  const gotoNext=()=>apiRef.current?.next();
-  const gotoToday=()=>apiRef.current?.today();
-  const switchView=(v)=>{setView(v);apiRef.current?.changeView(v);};
+  // v7 API: ref exposes getApi() → CalendarApi (changeView/prev/next/today).
+  const api=()=>apiRef.current?.getApi();
+  const gotoPrev=()=>api()?.prev();
+  const gotoNext=()=>api()?.next();
+  const gotoToday=()=>api()?.today();
+  const switchView=(v)=>{setView(v);api()?.changeView(v);};
 
   return <section data-testid="my-practice-calendar" aria-label="Редактируемый календарь врача" className="mp-schedule">
     <div className="mp-schedule-toolbar">
