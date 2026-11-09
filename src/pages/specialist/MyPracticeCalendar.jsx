@@ -1,9 +1,20 @@
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState, useCallback} from "react";
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/react/daygrid";
+import timeGridPlugin from "@fullcalendar/react/timegrid";
+import interactionPlugin from "@fullcalendar/react/interaction";
+import listPlugin from "@fullcalendar/react/list";
+import classicThemePlugin from "@fullcalendar/react/themes/classic";
+import ruLocale from "@fullcalendar/react/locales/ru";
+import "@fullcalendar/react/skeleton.css";
+import "@fullcalendar/react/themes/classic/theme.css";
+import "@fullcalendar/react/themes/classic/palette.css";
 import {addDaysUTC, rubles} from "../../../lib/my-practice/pilot-data.js";
 import {
   PATIENT_ALIASES, BOOKING_STATUSES, BUSY_REASONS, addScheduleEntry,
   updateScheduleEntry, removeScheduleEntry, entriesForWeek, endForDuration,
 } from "../../../lib/my-practice/schedule-draft.js";
+import {toCalendarResources, toCalendarEvents, DEMO_WORKING_HOURS} from "../../../lib/my-practice/availability.js";
 import "./MyPracticeCalendar.css";
 
 const DAYS=["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
@@ -163,11 +174,14 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
   const [draft,setDraft]=useState(null);
   const [editId,setEditId]=useState(null);
   const [notice,setNotice]=useState("");
+  const [view,setView]=useState("timeGridWeek");
+  const apiRef=useRef(null);
+
   const visible=useMemo(()=>entriesForWeek(entries,monday,clinic),[entries,monday,clinic]);
-  const byDay=useMemo(()=>Object.fromEntries(DAYS.map((_,i)=>{
-    const day=addDaysUTC(monday,i);
-    return [day,visible.filter(e=>e.day===day)];
-  })),[monday,visible]);
+  const resources=useMemo(()=>toCalendarResources(catalog,clinic),[catalog,clinic]);
+  // FullCalendar needs events across the 7 visible days plus free intervals.
+  const fcEvents=useMemo(()=>toCalendarEvents(visible,catalog,{includeFree:true,monday,days:7}),[visible,catalog,monday]);
+
   const startNew=(kind,day=monday)=>{
     if(!catalog.length)return;
     const selectedClinic=clinic==="all"?catalog[0]?.id:clinic;
@@ -180,12 +194,58 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
     setEditId(event.id);setNotice("");
   };
   const close=()=>{setDraft(null);setEditId(null);};
+
+  const handleSelect=useCallback((info)=>{
+    if(!catalog.length)return;
+    const day=(info.startStr||"").slice(0,10);
+    const start=(info.startStr||"").slice(11,16) || "09:00";
+    const end=(info.endStr||"").slice(11,16) || start;
+    const resourceId=info.resource?.id || (clinic==="all"?catalog[0]?.id:clinic);
+    if(!day||!resourceId)return;
+    const base=newEvent("booking",day,resourceId,catalog);
+    // Keep the selected interval; validation runs on save via schedule-draft.
+    setDraft({...base,start,end});
+    setEditId(null);setNotice("");
+  },[catalog,clinic]);
+
+  const handleEventClick=useCallback((info)=>{
+    const original=info.event.extendedProps;
+    if(original?.kind==="free")return;
+    const entry=entries.find(e=>e.id===original?.entryId);
+    if(entry)edit(entry);
+  },[entries]);
+
+  const handleEventDidMount=useCallback((info)=>{
+    const id=info.event.extendedProps?.entryId;
+    if(id)info.el.setAttribute("data-testid","mp-calendar-event-"+id);
+  },[]);
+
+  const handleDatesSet=useCallback((info)=>{
+    // Sync pilot week anchor (monday) with the calendar visible range.
+    const start=info.startStr?.slice(0,10);
+    if(start&&start!==monday)setMonday(start);
+  },[monday,setMonday]);
+
+  const gotoPrev=()=>apiRef.current?.prev();
+  const gotoNext=()=>apiRef.current?.next();
+  const gotoToday=()=>apiRef.current?.today();
+  const switchView=(v)=>{setView(v);apiRef.current?.changeView(v);};
+
   return <section data-testid="my-practice-calendar" aria-label="Редактируемый календарь врача" className="mp-schedule">
     <div className="mp-schedule-toolbar">
       <div className="mp-week-nav">
-        <button type="button" onClick={()=>setMonday(addDaysUTC(monday,-7))} aria-label="Предыдущая неделя">‹</button>
+        <button type="button" onClick={gotoPrev} aria-label="Предыдущий период">‹</button>
         <strong>{formatDay(monday)} — {formatDay(addDaysUTC(monday,6))}</strong>
-        <button type="button" onClick={()=>setMonday(addDaysUTC(monday,7))} aria-label="Следующая неделя">›</button>
+        <button type="button" onClick={gotoNext} aria-label="Следующий период">›</button>
+        <button type="button" onClick={gotoToday} aria-label="Сегодня">Сегодня</button>
+      </div>
+      <div className="mp-view-switch" role="group" aria-label="Вид календаря">
+        <button type="button" className={view==="timeGridWeek"?"active":""} onClick={()=>switchView("timeGridWeek")}
+          data-testid="mp-view-week">Неделя</button>
+        <button type="button" className={view==="timeGridDay"?"active":""} onClick={()=>switchView("timeGridDay")}
+          data-testid="mp-view-day">День</button>
+        <button type="button" className={view==="listWeek"?"active":""} onClick={()=>switchView("listWeek")}
+          data-testid="mp-view-list">Список</button>
       </div>
       <label className="mp-field">Место приёма
         <select value={clinic} onChange={e=>{setClinic(e.target.value);close();}}>
@@ -204,34 +264,41 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
       <span className="mp-legend-pending">Ожидает</span>
       <span className="mp-legend-cancelled">Отменена</span>
       <span className="mp-legend-completed">Завершена</span>
+      <span className="mp-legend-free">Свободно (справочно)</span>
     </div>
-    <div className="mp-calendar-scroll">
-      <div className="mp-week-grid">
-        {DAYS.map((label,i)=>{
-          const day=addDaysUTC(monday,i);
-          const current=byDay[day]||[];
-          return <div className="mp-day" key={day} data-testid={"my-practice-day-"+day}>
-            <div className="mp-day-head"><strong>{label}</strong><span>{formatDay(day)}</span></div>
-            {current.map(e=>{
-              const status=badgeColor(e);
-              const name=e.kind==="busy"?BUSY_REASONS[e.reason]:bookingLabel(e,catalog);
-              return <div key={e.id} className={"mp-schedule-event mp-event-"+status}
-                data-testid={"mp-schedule-event-"+e.id}>
-                <strong>{e.start}–{e.end}</strong>
-                <span>{name}</span>
-                <small>{clinicName(e.clinicId,catalog)}</small>
-                <small>{e.kind==="busy"?"Блок занятости":BOOKING_STATUSES[e.status]}</small>
-                {e.kind==="booking"&&<small>{PATIENT_ALIASES.find(p=>p.id===e.patientAlias)?.label||"пациент"}</small>}
-                <button className="mp-schedule-event-edit" type="button" onClick={()=>edit(e)}
-                  aria-label={"Изменить событие "+e.start+" в "+formatDay(day)}>Изменить</button>
-              </div>;
-            })}
-            {!current.length&&<p className="mp-no-block">Нет сведений о занятости</p>}
-            <button className="mp-schedule-day-add" type="button" onClick={()=>startNew("booking",day)} disabled={!catalog.length}
-              aria-label={"Добавить запись на "+formatDay(day)}>+ Добавить</button>
-          </div>;
-        })}
-      </div>
+    <p className="mp-footnote">Рабочее время для справочных свободных интервалов: {DEMO_WORKING_HOURS.label} ({DEMO_WORKING_HOURS.start}–{DEMO_WORKING_HOURS.end}).</p>
+    <div className="mp-fullcalendar-wrap" data-testid="my-practice-fullcalendar">
+      <FullCalendar
+        plugins={[classicThemePlugin,dayGridPlugin,timeGridPlugin,listPlugin,interactionPlugin]}
+        locale={ruLocale}
+        initialView={view}
+        initialDate={monday}
+        ref={apiRef}
+        resources={resources}
+        events={fcEvents}
+        headerToolbar={false}
+        firstDay={1}
+        allDaySlot={false}
+        slotMinTime="07:00"
+        slotMaxTime="22:00"
+        slotDuration="00:30"
+        slotLabelInterval="01:00"
+        businessHours={{
+          daysOfWeek: DEMO_WORKING_HOURS.days,
+          startTime: DEMO_WORKING_HOURS.start,
+          endTime: DEMO_WORKING_HOURS.end,
+        }}
+        height="auto"
+        dayMaxEvents={4}
+        selectable
+        select={handleSelect}
+        eventClick={handleEventClick}
+        eventDidMount={handleEventDidMount}
+        datesSet={handleDatesSet}
+        editable={false}
+        nowIndicator
+        listNoEventsText="Нет событий"
+      />
     </div>
     {draft&&<ScheduleForm draft={draft} setDraft={setDraft} editingId={editId} catalog={catalog}
       entries={entries} onChange={onChange} onClose={close}/>}
