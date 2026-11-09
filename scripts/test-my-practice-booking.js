@@ -1,7 +1,7 @@
 // A2 booking handler — unit checks (no DB writes outside guard).
 import assert from "node:assert/strict";
 import { freeSlotsForDay } from "../lib/my-practice/availability.js";
-import { slotsForServiceDay, publicServiceView } from "../lib/my-practice/booking-handler.js";
+import { slotsForServiceDay, publicServiceView } from "../lib/my-practice/booking-utils.js";
 import { isMyPracticeServerEnabled } from "../lib/my-practice/workspace-handler.js";
 
 // Guard: env must be preview + test ref + https host.

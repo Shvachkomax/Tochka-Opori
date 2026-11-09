@@ -85,20 +85,21 @@ function getClientIp(req) {
     || "unknown";
 }
 
-// Resolve support owner from session_id + access_token.
-// Returns { ownerId, sessionId, publicCode } or null.
-async function resolveSupportOwner(sessionId, accessToken) {
+// Patient identity helper: verify a request's session_id + access_token against
+// the existing session model. Returns { ownerId, sessionId, publicCode } or null.
+// Exported for reuse from booking actions (same check as session.js).
+export async function resolveSupportOwner(sessionId, accessToken) {
   if (!sessionId || !accessToken) return null;
   const valid = await validateSessionAccess(sessionId, accessToken);
   if (!valid) return null;
   const supabase = getSupabase();
   const { data: session, error } = await supabase
     .from("sessions")
-    .select("session_id, public_code, anonymous_owner_id, module, json_data")
+    .select("session_id, public_code, anonymous_owner_id, module")
     .eq("session_id", sessionId)
     .eq("module", "support")
     .maybeSingle();
-  if (error || !session || !session.anonymous_owner_id || !isPilotSessionMatch(session.json_data)) return null;
+  if (error || !session || !session.anonymous_owner_id) return null;
   return { ownerId: session.anonymous_owner_id, sessionId: session.session_id, publicCode: session.public_code };
 }
 
