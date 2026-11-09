@@ -5,6 +5,7 @@ import StrawberryQuestions from "./components/StrawberryQuestions.jsx";
 import StrawberryReport from "./components/StrawberryReport.jsx";
 import StrawberryCabinet from "./components/StrawberryCabinet.jsx";
 import StrawberryDiary from "./components/StrawberryDiary.jsx";
+import StrawberryPractices from "./components/StrawberryPractices.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -2124,7 +2125,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   // Update practice user_status
   async function updatePracticeStatus(practiceKey, userStatus) {
     const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
+    if (!saved.sessionId || !saved.accessToken) return false;
     try {
       const res = await fetch("/api/session", {
         method: "POST",
@@ -2134,8 +2135,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const data = await res.json();
       if (res.ok && data.ok) {
         await loadSupportPractices();
+        return true;
       }
-    } catch { /* silent */ }
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   // Load support chat messages
@@ -10055,6 +10060,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     );
   }
 
+  // Screen 07: standalone, fictional practice examples; no patient data or backend calls.
+  if (typeof window !== "undefined" &&
+      ["/strawberry-support/practices-preview", "/strawberry-support/practices-preview/"].includes(window.location.pathname)) {
+    return (
+      <StrawberryPractices
+        preview
+        onBack={() => window.location.assign("/strawberry-support/cabinet-preview")}
+      />
+    );
+  }
+
   // Screen 05: live, authenticated cabinet backed by the existing Support state.
   const strawberryCabinetActive = strawberryRoute &&
     !APP_BRAND.isSupportPilot && activeModule === "support" &&
@@ -10076,6 +10092,29 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         onChangeAnxiety={setCheckinAnxiety}
         onChangeComment={setCheckinComment}
         onSave={saveSupportCheckin}
+        onBack={() => setStrawberryEntryStep("intake")}
+        onAbout={() => {
+          setStrawberryEntryStep("legacy");
+          setAboutProjectOpen(true);
+        }}
+        onEmergency={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+      />
+    );
+  }
+
+  // Screen 07: only practices already linked to this patient's Support session.
+  if (strawberryCabinetActive && strawberryEntryStep === "practices") {
+    return (
+      <StrawberryPractices
+        practices={supportPractices}
+        urgent={Boolean(supportCabinet.latest_report?.crisisBlock?.emergencyRecommended ||
+          supportCabinet.latest_report?.crisisBlock?.status === "safety_check_in_progress" ||
+          supportCabinet.latest_report?.careRecommendation?.level === "urgent_help")}
+        onChangeStatus={updatePracticeStatus}
+        onRefresh={loadSupportPractices}
         onBack={() => setStrawberryEntryStep("intake")}
         onAbout={() => {
           setStrawberryEntryStep("legacy");
@@ -10115,6 +10154,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         onDiary={() => {
           setStrawberryEntryStep("diary");
           loadSupportCheckins();
+        }}
+        onPractices={() => {
+          setStrawberryEntryStep("practices");
+          loadSupportPractices();
         }}
         onSpecialistRequest={() => {
           setStrawberryEntryStep("legacy");

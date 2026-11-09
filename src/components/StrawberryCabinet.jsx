@@ -11,7 +11,7 @@ export default function StrawberryCabinet({
   preview = false, displayName = "", sessions = [], wallet = null,
   quickChatInput = "", onChatChange, onChatSend, chatBusy = false,
   onFollowUp, onOpenReport, onOpenHistory, onDiary, onSpecialistRequest,
-  onFullCabinet, onExit, onAbout, onEmergency,
+  onFullCabinet, onExit, onAbout, onEmergency, onPractices,
   crisisBlock = null, careRecommendation = null,
 }) {
   const [previewMessage, setPreviewMessage] = useState("");
@@ -97,6 +97,7 @@ export default function StrawberryCabinet({
           <h2 id="strawberry-cabinet-steps">Что можно сделать дальше</h2>
           <div className="strawberry-cabinet__links">
             <button type="button" onClick={onDiary || (() => window.location.assign("/strawberry-support/diary-preview"))}>Как вы сегодня? <small>Дневник состояния</small><span aria-hidden="true">→</span></button>
+            <button type="button" onClick={onPractices || (() => window.location.assign("/strawberry-support/practices-preview"))}>Практики для себя <small>Небольшие упражнения</small><span aria-hidden="true">→</span></button>
             <button type="button" onClick={onOpenHistory || previewAction}>Вернуться к прежним разговорам <small>История и результаты</small><span aria-hidden="true">→</span></button>
             <button type="button" onClick={onSpecialistRequest || previewAction}>Связаться со специалистом <small>Помощь человека</small><span aria-hidden="true">→</span></button>
           </div>
