@@ -29,7 +29,21 @@
 .mp-schedule-form-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:12px 0 0}
 .mp-schedule-danger{background:#fff3f0;color:#a54b49;border:1px solid #eed6d0;border-radius:9px;padding:9px 12px;font-size:12px;font-weight:650}
 .my-practice-pilot .mp-schedule-danger{font-size:12px;font-weight:650}
-.mp-schedule .mp-day{min-width:0;min-height:175px}
+/* A1: FullCalendar (MIT free core, RU locale). Week/day/list + multi-clinic resources. */
+.mp-legend-free{background:#eef7f0;color:#386e50}
+.mp-view-switch{display:flex;gap:6px}
+.mp-view-switch button{border:1px solid #d9e3d9;background:#fff;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:650;cursor:pointer}
+.mp-view-switch button.active{background:#B85C4A;color:#fff;border-color:#B85C4A}
+.mp-fullcalendar-wrap{overflow-x:auto;background:#fff;border:1px solid #e6e8e3;border-radius:13px;padding:10px;min-width:0}
+.mp-fullcalendar-wrap .fc{font-family:Inter,system-ui,sans-serif;font-size:13px}
+/* iPhone: day view is the readable default; week scrolls horizontally. */
+@media(max-width:760px){
+  .mp-fullcalendar-wrap{padding:6px}
+  .mp-fullcalendar-wrap .fc-col-header-cell{font-size:11px}
+  .mp-view-switch button{padding:8px 9px;font-size:11px}
+  .mp-schedule-toolbar{flex-direction:column;align-items:stretch}
+  .mp-schedule-toolbar .mp-field{width:100%}
+}
 .mp-schedule .mp-week-grid{grid-template-columns:repeat(7,minmax(116px,1fr));min-width:840px}
 .mp-schedule .mp-day-head{margin-bottom:5px}
 @media(max-width:620px){.mp-schedule-form-grid{grid-template-columns:1fr}.mp-schedule-toolbar .mp-week-nav{width:100%}.mp-schedule-toolbar>.mp-field{width:100%}.mp-schedule-form-actions>button{min-height:36px}}
