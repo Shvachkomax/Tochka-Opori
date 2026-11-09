@@ -294,7 +294,7 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
           startTime: DEMO_WORKING_HOURS.start,
           endTime: DEMO_WORKING_HOURS.end,
         }}
-        height="auto"
+        height={650}
         dayMaxEvents={4}
         selectable
         select={handleSelect}
