@@ -2,7 +2,7 @@
 .strawberry-questions__main{padding-top:clamp(50px,7vh,85px);padding-bottom:70px}
 .strawberry-questions__eyebrow{color:#849082;letter-spacing:.16em;font-size:10px;margin:0 0 22px}
 .strawberry-questions__eyebrow span{padding:0 7px}
-.strawberry-questions h1{font-size:clamp(37px,3.7vw,57px);max-width:700px}
+.strawberry-questions h1{font-size:clamp(30px,3vw,46px);max-width:700px}
 .strawberry-questions__lead{max-width:650px;margin-bottom:44px}
 .strawberry-questions__items{display:flex;flex-direction:column;gap:35px;width:min(100%,675px)}
 .strawberry-questions__item{padding:0;background:transparent}

@@ -2,6 +2,7 @@ import InformationFlow from "./InformationFlow.jsx";
 import StrawberryWelcome from "./components/StrawberryWelcome.jsx";
 import StrawberryConversation from "./components/StrawberryConversation.jsx";
 import StrawberryQuestions from "./components/StrawberryQuestions.jsx";
+import StrawberryReport from "./components/StrawberryReport.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -9974,6 +9975,52 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         }}
         onCrisis={() => {
           if (recordingQuestionIndex !== null) stopQuestionRecording();
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+        onSpecialist={() => { window.location.href = "/specialist"; }}
+      />
+    );
+  }
+
+
+  // Screen 04: real patient-facing report from the existing Support engine.
+  // Keep the legacy report available for its PDF/DOCX, feedback and care actions.
+  const strawberryReportActive = strawberryRoute &&
+    !APP_BRAND.isSupportPilot && activeModule === "support" &&
+    supportScreen === "report" && phase === "report" &&
+    Boolean(result) && reportSource === "generated" &&
+    strawberryEntryStep === "intake" &&
+    !inviteChecking && !inviteToken && !inviteInfo?.valid;
+
+  if (strawberryReportActive) {
+    return (
+      <StrawberryReport
+        patientReport={userPart}
+        continuationCode={continuationCode}
+        careRecommendation={careRecommendation}
+        crisisMode={crisisMode}
+        crisisBlock={crisisBlock}
+        isLoading={cabinetLoading}
+        onCopyCode={async (code) => {
+          try {
+            await navigator.clipboard.writeText(code);
+            return true;
+          } catch {
+            showToast("Не удалось скопировать код. Сохраните его вручную.", "error");
+            return false;
+          }
+        }}
+        onOpenFullReport={() => setStrawberryEntryStep("legacy")}
+        onOpenCabinet={() => {
+          setStrawberryEntryStep("legacy");
+          loadSupportCabinet();
+        }}
+        onAbout={() => {
+          setStrawberryEntryStep("legacy");
+          setAboutProjectOpen(true);
+        }}
+        onCrisis={() => {
           setStrawberryEntryStep("legacy");
           setCrisisOpen(true);
         }}
