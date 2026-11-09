@@ -6,6 +6,7 @@ import StrawberryReport from "./components/StrawberryReport.jsx";
 import StrawberryCabinet from "./components/StrawberryCabinet.jsx";
 import StrawberryDiary from "./components/StrawberryDiary.jsx";
 import StrawberryPractices from "./components/StrawberryPractices.jsx";
+import StrawberryHistory from "./components/StrawberryHistory.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -10071,6 +10072,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     );
   }
 
+  // Screen 08: visual-only history, no patient session access.
+  if (typeof window !== "undefined" &&
+    ["/strawberry-support/history-preview", "/strawberry-support/history-preview/"].includes(window.location.pathname)) {
+    return <StrawberryHistory preview onBack={() => window.location.assign("/strawberry-support/cabinet-preview")} />;
+  }
+
   // Screen 05: live, authenticated cabinet backed by the existing Support state.
   const strawberryCabinetActive = strawberryRoute &&
     !APP_BRAND.isSupportPilot && activeModule === "support" &&
@@ -10128,6 +10135,38 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     );
   }
 
+  // Screen 08: real history from the authenticated Support cabinet.
+  if (strawberryCabinetActive && strawberryEntryStep === "history") {
+    return (
+      <StrawberryHistory
+        sessions={supportCabinet.sessions}
+        emergency={Boolean(
+          supportCabinet.latest_report?.crisisBlock?.emergencyRecommended ||
+          supportCabinet.latest_report?.crisisBlock?.status === "safety_check_in_progress" ||
+          supportCabinet.latest_report?.careRecommendation?.level === "urgent_help"
+        )}
+        loading={supportSessionLoading || loading}
+        onBack={() => setStrawberryEntryStep("intake")}
+        onOpenSession={(id) => {
+          setStrawberryEntryStep("legacy");
+          openSupportSessionView(id);
+        }}
+        onOpenReport={(id) => {
+          setStrawberryEntryStep("legacy");
+          openSupportReport(id);
+        }}
+        onAbout={() => {
+          setStrawberryEntryStep("legacy");
+          setAboutProjectOpen(true);
+        }}
+        onEmergency={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+      />
+    );
+  }
+
   if (strawberryCabinetActive) {
     return (
       <StrawberryCabinet
@@ -10150,7 +10189,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           setStrawberryEntryStep("legacy");
           openSupportReport(id);
         }}
-        onOpenHistory={() => setStrawberryEntryStep("legacy")}
+        onOpenHistory={() => setStrawberryEntryStep("history")}
         onDiary={() => {
           setStrawberryEntryStep("diary");
           loadSupportCheckins();
