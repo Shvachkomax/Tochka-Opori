@@ -4,6 +4,7 @@ import StrawberryConversation from "./components/StrawberryConversation.jsx";
 import StrawberryQuestions from "./components/StrawberryQuestions.jsx";
 import StrawberryReport from "./components/StrawberryReport.jsx";
 import StrawberryCabinet from "./components/StrawberryCabinet.jsx";
+import StrawberryDiary from "./components/StrawberryDiary.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -2046,10 +2047,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   // Save daily check-in
   async function saveSupportCheckin() {
     const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("Нужен доступ к сессии. Войдите по коду продолжения.", "error");
+      return false;
+    }
     if (checkinWellbeing === null || checkinWellbeing === undefined) {
       showToast("Отметьте состояние.", "error");
-      return;
+      return false;
     }
     setCheckinSaving(true);
     try {
@@ -2070,11 +2074,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         setCheckinToday(data.checkin);
         showToast("Сохранено.", "success");
         await loadSupportCheckins();
+        return true;
       } else {
         showToast(data.error || "Не удалось сохранить", "error");
+        return false;
       }
     } catch {
       showToast("Не удалось сохранить", "error");
+      return false;
     } finally {
       setCheckinSaving(false);
     }
@@ -10037,12 +10044,50 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     return <StrawberryCabinet preview />;
   }
 
+  // Screen 06: explicit design review, fictional values, no patient API calls.
+  if (typeof window !== "undefined" &&
+      ["/strawberry-support/diary-preview", "/strawberry-support/diary-preview/"].includes(window.location.pathname)) {
+    return (
+      <StrawberryDiary
+        preview
+        onBack={() => window.location.assign("/strawberry-support/cabinet-preview")}
+      />
+    );
+  }
+
   // Screen 05: live, authenticated cabinet backed by the existing Support state.
   const strawberryCabinetActive = strawberryRoute &&
     !APP_BRAND.isSupportPilot && activeModule === "support" &&
     phase === "cabinet" && supportScreen === "cabinet" &&
     Boolean(supportCabinet) && strawberryEntryStep !== "legacy" &&
     !inviteChecking && !inviteToken && !inviteInfo?.valid;
+
+  // Screen 06: same live check-in as the existing Support cabinet.
+  if (strawberryCabinetActive && strawberryEntryStep === "diary") {
+    return (
+      <StrawberryDiary
+        wellbeing={checkinWellbeing}
+        anxiety={checkinAnxiety}
+        comment={checkinComment}
+        today={checkinToday}
+        history={checkinHistory}
+        saving={checkinSaving}
+        onChangeWellbeing={setCheckinWellbeing}
+        onChangeAnxiety={setCheckinAnxiety}
+        onChangeComment={setCheckinComment}
+        onSave={saveSupportCheckin}
+        onBack={() => setStrawberryEntryStep("intake")}
+        onAbout={() => {
+          setStrawberryEntryStep("legacy");
+          setAboutProjectOpen(true);
+        }}
+        onEmergency={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+      />
+    );
+  }
 
   if (strawberryCabinetActive) {
     return (
@@ -10067,7 +10112,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           openSupportReport(id);
         }}
         onOpenHistory={() => setStrawberryEntryStep("legacy")}
-        onDiary={() => setStrawberryEntryStep("legacy")}
+        onDiary={() => {
+          setStrawberryEntryStep("diary");
+          loadSupportCheckins();
+        }}
         onSpecialistRequest={() => {
           setStrawberryEntryStep("legacy");
           openSupportRequestForSession();
