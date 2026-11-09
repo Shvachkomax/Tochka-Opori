@@ -1,5 +1,6 @@
 import InformationFlow from "./InformationFlow.jsx";
 import StrawberryWelcome from "./components/StrawberryWelcome.jsx";
+import StrawberryConversation from "./components/StrawberryConversation.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -9857,21 +9858,19 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     ["specialist_to_patient", "patient_to_specialist"].includes(inviteInfo.direction)
   );
 
-  // Gradual screen-by-screen migration. Only /strawberry-support shows screen 01.
-  // Invitations, partner brands, Health and the existing root Support bypass this route.
+  // Isolated step-by-step rollout on /strawberry-support only.
   const strawberryRoute = typeof window !== "undefined" &&
     ["/strawberry-support", "/strawberry-support/"].includes(window.location.pathname);
-  const showStrawberryEntry = strawberryRoute &&
+  const strawberryActive = strawberryRoute &&
     !APP_BRAND.isSupportPilot && activeModule === "support" &&
     supportScreen === "landing" && phase === "input" &&
-    strawberryEntryStep === "welcome" &&
     !inviteChecking && !inviteToken && !inviteInfo?.valid;
-  if (showStrawberryEntry) {
+
+  if (strawberryActive && strawberryEntryStep === "welcome") {
     return (
       <StrawberryWelcome
-        onStartVoice={async () => {
-          await ensureStartSession();
-          setMode("voice");
+        onStartVoice={() => {
+          setMode("text");
           setStrawberryEntryStep("intake");
         }}
         onWrite={() => {
@@ -9879,7 +9878,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           setStrawberryEntryStep("intake");
         }}
         onResume={() => {
-          setStrawberryEntryStep("intake");
+          setStrawberryEntryStep("legacy");
           const saved = getSupportSession();
           if (saved.sessionId && saved.accessToken) {
             loadSupportCabinet();
@@ -9888,16 +9887,48 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           }
         }}
         onAbout={() => {
-          setStrawberryEntryStep("intake");
+          setStrawberryEntryStep("legacy");
           setAboutProjectOpen(true);
         }}
         onCrisis={() => {
-          setStrawberryEntryStep("intake");
+          setStrawberryEntryStep("legacy");
           setCrisisOpen(true);
         }}
-        onSpecialist={() => {
-          window.location.href = "/specialist";
+        onSpecialist={() => { window.location.href = "/specialist"; }}
+      />
+    );
+  }
+
+  if (strawberryActive && strawberryEntryStep === "intake") {
+    return (
+      <StrawberryConversation
+        text={text}
+        onChangeText={setText}
+        onSubmit={() => submitRound()}
+        loading={loading}
+        loadingMessage={loadingMessage}
+        error={error}
+        recording={recording}
+        recordingTime={recordingTime}
+        transcribing={transcribing}
+        voiceError={voiceError}
+        onStartRecording={startRecording}
+        onStopRecording={stopRecording}
+        onBack={() => {
+          if (recording) stopRecording();
+          setStrawberryEntryStep("welcome");
         }}
+        onAbout={() => {
+          if (recording) stopRecording();
+          setStrawberryEntryStep("legacy");
+          setAboutProjectOpen(true);
+        }}
+        onCrisis={() => {
+          if (recording) stopRecording();
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+        onSpecialist={() => { window.location.href = "/specialist"; }}
       />
     );
   }
