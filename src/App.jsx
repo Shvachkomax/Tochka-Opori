@@ -9973,6 +9973,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           setAboutProjectOpen(true);
         }}
         onCrisis={() => {
+          if (recordingQuestionIndex !== null) stopQuestionRecording();
           setStrawberryEntryStep("legacy");
           setCrisisOpen(true);
         }}
