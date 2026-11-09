@@ -1,7 +1,7 @@
 /* Экран 04: чистая поверхность в стиле ChatGPT, без рамок и карточек. */
 .strawberry-report__main{padding-top:clamp(54px,7vh,90px);padding-bottom:85px}
 .strawberry-report__eyebrow{color:#859286;letter-spacing:.15em;font-size:11px;margin:0 0 26px}
-.strawberry-report h1{font-size:clamp(35px,3.5vw,52px);margin-bottom:22px}
+.strawberry-report h1{max-width:710px}
 .strawberry-report__lead{max-width:680px;margin-bottom:49px}
 .strawberry-report__section{width:min(100%,735px);margin:0 0 48px}
 .strawberry-report__section h2{margin:0 0 14px;font:normal clamp(21px,2vw,26px)/1.4 Georgia,"Times New Roman",serif;color:#586555}
@@ -25,7 +25,6 @@
 .strawberry-report__urgent .strawberry-report__fine{margin:0;font-size:12px}
 @media(max-width:640px){
 .strawberry-report__main{padding-top:46px;padding-bottom:45px}
-.strawberry-report h1{font-size:clamp(34px,8.2vw,44px)}
 .strawberry-report__lead{margin-bottom:37px}
 .strawberry-report__section{margin-bottom:39px}
 .strawberry-report__actions{flex-direction:column;align-items:stretch;max-width:340px}

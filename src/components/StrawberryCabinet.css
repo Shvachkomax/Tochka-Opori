@@ -1,7 +1,7 @@
 /* Screen 05 — extremely quiet, typography-led cabinet. */
 .strawberry-cabinet__main{padding-top:clamp(55px,7vh,105px);padding-bottom:70px}
 .strawberry-cabinet__eyebrow{font-size:10px;letter-spacing:.17em;color:#929f90;margin:0 0 27px}
-.strawberry-cabinet h1{font-size:clamp(34px,3.2vw,47px);max-width:690px;line-height:1.22}
+.strawberry-cabinet h1{max-width:690px}
 .strawberry-cabinet__lead{max-width:610px;margin-bottom:40px}
 .strawberry-cabinet__block{width:min(100%,680px);margin:0 0 50px}
 .strawberry-cabinet__block h2{font:normal clamp(21px,2vw,26px)/1.4 Georgia,"Times New Roman",serif;color:#556452;margin:0 0 12px}
