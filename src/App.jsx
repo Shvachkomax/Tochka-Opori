@@ -7,6 +7,7 @@ import StrawberryCabinet from "./components/StrawberryCabinet.jsx";
 import StrawberryDiary from "./components/StrawberryDiary.jsx";
 import StrawberryPractices from "./components/StrawberryPractices.jsx";
 import StrawberryHistory from "./components/StrawberryHistory.jsx";
+import StrawberrySpecialist from "./components/StrawberrySpecialist.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -1709,15 +1710,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     const saved = getSupportSession();
     if (!saved.sessionId || !saved.accessToken) {
       showToast("Нужен код доступа.", "error");
-      return;
+      return false;
     }
     if (!supportNewRequest.service_code) {
       showToast("Выберите услугу.", "error");
-      return;
+      return false;
     }
     if (!supportNewRequest.message || supportNewRequest.message.trim().length < 2) {
       showToast("Укажите сообщение.", "error");
-      return;
+      return false;
     }
     setSupportRequestSubmitting(true);
     try {
@@ -1747,8 +1748,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setSupportNewRequest({ service_code: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
       // Refresh cabinet to show new request
       await refreshSupportCabinet();
+      return true;
     } catch (e) {
       showToast(e.message || "Не удалось отправить запрос", "error");
+      return false;
     } finally {
       setSupportRequestSubmitting(false);
     }
@@ -10078,6 +10081,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     return <StrawberryHistory preview onBack={() => window.location.assign("/strawberry-support/cabinet-preview")} />;
   }
 
+  // Screen 09: design review without any patient API calls.
+  if (typeof window !== "undefined" &&
+      ["/strawberry-support/specialist-preview", "/strawberry-support/specialist-preview/"].includes(window.location.pathname)) {
+    return (
+      <StrawberrySpecialist
+        preview
+        onBack={() => window.location.assign("/strawberry-support/cabinet-preview")}
+      />
+    );
+  }
+
   // Screen 05: live, authenticated cabinet backed by the existing Support state.
   const strawberryCabinetActive = strawberryRoute &&
     !APP_BRAND.isSupportPilot && activeModule === "support" &&
@@ -10167,6 +10181,45 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     );
   }
 
+  // Screen 09: connected specialist and the existing service-request backend.
+  if (strawberryCabinetActive && strawberryEntryStep === "specialist") {
+    return (
+      <StrawberrySpecialist
+        specialist={supportCabinet.specialist}
+        requests={supportCabinet.service_requests}
+        request={supportNewRequest}
+        sending={supportRequestSubmitting}
+        onChangeRequest={setSupportNewRequest}
+        onSubmit={submitSupportServiceRequest}
+        onCancelRequest={cancelSupportServiceRequest}
+        matching={matchRequestSending}
+        emergency={Boolean(
+          supportCabinet.latest_report?.crisisBlock?.emergencyRecommended ||
+          supportCabinet.latest_report?.crisisBlock?.status === "safety_check_in_progress" ||
+          supportCabinet.latest_report?.careRecommendation?.level === "urgent_help"
+        )}
+        onBack={() => setStrawberryEntryStep("intake")}
+        onInviteSpecialist={() => {
+          setStrawberryEntryStep("legacy");
+          setPatientInviteCreated(null);
+          setPatientInviteModalOpen(true);
+        }}
+        onFindSpecialist={() => {
+          setStrawberryEntryStep("legacy");
+          createMatchRequest();
+        }}
+        onAbout={() => {
+          setStrawberryEntryStep("legacy");
+          setAboutProjectOpen(true);
+        }}
+        onEmergency={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+      />
+    );
+  }
+
   if (strawberryCabinetActive) {
     return (
       <StrawberryCabinet
@@ -10198,10 +10251,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           setStrawberryEntryStep("practices");
           loadSupportPractices();
         }}
-        onSpecialistRequest={() => {
-          setStrawberryEntryStep("legacy");
-          openSupportRequestForSession();
-        }}
+        onSpecialistRequest={() => setStrawberryEntryStep("specialist")}
         onFullCabinet={() => setStrawberryEntryStep("legacy")}
         onExit={() => {
           goToSupportLanding();

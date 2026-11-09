@@ -99,7 +99,7 @@ export default function StrawberryCabinet({
             <button type="button" onClick={onDiary || (() => window.location.assign("/strawberry-support/diary-preview"))}>Как вы сегодня? <small>Дневник состояния</small><span aria-hidden="true">→</span></button>
             <button type="button" onClick={onPractices || (() => window.location.assign("/strawberry-support/practices-preview"))}>Практики для себя <small>Небольшие упражнения</small><span aria-hidden="true">→</span></button>
             <button type="button" onClick={onOpenHistory || (() => window.location.assign("/strawberry-support/history-preview"))}>Вернуться к прежним разговорам <small>История и результаты</small><span aria-hidden="true">→</span></button>
-            <button type="button" onClick={onSpecialistRequest || previewAction}>Связаться со специалистом <small>Помощь человека</small><span aria-hidden="true">→</span></button>
+            <button type="button" onClick={onSpecialistRequest || (() => window.location.assign("/strawberry-support/specialist-preview"))}>Связаться со специалистом <small>Помощь человека</small><span aria-hidden="true">→</span></button>
           </div>
         </section>
 
