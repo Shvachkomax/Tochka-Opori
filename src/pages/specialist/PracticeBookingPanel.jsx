@@ -48,7 +48,7 @@ function NewPlaceForm({ onSaved }) {
   );
 }
 
-function NewServiceForm({ places, onSaved }) {
+function NewServiceForm({ places, organizationId, onSaved }) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [duration, setDuration] = useState("60");
@@ -60,7 +60,7 @@ function NewServiceForm({ places, onSaved }) {
     try {
       await callPractice("savePracticeService", {
         name, price_kop: Math.round(Number(price) * 100), duration_min: Number(duration),
-        place_id: placeId || null,
+        place_id: placeId || null, organization_id: organizationId || null,
       });
       setName(""); setPrice("");
       await onSaved();
@@ -91,7 +91,49 @@ function NewServiceForm({ places, onSaved }) {
   );
 }
 
-export default function PracticeBookingPanel() {
+function NewAvailabilityForm({ organizationId, onSaved }) {
+  const [weekday, setWeekday] = useState("1");
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("18:00");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const weekdays = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"];
+
+  async function submit(e) {
+    e.preventDefault(); setBusy(true); setError("");
+    try {
+      await callPractice("savePracticeAvailability", {
+        organization_id: organizationId || null,
+        weekday: Number(weekday), start_time: startTime, end_time: endTime,
+      });
+      await onSaved();
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
+
+  return (
+    <form onSubmit={submit} data-testid="a2-availability-form" style={{ marginTop: 8 }}>
+      <label style={{ display: "block", fontSize: 13, marginBottom: 6 }}>День недели
+        <select data-testid="a2-availability-weekday" value={weekday} onChange={(e) => setWeekday(e.target.value)} style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ddd" }}>
+          {weekdays.map((label, index) => <option key={label} value={index + 1}>{label}</option>)}
+        </select>
+      </label>
+      <div style={{ display: "flex", gap: 8 }}>
+        <label style={{ flex: 1, fontSize: 13 }}>С
+          <input data-testid="a2-availability-start" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ width: "100%", padding: 9, borderRadius: 8, border: "1px solid #ddd" }} />
+        </label>
+        <label style={{ flex: 1, fontSize: 13 }}>До
+          <input data-testid="a2-availability-end" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ width: "100%", padding: 9, borderRadius: 8, border: "1px solid #ddd" }} />
+        </label>
+      </div>
+      <button disabled={busy} data-testid="a2-availability-save" style={{ padding: "9px 16px", borderRadius: 9, background: "#2F5D50", color: "#fff", border: 0, fontWeight: 700, cursor: "pointer" }}>
+        {busy ? "Сохраняем…" : "Добавить рабочие часы"}
+      </button>
+      {error && <p role="alert" style={{ color: "#a33" }}>{error}</p>}
+    </form>
+  );
+}
+
+export default function PracticeBookingPanel({ organizationId = null }) {
   const [places, setPlaces] = useState([]);
   const [services, setServices] = useState([]);
   const [availability, setAvailability] = useState([]);
@@ -107,14 +149,14 @@ export default function PracticeBookingPanel() {
         callPractice("listPracticePlaces").catch(() => ({ places: [] })),
         callPractice("listPracticeServices").catch(() => ({ services: [] })),
         callPractice("listPracticeAvailability").catch(() => ({ availability: [] })),
-        callPractice("listPracticeBookings").catch(() => ({ bookings: [] })),
+        callPractice("listPracticeBookings", { organization_id: organizationId || null }).catch(() => ({ bookings: [] })),
         callPractice("getPracticeFinance").catch(() => ({ payable: [], payable_total_kop: 0 })),
       ]);
       setPlaces(p.places || []); setServices(s.services || []); setAvailability(a.availability || []);
       setBookings(b.bookings || []); setFinance(f);
     } catch (err) { setError(err.message || "Не удалось загрузить."); }
   }
-  useEffect(() => { reload(); }, []);
+  useEffect(() => { reload(); }, [organizationId]);
 
   async function complete(id, who) {
     setError(""); setInfo("");
@@ -147,7 +189,14 @@ export default function PracticeBookingPanel() {
           {s.name} · {s.duration_min} мин · {(s.price_kop / 100).toLocaleString("ru-RU")} ₽
         </div>
       ))}
-      <NewServiceForm places={places} onSaved={reload} />
+      <NewServiceForm places={places} organizationId={organizationId} onSaved={reload} />
+
+      <h4>Расписание</h4>
+      {availability.length === 0 && <p style={{ fontSize: 13, color: "#777" }}>Рабочие часы пока не заданы.</p>}
+      {availability.map((a) => <div key={a.id} data-testid="a2-availability-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
+        {a.weekday >= 1 && a.weekday <= 7 ? ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][a.weekday - 1] : "Дата"} · {a.start_time}–{a.end_time}
+      </div>)}
+      <NewAvailabilityForm organizationId={organizationId} onSaved={reload} />
 
       <h4>Записи пациентов</h4>
       {bookings.length === 0 && <p style={{ fontSize: 13, color: "#777" }}>Записей пока нет.</p>}

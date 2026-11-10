@@ -830,7 +830,7 @@ export default function SpecialistCabinet() {
           <>
             <MyPracticePilot doctor={expert} key={`${expert.id}:${orgId || "private"}`} storageScope={`${expert.id}:${orgId || "private"}`} />
             <div style={{ marginTop: 20 }}>
-              <PracticeBookingPanel />
+              <PracticeBookingPanel organizationId={orgId} />
             </div>
           </>
         )}

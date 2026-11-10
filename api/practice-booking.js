@@ -3,7 +3,7 @@
 import { getSupabase } from "../lib/supabase.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { authorizeSpecialist } from "./specialist.js";
-import { resolveSupportOwner } from "./session.js";
+import { resolvePracticePatientOwner } from "./session.js";
 import { isMyPracticeServerEnabled } from "../lib/my-practice/workspace-handler.js";
 import {
   handlePracticePlaces,
@@ -25,9 +25,9 @@ export default async function handler(req, res) {
   const { action } = req.body || {};
   // Patient identity: resolve via verified session (function injected to keep handler light).
   const resolvePatient = async (session_id, access_token) => {
-    const r = await resolveSupportOwner(session_id, access_token);
+    const r = await resolvePracticePatientOwner(session_id, access_token);
     if (!r) return null;
-    return { ownerId: r.ownerId, sessionId: r.sessionId, publicCode: r.publicCode };
+    return { ownerId: r.ownerId, ownerType: r.ownerType, sessionId: r.sessionId, publicCode: r.publicCode, module: r.module };
   };
   const deps = { authorizeSpecialist, getSupabase, resolvePatient };
 
@@ -49,6 +49,7 @@ export default async function handler(req, res) {
     case "reservePracticeBooking":
     case "confirmPracticeTestPayment":
     case "cancelPracticeBookingPublic":
+    case "listPracticeBookingsPublic":
     case "listPracticeBookings":
     case "completePracticeBooking":
     case "getPracticeFinance":

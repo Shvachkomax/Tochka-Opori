@@ -83,11 +83,21 @@ function NewBookingForm({ services, session, token, onSaved }) {
 
 export default function PracticePatientBooking({ sessionId, accessToken, doctorExpertId }) {
   const [services, setServices] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [lastBookingId, setLastBookingId] = useState(null);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
-  useEffect(() => { listServices(); }, []);
+  useEffect(() => {
+    if (doctorExpertId) listServices();
+    else setServices([]);
+  }, [doctorExpertId]);
+
+  useEffect(() => {
+    if (sessionId && accessToken) loadBookings();
+    else setBookings([]);
+  }, [sessionId, accessToken]);
+
   async function listServices() {
     setError("");
     try {
@@ -96,9 +106,23 @@ export default function PracticePatientBooking({ sessionId, accessToken, doctorE
     } catch (e) { setError(e.message); }
   }
 
+  async function loadBookings(preferredId = null) {
+    try {
+      const res = await callPractice("listPracticeBookingsPublic", { session_id: sessionId, access_token: accessToken });
+      const next = res.bookings || [];
+      setBookings(next);
+      const preferred = preferredId || lastBookingId;
+      const nextId = next.some((booking) => booking.id === preferred)
+        ? preferred
+        : next.find((booking) => ["held", "confirmed"].includes(booking.status))?.id || next[0]?.id || null;
+      setLastBookingId(nextId);
+    } catch (e) { setError(e.message); }
+  }
+
   async function onReserved(id) {
     setLastBookingId(id);
     setInfo("Запись создана. Подтверждение: выберите «Подтвердить оплату» ниже.");
+    await loadBookings(id);
   }
 
   async function testPay() {
@@ -107,6 +131,7 @@ export default function PracticePatientBooking({ sessionId, accessToken, doctorE
     try {
       const res = await callPractice("confirmPracticeTestPayment", { booking_id: lastBookingId, session_id: sessionId, access_token: accessToken });
       setInfo(`Оплата подтверждена (тест). Статус: ${res.status}.`);
+      await loadBookings(lastBookingId);
     } catch (e) { setError(e.message); }
   }
 
@@ -116,8 +141,13 @@ export default function PracticePatientBooking({ sessionId, accessToken, doctorE
     try {
       const res = await callPractice("cancelPracticeBookingPublic", { booking_id: lastBookingId, session_id: sessionId, access_token: accessToken });
       setInfo(`Запись отменена. Статус: ${res.status}.`);
+      await loadBookings(lastBookingId);
     } catch (e) { setError(e.message); }
   }
+
+  const selectedBooking = bookings.find((booking) => booking.id === lastBookingId) || null;
+  const canPay = selectedBooking?.status === "held";
+  const canCancel = ["held", "confirmed"].includes(selectedBooking?.status);
 
   return (
     <section data-testid="a2-patient-panel" style={{ border: "1px solid #e3ddcf", borderRadius: 16, padding: 20, background: "#FFFEFB" }}>
@@ -126,10 +156,33 @@ export default function PracticePatientBooking({ sessionId, accessToken, doctorE
       {error && <p role="alert" style={{ color: "#a33" }}>{error}</p>}
       {info && <p role="status" style={{ color: "#2F5D50" }}>{info}</p>}
       <NewBookingForm services={services} session={sessionId} token={accessToken} onSaved={onReserved} />
-      {lastBookingId && (
+      {bookings.length > 0 && (
+        <div style={{ marginTop: 18 }}>
+          <h4 style={{ margin: "0 0 8px" }}>Мои записи</h4>
+          <div style={{ display: "grid", gap: 8 }}>
+            {bookings.slice(0, 10).map((booking) => {
+              const service = Array.isArray(booking.practice_services) ? booking.practice_services[0] : booking.practice_services;
+              const selected = booking.id === lastBookingId;
+              return (
+                <button
+                  type="button"
+                  key={booking.id}
+                  onClick={() => setLastBookingId(booking.id)}
+                  style={{ textAlign: "left", padding: 10, borderRadius: 9, border: selected ? "2px solid #2F5D50" : "1px solid #ddd", background: "#fff", cursor: "pointer" }}
+                >
+                  <strong>{service?.name || "Приём"}</strong>{" · "}
+                  {new Date(booking.starts_at).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short", timeZone: "UTC" })}
+                  <span style={{ display: "block", fontSize: 12, color: "#666", marginTop: 3 }}>Статус: {booking.status}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {selectedBooking && (
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-          <button onClick={testPay} data-testid="a2-patient-pay" style={{ padding: "8px 14px", borderRadius: 8, background: "#2F5D50", color: "#fff", border: 0, cursor: "pointer" }}>Подтвердить оплату (тест)</button>
-          <button onClick={cancel} data-testid="a2-patient-cancel" style={{ padding: "8px 14px", borderRadius: 8, background: "#fff", border: "1px solid #c33", color: "#c33", cursor: "pointer" }}>Отменить</button>
+          {canPay && <button onClick={testPay} data-testid="a2-patient-pay" style={{ padding: "8px 14px", borderRadius: 8, background: "#2F5D50", color: "#fff", border: 0, cursor: "pointer" }}>Подтвердить оплату (тест)</button>}
+          {canCancel && <button onClick={cancel} data-testid="a2-patient-cancel" style={{ padding: "8px 14px", borderRadius: 8, background: "#fff", border: "1px solid #c33", color: "#c33", cursor: "pointer" }}>Отменить</button>}
         </div>
       )}
     </section>

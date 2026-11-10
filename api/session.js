@@ -103,6 +103,18 @@ export async function resolveSupportOwner(sessionId, accessToken) {
   return { ownerId: session.anonymous_owner_id, sessionId: session.session_id, publicCode: session.public_code };
 }
 
+// Shared patient identity resolver for booking and other cross-module actions.
+// It deliberately tries the existing Support session model first, then the
+// existing Health body_clients model. No owner id or module from the request is
+// used to select the identity.
+export async function resolvePracticePatientOwner(sessionId, accessToken) {
+  const support = await resolveSupportOwner(sessionId, accessToken);
+  if (support) return { ...support, ownerType: "anonymous_case", module: "support" };
+  const body = await resolveBodyOwner(sessionId, accessToken);
+  if (body) return { ...body, ownerType: "anonymous_profile", module: "body" };
+  return null;
+}
+
 // Medication cards require a non-legacy session token. Legacy access remains
 // available to unrelated historical cabinet flows, but cannot expose C2 data.
 async function resolveMedicationSupportOwner(sessionId, accessToken) {
@@ -188,7 +200,7 @@ async function resolveSupportSpecialistRelation(ownerId) {
 
 // Resolve body owner from session_id + access_token.
 // Returns { ownerId, sessionId } or throws with appropriate HTTP status.
-async function resolveBodyOwner(sessionId, accessToken) {
+export async function resolveBodyOwner(sessionId, accessToken) {
   if (!sessionId || !accessToken) {
     return null;
   }
@@ -1992,7 +2004,7 @@ async function handleGetBodyCabinet(req, res) {
     // 1. Look up body_clients — only real columns
     const { data: client, error: clientError } = await supabase
       .from("body_clients")
-      .select("session_id, anonymous_owner_id, display_name, goal, created_at")
+      .select("session_id, anonymous_owner_id, display_name, goal, specialist_id, specialist_name, created_at")
       .eq("session_id", sessionId)
       .maybeSingle();
 
@@ -2124,6 +2136,10 @@ async function handleGetBodyCabinet(req, res) {
       ok: true,
       session_id: sessionId,
       display_name: client.display_name || null,
+      specialist: client.specialist_id ? {
+        expertId: client.specialist_id,
+        expertName: client.specialist_name || null,
+      } : null,
       profile,
       wallet: walletSummary ? {
         balance: walletSummary.available_credits,

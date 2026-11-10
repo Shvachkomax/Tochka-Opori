@@ -10559,6 +10559,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
              />
            )}
 
+            {/* Health uses the same patient booking flow and verified body session. */}
+           {activeModule === "body" && bodyScreen === "cabinet" && bodyCabinetData?.specialist?.expertId && (
+             <PracticePatientBooking
+               sessionId={bodyDiarySessionId}
+               accessToken={(getBodySession().sessionId === bodyDiarySessionId ? getBodySession().accessToken : null)}
+               doctorExpertId={bodyCabinetData.specialist.expertId}
+             />
+           )}
+
           {/* Body onboarding */}
           {activeModule === "body" && bodyScreen === "onboarding" && (
             <BodyOnboarding
