@@ -9979,11 +9979,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           if (recording) stopRecording();
           setStrawberryEntryStep("welcome");
         }}
-        onAbout={() => {
-          if (recording) stopRecording();
-          setStrawberryEntryStep("legacy");
-          setAboutProjectOpen(true);
-        }}
+        onAbout={openStrawberryAbout}
         onCrisis={() => {
           if (recording) stopRecording();
           setStrawberryEntryStep("legacy");
