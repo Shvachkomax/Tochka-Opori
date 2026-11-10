@@ -2829,8 +2829,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
     setLoading(true);
     setError("");
-    setQuestions(null);
-
+    // Keep the current questions on screen if the request fails.
     let analyzeSessionId = sessionId;
     let analyzeSessionAccess = null;
 
@@ -3030,9 +3029,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       }
     } catch (e) {
       const msg = e.message || "";
-      if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("abort")) {
-        // Connection dropped — check backend status before giving up.
-        await attemptReportRecovery(sid || sessionId, inputText, data?.report);
+      if (msg.includes("ИИ-анализ недоступен") || msg.includes("ИИ не смог подготовить итоговый разбор")) {
+        setError(msg);
+      } else if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("abort")) {
+        // These variables must be defined even if the request failed before parsing JSON.
+        await attemptReportRecovery(analyzeSessionId || sessionId, inputText, null);
       } else if (dialogDepth < 3 || activeModule !== "support") {
         setError("Не удалось начать разбор. Попробуйте ещё раз.");
       } else {
