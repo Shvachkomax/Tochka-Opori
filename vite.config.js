@@ -1,11 +1,15 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+export function isPreviewTestEnvironment(env = process.env) {
+  return env.VERCEL_ENV === "preview" && env.DEPLOYMENT_PURPOSE === "test";
+}
+
 export default defineConfig({
   plugins: [react()],
   define: {
     "import.meta.env.VITE_ENABLE_PARTNER_TEST_ACCOUNTING": JSON.stringify(
-      process.env.VERCEL_ENV !== "production" && process.env.DEPLOYMENT_PURPOSE !== "live" ? "true" : "false"
+      isPreviewTestEnvironment(process.env) ? "true" : "false"
     ),
     ...Object.fromEntries(["VITE_ENABLE_MY_PRACTICE_PILOT", "VITE_ENABLE_MY_PRACTICE_SERVER_UI"].map(key => [
       `import.meta.env.${key}`, JSON.stringify(process.env.VERCEL_ENV === "preview"
