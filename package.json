@@ -58,6 +58,7 @@
     "test:live-budget": "node scripts/test-live-budget.js && node scripts/test-live-relay.js && node scripts/test-live-pcm.js",
     "test:my-practice": "node scripts/test-my-practice-pilot.js && node scripts/test-my-practice-catalog.js && node scripts/test-my-practice-commission.js && node scripts/test-my-practice-schedule.js && node scripts/test-my-practice-server-workspace.js && node scripts/test-my-practice-workspace-handler.js && node scripts/test-my-practice-server-ui.js && node scripts/test-my-practice-preview-db-gate.js && node scripts/test-my-practice-paid-bookings.js && node scripts/test-my-practice-paid-ui.js && node scripts/test-my-practice-places.js",
     "test:my-practice-fullcalendar": "node scripts/test-my-practice-fullcalendar.js",
+    "test:my-practice-booking": "node scripts/test-my-practice-booking.js",
     "test:specialist-navigation": "node scripts/test-specialist-navigation.js"
   },
   "dependencies": {

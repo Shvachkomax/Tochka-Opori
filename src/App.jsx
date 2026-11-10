@@ -20,6 +20,7 @@ import ExpertInvitePage from "./pages/expert/ExpertInvitePage.jsx";
 import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
 import SpecialistCabinet from "./pages/specialist/SpecialistCabinet.jsx";
 import { APP_BRAND } from "./lib/appBrand.js";
+import PracticePatientBooking from "./pages/specialist/PracticePatientBooking.jsx";
 
 class AdminErrorBoundary extends Component {
   constructor(props) {
@@ -10558,6 +10559,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
              />
            )}
 
+            {/* Health uses the same patient booking flow and verified body session. */}
+           {activeModule === "body" && bodyScreen === "cabinet" && bodyCabinetData?.specialist?.expertId && (
+             <PracticePatientBooking
+               sessionId={bodyDiarySessionId}
+               accessToken={(getBodySession().sessionId === bodyDiarySessionId ? getBodySession().accessToken : null)}
+               doctorExpertId={bodyCabinetData.specialist.expertId}
+             />
+           )}
+
           {/* Body onboarding */}
           {activeModule === "body" && bodyScreen === "onboarding" && (
             <BodyOnboarding
@@ -12201,6 +12211,17 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     </div>
                   </div>
                 )}
+
+                {/* ROW: Запись на приём (A2, существующий кабинет пациента) */}
+                {(() => {
+                  const docExpert = supportCabinet.specialist || {};
+                  const expertId = docExpert?.expertId || docExpert?.id || null;
+                  return (
+                    <div style={{ marginBottom: 20 }}>
+                      <PracticePatientBooking sessionId={saved.sessionId} accessToken={saved.accessToken} doctorExpertId={expertId} />
+                    </div>
+                  );
+                })()}
 
                 {/* ROW: Запросы специалисту — no duplicate "Новый запрос" button */}
                 <div style={{ marginBottom: 24 }}>
