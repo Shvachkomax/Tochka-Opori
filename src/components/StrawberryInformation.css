@@ -56,10 +56,7 @@
 .strawberry-information__notice{font-size:13px;line-height:1.8;color:#8f7e78;max-width:710px;margin:34px 0 36px}
 .strawberry-information__actions{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 .strawberry-information__quiet{border:0;background:transparent;color:#6e816e;padding:10px 0;font-size:13px!important}
-@media(min-width:641px){
-.strawberry-entry__main:has(.strawberry-information__carousel){padding-top:clamp(75px,10vh,120px)}
-.strawberry-entry__main:has(.strawberry-information__carousel) .strawberry-entry__features{margin-top:24px}
-}
+
 @media(max-width:640px){
 .strawberry-information__carousel{margin-top:24px}
 .strawberry-information__carousel-line{font-size:13px!important}

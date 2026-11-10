@@ -47,29 +47,33 @@ export default function StrawberryWelcome({
         </nav>
       </header>
 
-      <main className="strawberry-entry__main">
-        <h1>Когда непросто,<br />можно поговорить.</h1>
-        <p className="strawberry-entry__intro">
-          Расскажите, что с вами происходит — голосом или текстом.
-          Поможем разобраться в ситуации и найти следующий шаг.
-        </p>
-        <div className="strawberry-entry__actions">
-          <button type="button" className="strawberry-entry__action strawberry-entry__action--primary" disabled={busy} onClick={startVoice}>
-            {busy ? "Открываем запись…" : "Рассказать голосом"}
-            <span aria-hidden="true">↗</span>
-          </button>
-          <button type="button" className="strawberry-entry__action strawberry-entry__action--quiet" onClick={onWrite}>
-            Написать сообщение <span aria-hidden="true">→</span>
-          </button>
-        </div>
-        {startError && <p className="strawberry-entry__error" role="alert">{startError}</p>}
-        <button type="button" className="strawberry-entry__resume" onClick={onResume}>У меня уже есть код продолжения</button>
-        <StrawberryInfoCarousel />
-        <div className="strawberry-entry__features" aria-label="Возможности сервиса">
-          <span>Анонимный разговор</span>
-          <span>Поддержка ИИ</span>
-          <span>При необходимости — специалист</span>
-        </div>
+      <main className="strawberry-entry__main strawberry-entry__main--welcome">
+        <section className="strawberry-entry__welcome-intro" aria-labelledby="strawberry-welcome-title">
+          <h1 id="strawberry-welcome-title">Когда непросто,<br />можно поговорить.</h1>
+          <p className="strawberry-entry__intro">
+            Расскажите, что с вами происходит — голосом или текстом.
+            Поможем разобраться в ситуации и найти следующий шаг.
+          </p>
+          <div className="strawberry-entry__actions">
+            <button type="button" className="strawberry-entry__action strawberry-entry__action--primary" disabled={busy} onClick={startVoice}>
+              {busy ? "Открываем запись…" : "Рассказать голосом"}
+              <span aria-hidden="true">↗</span>
+            </button>
+            <button type="button" className="strawberry-entry__action strawberry-entry__action--quiet" onClick={onWrite}>
+              Написать сообщение <span aria-hidden="true">→</span>
+            </button>
+          </div>
+          {startError && <p className="strawberry-entry__error" role="alert">{startError}</p>}
+          <button type="button" className="strawberry-entry__resume" onClick={onResume}>У меня уже есть код продолжения</button>
+        </section>
+        <aside className="strawberry-entry__welcome-air" aria-label="Информация о поддержке">
+          <StrawberryInfoCarousel />
+          <div className="strawberry-entry__features" aria-label="Возможности сервиса">
+            <span>Анонимный разговор</span>
+            <span>Поддержка ИИ</span>
+            <span>При необходимости — специалист</span>
+          </div>
+        </aside>
       </main>
       <footer className="strawberry-entry__footer">
         <span>Предварительная поддержка, не медицинский диагноз.</span>

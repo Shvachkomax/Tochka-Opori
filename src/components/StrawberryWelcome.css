@@ -4,7 +4,7 @@
   --se-secondary: #747e73;
   --se-leaf: #7d8f76;
   /* Unified type scale for ALL Strawberry Support screens. */
-  --se-heading-size: clamp(34px, 3.15vw, 44px);
+  --se-heading-size: clamp(32px, 2.95vw, 40px);
   --se-heading-leading: 1.22;
   --se-heading-gap: 22px;
   box-sizing: border-box;
@@ -218,4 +218,70 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .strawberry-entry__action { transition: none; }
+}
+
+/* Landing only — two independent typographic areas over the translucent
+   botanical shadow. There is intentionally no panel or border on the right. */
+.strawberry-entry__main--welcome {
+  display: grid;
+  grid-template-columns: minmax(0, 540px) minmax(0, 1fr);
+  column-gap: clamp(48px, 5.5vw, 90px);
+  align-items: center;
+  align-content: center;
+  padding: clamp(60px, 9vh, 112px) clamp(24px, 5.4vw, 86px) 55px;
+}
+.strawberry-entry__welcome-intro,
+.strawberry-entry__welcome-air { min-width: 0; }
+.strawberry-entry__welcome-intro h1 { max-width: 520px; }
+.strawberry-entry__welcome-intro .strawberry-entry__intro {
+  max-width: 535px;
+  font-size: clamp(16px, 1.18vw, 18px);
+  line-height: 1.82;
+}
+.strawberry-entry__welcome-air {
+  align-self: center;
+  padding: 12px 0 0;
+  max-width: 630px;
+}
+.strawberry-entry__welcome-air .strawberry-information__carousel {
+  width: 100%;
+  margin-top: 0;
+}
+.strawberry-entry__welcome-air .strawberry-entry__features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 31px;
+  font-size: 11px;
+  color: #79877a;
+}
+.strawberry-entry__welcome-air .strawberry-entry__features span::before {
+  margin-right: 7px;
+}
+@media (max-width: 1100px) {
+  .strawberry-entry__main--welcome {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 46px;
+    justify-content: start;
+    align-content: start;
+    padding-top: 80px;
+  }
+  .strawberry-entry__welcome-air { width: min(100%, 640px); padding: 0; }
+  .strawberry-entry__welcome-intro .strawberry-entry__intro { max-width: 640px; }
+  .strawberry-entry__main--welcome .strawberry-entry__features { margin-top: 24px; }
+}
+@media (max-width: 640px) {
+  .strawberry-entry__main--welcome {
+    padding: 70px 23px 45px;
+    row-gap: 38px;
+  }
+  .strawberry-entry__welcome-air .strawberry-entry__features {
+    flex-direction: column;
+    gap: 3px;
+    margin-top: 25px;
+  }
+  .strawberry-entry__welcome-intro .strawberry-entry__intro {
+    font-size: 16px;
+    line-height: 1.66;
+  }
 }
