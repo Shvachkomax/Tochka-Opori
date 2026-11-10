@@ -128,7 +128,7 @@ function OfferCard({ offer, onSaveEdit }) {
   );
 }
 
-export default function MyPracticePilot({ standalone = false, storageScope = "public-demo", doctor = DEMO_DOCTOR }) {
+export default function MyPracticePilot({ standalone = false, storageScope = "public-demo", doctor = DEMO_DOCTOR, serverBookings = null }) {
   const catalogKey = DRAFT_STORAGE_KEY + ":" + storageScope;
   const scheduleKey = SCHEDULE_DRAFT_STORAGE_KEY + ":" + storageScope;
   const [tab,setTab] = useState("overview");
@@ -271,7 +271,8 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
       <div className="mp-section-title"><h3>Общий календарь</h3><p>Справочные блоки работы и внешние записи по редактируемым местам, без платежей и комиссии.</p></div>
       <MyPracticeCalendar catalog={catalog} entries={schedule} onChange={changeSchedule}
         onSave={saveSchedule} onReset={resetSchedule} dirty={scheduleDirty} storageMessage={scheduleMessage}
-        monday={monday} setMonday={setMonday} clinic={calendarClinic} setClinic={setCalendarClinic}/>
+        monday={monday} setMonday={setMonday} clinic={calendarClinic} setClinic={setCalendarClinic}
+        serverBookings={serverBookings}/>
     </div>}
   </section>;
 }

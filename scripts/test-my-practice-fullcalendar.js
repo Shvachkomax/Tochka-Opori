@@ -54,6 +54,10 @@ assert.ok(evts.some(e=>e.rendering==="background"), "free intervals render as ba
 assert.ok(evts.every(e=>/^2026-11-/.test(e.start)), "all events are within the visible week");
 assert.ok(evts.filter(e=>e.extendedProps?.kind!=="free").every(e=>!e.resourceId), "no resourceId — resources are Premium");
 assert.ok(evts.some(e=>e.title.includes(catalog[0].name)), "clinic name is shown in event title");
+const serverEvents = toCalendarEvents([
+  { id: "server-booking-1", day: monday, start: "10:00", end: "11:00", kind: "booking", status: "confirmed", source: "server", title: "Приём · Клиника А" },
+], catalog);
+assert.equal(serverEvents[0].title, "Приём · Клиника А", "server booking title is preserved in FullCalendar");
 assert.ok(!calSrc.includes("resources={resources}") && !calSrc.includes("resourceId:"), "calendar does not use Premium resources");
 assert.ok(calSrc.includes("Выберите клинику"), "explicit clinic choice in the form when filter is all");
 

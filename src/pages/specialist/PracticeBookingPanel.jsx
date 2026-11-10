@@ -133,7 +133,7 @@ function NewAvailabilityForm({ organizationId, onSaved }) {
   );
 }
 
-export default function PracticeBookingPanel({ organizationId = null }) {
+export default function PracticeBookingPanel({ organizationId = null, onBookingsChange }) {
   const [places, setPlaces] = useState([]);
   const [services, setServices] = useState([]);
   const [availability, setAvailability] = useState([]);
@@ -149,11 +149,12 @@ export default function PracticeBookingPanel({ organizationId = null }) {
         callPractice("listPracticePlaces").catch(() => ({ places: [] })),
         callPractice("listPracticeServices").catch(() => ({ services: [] })),
         callPractice("listPracticeAvailability").catch(() => ({ availability: [] })),
-        callPractice("listPracticeBookings", { organization_id: organizationId || null }).catch(() => ({ bookings: [] })),
+        callPractice("listPracticeBookings", { organization_id: organizationId || null }).catch(() => ({ bookings: [], failed: true })),
         callPractice("getPracticeFinance").catch(() => ({ payable: [], payable_total_kop: 0 })),
       ]);
       setPlaces(p.places || []); setServices(s.services || []); setAvailability(a.availability || []);
       setBookings(b.bookings || []); setFinance(f);
+      if (!b.failed) onBookingsChange?.(b.bookings || []);
     } catch (err) { setError(err.message || "Не удалось загрузить."); }
   }
   useEffect(() => { reload(); }, [organizationId]);
@@ -199,6 +200,7 @@ export default function PracticeBookingPanel({ organizationId = null }) {
       <NewAvailabilityForm organizationId={organizationId} onSaved={reload} />
 
       <h4>Записи пациентов</h4>
+      <button type="button" onClick={reload} data-testid="a2-refresh-bookings" style={{ padding: "6px 10px", borderRadius: 8, background: "#fff", border: "1px solid #ddd", cursor: "pointer" }}>Обновить серверные записи</button>
       {bookings.length === 0 && <p style={{ fontSize: 13, color: "#777" }}>Записей пока нет.</p>}
       {bookings.map((b) => (
         <div key={b.id} data-testid="a2-booking-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
