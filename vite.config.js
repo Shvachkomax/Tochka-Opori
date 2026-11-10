@@ -1,8 +1,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { isMyPracticeTestEnvironment } from "./lib/my-practice/workspace-handler.js";
 
 export function isPreviewTestEnvironment(env = process.env) {
-  return env.VERCEL_ENV === "preview" && env.DEPLOYMENT_PURPOSE === "test";
+  return isMyPracticeTestEnvironment(env);
 }
 
 export default defineConfig({
@@ -13,7 +14,8 @@ export default defineConfig({
     ),
     ...Object.fromEntries(["VITE_ENABLE_MY_PRACTICE_PILOT", "VITE_ENABLE_MY_PRACTICE_SERVER_UI"].map(key => [
       `import.meta.env.${key}`, JSON.stringify(process.env.VERCEL_ENV === "preview"
-        && process.env.DEPLOYMENT_PURPOSE === "test" && process.env[key] === "true" ? "true" : "false"),
+        && process.env.DEPLOYMENT_PURPOSE === "test" && process.env[key] === "true" ? "true"
+        : isMyPracticeTestEnvironment(process.env) && process.env[key] === "true" ? "true" : "false"),
     ])),
     ...Object.fromEntries(['HEALTH', 'SUPPORT'].map(module => [
       `import.meta.env.VITE_${module}_LIVE_ENABLED`, JSON.stringify(

@@ -3,7 +3,7 @@ import {handleMyPracticeWorkspace,isMyPracticeServerEnabled,isSameOriginPractice
 
 const a="00000000-0000-4000-8000-000000000001",b="00000000-0000-4000-8000-000000000002";
 const env={MY_PRACTICE_SERVER_ENABLED:"true",MY_PRACTICE_ALLOWED_SUPABASE_REF:"eehyehlhiyztciaezaus",
-  VERCEL_ENV:"preview",SUPABASE_URL:"https://eehyehlhiyztciaezaus.supabase.co"};
+  VERCEL_ENV:"preview",DEPLOYMENT_PURPOSE:"test",SUPABASE_URL:"https://eehyehlhiyztciaezaus.supabase.co"};
 const headers={origin:"https://test-preview.vercel.app",host:"test-preview.vercel.app"};
 assert(isMyPracticeServerEnabled(env));
 assert(!isMyPracticeServerEnabled({...env,VERCEL_ENV:"production"}));

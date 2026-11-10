@@ -6,11 +6,11 @@ import { isMyPracticeServerEnabled } from "../lib/my-practice/workspace-handler.
 
 // Guard: env must be preview + test ref + https host.
 assert.equal(
-  isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", VERCEL_ENV: "preview", MY_PRACTICE_ALLOWED_SUPABASE_REF: "eehyehlhiyztciaezaus", SUPABASE_URL: "https://eehyehlhiyztciaezaus.supabase.co" }),
+  isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", VERCEL_ENV: "preview", DEPLOYMENT_PURPOSE: "test", MY_PRACTICE_ALLOWED_SUPABASE_REF: "eehyehlhiyztciaezaus", SUPABASE_URL: "https://eehyehlhiyztciaezaus.supabase.co" }),
   true,
 );
 assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", VERCEL_ENV: "production", MY_PRACTICE_ALLOWED_SUPABASE_REF: "eehyehlhiyztciaezaus", SUPABASE_URL: "https://eehyehlhiyztciaezaus.supabase.co" }), false);
-assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", VERCEL_ENV: "preview", MY_PRACTICE_ALLOWED_SUPABASE_REF: "OTHER", SUPABASE_URL: "https://OTHER.supabase.co" }), false);
+assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", VERCEL_ENV: "preview", DEPLOYMENT_PURPOSE: "test", MY_PRACTICE_ALLOWED_SUPABASE_REF: "OTHER", SUPABASE_URL: "https://OTHER.supabase.co" }), false);
 
 // availability lib still consistent
 const entries = [{ id: "b", clinicId: "c1", day: "2026-11-09", start: "10:00", end: "12:00", kind: "busy", reason: "clinic", status: "active", serviceId: null, patientAlias: null, source: "manual" }];

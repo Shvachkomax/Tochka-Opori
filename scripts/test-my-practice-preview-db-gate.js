@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {getSupabase} from "../lib/supabase.js";
 import {isMyPracticeServerEnabled} from "../lib/my-practice/workspace-handler.js";
-const vars=["MY_PRACTICE_REQUIRE_TEST_DB","MY_PRACTICE_SERVER_ENABLED","MY_PRACTICE_ALLOWED_SUPABASE_REF","SUPABASE_URL","VERCEL_ENV"];
+const vars=["MY_PRACTICE_REQUIRE_TEST_DB","MY_PRACTICE_SERVER_ENABLED","MY_PRACTICE_ALLOWED_SUPABASE_REF","SUPABASE_URL","VERCEL_ENV","DEPLOYMENT_PURPOSE"];
 const saved=Object.fromEntries(vars.map(k=>[k,process.env[k]]));
 try{
   Object.assign(process.env,{
@@ -10,6 +10,7 @@ try{
     MY_PRACTICE_ALLOWED_SUPABASE_REF:"eehyehlhiyztciaezaus",
     SUPABASE_URL:"https://eehyehlhiyztciaezaus.supabase.co",
     VERCEL_ENV:"preview",
+    DEPLOYMENT_PURPOSE:"test",
   });
   assert.equal(isMyPracticeServerEnabled(process.env),false);
   assert.throws(()=>getSupabase(),/verified test database credentials not configured/);
