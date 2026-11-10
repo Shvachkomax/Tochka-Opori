@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import "./StrawberryWelcome.css";
 import "./StrawberryInformation.css";
 
@@ -23,7 +23,6 @@ export function StrawberryInfoCarousel() {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [manualPause, setManualPause] = useState(false);
-  const rootRef = useRef(null);
   useEffect(() => {
     if (paused || manualPause) return undefined;
     const media = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)");
@@ -31,27 +30,42 @@ export function StrawberryInfoCarousel() {
     const id = window.setInterval(() => setIndex(v => (v + 1) % ITEMS.length), 6800);
     return () => window.clearInterval(id);
   }, [paused, manualPause]);
+
+  // Five readable lines, with the current message in the centre.
+  // No visual borders: this should look like text gently moving on white paper.
+  const nearby = [-2, -1, 0, 1, 2].map(offset => ({
+    itemIndex: (index + offset + ITEMS.length) % ITEMS.length,
+    offset
+  }));
   const current = ITEMS[index];
+
   return (
-    <section className="strawberry-information__carousel" aria-label="Коротко о поддержке"
-      ref={rootRef}
+    <section className="strawberry-information__carousel" aria-label="Информационная лента о поддержке"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
-      onBlurCapture={e => {
-        if (!e.currentTarget.contains(e.relatedTarget)) setPaused(false);
-      }}>
+      onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget)) setPaused(false); }}>
       <div className="strawberry-information__carousel-top">
-        <span>НЕСКОЛЬКО СЛОВ О ПОДДЕРЖКЕ</span>
-        <span className="strawberry-information__carousel-count" aria-label={"Сообщение " + (index+1) + " из " + ITEMS.length}>
-          {String(index + 1).padStart(2,"0")} / {String(ITEMS.length).padStart(2,"0")}
+        <span>ВАЖНО ЗНАТЬ О ПОДДЕРЖКЕ</span>
+        <span className="strawberry-information__carousel-count" aria-label={"Сообщение " + (index + 1) + " из " + ITEMS.length}>
+          {String(index + 1).padStart(2, "0")} / {String(ITEMS.length).padStart(2, "0")}
         </span>
       </div>
-      <div className="strawberry-information__carousel-body" aria-live="off" key={index}>
-        <span className="strawberry-information__carousel-label">{current.label}</span>
-        <h2>{current.title}</h2>
-        <p>{current.body}</p>
+      <div className="strawberry-information__carousel-list" aria-label="Сообщения">
+        {nearby.map(({ itemIndex, offset }) => (
+          <button type="button" key={offset}
+            className={"strawberry-information__carousel-line" + (offset === 0 ? " is-current" : "")}
+            aria-current={offset === 0 ? "true" : undefined}
+            aria-label={ITEMS[itemIndex].title}
+            onClick={() => setIndex(itemIndex)}>
+            <span className="strawberry-information__carousel-dot" aria-hidden="true">{offset === 0 ? "•" : "·"}</span>
+            {ITEMS[itemIndex].title}
+          </button>
+        ))}
       </div>
+      <p className="strawberry-information__carousel-description" aria-live="off" key={"description-" + index}>
+        {current.body}
+      </p>
       <div className="strawberry-information__carousel-controls">
         <button type="button" onClick={() => setIndex(v => (v + ITEMS.length - 1) % ITEMS.length)}
           aria-label="Предыдущее сообщение">←</button>

@@ -64,12 +64,12 @@ export default function StrawberryWelcome({
         </div>
         {startError && <p className="strawberry-entry__error" role="alert">{startError}</p>}
         <button type="button" className="strawberry-entry__resume" onClick={onResume}>У меня уже есть код продолжения</button>
+        <StrawberryInfoCarousel />
         <div className="strawberry-entry__features" aria-label="Возможности сервиса">
           <span>Анонимный разговор</span>
           <span>Поддержка ИИ</span>
           <span>При необходимости — специалист</span>
         </div>
-        <StrawberryInfoCarousel />
       </main>
       <footer className="strawberry-entry__footer">
         <span>Предварительная поддержка, не медицинский диагноз.</span>
