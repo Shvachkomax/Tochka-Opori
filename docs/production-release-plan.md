@@ -2,7 +2,7 @@
 
 Дата подготовки: 10 ноября 2026 года
 Функциональный HEAD под аудитом: `3b117d98cd826e01f6432d3d7b1300b459f8307f`
-Текущий integration HEAD с документом: `fc9ac96c6df4b5dce6f8ad94e953d22793cd9db4`
+Текущий integration HEAD с документом: `138b51cc61a3f1426b759e6b3245e051fabb6b7f`
 PR №16: https://github.com/Shvachkomax/Tochka-Opori/pull/16
 Статус PR: OPEN/DRAFT
 
