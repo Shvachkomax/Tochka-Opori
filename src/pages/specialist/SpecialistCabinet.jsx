@@ -93,6 +93,7 @@ export default function SpecialistCabinet() {
   const [loginCode, setLoginCode] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [toast, setToast] = useState({ message: "", type: "" });
+  const [serverBookings, setServerBookings] = useState(null);
 
   // Working context (NOT secrets — sessionStorage is fine)
   const [orgId, setOrgId] = useState(() => {
@@ -172,6 +173,7 @@ export default function SpecialistCabinet() {
     setServiceRequestUpdating(null);
     setServiceRequestPendingAction(null);
     setServiceRequestFeedback({});
+    setServerBookings(null);
     setServiceRequestsFilter("all");
     setClients([]);
     setClientsLoading(false);
@@ -828,9 +830,9 @@ export default function SpecialistCabinet() {
         {/* Только синтетический пилот; Preview-флаг по умолчанию выключен. */}
         {import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && !selectedClient && (
           <>
-            <MyPracticePilot doctor={expert} key={`${expert.id}:${orgId || "private"}`} storageScope={`${expert.id}:${orgId || "private"}`} />
+            <MyPracticePilot doctor={expert} key={`${expert.id}:${orgId || "private"}`} storageScope={`${expert.id}:${orgId || "private"}`} serverBookings={serverBookings} />
             <div style={{ marginTop: 20 }}>
-              <PracticeBookingPanel organizationId={orgId} />
+              <PracticeBookingPanel organizationId={orgId} onBookingsChange={setServerBookings} />
             </div>
           </>
         )}

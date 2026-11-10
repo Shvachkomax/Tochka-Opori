@@ -48,7 +48,7 @@ const badgeColor=entry=>entry.kind==="busy"?"busy":
   entry.status==="pending"?"pending":entry.status==="cancelled"?"cancelled":
   entry.status==="completed"?"completed":"confirmed";
 
-function ScheduleForm({draft,setDraft,editingId,catalog,entries,onChange,onClose}){
+function ScheduleForm({draft,setDraft,editingId,catalog,entries,serverEntries=[],onChange,onClose}){
   const [error,setError]=useState("");
   const formRef=useRef(null);
   useEffect(()=>{formRef.current?.scrollIntoView?.({behavior:"smooth",block:"nearest"});},[editingId,draft.kind]);
@@ -90,10 +90,11 @@ function ScheduleForm({draft,setDraft,editingId,catalog,entries,onChange,onClose
     e.preventDefault();
     setError("");
     try{
+      const combinedEntries=[...entries,...serverEntries];
       const next=editingId
-        ? updateScheduleEntry(entries,editingId,draft,catalog)
-        : addScheduleEntry(entries,draft,catalog);
-      onChange(next);
+        ? updateScheduleEntry(combinedEntries,editingId,draft,catalog)
+        : addScheduleEntry(combinedEntries,draft,catalog);
+      onChange(next.filter(entry=>entry.source!=="server"));
       onClose();
     }catch(err){setError(err.message||"Не удалось сохранить запись.");}
   };
@@ -171,17 +172,41 @@ function ScheduleForm({draft,setDraft,editingId,catalog,entries,onChange,onClose
   </form>;
 }
 
-export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onReset,dirty,storageMessage,monday,setMonday,clinic,setClinic}){
+export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onReset,dirty,storageMessage,monday,setMonday,clinic,setClinic,serverBookings=null}){
   const [draft,setDraft]=useState(null);
   const [editId,setEditId]=useState(null);
   const [notice,setNotice]=useState("");
   const [view,setView]=useState("timeGridWeek");
   const apiRef=useRef(null);
 
-  const visible=useMemo(()=>entriesForWeek(entries,monday,clinic),[entries,monday,clinic]);
+  const serverEntries=useMemo(()=>Array.isArray(serverBookings)?serverBookings.map(booking=>{
+    const start=new Date(booking.starts_at),end=new Date(booking.ends_at);
+    if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime()))return null;
+    const service=Array.isArray(booking.practice_services)?booking.practice_services[0]:booking.practice_services;
+    if (["cancelled", "expired"].includes(booking.status)) return null;
+    return {
+      id:`server-booking-${booking.id}`,
+      clinicId:booking.organization_id||"server-private",
+      day:start.toISOString().slice(0,10),
+      start:start.toISOString().slice(11,16),
+      end:end.toISOString().slice(11,16),
+      kind:"booking",
+      status:booking.status==="held"?"pending":booking.status,
+      serviceId:booking.service_id,
+      patientAlias:null,
+      source:"server",
+      title:`${service?.name||"Серверная запись"} · ${booking.organization_id?"Организация":"Частная практика"}`,
+    };
+  }).filter(Boolean):[],[serverBookings]);
+  // Server bookings are global by expert_id. They remain visible and block
+  // reference gaps even when the local draft filter points at one clinic.
+  const visible=useMemo(()=>[
+    ...entriesForWeek(entries,monday,clinic),
+    ...entriesForWeek(serverEntries,monday,"all"),
+  ],[entries,monday,clinic,serverEntries]);
   // Multi-clinic without Premium: the clinic filter selects visible events;
   // each event title carries its clinic name. No resources/resourceId.
-  const fcEvents=useMemo(()=>toCalendarEvents(visible,catalog,{includeFree:true,monday,days:7}),[visible,catalog,monday]);
+  const fcEvents=useMemo(()=>toCalendarEvents(visible,catalog,{includeFree:!Array.isArray(serverBookings),monday,days:7}),[visible,catalog,monday,serverBookings]);
 
   const startNew=(kind,day=monday)=>{
     if(!catalog.length)return;
@@ -217,9 +242,9 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
   const handleEventClick=useCallback((info)=>{
     const original=info.event.extendedProps;
     if(original?.kind==="free")return;
-    const entry=entries.find(e=>e.id===original?.entryId);
+    const entry=visible.find(e=>e.id===original?.entryId);
     if(entry)edit(entry);
-  },[entries]);
+  },[visible]);
 
   const handleEventDidMount=useCallback((info)=>{
     const id=info.event.extendedProps?.entryId;
@@ -274,7 +299,7 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
       <span className="mp-legend-completed">Завершена</span>
       <span className="mp-legend-free">Свободно (справочно)</span>
     </div>
-    <p className="mp-footnote">Рабочее время для справочных свободных интервалов: {DEMO_WORKING_HOURS.label} ({DEMO_WORKING_HOURS.start}–{DEMO_WORKING_HOURS.end}).</p>
+    <p className="mp-footnote">{Array.isArray(serverBookings)?"Серверные записи показаны из Test Supabase; пустые интервалы не являются обещанием доступности.":`Рабочее время для справочных свободных интервалов: ${DEMO_WORKING_HOURS.label} (${DEMO_WORKING_HOURS.start}–${DEMO_WORKING_HOURS.end}).`}</p>
     <div className="mp-fullcalendar-wrap" data-testid="my-practice-fullcalendar">
       <FullCalendar
         plugins={[classicThemePlugin,dayGridPlugin,timeGridPlugin,listPlugin,interactionPlugin]}
@@ -309,7 +334,7 @@ export default function MyPracticeCalendar({catalog,entries,onChange,onSave,onRe
       />
     </div>
     {draft&&<ScheduleForm draft={draft} setDraft={setDraft} editingId={editId} catalog={catalog}
-      entries={entries} onChange={onChange} onClose={close}/>}
+      entries={entries} serverEntries={serverEntries} onChange={onChange} onClose={close}/>}
     {notice&&<p role="status" className="mp-editor-note">{notice}</p>}
     <div className="mp-services-save">
       <span>{dirty?"Есть несохранённые изменения расписания":(storageMessage||"Изменения сохраняются в этой вкладке")}</span>
