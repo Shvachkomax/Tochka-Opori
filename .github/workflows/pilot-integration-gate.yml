@@ -77,6 +77,9 @@ jobs:
           LIVE_TEST_MODULE=support npm run e2e:health-live
 
       - name: Partner cabinet browser test
+        env:
+          VERCEL_ENV: preview
+          DEPLOYMENT_PURPOSE: test
         run: npm run test:partner-browser
 
       - name: Integrated practice browser contexts and synthetic bookings
