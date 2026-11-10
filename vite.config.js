@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   define: {
     "import.meta.env.VITE_ENABLE_PARTNER_TEST_ACCOUNTING": JSON.stringify(
-      process.env.VERCEL_ENV === "preview" && process.env.DEPLOYMENT_PURPOSE === "test" ? "true" : "false"
+      process.env.VERCEL_ENV !== "production" && process.env.DEPLOYMENT_PURPOSE !== "live" ? "true" : "false"
     ),
     ...Object.fromEntries(["VITE_ENABLE_MY_PRACTICE_PILOT", "VITE_ENABLE_MY_PRACTICE_SERVER_UI"].map(key => [
       `import.meta.env.${key}`, JSON.stringify(process.env.VERCEL_ENV === "preview"
