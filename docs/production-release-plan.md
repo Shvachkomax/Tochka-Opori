@@ -1,7 +1,8 @@
 # Production Release Plan — «Точка опоры»
 
 Дата подготовки: 10 ноября 2026 года
-Интеграционный HEAD: `3b117d98cd826e01f6432d3d7b1300b459f8307f`
+Функциональный HEAD под аудитом: `3b117d98cd826e01f6432d3d7b1300b459f8307f`
+Текущий integration HEAD с документом: `666d5b743b27d926d59acf0fe8e4c5e30bcd2d7e`
 PR №16: https://github.com/Shvachkomax/Tochka-Opori/pull/16
 Статус PR: OPEN/DRAFT
 
