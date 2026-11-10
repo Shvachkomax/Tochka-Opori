@@ -7,6 +7,9 @@ function response() {
 }
 const calls = [];
 let fault = null;
+const previousEnvironment = { VERCEL_ENV: process.env.VERCEL_ENV, DEPLOYMENT_PURPOSE: process.env.DEPLOYMENT_PURPOSE };
+process.env.VERCEL_ENV = "preview";
+process.env.DEPLOYMENT_PURPOSE = "test";
 const deps = {
   authorizeSpecialist: async () => ({ expert: { id: "verified-expert", allowed_modules: ["support", "body"] }, memberships: [{ organization_id: "allowed-org" }] }),
   validateSpecialistContext,
@@ -40,6 +43,16 @@ for (const [code, expected] of [["PGRST202", 503], ["XX000", 500]]) {
   assert.equal(res.code, expected);
   assert.equal(res.body.summary, undefined, "database failures never become a zero balance");
 }
+process.env.VERCEL_ENV = "production";
+process.env.DEPLOYMENT_PURPOSE = "live";
+res = response(); calls.length = 0; fault = null;
+await handlePartnerProgram(req, res, deps);
+assert.equal(res.code, 503, "Production must not call test partner RPCs");
+assert.equal(calls.length, 0, "Production partner gate runs before test-only RPCs");
+if (previousEnvironment.VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
+else process.env.VERCEL_ENV = previousEnvironment.VERCEL_ENV;
+if (previousEnvironment.DEPLOYMENT_PURPOSE === undefined) delete process.env.DEPLOYMENT_PURPOSE;
+else process.env.DEPLOYMENT_PURPOSE = previousEnvironment.DEPLOYMENT_PURPOSE;
 console.log("Partner API tests passed: session identity, scope, no-store, errors and missing migration.");
 
 // The imported application rate limiter owns a recurring cleanup timer.

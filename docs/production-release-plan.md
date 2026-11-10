@@ -267,8 +267,60 @@ Production payment GO requires:
 - [ ] Cross-organization or cross-patient access violation.
 - [ ] Backup/restore or rollback procedure is untested.
 
-## 8. Release decision for current HEAD
+## 8. Release candidate preparation
+
+### 8.1 Production-like local RC
+
+Read-only/local checks were run with:
+
+- `VERCEL_ENV=production`;
+- `DEPLOYMENT_PURPOSE=live`;
+- synthetic database-policy credentials for the expected Production ref, without network access;
+- `VITE_ENABLE_MY_PRACTICE_PILOT=true` and `VITE_ENABLE_MY_PRACTICE_SERVER_UI=true` deliberately supplied as a negative test.
+
+The Vite production build still compiled Preview-only My Practice flags to `false`. The database policy check accepted only the synthetic `live` ref/credential shape. The partner API regression confirmed that Production returns `503` before calling any `partner_test_*` RPC. The Production build now hides the test partner-accounting UI.
+
+This is a local RC check, not a Production deployment.
+
+### 8.2 Current Test Preview limitation
+
+The shared integration Test Preview remains intentionally configured for test acceptance: A2 server flags and the Test Supabase gate are enabled, while Live and Langfuse are disabled. It is therefore not a Production-like Preview. No Vercel environment was changed during this preparation.
+
+A separate branch-scoped RC Preview may be created only after owner approval, with A1/A2, Live, Langfuse, partner test accounting and test payment flags disabled.
+
+### 8.3 Feature flag matrix
+
+| Feature | Test Preview integration | Production target | RC expectation |
+|---|---:|---:|---:|
+| A1/A2 My Practice UI/server | enabled for acceptance | `false`/unset | disabled |
+| Test payments/commissions | reachable only in A2 Test API | disabled | disabled |
+| Health/Support Live | `false` | `false` | disabled |
+| Live budget relay | test-only | `false` | disabled |
+| AI telemetry/Langfuse | `false` in integration Preview | `false`/unset | disabled |
+| Partner test accounting | test-only Preview | hidden/disabled | disabled |
+| Standard Support/Health AI | existing provider path | allowed by existing policy | allowed, with monitoring |
+
+### 8.4 Pre-merge GO vs post-deployment GO
+
+**Pre-merge GO** means only that the shared code is suitable for merging after the current PR checks are green:
+
+- build and Pilot Integration Gate pass;
+- Support crisis and patient-specialist browser regressions pass;
+- production-like local build passes with flags forced off;
+- no Test-only DDL/DML is applied to Production;
+- this release plan and migration allowlist are approved.
+
+**Post-deployment GO** additionally requires:
+
+- Production Supabase URL/key fingerprint verified by the owner;
+- backup/PITR checkpoint and restore drill recorded;
+- Production migration allowlist applied and verified;
+- Support/Health/auth/crisis/device smoke passed on the exact deployment;
+- no Preview-only flags in the compiled Production artifact;
+- rollback owner and monitoring window active.
+
+## 9. Release decision for current HEAD
 
 Current decision: **NO-GO for Production release**.
 
-The integration branch is suitable for continued Test/Preview validation after the Support regression fix. A separate release approval is required before merge to `main`, Production deployment, Production migrations or enabling any experimental function.
+The integration branch is suitable for continued Test/Preview validation and local RC checks. A separate release approval is required before merge to `main`, Production deployment, Production migrations or enabling any experimental function.

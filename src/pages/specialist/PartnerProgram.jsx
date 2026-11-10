@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 const format = value => Number(value).toLocaleString("ru-RU");
 
 export default function PartnerProgram({ module, organizationId, styles }) {
+  if (import.meta.env.VITE_ENABLE_PARTNER_TEST_ACCOUNTING !== "true") return null;
   const [open, setOpen] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState(null);
