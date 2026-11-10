@@ -2,7 +2,7 @@
 
 Дата подготовки: 10 ноября 2026 года
 Функциональный HEAD под аудитом: `3b117d98cd826e01f6432d3d7b1300b459f8307f`
-Текущий integration HEAD с документом: `959928d9a2b8bdb7a2aa5c6f78f06a5b1bc11c7c`
+Текущий integration HEAD с документом: `fc9ac96c6df4b5dce6f8ad94e953d22793cd9db4`
 PR №16: https://github.com/Shvachkomax/Tochka-Opori/pull/16
 Статус PR: OPEN/DRAFT
 
@@ -78,6 +78,8 @@ PR №16: https://github.com/Shvachkomax/Tochka-Opori/pull/16
 
 **Production-safe без изменений:** новых миграций в этом списке нет.
 
+**Production migration allowlist для этого integration diff: пустой.** Базовый Support/Health контур использует уже существующую Production schema; новые таблицы/RPC не нужны для запуска базового интерфейса при выключенных experimental flags. Это утверждение требует финального Production schema diff владельца перед deployment и не разрешает автоматически переносить Test history.
+
 **Test/Preview-only, не применять в Production:**
 
 - `live_test_budgets`, `live_test_bindings`, `live_test_reservations`;
@@ -113,12 +115,32 @@ PR №16: https://github.com/Shvachkomax/Tochka-Opori/pull/16
 - провести восстановление в разрешённом изолированном recovery process, не направляя пользователей на восстановленную копию до проверки;
 - отдельно проверить RLS, функции, grants, triggers и индексы после восстановления.
 
+Текущая read-only проверка Supabase подтвердила наличие двух целевых проектов: Test `eehyehlhiyztciaezaus` (`ACTIVE_HEALTHY`, linked) и Production `blwogrdezfhprdpdnxtn` (`ACTIVE_HEALTHY`). Vercel показывает Production `SUPABASE_URL` и `SUPABASE_SERVICE_ROLE_KEY` как скрытые переменные, поэтому fingerprint пары не подтверждён. Доступность Production backups/PITR, retention и restore point через текущие права не подтверждена.
+
+Минимальные действия владельца до deployment:
+
+1. В защищённой среде сравнить Production `SUPABASE_URL` с `https://blwogrdezfhprdpdnxtn.supabase.co` и проверить, что server key принадлежит тому же ref; ключи не передавать в чат.
+2. В Supabase Dashboard/organization recovery settings зафиксировать наличие PITR/backup, retention, последний restore point и процедуру восстановления.
+3. Из защищённой среды выполнить read-only migration/schema inventory Production и сохранить результат как release evidence.
+
 ### 3.5 Rollback
 
 - Код: вернуть предыдущий Production deployment/commit через Vercel rollback.
 - Схема: не рассчитывать на автоматический down migration. Для Production migrations требуются forward-compatible rollback scripts.
 - Данные: partner/test accruals, payment rows и usage ledger нельзя откатывать простым `DROP`; требуется транзакционный reconciliation/forward correction.
 - A2 test tables не должны появиться в Production, поэтому их Production rollback не планируется — они исключаются на этапе migration review.
+
+### 3.6 RC flag validation
+
+Добавлена автоматическая матрица `scripts/test-release-config.js`, включённая в `npm run build`:
+
+- `Production/live` → test-only UI disabled;
+- `Preview/test` → test-only UI enabled;
+- `Preview/live` → disabled;
+- `Preview` без явного `DEPLOYMENT_PURPOSE=test` → disabled;
+- локальная сборка без deployment variables → disabled.
+
+Серверный partner gate дополнительно проверяет `VERCEL_ENV=preview` и `DEPLOYMENT_PURPOSE=test` до обращения к `partner_test_*` RPC. Test Preview integration остаётся test-enabled для acceptance и не считается Production-like RC.
 
 ## 4. Vercel/GitHub release plan
 
