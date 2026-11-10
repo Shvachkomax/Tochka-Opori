@@ -2,7 +2,7 @@
 
 Дата подготовки: 10 ноября 2026 года
 Функциональный HEAD под аудитом: `3b117d98cd826e01f6432d3d7b1300b459f8307f`
-Текущий integration HEAD с документом: `666d5b743b27d926d59acf0fe8e4c5e30bcd2d7e`
+Текущий integration HEAD с документом: `959928d9a2b8bdb7a2aa5c6f78f06a5b1bc11c7c`
 PR №16: https://github.com/Shvachkomax/Tochka-Opori/pull/16
 Статус PR: OPEN/DRAFT
 
@@ -278,7 +278,7 @@ Read-only/local checks were run with:
 - synthetic database-policy credentials for the expected Production ref, without network access;
 - `VITE_ENABLE_MY_PRACTICE_PILOT=true` and `VITE_ENABLE_MY_PRACTICE_SERVER_UI=true` deliberately supplied as a negative test.
 
-The Vite production build still compiled Preview-only My Practice flags to `false`. The database policy check accepted only the synthetic `live` ref/credential shape. The partner API regression confirmed that Production returns `503` before calling any `partner_test_*` RPC. The Production build now hides the test partner-accounting UI.
+The Vite production build still compiled Preview-only My Practice flags to `false`. The database policy check accepted only the synthetic `live` ref/credential shape. The partner API regression confirmed that Production returns `503` before calling any `partner_test_*` RPC. The Production build now hides the test partner-accounting UI, and the server handler rejects Production requests before any `partner_test_*` RPC call.
 
 This is a local RC check, not a Production deployment.
 
