@@ -1,3 +1,6 @@
+import {debitCreditsForSession} from "../lib/usage/debit.js";
+import { createLiveHandler } from '../lib/voice/health-live.js';
+import { resolveLiveOwner } from '../lib/voice/live-owner.js';
 import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import crypto from "crypto";
 import { getSupabase } from "../lib/supabase.js";
@@ -82,21 +85,34 @@ function getClientIp(req) {
     || "unknown";
 }
 
-// Resolve support owner from session_id + access_token.
-// Returns { ownerId, sessionId, publicCode } or null.
-async function resolveSupportOwner(sessionId, accessToken) {
+// Patient identity helper: verify a request's session_id + access_token against
+// the existing session model. Returns { ownerId, sessionId, publicCode } or null.
+// Exported for reuse from booking actions (same check as session.js).
+export async function resolveSupportOwner(sessionId, accessToken) {
   if (!sessionId || !accessToken) return null;
   const valid = await validateSessionAccess(sessionId, accessToken);
   if (!valid) return null;
   const supabase = getSupabase();
   const { data: session, error } = await supabase
     .from("sessions")
-    .select("session_id, public_code, anonymous_owner_id, module, json_data")
+    .select("session_id, public_code, anonymous_owner_id, module")
     .eq("session_id", sessionId)
     .eq("module", "support")
     .maybeSingle();
-  if (error || !session || !session.anonymous_owner_id || !isPilotSessionMatch(session.json_data)) return null;
+  if (error || !session || !session.anonymous_owner_id) return null;
   return { ownerId: session.anonymous_owner_id, sessionId: session.session_id, publicCode: session.public_code };
+}
+
+// Shared patient identity resolver for booking and other cross-module actions.
+// It deliberately tries the existing Support session model first, then the
+// existing Health body_clients model. No owner id or module from the request is
+// used to select the identity.
+export async function resolvePracticePatientOwner(sessionId, accessToken) {
+  const support = await resolveSupportOwner(sessionId, accessToken);
+  if (support) return { ...support, ownerType: "anonymous_case", module: "support" };
+  const body = await resolveBodyOwner(sessionId, accessToken);
+  if (body) return { ...body, ownerType: "anonymous_profile", module: "body" };
+  return null;
 }
 
 // Medication cards require a non-legacy session token. Legacy access remains
@@ -184,7 +200,7 @@ async function resolveSupportSpecialistRelation(ownerId) {
 
 // Resolve body owner from session_id + access_token.
 // Returns { ownerId, sessionId } or throws with appropriate HTTP status.
-async function resolveBodyOwner(sessionId, accessToken) {
+export async function resolveBodyOwner(sessionId, accessToken) {
   if (!sessionId || !accessToken) {
     return null;
   }
@@ -347,6 +363,17 @@ export default async function handler(req, res) {
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  if (['healthLive', 'supportLive'].includes(req.body?.action)) {
+    const liveModule = req.body.action === 'supportLive' ? 'support' : 'body';
+    return createLiveHandler({
+      module: liveModule,
+      resolveOwner: (id, token) => resolveLiveOwner(getSupabase(), id, token, liveModule),
+      buildContext: owner => liveModule === 'support'
+        ? buildSupportChatContext(getSupabase(), owner.ownerId)
+        : buildAiChatContext({ supabase: getSupabase(), ownerId: owner.ownerId }),
+    })(req, res);
   }
 
   const limit = rateLimit({ windowMs: 10 * 60 * 1000, max: 60, prefix: "session:" });
@@ -1977,7 +2004,7 @@ async function handleGetBodyCabinet(req, res) {
     // 1. Look up body_clients — only real columns
     const { data: client, error: clientError } = await supabase
       .from("body_clients")
-      .select("session_id, anonymous_owner_id, display_name, goal, created_at")
+      .select("session_id, anonymous_owner_id, display_name, goal, specialist_id, specialist_name, created_at")
       .eq("session_id", sessionId)
       .maybeSingle();
 
@@ -2109,6 +2136,10 @@ async function handleGetBodyCabinet(req, res) {
       ok: true,
       session_id: sessionId,
       display_name: client.display_name || null,
+      specialist: client.specialist_id ? {
+        expertId: client.specialist_id,
+        expertName: client.specialist_name || null,
+      } : null,
       profile,
       wallet: walletSummary ? {
         balance: walletSummary.available_credits,
@@ -3176,6 +3207,9 @@ async function handleSendBodyAiMessage(req, res) {
       console.log("[chat] step=8 assistant saved, total_duration:", Date.now() - startTime, "ms");
     }
 
+    const chatDebit = await debitCreditsForSession({sessionId:session_id,module:"body",resourceType:"body_chat",
+      requestId:`body-usage-${assistantMsgId}`,inputTokens:result.input_tokens,outputTokens:result.output_tokens,
+      model:result.model_used,provider:"openai"});
     return res.status(200).json({
       ok: true,
       message: {
@@ -3188,7 +3222,7 @@ async function handleSendBodyAiMessage(req, res) {
         confidence: aiConfidence,
         created_at: new Date().toISOString(),
       },
-      credits_charged: 1,
+      credits_charged: chatDebit.charged ? chatDebit.amount : 0,
     });
   } catch (error) {
     console.error("handleSendBodyAiMessage error:", error.message);
@@ -5635,7 +5669,10 @@ async function handleSendSupportMessage(req, res) {
       created_at: new Date().toISOString(),
     });
 
-    return res.status(200).json({ ok: true, response: parsed });
+    const chatDebit = await debitCreditsForSession({sessionId:owner.sessionId,module:"support",resourceType:"support_chat",
+      requestId:`support-usage-${requestId}`,inputTokens:aiResult.input_tokens,outputTokens:aiResult.output_tokens,
+      model:aiResult.model_used,provider:"openai"});
+    return res.status(200).json({ ok: true, response: parsed, credits_charged:chatDebit.charged?chatDebit.amount:0 });
   } catch (error) {
     console.error("handleSendSupportMessage error:", error.message);
     return res.status(500).json({ ok: false, error: "Ошибка отправки." });

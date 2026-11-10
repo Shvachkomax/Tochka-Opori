@@ -11,6 +11,7 @@ import { medicationRpcForClinicalArchive } from "../lib/clinical/medication-arch
 import { getPilotId, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { handlePartnerProgram } from "../lib/partners/program-handler.js";
 import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
+import { handleMyPracticeWorkspace, isMyPracticeServerEnabled } from "../lib/my-practice/workspace-handler.js";
 import { buildSpecialistClientList } from "../lib/specialist-client-list.js";
 import { normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
 import { buildSpecialistRequestContext } from "../lib/specialist/request-context.js";
@@ -32,7 +33,8 @@ const TOKEN_BYTES = 32; // 256-bit token
 const GENERIC_AUTH_ERROR = "Неверный код специалиста";
 const COOKIE_NAME = "tochka_specialist_session";
 const COOKIE_MAX_AGE = Math.floor(SESSION_TTL_MS / 1000); // seconds
-const COOKIE_PATH = "/api/specialist";
+const COOKIE_PATH = "/api";
+const LEGACY_COOKIE_PATH = "/api/specialist";
 
 // ── Allowed origins for cookie-authenticated requests ─────
 
@@ -50,6 +52,10 @@ function buildAllowedOrigins() {
       const origin = `${u.protocol}//${u.host}`;
       if (!origins.includes(origin)) origins.push(origin);
     } catch {}
+  }
+  // Only this exact Preview deployment; never trust request Host or a wildcard.
+  if (process.env.VERCEL_ENV === 'preview' && /^[a-z0-9-]+\.vercel\.app$/i.test(process.env.VERCEL_URL || '')) {
+    origins.push(`https://${process.env.VERCEL_URL}`);
   }
   return origins;
 }
@@ -96,12 +102,12 @@ function isProduction() {
   return process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
 }
 
-function buildCookie(name, value, maxAge) {
+function buildCookie(name, value, maxAge, path = COOKIE_PATH) {
   const parts = [
     `${name}=${value}`,
     "HttpOnly",
     "SameSite=Lax",
-    `Path=${COOKIE_PATH}`,
+    `Path=${path}`,
     `Max-Age=${maxAge}`,
   ];
   if (isProduction()) parts.push("Secure");
@@ -135,6 +141,16 @@ const loginLimiter = rateLimit({
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   applyCors(req, res);
+
+  // This preview branch must not use inherited Production credentials.
+  if (process.env.MY_PRACTICE_REQUIRE_TEST_DB === "true" && !isMyPracticeServerEnabled(process.env)) {
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(503).json({
+      ok: false,
+      error: "Кабинет врача заблокирован до подключения проверенной учебной базы.",
+      code: "MY_PRACTICE_TEST_DB_REQUIRED",
+    });
+  }
 
   // Strictly prohibit all specialist data access in the isolated
   // build-only medical staging shell until staging credentials,
@@ -190,6 +206,9 @@ export default async function handler(req, res) {
         return await handleLogout(req, res);
       case "listClients":
         return await handleListClients(req, res);
+      case "getMyPracticeWorkspace":
+      case "saveMyPracticeWorkspace":
+        return await handleMyPracticeWorkspace(req, res, { authorizeSpecialist, getSupabase });
       case "getPartnerProgram":
         return await handlePartnerProgram(req, res, { authorizeSpecialist, validateSpecialistContext, getSupabase, getPilotId });
       case "getClientOverview":
@@ -687,7 +706,10 @@ async function handleLogin(req, res) {
   }
 
   // Set HttpOnly cookie — raw token never exposed to JavaScript
-  res.setHeader("Set-Cookie", buildCookie(COOKIE_NAME, rawToken, COOKIE_MAX_AGE));
+  res.setHeader("Set-Cookie", [
+    buildCookie(COOKIE_NAME, rawToken, COOKIE_MAX_AGE),
+    buildCookie(COOKIE_NAME, "", 0, LEGACY_COOKIE_PATH),
+  ]);
 
   return res.status(200).json({
     ok: true,
@@ -738,7 +760,10 @@ async function handleLogout(req, res) {
   const authResult = await authorizeSpecialist(req);
 
   // Clear cookie regardless of auth result
-  res.setHeader("Set-Cookie", buildCookie(COOKIE_NAME, "", 0));
+  res.setHeader("Set-Cookie", [
+    buildCookie(COOKIE_NAME, "", 0),
+    buildCookie(COOKIE_NAME, "", 0, LEGACY_COOKIE_PATH),
+  ]);
 
   if (authResult.error) {
     // Even if session was already invalid, cookie is cleared — treat as success

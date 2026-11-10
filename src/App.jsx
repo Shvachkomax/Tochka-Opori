@@ -1,3 +1,4 @@
+import HealthLiveConversation from "./HealthLiveConversation.jsx";
 import InformationFlow from "./InformationFlow.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
@@ -19,6 +20,7 @@ import ExpertInvitePage from "./pages/expert/ExpertInvitePage.jsx";
 import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
 import SpecialistCabinet from "./pages/specialist/SpecialistCabinet.jsx";
 import { APP_BRAND } from "./lib/appBrand.js";
+import PracticePatientBooking from "./pages/specialist/PracticePatientBooking.jsx";
 
 class AdminErrorBoundary extends Component {
   constructor(props) {
@@ -147,6 +149,7 @@ export default function App() {
 
   // Support Cabinet MVP
   const [supportCabinet, setSupportCabinet] = useState(null);
+  const [supportLiveOpen, setSupportLiveOpen] = useState(false);
   const [patientInvitations, setPatientInvitations] = useState([]);
   const [patientInvitationsLoading, setPatientInvitationsLoading] = useState(false);
   const [patientInviteModalOpen, setPatientInviteModalOpen] = useState(false);
@@ -10556,6 +10559,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
              />
            )}
 
+            {/* Health uses the same patient booking flow and verified body session. */}
+           {activeModule === "body" && bodyScreen === "cabinet" && bodyCabinetData?.specialist?.expertId && (
+             <PracticePatientBooking
+               sessionId={bodyDiarySessionId}
+               accessToken={(getBodySession().sessionId === bodyDiarySessionId ? getBodySession().accessToken : null)}
+               doctorExpertId={bodyCabinetData.specialist.expertId}
+             />
+           )}
+
           {/* Body onboarding */}
           {activeModule === "body" && bodyScreen === "onboarding" && (
             <BodyOnboarding
@@ -11523,6 +11535,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 <PatientMedicationOrders module="support" />
                 <MedicationCard cards={supportCabinet.medication_cards} />
 
+                {import.meta.env.VITE_SUPPORT_LIVE_ENABLED === 'true' && <div className="health-talk-entry">
+                  <div><strong>Живое общение · тест</strong><p>Расскажите, что вас волнует. Можно говорить и перебивать. До 3 минут.</p></div>
+                  <button disabled={cabinetVoiceRecording || cabinetVoiceTranscribing} onClick={() => setSupportLiveOpen(true)}>Живое общение</button>
+                </div>}
+                {supportLiveOpen && <HealthLiveConversation module="support" sessionId={getSupportSession().sessionId} accessToken={getSupportSession().accessToken} onClose={() => setSupportLiveOpen(false)} onSpecialist={() => setSupportNewRequestOpen(true)} />}
+
                 {/* ROW 1: Последний разговор + Следующий шаг */}
                 {latestSession && (
                   <div style={{
@@ -12193,6 +12211,23 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     </div>
                   </div>
                 )}
+
+                {/* ROW: Запись на приём (A2, существующий кабинет пациента) */}
+                {(() => {
+                  const docExpert = supportCabinet.specialist || {};
+                  const expertId = docExpert?.expertId || docExpert?.id || null;
+                  const supportSession = getSupportSession();
+                  if (!expertId || !supportSession.sessionId || !supportSession.accessToken) return null;
+                  return (
+                    <div style={{ marginBottom: 20 }}>
+                      <PracticePatientBooking
+                        sessionId={supportSession.sessionId}
+                        accessToken={supportSession.accessToken}
+                        doctorExpertId={expertId}
+                      />
+                    </div>
+                  );
+                })()}
 
                 {/* ROW: Запросы специалисту — no duplicate "Новый запрос" button */}
                 <div style={{ marginBottom: 24 }}>

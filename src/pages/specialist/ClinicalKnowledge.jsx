@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import SpecialistPageNavigation from "./SpecialistPageNavigation.jsx";
 
 const S = {
   page: { minHeight: "100vh", background: "#F6F0E7", color: "#2E2A25", fontFamily: "Inter, system-ui, sans-serif", padding: 32 },
@@ -43,6 +44,7 @@ export default function ClinicalKnowledge() {
 
   return (
     <div style={S.page}>
+      <SpecialistPageNavigation />
       <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>Клиническая библиотека</h1>
       <a href="/specialist/knowledge/demo" style={{ display: "inline-block", marginBottom: 12, color: "#B85C4A", fontWeight: 700 }}>Демо-режим</a>
       <p style={S.small}>Справочный инструмент. Данные демонстрационные (mock). Реальные списания отключены.</p>
