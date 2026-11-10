@@ -1,0 +1,76 @@
+/* Informational flow: no cards, no outlines, almost-white surface. */
+.strawberry-information__carousel{
+  width:min(100%,655px);
+  margin-top:27px;
+  color:#758675;
+  outline:none;
+}
+.strawberry-information__carousel-top{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:12px;margin-bottom:13px;
+  font-size:11px;letter-spacing:.16em;color:#829582;
+}
+.strawberry-information__carousel-count{font-size:12px;letter-spacing:.08em;font-variant-numeric:tabular-nums}
+.strawberry-information__carousel-list{display:flex;flex-direction:column;align-items:flex-start;gap:1px}
+.strawberry-information__carousel-line{
+  display:flex;align-items:baseline;gap:11px;width:100%;
+  min-height:26px;padding:3px 0;
+  background:none;border:0;color:#a2afa1;
+  text-align:left;font:normal 15px/1.35 Georgia,"Times New Roman",serif!important;
+  transition:color .35s ease,transform .35s ease;
+}
+.strawberry-information__carousel-line.is-current{
+  color:#526c55;font-size:21px!important;line-height:1.42;
+  padding:5px 0;
+  transform:translateX(5px);
+}
+.strawberry-information__carousel-dot{display:inline-block;min-width:8px;color:#bdc8bc}
+.strawberry-information__carousel-line.is-current .strawberry-information__carousel-dot{color:#bb8e8b}
+.strawberry-information__carousel-line:hover{color:#627b64}
+.strawberry-information__carousel-description{
+  margin:13px 0 7px 20px;
+  max-width:590px;min-height:35px;
+  color:#79897b;font-size:14px;line-height:1.58;
+}
+.strawberry-information__carousel-controls{
+  display:flex;align-items:center;gap:16px;margin-left:16px;margin-top:5px;
+}
+.strawberry-information__carousel-controls button{
+  border:0;background:none;color:#657f68;
+  padding:7px 4px;font-size:19px!important;line-height:1.1;
+}
+.strawberry-information__carousel-controls button:hover{color:#365d3c}
+.strawberry-information__carousel-controls .strawberry-information__pause{
+  font-size:12px!important;color:#8a9c8b;margin-left:5px;
+}
+.strawberry-information__brand{padding:0;border:0;background:none;text-align:left}
+.strawberry-information__about-main{padding-top:clamp(52px,7vh,92px);padding-bottom:75px}
+.strawberry-information__eyebrow{font-size:10px;letter-spacing:.18em;color:#97a393;margin:0 0 26px}
+.strawberry-information__about h1{max-width:790px}
+.strawberry-information__lead{max-width:735px;margin-bottom:47px}
+.strawberry-information__chapters{max-width:740px}
+.strawberry-information__chapters section{margin-bottom:37px}
+.strawberry-information__chapters section>span{display:block;font-size:11px;letter-spacing:.1em;color:#9ea99e;margin-bottom:8px}
+.strawberry-information__chapters h2{font:normal clamp(20px,2vw,25px)/1.42 Georgia,"Times New Roman",serif;color:#566856;margin:0 0 10px}
+.strawberry-information__chapters p{font-size:15px;line-height:1.8;color:#768577;margin:0;max-width:690px}
+.strawberry-information__notice{font-size:13px;line-height:1.8;color:#8f7e78;max-width:710px;margin:34px 0 36px}
+.strawberry-information__actions{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.strawberry-information__quiet{border:0;background:transparent;color:#6e816e;padding:10px 0;font-size:13px!important}
+
+@media(max-width:640px){
+.strawberry-information__carousel{margin-top:24px}
+.strawberry-information__carousel-line{font-size:13px!important}
+.strawberry-information__carousel-line.is-current{font-size:18px!important}
+.strawberry-information__carousel-description{font-size:13px;min-height:45px}
+.strawberry-information__about-main{padding-top:41px;padding-bottom:45px}
+.strawberry-information__chapters section{margin-bottom:29px}
+.strawberry-information__chapters p{font-size:14px}
+.strawberry-information__actions{flex-direction:column;align-items:stretch;max-width:330px}
+.strawberry-information__actions .strawberry-entry__action{width:100%}
+}
+@media(prefers-reduced-motion:reduce){.strawberry-information__carousel-line{transition:none}}
+
+.strawberry-information__emergency{width:min(100%,730px);margin:5px 0 34px;padding:22px;border-left:4px solid #ad4f43;background:#fff3ee;color:#813c31;border-radius:5px}
+.strawberry-information__emergency strong{display:block;margin-bottom:9px}
+.strawberry-information__emergency p{font-size:14px;line-height:1.6;margin:0 0 13px}
+.strawberry-information__emergency a{display:inline-flex;background:#aa4237;color:white;padding:10px 15px;min-height:44px;border-radius:9px;margin:3px 9px 3px 0}

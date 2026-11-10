@@ -1,4 +1,14 @@
 import InformationFlow from "./InformationFlow.jsx";
+import StrawberryWelcome from "./components/StrawberryWelcome.jsx";
+import StrawberryConversation from "./components/StrawberryConversation.jsx";
+import StrawberryQuestions from "./components/StrawberryQuestions.jsx";
+import StrawberryReport from "./components/StrawberryReport.jsx";
+import StrawberryCabinet from "./components/StrawberryCabinet.jsx";
+import StrawberryDiary from "./components/StrawberryDiary.jsx";
+import StrawberryPractices from "./components/StrawberryPractices.jsx";
+import StrawberryHistory from "./components/StrawberryHistory.jsx";
+import StrawberrySpecialist from "./components/StrawberrySpecialist.jsx";
+import StrawberryAbout from "./components/StrawberryInformation.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -60,6 +70,13 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [phase, setPhase] = useState("input");
   const [supportScreen, setSupportScreen] = useState("landing");
+  // Route-scoped design rollout: first screen only, old Support remains unchanged.
+  const [strawberryEntryStep, setStrawberryEntryStep] = useState(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("start") === "text" &&
+        ["/strawberry-support", "/strawberry-support/"].includes(window.location.pathname)) return "intake";
+    return "welcome";
+  });
+  const [strawberryAboutReturnStep, setStrawberryAboutReturnStep] = useState("welcome");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("user");
@@ -1699,15 +1716,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     const saved = getSupportSession();
     if (!saved.sessionId || !saved.accessToken) {
       showToast("Нужен код доступа.", "error");
-      return;
+      return false;
     }
     if (!supportNewRequest.service_code) {
       showToast("Выберите услугу.", "error");
-      return;
+      return false;
     }
     if (!supportNewRequest.message || supportNewRequest.message.trim().length < 2) {
       showToast("Укажите сообщение.", "error");
-      return;
+      return false;
     }
     setSupportRequestSubmitting(true);
     try {
@@ -1737,8 +1754,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setSupportNewRequest({ service_code: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
       // Refresh cabinet to show new request
       await refreshSupportCabinet();
+      return true;
     } catch (e) {
       showToast(e.message || "Не удалось отправить запрос", "error");
+      return false;
     } finally {
       setSupportRequestSubmitting(false);
     }
@@ -2039,10 +2058,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   // Save daily check-in
   async function saveSupportCheckin() {
     const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
+    if (!saved.sessionId || !saved.accessToken) {
+      showToast("Нужен доступ к сессии. Войдите по коду продолжения.", "error");
+      return false;
+    }
     if (checkinWellbeing === null || checkinWellbeing === undefined) {
       showToast("Отметьте состояние.", "error");
-      return;
+      return false;
     }
     setCheckinSaving(true);
     try {
@@ -2063,11 +2085,14 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         setCheckinToday(data.checkin);
         showToast("Сохранено.", "success");
         await loadSupportCheckins();
+        return true;
       } else {
         showToast(data.error || "Не удалось сохранить", "error");
+        return false;
       }
     } catch {
       showToast("Не удалось сохранить", "error");
+      return false;
     } finally {
       setCheckinSaving(false);
     }
@@ -2110,7 +2135,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
   // Update practice user_status
   async function updatePracticeStatus(practiceKey, userStatus) {
     const saved = getSupportSession();
-    if (!saved.sessionId || !saved.accessToken) return;
+    if (!saved.sessionId || !saved.accessToken) return false;
     try {
       const res = await fetch("/api/session", {
         method: "POST",
@@ -2120,8 +2145,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const data = await res.json();
       if (res.ok && data.ok) {
         await loadSupportPractices();
+        return true;
       }
-    } catch { /* silent */ }
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   // Load support chat messages
@@ -2800,8 +2829,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
     setLoading(true);
     setError("");
-    setQuestions(null);
-
+    // Keep the current questions on screen if the request fails.
     let analyzeSessionId = sessionId;
     let analyzeSessionAccess = null;
 
@@ -3001,9 +3029,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       }
     } catch (e) {
       const msg = e.message || "";
-      if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("abort")) {
-        // Connection dropped — check backend status before giving up.
-        await attemptReportRecovery(sid || sessionId, inputText, data?.report);
+      if (msg.includes("ИИ-анализ недоступен") || msg.includes("ИИ не смог подготовить итоговый разбор")) {
+        setError(msg);
+      } else if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("abort")) {
+        // These variables must be defined even if the request failed before parsing JSON.
+        await attemptReportRecovery(analyzeSessionId || sessionId, inputText, null);
       } else if (dialogDepth < 3 || activeModule !== "support") {
         setError("Не удалось начать разбор. Попробуйте ещё раз.");
       } else {
@@ -4836,9 +4866,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
 
   // Keep the AnMed pilot's presentation separate from the module selection.
   useEffect(() => {
-    document.title = APP_BRAND.isSupportPilot
-      ? APP_BRAND.title
-      : isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.title;
+    document.title = !APP_BRAND.isSupportPilot && window.location.pathname === "/strawberry-support"
+      ? "Земляничные поляны — Поддержка (тест)"
+      : APP_BRAND.isSupportPilot
+        ? APP_BRAND.title
+        : isDedicatedSubdomain ? "Опора. Здоровье & Стройность" : APP_BRAND.title;
   }, [isDedicatedSubdomain]);
 
   const s = {
@@ -9851,6 +9883,411 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     inviteInfo.invite_kind === "patient_specialist" &&
     ["specialist_to_patient", "patient_to_specialist"].includes(inviteInfo.direction)
   );
+
+  // Isolated step-by-step rollout on /strawberry-support only.
+  const strawberryRoute = typeof window !== "undefined" &&
+    ["/strawberry-support", "/strawberry-support/"].includes(window.location.pathname);
+  const strawberryActive = strawberryRoute &&
+    !APP_BRAND.isSupportPilot && activeModule === "support" &&
+    supportScreen === "landing" && phase === "input" &&
+    !inviteChecking && !inviteToken && !inviteInfo?.valid;
+
+  function openStrawberryAbout() {
+    if (recording) stopRecording();
+    if (recordingQuestionIndex !== null) stopQuestionRecording();
+    setStrawberryAboutReturnStep(strawberryEntryStep);
+    setStrawberryEntryStep("about");
+  }
+
+  // Screen 10: visual-only explanation, no patient session/API.
+  if (typeof window !== "undefined" &&
+      ["/strawberry-support/about-preview", "/strawberry-support/about-preview/"].includes(window.location.pathname)) {
+    return (
+      <StrawberryAbout
+        onBack={() => window.location.assign("/strawberry-support")}
+        onWrite={() => window.location.assign("/strawberry-support?start=text")}
+        onSpecialist={() => { window.location.href = "/specialist"; }}
+      />
+    );
+  }
+
+  // Shared About screen for all redesigned Support pages.
+  if (strawberryRoute && !APP_BRAND.isSupportPilot && activeModule === "support" &&
+      strawberryEntryStep === "about" && !inviteChecking && !inviteToken && !inviteInfo?.valid) {
+    return (
+      <StrawberryAbout
+        onBack={() => setStrawberryEntryStep(strawberryAboutReturnStep)}
+        onWrite={() => {
+          goToSupportLanding();
+          setMode("text");
+          setStrawberryEntryStep("intake");
+        }}
+        onCrisis={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+        onSpecialist={() => { window.location.href = "/specialist"; }}
+      />
+    );
+  }
+
+  if (strawberryActive && strawberryEntryStep === "welcome") {
+    return (
+      <StrawberryWelcome
+        onStartVoice={() => {
+          setMode("text");
+          setStrawberryEntryStep("intake");
+        }}
+        onWrite={() => {
+          setMode("text");
+          setStrawberryEntryStep("intake");
+        }}
+        onResume={() => {
+          setStrawberryEntryStep("legacy");
+          const saved = getSupportSession();
+          if (saved.sessionId && saved.accessToken) {
+            loadSupportCabinet();
+          } else {
+            setSessionModalOpen(true);
+          }
+        }}
+        onAbout={openStrawberryAbout}
+        onCrisis={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+        onSpecialist={() => { window.location.href = "/specialist"; }}
+      />
+    );
+  }
+
+  if (strawberryActive && strawberryEntryStep === "intake") {
+    return (
+      <StrawberryConversation
+        text={text}
+        onChangeText={setText}
+        onSubmit={() => submitRound()}
+        loading={loading}
+        loadingMessage={loadingMessage}
+        error={error}
+        recording={recording}
+        recordingTime={recordingTime}
+        transcribing={transcribing}
+        voiceError={voiceError}
+        onStartRecording={startRecording}
+        onStopRecording={stopRecording}
+        onBack={() => {
+          if (recording) stopRecording();
+          setStrawberryEntryStep("welcome");
+        }}
+        onAbout={openStrawberryAbout}
+        onCrisis={() => {
+          if (recording) stopRecording();
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+        onSpecialist={() => { window.location.href = "/specialist"; }}
+      />
+    );
+  }
+
+
+  // The third design screen is shown only for real AI question rounds in this preview.
+  const strawberryQuestionsActive =
+    strawberryRoute && !APP_BRAND.isSupportPilot &&
+    activeModule === "support" &&
+    phase === "questions" && supportScreen === "questions" &&
+    strawberryEntryStep === "intake" &&
+    !inviteChecking && !inviteToken && !inviteInfo?.valid;
+
+  if (strawberryQuestionsActive) {
+    return (
+      <StrawberryQuestions
+        questions={questions}
+        answers={answers}
+        onAnswer={(index, answer) => setAnswers(prev => ({ ...prev, [index]: answer }))}
+        dialogDepth={dialogDepth}
+        crisisMode={crisisMode}
+        onContinue={() => submitRound()}
+        loading={loading}
+        loadingMessage={loadingMessage}
+        error={error}
+        voiceError={voiceError}
+        recordingQuestionIndex={recordingQuestionIndex}
+        questionRecordingTime={questionRecordingTime}
+        questionTranscribingIndex={questionTranscribingIndex}
+        onStartRecording={startQuestionRecording}
+        onStopRecording={stopQuestionRecording}
+        onBack={() => {
+          if (crisisMode || recordingQuestionIndex !== null || questionTranscribingIndex !== null) return;
+          if (window.confirm("Начать разговор заново? Ответы на вопросы будут сброшены.")) {
+            handleReset();
+            setStrawberryEntryStep("welcome");
+          }
+        }}
+        onAbout={openStrawberryAbout}
+        onCrisis={() => {
+          if (recordingQuestionIndex !== null) stopQuestionRecording();
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+        onSpecialist={() => { window.location.href = "/specialist"; }}
+      />
+    );
+  }
+
+
+  // Screen 04: real patient-facing report from the existing Support engine.
+  // Keep the legacy report available for its PDF/DOCX, feedback and care actions.
+  const strawberryReportActive = strawberryRoute &&
+    !APP_BRAND.isSupportPilot && activeModule === "support" &&
+    supportScreen === "report" && phase === "report" &&
+    Boolean(result) && reportSource === "generated" &&
+    strawberryEntryStep === "intake" &&
+    !inviteChecking && !inviteToken && !inviteInfo?.valid;
+
+  if (strawberryReportActive) {
+    return (
+      <StrawberryReport
+        patientReport={userPart}
+        continuationCode={continuationCode}
+        careRecommendation={careRecommendation}
+        crisisMode={crisisMode}
+        crisisBlock={crisisBlock}
+        isLoading={cabinetLoading}
+        onCopyCode={async (code) => {
+          try {
+            await navigator.clipboard.writeText(code);
+            return true;
+          } catch {
+            showToast("Не удалось скопировать код. Сохраните его вручную.", "error");
+            return false;
+          }
+        }}
+        onOpenFullReport={() => setStrawberryEntryStep("legacy")}
+        onOpenCabinet={() => {
+          // Keep the new cabinet design active; backend retrieval is unchanged.
+          loadSupportCabinet();
+        }}
+        onAbout={openStrawberryAbout}
+        onCrisis={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+        onSpecialist={() => { window.location.href = "/specialist"; }}
+      />
+    );
+  }
+
+
+  // Screen 05: direct visual-only preview does not access patient services.
+  if (typeof window !== "undefined" &&
+      ["/strawberry-support/cabinet-preview", "/strawberry-support/cabinet-preview/"].includes(window.location.pathname)) {
+    return <StrawberryCabinet preview />;
+  }
+
+  // Screen 06: explicit design review, fictional values, no patient API calls.
+  if (typeof window !== "undefined" &&
+      ["/strawberry-support/diary-preview", "/strawberry-support/diary-preview/"].includes(window.location.pathname)) {
+    return (
+      <StrawberryDiary
+        preview
+        onBack={() => window.location.assign("/strawberry-support/cabinet-preview")}
+      />
+    );
+  }
+
+  // Screen 07: standalone, fictional practice examples; no patient data or backend calls.
+  if (typeof window !== "undefined" &&
+      ["/strawberry-support/practices-preview", "/strawberry-support/practices-preview/"].includes(window.location.pathname)) {
+    return (
+      <StrawberryPractices
+        preview
+        onBack={() => window.location.assign("/strawberry-support/cabinet-preview")}
+      />
+    );
+  }
+
+  // Screen 08: visual-only history, no patient session access.
+  if (typeof window !== "undefined" &&
+    ["/strawberry-support/history-preview", "/strawberry-support/history-preview/"].includes(window.location.pathname)) {
+    return <StrawberryHistory preview onBack={() => window.location.assign("/strawberry-support/cabinet-preview")} />;
+  }
+
+  // Screen 09: design review without any patient API calls.
+  if (typeof window !== "undefined" &&
+      ["/strawberry-support/specialist-preview", "/strawberry-support/specialist-preview/"].includes(window.location.pathname)) {
+    return (
+      <StrawberrySpecialist
+        preview
+        onBack={() => window.location.assign("/strawberry-support/cabinet-preview")}
+      />
+    );
+  }
+
+  // Screen 05: live, authenticated cabinet backed by the existing Support state.
+  const strawberryCabinetActive = strawberryRoute &&
+    !APP_BRAND.isSupportPilot && activeModule === "support" &&
+    phase === "cabinet" && supportScreen === "cabinet" &&
+    Boolean(supportCabinet) && strawberryEntryStep !== "legacy" &&
+    !inviteChecking && !inviteToken && !inviteInfo?.valid;
+
+  // Screen 06: same live check-in as the existing Support cabinet.
+  if (strawberryCabinetActive && strawberryEntryStep === "diary") {
+    return (
+      <StrawberryDiary
+        wellbeing={checkinWellbeing}
+        anxiety={checkinAnxiety}
+        comment={checkinComment}
+        today={checkinToday}
+        history={checkinHistory}
+        saving={checkinSaving}
+        onChangeWellbeing={setCheckinWellbeing}
+        onChangeAnxiety={setCheckinAnxiety}
+        onChangeComment={setCheckinComment}
+        onSave={saveSupportCheckin}
+        onBack={() => setStrawberryEntryStep("intake")}
+        onAbout={openStrawberryAbout}
+        onEmergency={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+      />
+    );
+  }
+
+  // Screen 07: only practices already linked to this patient's Support session.
+  if (strawberryCabinetActive && strawberryEntryStep === "practices") {
+    return (
+      <StrawberryPractices
+        practices={supportPractices}
+        urgent={Boolean(supportCabinet.latest_report?.crisisBlock?.emergencyRecommended ||
+          supportCabinet.latest_report?.crisisBlock?.status === "safety_check_in_progress" ||
+          supportCabinet.latest_report?.careRecommendation?.level === "urgent_help")}
+        onChangeStatus={updatePracticeStatus}
+        onRefresh={loadSupportPractices}
+        onBack={() => setStrawberryEntryStep("intake")}
+        onAbout={openStrawberryAbout}
+        onEmergency={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+      />
+    );
+  }
+
+  // Screen 08: real history from the authenticated Support cabinet.
+  if (strawberryCabinetActive && strawberryEntryStep === "history") {
+    return (
+      <StrawberryHistory
+        sessions={supportCabinet.sessions}
+        emergency={Boolean(
+          supportCabinet.latest_report?.crisisBlock?.emergencyRecommended ||
+          supportCabinet.latest_report?.crisisBlock?.status === "safety_check_in_progress" ||
+          supportCabinet.latest_report?.careRecommendation?.level === "urgent_help"
+        )}
+        loading={supportSessionLoading || loading}
+        onBack={() => setStrawberryEntryStep("intake")}
+        onOpenSession={(id) => {
+          setStrawberryEntryStep("legacy");
+          openSupportSessionView(id);
+        }}
+        onOpenReport={(id) => {
+          setStrawberryEntryStep("legacy");
+          openSupportReport(id);
+        }}
+        onAbout={openStrawberryAbout}
+        onEmergency={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+      />
+    );
+  }
+
+  // Screen 09: connected specialist and the existing service-request backend.
+  if (strawberryCabinetActive && strawberryEntryStep === "specialist") {
+    return (
+      <StrawberrySpecialist
+        specialist={supportCabinet.specialist}
+        requests={supportCabinet.service_requests}
+        request={supportNewRequest}
+        sending={supportRequestSubmitting}
+        onChangeRequest={setSupportNewRequest}
+        onSubmit={submitSupportServiceRequest}
+        onCancelRequest={cancelSupportServiceRequest}
+        matching={matchRequestSending}
+        emergency={Boolean(
+          supportCabinet.latest_report?.crisisBlock?.emergencyRecommended ||
+          supportCabinet.latest_report?.crisisBlock?.status === "safety_check_in_progress" ||
+          supportCabinet.latest_report?.careRecommendation?.level === "urgent_help"
+        )}
+        onBack={() => setStrawberryEntryStep("intake")}
+        onInviteSpecialist={() => {
+          setStrawberryEntryStep("legacy");
+          setPatientInviteCreated(null);
+          setPatientInviteModalOpen(true);
+        }}
+        onFindSpecialist={() => {
+          setStrawberryEntryStep("legacy");
+          createMatchRequest();
+        }}
+        onAbout={openStrawberryAbout}
+        onEmergency={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+      />
+    );
+  }
+
+  if (strawberryCabinetActive) {
+    return (
+      <StrawberryCabinet
+        displayName={supportDisplayName}
+        sessions={supportCabinet.sessions}
+        wallet={supportCabinet.wallet}
+        quickChatInput={quickChatInput}
+        onChatChange={setQuickChatInput}
+        onChatSend={() => {
+          setStrawberryEntryStep("legacy");
+          // Show the live AI response in the original cabinet until the chat is restyled.
+          sendQuickChatMessage();
+        }}
+        chatBusy={quickChatLoading}
+        onFollowUp={() => {
+          setStrawberryEntryStep("legacy");
+          startSupportFollowUp();
+        }}
+        onOpenReport={(id) => {
+          setStrawberryEntryStep("legacy");
+          openSupportReport(id);
+        }}
+        onOpenHistory={() => setStrawberryEntryStep("history")}
+        onDiary={() => {
+          setStrawberryEntryStep("diary");
+          loadSupportCheckins();
+        }}
+        onPractices={() => {
+          setStrawberryEntryStep("practices");
+          loadSupportPractices();
+        }}
+        onSpecialistRequest={() => setStrawberryEntryStep("specialist")}
+        onFullCabinet={() => setStrawberryEntryStep("legacy")}
+        onExit={() => {
+          goToSupportLanding();
+          setStrawberryEntryStep("welcome");
+        }}
+        onAbout={openStrawberryAbout}
+        onEmergency={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+        crisisBlock={supportCabinet.latest_report?.crisisBlock}
+        careRecommendation={supportCabinet.latest_report?.careRecommendation}
+      />
+    );
+  }
 
   return (
     <div style={s.page} className="app-page">
