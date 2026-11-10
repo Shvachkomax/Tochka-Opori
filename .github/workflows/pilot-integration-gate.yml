@@ -67,6 +67,10 @@ jobs:
 
       - name: Install Chromium for synthetic browser test
         run: npx playwright install --with-deps chromium
+      - name: Support mobile and patient-specialist browser regressions
+        run: |
+          npm run test:crisis-mobile
+          npm run test:patient-specialist-workflow
       - name: Health voice browser lifecycle (mock API and media)
         run: |
           npm run e2e:health-live

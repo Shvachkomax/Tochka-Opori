@@ -12216,9 +12216,15 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 {(() => {
                   const docExpert = supportCabinet.specialist || {};
                   const expertId = docExpert?.expertId || docExpert?.id || null;
+                  const supportSession = getSupportSession();
+                  if (!expertId || !supportSession.sessionId || !supportSession.accessToken) return null;
                   return (
                     <div style={{ marginBottom: 20 }}>
-                      <PracticePatientBooking sessionId={saved.sessionId} accessToken={saved.accessToken} doctorExpertId={expertId} />
+                      <PracticePatientBooking
+                        sessionId={supportSession.sessionId}
+                        accessToken={supportSession.accessToken}
+                        doctorExpertId={expertId}
+                      />
                     </div>
                   );
                 })()}
