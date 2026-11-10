@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import "./StrawberryWelcome.css";
+import { StrawberryInfoCarousel } from "./StrawberryInformation.jsx";
 
 /**
  * Экран 01 новой ветки «Земляничные поляны — Поддержка».
@@ -68,6 +69,7 @@ export default function StrawberryWelcome({
           <span>Поддержка ИИ</span>
           <span>При необходимости — специалист</span>
         </div>
+        <StrawberryInfoCarousel />
       </main>
       <footer className="strawberry-entry__footer">
         <span>Предварительная поддержка, не медицинский диагноз.</span>

@@ -1,0 +1,44 @@
+/* Informational flow: no cards, no outlines, almost-white surface. */
+.strawberry-information__carousel{max-width:610px;margin-top:33px;min-height:154px;color:#819083;outline:none}
+.strawberry-information__carousel-top{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:10px;letter-spacing:.14em;color:#9ba89a}
+.strawberry-information__carousel-count{font-size:11px;letter-spacing:.06em}
+.strawberry-information__carousel-body{padding-top:13px;min-height:100px}
+.strawberry-information__carousel-label{font-size:11px;color:#a59c96}
+.strawberry-information__carousel-body h2{font:normal 18px/1.42 Georgia,"Times New Roman",serif;margin:3px 0 5px;color:#6b7b69;letter-spacing:-.012em}
+.strawberry-information__carousel-body p{font-size:13px;line-height:1.65;color:#8c978b;margin:0;max-width:535px}
+.strawberry-information__carousel-controls{display:flex;align-items:center;gap:12px;margin-top:5px}
+.strawberry-information__carousel-controls button{border:0;background:none;color:#849784;padding:7px 3px;font-size:15px!important}
+.strawberry-information__carousel-controls button:hover{color:#4d6c53}
+.strawberry-information__carousel-controls .strawberry-information__pause{font-size:11px!important;color:#98a396;margin-left:8px}
+.strawberry-information__brand{padding:0;border:0;background:none;text-align:left}
+.strawberry-information__about-main{padding-top:clamp(52px,7vh,92px);padding-bottom:75px}
+.strawberry-information__eyebrow{font-size:10px;letter-spacing:.18em;color:#97a393;margin:0 0 26px}
+.strawberry-information__about h1{max-width:790px}
+.strawberry-information__lead{max-width:735px;margin-bottom:47px}
+.strawberry-information__chapters{max-width:740px}
+.strawberry-information__chapters section{margin-bottom:37px}
+.strawberry-information__chapters section>span{display:block;font-size:11px;letter-spacing:.1em;color:#9ea99e;margin-bottom:8px}
+.strawberry-information__chapters h2{font:normal clamp(20px,2vw,25px)/1.42 Georgia,"Times New Roman",serif;color:#566856;margin:0 0 10px}
+.strawberry-information__chapters p{font-size:15px;line-height:1.8;color:#768577;margin:0;max-width:690px}
+.strawberry-information__notice{font-size:13px;line-height:1.8;color:#8f7e78;max-width:710px;margin:34px 0 36px}
+.strawberry-information__actions{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.strawberry-information__quiet{border:0;background:transparent;color:#6e816e;padding:10px 0;font-size:13px!important}
+@media(min-width:641px){
+.strawberry-entry__main:has(.strawberry-information__carousel){padding-top:clamp(75px,10vh,120px)}
+.strawberry-entry__main:has(.strawberry-information__carousel) .strawberry-entry__features{margin-top:48px}
+}
+@media(max-width:640px){
+.strawberry-information__carousel{margin-top:29px;min-height:175px}
+.strawberry-information__carousel-body{min-height:123px}
+.strawberry-information__about-main{padding-top:41px;padding-bottom:45px}
+.strawberry-information__chapters section{margin-bottom:29px}
+.strawberry-information__chapters p{font-size:14px}
+.strawberry-information__actions{flex-direction:column;align-items:stretch;max-width:330px}
+.strawberry-information__actions .strawberry-entry__action{width:100%}
+}
+@media(prefers-reduced-motion:reduce){.strawberry-information__carousel-body{transition:none}}
+
+.strawberry-information__emergency{width:min(100%,730px);margin:5px 0 34px;padding:22px;border-left:4px solid #ad4f43;background:#fff3ee;color:#813c31;border-radius:5px}
+.strawberry-information__emergency strong{display:block;margin-bottom:9px}
+.strawberry-information__emergency p{font-size:14px;line-height:1.6;margin:0 0 13px}
+.strawberry-information__emergency a{display:inline-flex;background:#aa4237;color:white;padding:10px 15px;min-height:44px;border-radius:9px;margin:3px 9px 3px 0}

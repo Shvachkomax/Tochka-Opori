@@ -8,6 +8,7 @@ import StrawberryDiary from "./components/StrawberryDiary.jsx";
 import StrawberryPractices from "./components/StrawberryPractices.jsx";
 import StrawberryHistory from "./components/StrawberryHistory.jsx";
 import StrawberrySpecialist from "./components/StrawberrySpecialist.jsx";
+import StrawberryAbout from "./components/StrawberryInformation.jsx";
 import React, { useRef, useState, useEffect, Component } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { appendVoiceText } from "./supportVoice.js";
@@ -70,7 +71,12 @@ export default function App() {
   const [phase, setPhase] = useState("input");
   const [supportScreen, setSupportScreen] = useState("landing");
   // Route-scoped design rollout: first screen only, old Support remains unchanged.
-  const [strawberryEntryStep, setStrawberryEntryStep] = useState("welcome");
+  const [strawberryEntryStep, setStrawberryEntryStep] = useState(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("start") === "text" &&
+        ["/strawberry-support", "/strawberry-support/"].includes(window.location.pathname)) return "intake";
+    return "welcome";
+  });
+  const [strawberryAboutReturnStep, setStrawberryAboutReturnStep] = useState("welcome");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("user");
@@ -9885,6 +9891,45 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     supportScreen === "landing" && phase === "input" &&
     !inviteChecking && !inviteToken && !inviteInfo?.valid;
 
+  function openStrawberryAbout() {
+    if (recording) stopRecording();
+    if (recordingQuestionIndex !== null) stopQuestionRecording();
+    setStrawberryAboutReturnStep(strawberryEntryStep);
+    setStrawberryEntryStep("about");
+  }
+
+  // Screen 10: visual-only explanation, no patient session/API.
+  if (typeof window !== "undefined" &&
+      ["/strawberry-support/about-preview", "/strawberry-support/about-preview/"].includes(window.location.pathname)) {
+    return (
+      <StrawberryAbout
+        onBack={() => window.location.assign("/strawberry-support")}
+        onWrite={() => window.location.assign("/strawberry-support?start=text")}
+        onSpecialist={() => { window.location.href = "/specialist"; }}
+      />
+    );
+  }
+
+  // Shared About screen for all redesigned Support pages.
+  if (strawberryRoute && !APP_BRAND.isSupportPilot && activeModule === "support" &&
+      strawberryEntryStep === "about" && !inviteChecking && !inviteToken && !inviteInfo?.valid) {
+    return (
+      <StrawberryAbout
+        onBack={() => setStrawberryEntryStep(strawberryAboutReturnStep)}
+        onWrite={() => {
+          goToSupportLanding();
+          setMode("text");
+          setStrawberryEntryStep("intake");
+        }}
+        onCrisis={() => {
+          setStrawberryEntryStep("legacy");
+          setCrisisOpen(true);
+        }}
+        onSpecialist={() => { window.location.href = "/specialist"; }}
+      />
+    );
+  }
+
   if (strawberryActive && strawberryEntryStep === "welcome") {
     return (
       <StrawberryWelcome
@@ -9905,10 +9950,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             setSessionModalOpen(true);
           }
         }}
-        onAbout={() => {
-          setStrawberryEntryStep("legacy");
-          setAboutProjectOpen(true);
-        }}
+        onAbout={openStrawberryAbout}
         onCrisis={() => {
           setStrawberryEntryStep("legacy");
           setCrisisOpen(true);
@@ -9986,10 +10028,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             setStrawberryEntryStep("welcome");
           }
         }}
-        onAbout={() => {
-          setStrawberryEntryStep("legacy");
-          setAboutProjectOpen(true);
-        }}
+        onAbout={openStrawberryAbout}
         onCrisis={() => {
           if (recordingQuestionIndex !== null) stopQuestionRecording();
           setStrawberryEntryStep("legacy");
@@ -10033,10 +10072,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           // Keep the new cabinet design active; backend retrieval is unchanged.
           loadSupportCabinet();
         }}
-        onAbout={() => {
-          setStrawberryEntryStep("legacy");
-          setAboutProjectOpen(true);
-        }}
+        onAbout={openStrawberryAbout}
         onCrisis={() => {
           setStrawberryEntryStep("legacy");
           setCrisisOpen(true);
@@ -10114,10 +10150,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         onChangeComment={setCheckinComment}
         onSave={saveSupportCheckin}
         onBack={() => setStrawberryEntryStep("intake")}
-        onAbout={() => {
-          setStrawberryEntryStep("legacy");
-          setAboutProjectOpen(true);
-        }}
+        onAbout={openStrawberryAbout}
         onEmergency={() => {
           setStrawberryEntryStep("legacy");
           setCrisisOpen(true);
@@ -10137,10 +10170,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         onChangeStatus={updatePracticeStatus}
         onRefresh={loadSupportPractices}
         onBack={() => setStrawberryEntryStep("intake")}
-        onAbout={() => {
-          setStrawberryEntryStep("legacy");
-          setAboutProjectOpen(true);
-        }}
+        onAbout={openStrawberryAbout}
         onEmergency={() => {
           setStrawberryEntryStep("legacy");
           setCrisisOpen(true);
@@ -10169,10 +10199,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           setStrawberryEntryStep("legacy");
           openSupportReport(id);
         }}
-        onAbout={() => {
-          setStrawberryEntryStep("legacy");
-          setAboutProjectOpen(true);
-        }}
+        onAbout={openStrawberryAbout}
         onEmergency={() => {
           setStrawberryEntryStep("legacy");
           setCrisisOpen(true);
@@ -10208,10 +10235,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           setStrawberryEntryStep("legacy");
           createMatchRequest();
         }}
-        onAbout={() => {
-          setStrawberryEntryStep("legacy");
-          setAboutProjectOpen(true);
-        }}
+        onAbout={openStrawberryAbout}
         onEmergency={() => {
           setStrawberryEntryStep("legacy");
           setCrisisOpen(true);
@@ -10257,10 +10281,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           goToSupportLanding();
           setStrawberryEntryStep("welcome");
         }}
-        onAbout={() => {
-          setStrawberryEntryStep("legacy");
-          setAboutProjectOpen(true);
-        }}
+        onAbout={openStrawberryAbout}
         onEmergency={() => {
           setStrawberryEntryStep("legacy");
           setCrisisOpen(true);
