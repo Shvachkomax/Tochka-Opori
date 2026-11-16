@@ -14,7 +14,7 @@ import {
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
-  applyCors(req, res);
+  if (!applyCors(req, res)) return res.status(403).json({ ok: false, error: "Нет доступа." });
 
   if (!isMyPracticeServerEnabled(process.env)) {
     res.setHeader("Cache-Control", "no-store");
@@ -44,9 +44,13 @@ export default async function handler(req, res) {
     case "savePracticeAvailability":
     case "deletePracticeAvailability":
       return handlePracticeAvailability(req, res, deps);
+    case "getPracticePatientCabinet":
+    case "unlinkPracticePatientProfiles":
     case "getPracticeSlots":
     case "listPracticeDoctorServices":
     case "reservePracticeBooking":
+    case "payPracticeBookingCredits":
+    case "quotePracticeCancellation":
     case "confirmPracticeTestPayment":
     case "cancelPracticeBookingPublic":
     case "listPracticeBookingsPublic":

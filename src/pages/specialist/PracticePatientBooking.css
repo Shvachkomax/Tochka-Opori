@@ -1,0 +1,58 @@
+.practice-patient {
+  color: #2e2a25;
+  background: #fffefb;
+  border: 1px solid #e3ddcf;
+  border-radius: 16px;
+  padding: clamp(12px, 3vw, 20px);
+  margin: 16px 0 24px;
+}
+.practice-patient h3 { margin: 0 0 10px; }
+.practice-patient ul + h3 { margin-top: 20px; }
+.practice-patient h4 { margin: 12px 0 8px; }
+.practice-patient p { margin: 8px 0; }
+.practice-patient [role="alert"] { color: #9e3026; }
+.practice-patient-list { display: grid; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.practice-patient-card {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #e3ddcf;
+  border-radius: 10px;
+}
+.practice-patient-card span:empty, .practice-patient-list:empty { display: none; }
+.practice-patient-fields { width: 100%; display: grid; gap: 10px; justify-items: start; }
+.practice-patient-fields label { width: 100%; display: grid; gap: 4px; }
+.practice-patient-fields :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 9px;
+  border: 1px solid #a89d88;
+  border-radius: 8px;
+  background: white;
+  color: inherit;
+  font: inherit;
+}
+.practice-patient button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #2f5d50;
+  border-radius: 8px;
+  background: #2f5d50;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+}
+.practice-patient .practice-patient-secondary { color: #2f5d50; background: white; }
+.practice-patient button:disabled { opacity: .55; cursor: default; }
+.practice-patient-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.practice-patient details { margin-top: 16px; }
+.practice-patient summary { cursor: pointer; margin-bottom: 8px; }
+
+.practice-patient-fields .practice-patient-consent { display: flex; align-items: start; gap: 8px; }
+.practice-patient-consent input[type="checkbox"] { width: 20px; height: 20px; flex-shrink: 0; }
+.practice-patient [role="dialog"] { border: 2px solid #2f5d50; margin-bottom: 16px; }
+.practice-patient > button + h3 { margin-top: 16px; }

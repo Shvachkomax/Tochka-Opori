@@ -14,6 +14,7 @@ import crisisHandler from "./api/crisis.js";
 import councilHandler from "./api/council.js";
 import usageHandler from "./api/usage.js";
 import startSessionHandler from "./api/start-session.js";
+import practiceBookingHandler from "./api/practice-booking.js";
 import specialistHandler from "./api/specialist.js";
 import clientTokenHandler from "./api/client-token.js";
 
@@ -61,6 +62,9 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     const bodyBuffer = Buffer.concat(chunks);
     const { req, res } = createReqRes(nodeReq, nodeRes, bodyBuffer);
 
+    if (nodeReq.url.startsWith("/api/practice-booking")) {
+      return practiceBookingHandler(req, res);
+    }
     if (nodeReq.url.startsWith("/api/specialist")) {
       return specialistHandler(req, res);
     }

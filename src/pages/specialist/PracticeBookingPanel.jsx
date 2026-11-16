@@ -74,6 +74,7 @@ function NewServiceForm({ places, organizationId, onSaved }) {
       <label style={{ display: "block", fontSize: 13, marginBottom: 6 }}>Цена, ₽
         <input data-testid="a2-service-price" type="number" min="0" step="1" value={price} onChange={(e) => setPrice(e.target.value)} required style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ddd" }} />
       </label>
+      <p>К оплате пациентом {Math.ceil(Number(price || 0) * 10).toLocaleString("ru-RU")} кредитов. Курс 10 кредитов = 1 ₽.</p>
       <label style={{ display: "block", fontSize: 13, marginBottom: 6 }}>Длительность, минут
         <input type="number" min="15" max="240" step="5" value={duration} onChange={(e) => setDuration(e.target.value)} style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ddd" }} />
       </label>
@@ -163,7 +164,7 @@ export default function PracticeBookingPanel({ organizationId = null, onBookings
     setError(""); setInfo("");
     try {
       const res = await callPractice("completePracticeBooking", { booking_id: id });
-      setInfo(`Запись завершена. Комиссия: ${res.commission_id ? "начислена" : "нет"}`);
+      setInfo(res.service_fee_credits !== undefined ? `Приём завершён. Комиссия сервиса ${res.service_fee_credits} кредитов.` : `Запись завершена. Комиссия: ${res.commission_id ? "начислена" : "нет"}`);
     } catch (err) { setError(err.message); }
     await reload();
   }
@@ -187,7 +188,7 @@ export default function PracticeBookingPanel({ organizationId = null, onBookings
       <h4>Услуги</h4>
       {services.map((s) => (
         <div key={s.id} data-testid="a2-service-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
-          {s.name} · {s.duration_min} мин · {(s.price_kop / 100).toLocaleString("ru-RU")} ₽
+          {s.name} · {s.duration_min} мин · {(s.price_kop / 100).toLocaleString("ru-RU")} ₽ · {Number(s.price_credits || 0).toLocaleString("ru-RU")} кредитов
         </div>
       ))}
       <NewServiceForm places={places} organizationId={organizationId} onSaved={reload} />
@@ -209,7 +210,10 @@ export default function PracticeBookingPanel({ organizationId = null, onBookings
         </div>
       ))}
 
-      <h4>Финансы (тест, 20%)</h4>
+      <h4>Финансы</h4>
+      <p>Начислено специалисту за завершённые приёмы: <strong>{Number(finance?.specialist_credits || 0).toLocaleString("ru-RU")} кредитов</strong>.</p>
+      <p>Комиссия сервиса: {Number(finance?.service_fee_credits || 0).toLocaleString("ru-RU")} кредитов.</p>
+      <p>Удержания при поздней отмене: {Number(finance?.cancellation_fee_credits || 0).toLocaleString("ru-RU")} кредитов.</p>
       <p style={{ fontSize: 13 }}>К выплате начислено: <strong>{finance ? (finance.payable_total_kop / 100).toLocaleString("ru-RU") : "0"} ₽</strong> (симуляция, без реальных выплат).</p>
       <p style={{ fontSize: 12, color: "#999" }}>Рабочие часы: {availability.length} записей. Отпуск/выходные — через расписание демо.</p>
     </section>

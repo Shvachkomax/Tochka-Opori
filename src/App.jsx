@@ -10559,14 +10559,25 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
              />
            )}
 
-            {/* Health uses the same patient booking flow and verified body session. */}
-           {activeModule === "body" && bodyScreen === "cabinet" && bodyCabinetData?.specialist?.expertId && (
-             <PracticePatientBooking
-               sessionId={bodyDiarySessionId}
-               accessToken={(getBodySession().sessionId === bodyDiarySessionId ? getBodySession().accessToken : null)}
-               doctorExpertId={bodyCabinetData.specialist.expertId}
-             />
-           )}
+           {activeModule === "body" && bodyScreen === "cabinet" && bodyCabinetData && (() => {
+             const session = getBodySession();
+             if (session.sessionId !== bodyDiarySessionId || !session.accessToken) return null;
+             return (
+               <PracticePatientBooking
+                 key={session.sessionId}
+                 sessionId={session.sessionId}
+                 accessToken={session.accessToken}
+                 module="body"
+                 onBalanceChange={(balance) => setBodyCabinetData((previous) => {
+                   if (!previous?.wallet || previous.wallet.available_credits === balance) return previous;
+                   return { ...previous, wallet: {
+                     ...previous.wallet, balance, available_credits: balance,
+                     balance_total: balance + Number(previous.wallet.reserved_credits || 0),
+                   } };
+                 })}
+               />
+             );
+           })()}
 
           {/* Body onboarding */}
           {activeModule === "body" && bodyScreen === "onboarding" && (
@@ -12212,20 +12223,24 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 )}
 
-                {/* ROW: Запись на приём (A2, существующий кабинет пациента) */}
                 {(() => {
-                  const docExpert = supportCabinet.specialist || {};
-                  const expertId = docExpert?.expertId || docExpert?.id || null;
-                  const supportSession = getSupportSession();
-                  if (!expertId || !supportSession.sessionId || !supportSession.accessToken) return null;
+                  const session = getSupportSession();
+                  if (!session.sessionId || !session.accessToken) return null;
                   return (
-                    <div style={{ marginBottom: 20 }}>
-                      <PracticePatientBooking
-                        sessionId={supportSession.sessionId}
-                        accessToken={supportSession.accessToken}
-                        doctorExpertId={expertId}
-                      />
-                    </div>
+                    <PracticePatientBooking
+                      key={session.sessionId}
+                      sessionId={session.sessionId}
+                      accessToken={session.accessToken}
+                      module="support"
+                      cabinetVersion={supportCabinet}
+                      onBalanceChange={(balance) => setSupportCabinet((previous) => {
+                        if (!previous?.wallet || previous.wallet.available_credits === balance) return previous;
+                        return { ...previous, wallet: {
+                          ...previous.wallet, balance, available_credits: balance,
+                          balance_total: balance + Number(previous.wallet.reserved_credits || 0),
+                        } };
+                      })}
+                    />
                   );
                 })()}
 

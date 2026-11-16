@@ -7,7 +7,9 @@ import { getSupabase } from "../lib/supabase.js";
 import { maskText, maskSensitiveData, getPrivacySafeMode } from "../lib/sanitize.js";
 import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
-import { validateSessionAccess, generateSessionAccessToken } from "../lib/security/access-token.js";
+import { canLinkPracticeProfiles, changePracticeProfileLink } from "../lib/my-practice/patient-cabinet.js";
+import { isMyPracticeServerEnabled } from "../lib/my-practice/workspace-handler.js";
+import { accessTokenMatchesHash, validateSessionAccess, generateSessionAccessToken } from "../lib/security/access-token.js";
 import {
   parseContinuationCredential,
   verifyContinuationSecret,
@@ -103,16 +105,25 @@ export async function resolveSupportOwner(sessionId, accessToken) {
   return { ownerId: session.anonymous_owner_id, sessionId: session.session_id, publicCode: session.public_code };
 }
 
-// Shared patient identity resolver for booking and other cross-module actions.
-// It deliberately tries the existing Support session model first, then the
-// existing Health body_clients model. No owner id or module from the request is
-// used to select the identity.
+// The exact scoped session row supplies both the token hash and the module.
 export async function resolvePracticePatientOwner(sessionId, accessToken) {
-  const support = await resolveSupportOwner(sessionId, accessToken);
-  if (support) return { ...support, ownerType: "anonymous_case", module: "support" };
+  if (typeof sessionId !== "string" || !sessionId || !accessToken) return null;
+  const supabase = getSupabase();
+  const { data: session, error } = await supabase.from("sessions")
+    .select("session_id, public_code, anonymous_owner_id, module, legacy_access, access_token_hash, json_data")
+    .eq("session_id", sessionId).maybeSingle();
+  if (error || !session || session.legacy_access !== false || !isPilotSessionMatch(session.json_data)
+    || !accessTokenMatchesHash(accessToken, session.access_token_hash)) return null;
+
+  if (session.module === "support" && session.anonymous_owner_id) {
+    return {
+      ownerId: session.anonymous_owner_id, ownerType: "anonymous_case", module: "support",
+      sessionId: session.session_id, publicCode: session.public_code,
+    };
+  }
+  if (session.module !== "body" || isAnMedSupportOnlyDeployment()) return null;
   const body = await resolveBodyOwner(sessionId, accessToken);
-  if (body) return { ...body, ownerType: "anonymous_profile", module: "body" };
-  return null;
+  return body ? { ...body, ownerType: "anonymous_profile", module: "body" } : null;
 }
 
 // Medication cards require a non-legacy session token. Legacy access remains
@@ -359,7 +370,7 @@ function isValidSessionId(id) {
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
 
-  applyCors(req, res);
+  const allowedOrigin = applyCors(req, res);
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -412,6 +423,9 @@ export default async function handler(req, res) {
         return await handleCreateFollowUpSession(req, res);
       case "exchangeContinuationCredential":
         return await handleExchangeContinuationCredential(req, res);
+      case "linkPracticePatientProfiles":
+        if (!allowedOrigin) return res.status(403).json({ ok: false, error: "Нет доступа." });
+        return await handleExchangeContinuationCredential(req, res, { linkProfiles: true });
       case "regenerateContinuationCredential":
         return await handleRegenerateContinuationCredential(req, res);
       case "getReportStatus":
@@ -1605,9 +1619,21 @@ async function handleValidateInviteToken(req, res) {
 const EXCHANGE_RATE_LIMIT_ERROR = "Не удалось открыть запись. Проверьте код продолжения.";
 const LEGACY_CODE_ERROR = "Этот код был создан в старой тестовой версии. Создайте новый код или обратитесь к специалисту.";
 
-async function handleExchangeContinuationCredential(req, res) {
+async function handleExchangeContinuationCredential(req, res, { linkProfiles = false } = {}) {
   try {
-    const { module: reqModule, continuation_code } = req.body || {};
+    const { module: reqModule, continuation_code, session_id, access_token } = req.body || {};
+    let practiceOwner;
+    if (linkProfiles) {
+      res.setHeader("Cache-Control", "no-store");
+      if (!isMyPracticeServerEnabled() || !canLinkPracticeProfiles()) {
+        return res.status(403).json({ ok: false, error: "Привязка профилей здесь недоступна." });
+      }
+      practiceOwner = await resolvePracticePatientOwner(session_id, access_token);
+      if (!practiceOwner) return res.status(401).json({ ok: false, error: "Войдите снова по коду продолжения." });
+      if (practiceOwner.module === reqModule) {
+        return res.status(400).json({ ok: false, error: "Введите код продолжения второго раздела." });
+      }
+    }
 
     if (!SUPPORTED_MODULES.includes(reqModule)) {
       return res.status(400).json({ ok: false, error: "Invalid module" });
@@ -1712,7 +1738,7 @@ async function handleExchangeContinuationCredential(req, res) {
     // Success: clear failures for this IP + lookup pair, issue new access token.
     await supabase.rpc("clear_continuation_failed_attempts", { p_attempt_key: attemptKey });
 
-    console.log("[exchange] start module=" + reqModule + " lookup_prefix=" + parsed.lookupCode.slice(0, 8));
+    if (!linkProfiles) console.log("[exchange] start module=" + reqModule + " lookup_prefix=" + parsed.lookupCode.slice(0, 8));
 
     // Step 1: Find target session
     const targetTable = reqModule === "body" ? "body_clients" : "sessions";
@@ -1741,6 +1767,23 @@ async function handleExchangeContinuationCredential(req, res) {
 
     if (!isPilotSessionMatch(targetSession.json_data)) {
       return res.status(403).json({ ok: false, error: "Код продолжения не принадлежит этому сервису." });
+    }
+
+    if (linkProfiles) {
+      const peerOwnerType = reqModule === "body" ? "anonymous_profile" : "anonymous_case";
+      if (credential.owner_type !== peerOwnerType) {
+        return res.status(403).json({ ok: false, error: "Не удалось подтвердить второй профиль." });
+      }
+      const result = await changePracticeProfileLink(supabase, practiceOwner, {
+        ownerId: credential.owner_id, ownerType: peerOwnerType, module: reqModule,
+      });
+      if (result.error) {
+        return res.status(500).json({ ok: false, error: "Не удалось связать профили. Попробуйте ещё раз." });
+      }
+      if (result.conflict) {
+        return res.status(409).json({ ok: false, error: "Один из профилей уже связан с другим профилем." });
+      }
+      return res.status(200).json({ ok: true });
     }
 
     console.log("[exchange] target session found");
