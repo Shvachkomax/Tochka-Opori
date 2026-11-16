@@ -9,8 +9,8 @@ const events=[
  {at:'2026-01-01T00:00:00.000Z',source:'sessions',provenance:'patient_reported',details:{}}
 ];
 const health=buildPatientDraft(events,'body','days7',new Date(d));
-assert.equal(health.items.find(x=>x.label==='Вес, кг').value,'79');
-assert.equal(health.items.find(x=>x.label==='Вес, кг').sources.length,1);
+assert.equal(health.items.find(x=>x.label==='Вес, кг').value,'79 (первое в периоде: 80)');
+assert.equal(health.items.find(x=>x.label==='Вес, кг').sources.length,2);
 const support=buildPatientDraft(events,'support','days30',new Date(d));
 assert.equal(support.items.find(x=>x.label==='Контакты Support').value,'Сохранённых сессий: 1');
 assert.ok(support.items.every(x=>x.sources.length>0));
