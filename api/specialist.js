@@ -1,3 +1,4 @@
+import { handleMedicalRecord } from "../lib/clinical/medical-record.js";
 import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import crypto from "node:crypto";
 import { getSupabase } from "../lib/supabase.js";
@@ -215,6 +216,12 @@ export default async function handler(req, res) {
         return await handleGetClientOverview(req, res);
       case "getClientProfessionalAnalysis":
         return await handleGetClientProfessionalAnalysis(req, res);
+      case "listMedicalEncounters":
+      case "saveMedicalEncounter":
+        if (!assertCookieOrigin(req,res)) return;
+        return await handleMedicalRecord(req,res,{
+          enabled:()=>isMyPracticeServerEnabled(), getSupabase, authorize:authorizeMedicalRecord,
+        });
       case "getClinicalTimeline":
         return await handleGetClinicalTimeline(req, res);
       case "getBodyClientOverview":
@@ -2172,4 +2179,30 @@ export function validateSpecialistContext({ memberships, organizationId, module,
   }
 
   return { ok: true };
+}
+
+// Resolve every request through the current patient grant; pairing booking profiles
+// never grants access to another module's clinical history.
+async function authorizeMedicalRecord(req) {
+  const auth=await authorizeSpecialist(req);
+  if(auth.error)return {ok:false,status:auth.status||401,error:auth.error};
+  const {client_ref:clientRef,module,organization_id:organizationId=null}=req.body||{};
+  if(typeof clientRef!=="string"||!/^(assignment|access):[a-f0-9-]{36}$/i.test(clientRef)||!["support","body"].includes(module))return {ok:false,status:400,error:"Некорректная ссылка на пациента."};
+  const context=validateSpecialistContext({memberships:auth.memberships,organizationId,module,allowedModules:auth.expert.allowed_modules});
+  if(!context.ok)return {ok:false,error:context.error};
+  const resolved=await resolveAuthorizedSpecialistClient({expert:auth.expert,memberships:auth.memberships,clientRef,organizationId,module});
+  if(!resolved.ok)return resolved;
+  if(!canViewExpandedPatientData(resolved))return {ok:false,error:"Нет доступа к медицинской карте."};
+  let {ownerType,ownerId}=resolved;
+  if(module==="support"){
+    if(!resolved.publicCode)return {ok:false,error:"Пациент не определён."};
+    const {data,error}=await getSupabase().from("sessions").select("anonymous_owner_id,json_data")
+      .eq("public_code",resolved.publicCode).eq("module","support").maybeSingle();
+    if(error||!data?.anonymous_owner_id)return {ok:false,error:"Пациент не определён."};
+    if(getPilotId() && data.json_data?.pilot_id!==getPilotId())return {ok:false,error:"Нет доступа к пациенту."};
+    ownerType="anonymous_case";ownerId=data.anonymous_owner_id;
+  }
+  if(!ownerId||ownerType!==(module==="body"?"anonymous_profile":"anonymous_case"))return {ok:false,error:"Пациент не определён."};
+  return {ok:true,expertId:auth.expert.id,expertName:auth.expert.name,ownerType,ownerId,module,organizationId,
+    canPrescribe:await hasVerifiedMedicationAuthorization({expertId:auth.expert.id,organizationId})};
 }

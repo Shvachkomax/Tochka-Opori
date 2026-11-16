@@ -1,3 +1,4 @@
+import MedicalRecordPanel from "./MedicalRecordPanel.jsx";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import SpecialistMedicationOrders from "../../SpecialistMedicationOrders.jsx";
 import PatientReportedMedicationSummary from "../../PatientReportedMedicationSummary.jsx";
@@ -900,6 +901,10 @@ export default function SpecialistCabinet() {
           })()}
         </div>
 
+
+        {selectedClient && import.meta.env.VITE_ENABLE_MY_PRACTICE_SERVER_UI === "true" && <MedicalRecordPanel
+          key={`medical:${expert.id}:${orgId || "private"}:${module}:${selectedClient}`}
+          module={module} organizationId={orgId} clientRef={selectedClient} /> }
 
         {selectedClient && <ClinicalTimelinePanel
           key={`${expert.id}:${orgId || "private"}:${module}:${selectedClient || "demo"}`}
