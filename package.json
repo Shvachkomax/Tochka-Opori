@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:api": "node --env-file=.env.local local-api-server.js",
     "dev:all": "concurrently \"npm run dev:api\" \"npm run dev\"",
-    "build": "npm run test:release-config && npm run test:my-practice && npm run test:specialist-navigation && node scripts/check-database-architecture.js && npm run test:medical-record && vite build",
+    "build": "npm run test:release-config && npm run test:my-practice && npm run test:specialist-navigation && node scripts/check-database-architecture.js && npm run test:medical-record && npm run test:patient-draft && vite build",
     "preview": "vite preview",
     "e2e:phase11c1": "node scripts/e2e-phase11c1-browser.mjs",
     "e2e:service-requests": "node scripts/e2e-service-requests-browser.mjs",
@@ -63,7 +63,8 @@
     "test:specialist-navigation": "node scripts/test-specialist-navigation.js",
     "test:my-practice-patient-cabinet": "node scripts/test-my-practice-patient-cabinet.js",
     "test:practice-booking-credits": "node scripts/test-practice-booking-credits.mjs",
-    "test:medical-record": "node scripts/test-medical-record.mjs"
+    "test:medical-record": "node scripts/test-medical-record.mjs",
+    "test:patient-draft": "node scripts/test-patient-draft.mjs"
   },
   "dependencies": {
     "@fullcalendar/react": "^7.1.4",

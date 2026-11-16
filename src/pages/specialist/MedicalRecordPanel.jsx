@@ -1,5 +1,6 @@
 import React, {useEffect,useRef,useState} from 'react';
 import './MedicalRecordPanel.css';
+import PatientDraftSummary from './PatientDraftSummary.jsx';
 const FIELDS={reason:'Причина обращения',complaints:'Жалобы',history:'Анамнез',allergies:'Аллергии и нежелательные реакции',assessment:'Оценка врача',diagnosis:'Диагноз, внесённый врачом',therapy:'Терапия и рекомендации',plan:'Обследования и дальнейший план'};
 const MED_FIELDS={name:'Препарат',dose:'Доза и единица',frequency:'Кратность приёма',route:'Способ приёма',start_date:'Начало',end_date:'Окончание',prescriber:'Назначивший врач',change_reason:'Причина изменения или отмены'};
 const blankContent=()=>({...Object.fromEntries(Object.keys(FIELDS).map(k=>[k,''])),medications:[]});
@@ -41,7 +42,8 @@ export default function MedicalRecordPanel({clientRef,module,organizationId}){
  }
  const latest=[...new Map(records.map(r=>[r.encounter_id,records.find(x=>x.encounter_id===r.encounter_id)])).values()].sort((a,b)=>b.encounter_at.localeCompare(a.encounter_at));
  return <section className="medical-record" aria-label="Медицинская карта">
-  <h3>Медицинская карта</h3><p>Ваши записи приёмов и история терапии этого пациента. Подтверждение фиксирует авторство; электронный рецепт не оформляется.</p>
+  <h3>Медицинская карта</h3>
+  <PatientDraftSummary clientRef={clientRef} module={module} organizationId={organizationId}/><p>Ваши записи приёмов и история терапии этого пациента. Подтверждение фиксирует авторство; электронный рецепт не оформляется.</p>
   <button type="button" onClick={()=>edit(null)} disabled={loading||busy}>+ Новое обращение</button>
   <button type="button" onClick={()=>{if(discard()){setForm(null);setDirty(false);load();}}} disabled={loading||busy}>Обновить</button>
   {loading&&<p role="status">Загрузка карты…</p>}{error&&<p role="alert" className="mr-error">{error}</p>}{message&&<p role="status">{message}</p>}

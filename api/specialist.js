@@ -1,4 +1,5 @@
 import { handleMedicalRecord } from "../lib/clinical/medical-record.js";
+import { handlePatientDraft,loadPatientDraftSources } from "../lib/clinical/patient-draft-summary.js";
 import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import crypto from "node:crypto";
 import { getSupabase } from "../lib/supabase.js";
@@ -216,6 +217,9 @@ export default async function handler(req, res) {
         return await handleGetClientOverview(req, res);
       case "getClientProfessionalAnalysis":
         return await handleGetClientProfessionalAnalysis(req, res);
+      case "getPatientDraftSummary":
+        if (!assertCookieOrigin(req,res)) return;
+        return await handlePatientDraft(req,res,{enabled:()=>isMyPracticeServerEnabled(),authorize:authorizeMedicalRecord,getSupabase,load:loadPatientDraftSources});
       case "listMedicalEncounters":
       case "saveMedicalEncounter":
         if (!assertCookieOrigin(req,res)) return;
@@ -2203,6 +2207,6 @@ async function authorizeMedicalRecord(req) {
     ownerType="anonymous_case";ownerId=data.anonymous_owner_id;
   }
   if(!ownerId||ownerType!==(module==="body"?"anonymous_profile":"anonymous_case"))return {ok:false,error:"Пациент не определён."};
-  return {ok:true,expertId:auth.expert.id,expertName:auth.expert.name,ownerType,ownerId,module,organizationId,
+  return {ok:true,expertId:auth.expert.id,expertName:auth.expert.name,ownerType,ownerId,module,organizationId,relationship:resolved.relationship,
     canPrescribe:await hasVerifiedMedicationAuthorization({expertId:auth.expert.id,organizationId})};
 }
