@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from "react";
+import PracticeTour from "./PracticeTour.jsx";
+import { tourStorageKey, tourStepReady } from "../../../lib/my-practice/onboarding-tour.js";
 import {
   DEMO_DOCTOR, DEMO_CLINICS,
   filterOffers, canPublishBookingLink, rubles,
@@ -137,6 +139,20 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
   const catalogKey = DRAFT_STORAGE_KEY + ":" + storageScope;
   const scheduleKey = SCHEDULE_DRAFT_STORAGE_KEY + ":" + storageScope;
   const [tab,setTab] = useState("overview");
+  const tourKey = tourStorageKey(storageScope);
+  const [tourActive,setTourActive] = useState(false);
+  const [tourStep,setTourStep] = useState(() => {
+    try { const n = Number(localStorage.getItem(tourKey)); return Number.isInteger(n) && n >= 0 && n < 3 ? n : 0; }
+    catch { return 0; }
+  });
+  const openTour = () => { setTourStep(0); setTab("overview"); setTourActive(true); };
+  const changeTourStep = next => {
+    setTourStep(next);
+    setTab(["overview","services","calendar"][next]);
+    try { localStorage.setItem(tourKey,String(next)); } catch {}
+  };
+  const closeTour = () => { setTourActive(false); try { localStorage.setItem(tourKey,String(tourStep)); } catch {} };
+  const finishTour = () => { setTourActive(false); setTourStep(0); try { localStorage.removeItem(tourKey); } catch {} };
   const [catalog,setCatalog] = useState(() => {
     try {return restoreDraftCatalog(sessionStorage.getItem(catalogKey),initialCatalog());}
     catch {return initialCatalog();}
@@ -216,6 +232,12 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
         <p>Ваши места работы, услуги и расписание.</p>
       </div>
     </header>
+    <div className="mp-tour-launch">
+      <button type="button" className="mp-secondary" onClick={openTour} data-testid="mp-start-tour">
+        ▶ Обучение по кабинету
+      </button>
+      <span>Три шага: место работы, услуга, расписание. Можно прервать в любой момент.</span>
+    </div>
     <div className="mp-doctor">
       <div className="mp-avatar" aria-hidden="true">В</div>
       <div>
@@ -246,7 +268,7 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
     </div>}
     {tab==="services" && <div role="tabpanel" id="mp-panel-services" aria-labelledby="mp-tab-services">
       <div className="mp-section-title"><h3>Каталог услуг</h3><p>Это информационный каталог. Сделки через платформу оформляются отдельно — в разделе «Платные приёмы».</p></div>
-      <button type="button" className="mp-primary" aria-expanded={addingService}
+      <button type="button" className="mp-primary" data-tour-target="services" aria-expanded={addingService}
         onClick={()=>setAddingService(!addingService)}>{addingService?"Закрыть добавление":"+ Добавить услугу"}</button>
       {addingService && <MyPracticeCatalogEditor catalog={catalog} onChange={changeCatalog}
         onSave={saveDraft} onReset={resetDraft} dirty={dirty} storageMessage={storageMessage}/>}
@@ -283,10 +305,19 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
     </div>}
     {tab==="calendar" && <div role="tabpanel" id="mp-panel-calendar" aria-labelledby="mp-tab-calendar">
       <div className="mp-section-title"><h3>Общий календарь</h3><p>Справочные блоки работы и внешние записи по редактируемым местам, без платежей и комиссии.</p></div>
+      <div data-tour-target="calendar">
       <MyPracticeCalendar catalog={catalog} entries={schedule} onChange={changeSchedule}
         onSave={saveSchedule} onReset={resetSchedule} dirty={scheduleDirty} storageMessage={scheduleMessage}
         monday={monday} setMonday={setMonday} clinic={calendarClinic} setClinic={setCalendarClinic}
         serverBookings={serverBookings}/>
+      </div>
     </div>}
+    {tourActive && <PracticeTour
+      step={tourStep}
+      onNext={() => tourStep===2 ? finishTour() : changeTourStep(tourStep+1)}
+      onSkip={() => tourStep===2 ? finishTour() : changeTourStep(tourStep+1)}
+      onClose={closeTour}
+      ready={tourStepReady(tourStep,{places:catalog.length,offers:countActiveOffers(catalog),events:schedule.length,dirty,scheduleDirty})}
+    />}
   </section>;
 }

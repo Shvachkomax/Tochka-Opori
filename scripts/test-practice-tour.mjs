@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import {TOUR_STEPS,tourStorageKey,tourStepReady} from "../lib/my-practice/onboarding-tour.js";
+assert.deepEqual(TOUR_STEPS.map(s=>s.id),["places","services","calendar"]);
+assert.equal(new Set(TOUR_STEPS.map(s=>s.target)).size,3);
+assert.equal(tourStepReady(0,{places:1,dirty:true}),false);
+assert.equal(tourStepReady(0,{places:1,dirty:false}),true);
+assert.equal(tourStepReady(1,{offers:1,dirty:false}),true);
+assert.equal(tourStepReady(1,{offers:0}),false);
+assert.equal(tourStepReady(2,{events:1,scheduleDirty:true}),false);
+assert.equal(tourStepReady(2,{events:1,scheduleDirty:false}),true);
+assert.notEqual(tourStorageKey("expertA"),tourStorageKey("expertB"));
+console.log("A3.6 product tour: PASS (steps, completion gates, scope isolation)");

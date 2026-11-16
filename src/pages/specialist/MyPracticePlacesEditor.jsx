@@ -51,7 +51,7 @@ export default function MyPracticePlacesEditor({
     <div className="mp-places-heading">
       <div><h3>Места работы и приёма</h3>
         <p>Личный справочник врача, как в календаре. Название и адрес можно менять самостоятельно.</p></div>
-      <button type="button" className="mp-primary" data-testid="mp-add-place" onClick={startNew}>+ Добавить место</button>
+      <button type="button" className="mp-primary" data-testid="mp-add-place" data-tour-target="places" onClick={startNew}>+ Добавить место</button>
     </div>
     <div className="mp-two-col">
       {catalog.map(place=><article className="mp-clinic mp-place-card" key={place.id} data-testid={"mp-place-"+place.id}>
