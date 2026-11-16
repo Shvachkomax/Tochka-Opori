@@ -12,7 +12,7 @@ import MyPracticeCalendar from "./MyPracticeCalendar.jsx";
 import MyPracticePlacesEditor from "./MyPracticePlacesEditor.jsx";
 import {MyPracticePaidBookingsDemo} from "./MyPracticePaidBookingDemo.jsx";
 import {initialScheduleDraft, restoreScheduleDraft, SCHEDULE_DRAFT_STORAGE_KEY} from "../../../lib/my-practice/schedule-draft.js";
-import {initialDraftCatalog,restoreDraftCatalog,countActiveOffers,DRAFT_STORAGE_KEY,updateDraftOffer} from "../../../lib/my-practice/catalog-draft.js";
+import {initialDraftCatalog,restoreDraftCatalog,countActiveOffers,DRAFT_STORAGE_KEY,updateDraftOffer,setDraftOfferArchived} from "../../../lib/my-practice/catalog-draft.js";
 
 // Чистый визуальный прототип. Никаких запросов к API, личных или медицинских данных.
 const TABS = [
@@ -38,7 +38,7 @@ function ClinicCard({ clinic, onServices }) {
   );
 }
 
-function OfferCard({ offer, onSaveEdit }) {
+function OfferCard({ offer, onSaveEdit, onRemove }) {
   const [editing, setEditing] = useState(false);
   const [editError, setEditError] = useState("");
   const [fields, setFields] = useState(() => ({
@@ -87,6 +87,8 @@ function OfferCard({ offer, onSaveEdit }) {
           >
             Редактировать
           </button>
+          <button type="button" className="mp-secondary" onClick={()=>onRemove(offer)}
+            aria-label={"Удалить услугу: " + offer.name}>Удалить</button>
           {verified
             ? <a href={offer.bookingUrl} target="_blank" rel="noopener noreferrer">Перейти к записи клиники</a>
             : <p className="mp-booking-disabled">Запись недоступна: требуется подключение клиники</p>}
@@ -184,6 +186,7 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
     setStorageMessage("Исходный каталог и календарь восстановлены.");
     setScheduleMessage("Исходное расписание восстановлено.");
   };
+  const [addingService,setAddingService] = useState(false);
   const [clinicFilter,setClinicFilter] = useState("all");
   const [formatFilter,setFormatFilter] = useState("all");
   const [calendarClinic,setCalendarClinic] = useState("all");
@@ -196,6 +199,10 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
   const saveOfferFromCard = payload => {
     const next = updateDraftOffer(catalog, payload);
     changeCatalog(next);
+  };
+  const removeOfferFromCard = offer => {
+    if (!window.confirm(`Удалить услугу «${offer.name}» из каталога? Её можно восстановить на вкладке «Управление». Существующие записи сохранятся.`)) return;
+    changeCatalog(setDraftOfferArchived(catalog,{clinicId:offer.clinicId,offerId:offer.id,archived:true}));
   };
   return <section className="my-practice-pilot" data-testid="my-practice-pilot" aria-labelledby="my-practice-title">
     {standalone && <SpecialistPageNavigation />}
@@ -236,6 +243,10 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
     </div>}
     {tab==="services" && <div role="tabpanel" id="mp-panel-services" aria-labelledby="mp-tab-services">
       <div className="mp-section-title"><h3>Каталог услуг</h3><p>Это информационный каталог. Сделки через платформу оформляются отдельно — в разделе «Платные приёмы».</p></div>
+      <button type="button" className="mp-primary" aria-expanded={addingService}
+        onClick={()=>setAddingService(!addingService)}>{addingService?"Закрыть добавление":"+ Добавить услугу"}</button>
+      {addingService && <MyPracticeCatalogEditor catalog={catalog} onChange={changeCatalog}
+        onSave={saveDraft} onReset={resetDraft} dirty={dirty} storageMessage={storageMessage}/>}
       <div className="mp-filters">
         <label className="mp-field">Клиника<select value={clinicFilter} onChange={e=>setClinicFilter(e.target.value)}>
           <option value="all">Все места</option>
@@ -246,7 +257,7 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
           <option value="online">Дистанционно*</option>
         </select></label>
       </div>
-      <div className="mp-two-col">{offers.map(o=><OfferCard key={o.id} offer={o} onSaveEdit={saveOfferFromCard}/>)}</div>
+      <div className="mp-two-col">{offers.map(o=><OfferCard key={o.id} offer={o} onSaveEdit={saveOfferFromCard} onRemove={removeOfferFromCard}/>)}</div>
       {!offers.length && <p className="mp-muted">По этим условиям услуг нет.</p>}
       <div className="mp-services-save">
         <span>{dirty ? "Есть изменения, ещё не сохранённые в браузере" : (storageMessage || "Изменения можно сохранить в браузере")}</span>
