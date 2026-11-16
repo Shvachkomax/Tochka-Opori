@@ -131,16 +131,19 @@ function OfferCard({ offer, onSaveEdit, onRemove }) {
 }
 
 export default function MyPracticePilot({ standalone = false, storageScope = "public-demo", doctor = DEMO_DOCTOR, serverBookings = null }) {
+  const personalCabinet = !standalone;
+  const initialCatalog = () => personalCabinet ? [] : initialDraftCatalog();
+  const initialSchedule = (items) => personalCabinet ? [] : initialScheduleDraft(items);
   const catalogKey = DRAFT_STORAGE_KEY + ":" + storageScope;
   const scheduleKey = SCHEDULE_DRAFT_STORAGE_KEY + ":" + storageScope;
   const [tab,setTab] = useState("overview");
   const [catalog,setCatalog] = useState(() => {
-    try {return restoreDraftCatalog(sessionStorage.getItem(catalogKey));}
-    catch {return initialDraftCatalog();}
+    try {return restoreDraftCatalog(sessionStorage.getItem(catalogKey),initialCatalog());}
+    catch {return initialCatalog();}
   });
   const [schedule,setSchedule] = useState(() => {
-    try {return restoreScheduleDraft(sessionStorage.getItem(scheduleKey),catalog);}
-    catch {return initialScheduleDraft(catalog);}
+    try {const saved=sessionStorage.getItem(scheduleKey);return saved?restoreScheduleDraft(saved,catalog):initialSchedule(catalog);}
+    catch {return initialSchedule(catalog);}
   });
   const [scheduleDirty,setScheduleDirty] = useState(false);
   const [scheduleMessage,setScheduleMessage] = useState("");
@@ -151,7 +154,7 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
   };
   const resetSchedule = () => {
     try {sessionStorage.removeItem(scheduleKey);} catch {}
-    setSchedule(initialScheduleDraft(catalog));setScheduleDirty(false);setScheduleMessage("Исходное расписание восстановлено.");
+    setSchedule(initialSchedule(catalog));setScheduleDirty(false);setScheduleMessage("Расписание очищено.");
   };
   const [dirty,setDirty] = useState(false);
   const [storageMessage,setStorageMessage] = useState("");
@@ -172,7 +175,7 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
     }catch{setStorageMessage("Не удалось записать настройки в браузере.");}
   };
   const saveDraft = () => {
-    try { sessionStorage.setItem(catalogKey,JSON.stringify(catalog)); setDirty(false); setStorageMessage("настройки сохранён только в этом браузере."); }
+    try { sessionStorage.setItem(catalogKey,JSON.stringify(catalog)); setDirty(false); setStorageMessage("Настройки сохранены в этом браузере."); }
     catch { setStorageMessage("Браузер не разрешил локальное сохранение. Настройки остаётся только на экране."); }
   };
   const resetDraft = () => {
@@ -180,11 +183,11 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
       sessionStorage.removeItem(catalogKey);
       sessionStorage.removeItem(scheduleKey);
     }catch{}
-    setCatalog(initialDraftCatalog());setDirty(false);
-    setSchedule(initialScheduleDraft());setScheduleDirty(false);
+    setCatalog(initialCatalog());setDirty(false);
+    setSchedule(initialSchedule());setScheduleDirty(false);
     setClinicFilter("all");setCalendarClinic("all");
-    setStorageMessage("Исходный каталог и календарь восстановлены.");
-    setScheduleMessage("Исходное расписание восстановлено.");
+    setStorageMessage("Каталог и календарь очищены.");
+    setScheduleMessage("Расписание очищено.");
   };
   const [addingService,setAddingService] = useState(false);
   const [clinicFilter,setClinicFilter] = useState("all");
@@ -210,15 +213,15 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
       <div>
         <p className="mp-eyebrow">Земляничные поляны · Моя практика</p>
         <h2 id="my-practice-title">Практика врача в одном пространстве</h2>
-        <p>Справочное расписание и отдельный сценарий платных приёмов через платформу.</p>
+        <p>Ваши места работы, услуги и расписание.</p>
       </div>
     </header>
     <div className="mp-doctor">
       <div className="mp-avatar" aria-hidden="true">В</div>
       <div>
         <h3>{/^QA /.test(doctor.name || "") ? "Специалист" : doctor.name}</h3>
-        <p>{doctor.specialty === "Учебная проверка" ? "" : (doctor.specialty || DEMO_DOCTOR.specialty)} · {doctor.city || DEMO_DOCTOR.city}</p>
-        <p className="mp-muted">{DEMO_DOCTOR.about}</p>
+        <p>{[doctor.specialty === "Учебная проверка" ? "" : doctor.specialty, doctor.city].filter(Boolean).join(" · ")}</p>
+        <p className="mp-muted">{"Добавьте места работы, услуги и расписание своей практики."}</p>
       </div>
     </div>
     <div className="mp-stats" aria-label="Показатели практики">
@@ -227,7 +230,7 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
       <div><strong>{schedule.length}</strong><span>событий календаря</span></div>
     </div>
     <div className="mp-tabs" role="tablist" aria-label="Разделы моей практики">
-      {TABS.map(t=><button key={t.id} type="button" role="tab"
+      {TABS.filter(t=>!personalCabinet || !["paid","finance"].includes(t.id)).map(t=><button key={t.id} type="button" role="tab"
         id={"mp-tab-"+t.id} aria-selected={tab===t.id} aria-controls={"mp-panel-"+t.id}
         className={tab===t.id?"mp-tab active":"mp-tab"} onClick={()=>setTab(t.id)}>{t.label}</button>)}
     </div>

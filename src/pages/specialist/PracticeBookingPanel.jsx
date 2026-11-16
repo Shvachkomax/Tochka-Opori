@@ -81,7 +81,8 @@ function NewServiceForm({ places, organizationId, onSaved }) {
       <label style={{ display: "block", fontSize: 13, marginBottom: 6 }}>Место приёма
         <select data-testid="a2-service-place" value={placeId} onChange={(e) => setPlaceId(e.target.value)} style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ddd" }}>
           <option value="">Без места</option>
-          {places.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {!places.length && <p>Добавьте место работы или онлайн-приём.</p>}
+      {places.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </label>
       <button disabled={busy} data-testid="a2-service-save" style={{ padding: "9px 16px", borderRadius: 9, background: "#2F5D50", color: "#fff", border: 0, fontWeight: 700, cursor: "pointer" }}>
@@ -171,21 +172,22 @@ export default function PracticeBookingPanel({ organizationId = null, onBookings
 
   return (
     <section data-testid="a2-booking-panel" style={{ border: "1px solid #e3ddcf", borderRadius: 16, padding: 20, background: "#FFFEFB" }}>
-      <h3 style={{ margin: "0 0 8px" }}>Серверное бронирование (тест)</h3>
+      <h3 style={{ margin: "0 0 8px" }}>Запись на приём</h3>
       <p style={{ fontSize: 13, color: "#666", marginTop: 0 }}>
-        Данные хранятся в тестовой базе и не зависят от браузера. Пациент видит только свободные интервалы;
-        внутренние документы не открываются.
+        Добавьте места работы, услуги и рабочие часы. Пациенты смогут выбрать свободное время и записаться.
       </p>
       {error && <p role="alert" style={{ color: "#a33" }}>{error}</p>}
       {info && <p role="status" style={{ color: "#2F5D50" }}>{info}</p>}
 
       <h4>Места работы</h4>
+      {!places.length && <p>Добавьте место работы или онлайн-приём.</p>}
       {places.map((p) => <div key={p.id} data-testid="a2-place-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee" }}>
         <strong>{p.name}</strong>{p.address ? <span style={{ color: "#777" }}> · {p.address}</span> : null}
       </div>)}
       <NewPlaceForm onSaved={reload} />
 
       <h4>Услуги</h4>
+      {!services.length && <p>Услуг пока нет. Добавьте первую услугу.</p>}
       {services.map((s) => (
         <div key={s.id} data-testid="a2-service-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
           {s.name} · {s.duration_min} мин · {(s.price_kop / 100).toLocaleString("ru-RU")} ₽ · {Number(s.price_credits || 0).toLocaleString("ru-RU")} кредитов
@@ -201,7 +203,7 @@ export default function PracticeBookingPanel({ organizationId = null, onBookings
       <NewAvailabilityForm organizationId={organizationId} onSaved={reload} />
 
       <h4>Записи пациентов</h4>
-      <button type="button" onClick={reload} data-testid="a2-refresh-bookings" style={{ padding: "6px 10px", borderRadius: 8, background: "#fff", border: "1px solid #ddd", cursor: "pointer" }}>Обновить серверные записи</button>
+      <button type="button" onClick={reload} data-testid="a2-refresh-bookings" style={{ padding: "6px 10px", borderRadius: 8, background: "#fff", border: "1px solid #ddd", cursor: "pointer" }}>Обновить записи</button>
       {bookings.length === 0 && <p style={{ fontSize: 13, color: "#777" }}>Записей пока нет.</p>}
       {bookings.map((b) => (
         <div key={b.id} data-testid="a2-booking-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
@@ -214,8 +216,8 @@ export default function PracticeBookingPanel({ organizationId = null, onBookings
       <p>Начислено специалисту за завершённые приёмы: <strong>{Number(finance?.specialist_credits || 0).toLocaleString("ru-RU")} кредитов</strong>.</p>
       <p>Комиссия сервиса: {Number(finance?.service_fee_credits || 0).toLocaleString("ru-RU")} кредитов.</p>
       <p>Удержания при поздней отмене: {Number(finance?.cancellation_fee_credits || 0).toLocaleString("ru-RU")} кредитов.</p>
-      <p style={{ fontSize: 13 }}>К выплате начислено: <strong>{finance ? (finance.payable_total_kop / 100).toLocaleString("ru-RU") : "0"} ₽</strong> (симуляция, без реальных выплат).</p>
-      <p style={{ fontSize: 12, color: "#999" }}>Рабочие часы: {availability.length} записей. Отпуск/выходные — через расписание демо.</p>
+      <p style={{ fontSize: 13 }}>Выплаты в рублях пока не подключены.</p>
+      <p style={{ fontSize: 12, color: "#999" }}>Рабочие часы: {availability.length} записей. Укажите часы, доступные для записи.</p>
     </section>
   );
 }

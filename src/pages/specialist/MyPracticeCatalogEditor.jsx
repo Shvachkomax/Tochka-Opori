@@ -90,7 +90,7 @@ export default function MyPracticeCatalogEditor({catalog,onChange,onSave,onReset
     </div>
     <div className="mp-editor-footer">
       <button type="button" className="mp-primary" onClick={onSave} disabled={!dirty} data-testid="my-practice-save-draft">Сохранить</button>
-      <button type="button" className="mp-secondary" onClick={()=>{if(window.confirm("Вернуть исходные места, услуги и календарь? Текущие несохранённые изменения будут потеряны.")){onReset();resetForm();}}} data-testid="my-practice-reset-draft">Вернуть исходные данные</button>
+      <button type="button" className="mp-secondary" onClick={()=>{if(window.confirm("Очистить места, услуги и календарь? Текущие изменения будут потеряны.")){onReset();resetForm();}}} data-testid="my-practice-reset-draft">Очистить каталог и календарь</button>
     </div>
     {storageMessage&&<p role="status" className="mp-editor-note">{storageMessage}</p>}
     <p className="mp-footnote">Сохранение не отправляет данные в Supabase и не публикует их для пациентов. Не вводите настоящие персональные данные. * Дистанционный приём возможен только при наличии правовых оснований.</p>
