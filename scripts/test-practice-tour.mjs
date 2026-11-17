@@ -16,4 +16,10 @@ assert.ok(!placesEditor.includes('data-testid="mp-save-places"'),"no duplicate p
 assert.ok(placesEditor.includes("onChange(next)"),"place form triggers single save");
 assert.ok(pilot.includes("sessionStorage.setItem(catalogKey,JSON.stringify(nextCatalog))"),"place changes persist immediately");
 assert.ok(pilot.includes("return true;"),"persist result exposed to form");
+assert.ok(pilot.includes('my-practice-offer-form'),"tour follows the opened service form");
+const tourSource=readFileSync(new URL("../src/pages/specialist/PracticeTour.jsx",import.meta.url),"utf8");
+assert.ok(tourSource.includes('panel.right+gutter'),"tour docks to right outside cabinet");
+assert.ok(tourSource.includes('panel.left-width-gutter'),"tour can dock to left outside cabinet");
+assert.ok(tourSource.includes('side==="right"'),"tour chooses available gutter");
+
 console.log("A3.6 product tour: PASS (steps, completion gates, scope isolation, single-save places)");

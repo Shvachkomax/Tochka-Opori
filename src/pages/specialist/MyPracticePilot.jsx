@@ -320,7 +320,9 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
     </div>}
     {tourActive && <PracticeTour
       step={tourStep}
-       onNext={() => tourStep===2 ? finishTour() : changeTourStep(tourStep+1)}
+      targetOverride={tourStep===1 && addingService ? '[data-testid="my-practice-offer-form"]' : null}
+      instructionOverride={tourStep===1 && addingService ? "Заполните название, формат, стоимость и продолжительность услуги. После добавления услуги сохраните изменения." : null}
+      onNext={() => tourStep===2 ? finishTour() : changeTourStep(tourStep+1)}
       onSkip={() => tourStep===2 ? finishTour() : changeTourStep(tourStep+1)}
       onClose={closeTour}
       ready={tourStepReady(tourStep,{places:catalog.length,offers:countActiveOffers(catalog),events:schedule.length,dirty,scheduleDirty})}
