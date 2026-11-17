@@ -25,6 +25,7 @@ const fixture = {
 };
 const publicCode = `A38-SYN-${runId}`;
 const day = new Date(Date.now() + 8 * 86400000).toISOString().slice(0, 10);
+const weekday = ((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
 const accessCodeA = `A38-SYN-A-${runId}`;
 const accessCodeB = `A38-SYN-B-${runId}`;
 const memberships = [{ organization_id: fixture.organization, status: "active", role: "doctor" }];
@@ -146,8 +147,8 @@ try {
   }, doctorDeps(fixture.expertA));
   assert.equal(service.status, 200); assert.equal(service.body.service?.is_active, true);
   const availability = await invoke(handlePracticeAvailability, {
-    action: "savePracticeAvailability", organization_id: fixture.organization, weekday: 0,
-    exception_date: day, start_time: "09:00", end_time: "18:00", note: "A38 synthetic",
+    action: "savePracticeAvailability", organization_id: fixture.organization, weekday,
+    start_time: "09:00", end_time: "18:00", note: "A38 synthetic",
   }, doctorDeps(fixture.expertA));
   assert.equal(availability.status, 200);
 
