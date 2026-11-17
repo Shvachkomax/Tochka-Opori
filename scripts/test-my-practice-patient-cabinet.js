@@ -101,7 +101,9 @@ const deps = {
   getSupabase: () => supabase,
   resolvePatient: (session, token) => token === "verified"
     ? [support, health, other].find(({ sessionId }) => sessionId === session) : null,
-  authorizeSpecialist: async () => ({ expert: { id: "doctor-h" }, memberships: [{ organization_id: "clinic", status: "active" }] }),
+  // Production membership loader already filters active rows and normalizes
+  // status away. Organization-scoped practice actions must accept this shape.
+  authorizeSpecialist: async () => ({ expert: { id: "doctor-h" }, memberships: [{ organization_id: "clinic" }] }),
 };
 
 async function request(action, owner, body = {}, token = "verified") {

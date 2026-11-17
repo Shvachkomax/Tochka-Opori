@@ -99,4 +99,17 @@ assert.deepEqual(assignedClients, [{
   last_activity_at: "2026-09-30T12:00:00.000Z",
 }]);
 
+const canonicalSupportClients = buildSpecialistClientList({
+  module: "support",
+  assignments: [
+    { id: "owner-a", public_code: null, owner_type: "anonymous_case", owner_id: "owner-a", status: "active", patient_label: "Пациент A" },
+    { id: "owner-b", public_code: null, owner_type: "anonymous_case", owner_id: "owner-b", status: "active", patient_label: "Пациент B" },
+  ],
+  accessRows: [
+    { id: "duplicate-a", public_code: null, owner_type: "anonymous_case", owner_id: "owner-a", status: "active", access_role: "clinician" },
+  ],
+});
+assert.deepEqual(canonicalSupportClients.map((client) => client.display_name), ["Пациент A", "Пациент B"],
+  "canonical Support owners remain distinct while an exact assignment/access pair is deduplicated");
+
 console.log("Specialist membership regression tests passed.");
