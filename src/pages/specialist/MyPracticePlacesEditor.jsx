@@ -5,7 +5,7 @@ import "./MyPracticePlacesEditor.css";
 
 const EMPTY={name:"",address:""};
 export default function MyPracticePlacesEditor({
-  catalog,schedule,storageScope = "public-demo",onChange,onSave,dirty,storageMessage,onServices,
+  catalog,schedule,storageScope = "public-demo",onChange,scheduleDirty,storageMessage,onServices,
 }){
   const [editId,setEditId]=useState(null);
   const [showForm,setShowForm]=useState(false);
@@ -22,8 +22,8 @@ export default function MyPracticePlacesEditor({
       const next=editId
         ?updateDraftPlace(catalog,{placeId:editId,...form})
         :addDraftPlace(catalog,form);
-      onChange(next);
-      setMessage(editId?"Название и адрес места обновлены в справочнике.":"Место добавлено в справочный каталог.");
+      const saved=onChange(next);
+      setMessage(saved ? (editId?"Место работы изменено и сохранено.":"Место работы добавлено и сохранено.") : "Место изменено, но сохранить его не удалось.");
       close();
     }catch(ex){setError(ex.message||"Проверьте название места.");}
   };
@@ -42,9 +42,9 @@ export default function MyPracticePlacesEditor({
         +"Они будут удалены вместе с местом. Продолжить?";
       if(!window.confirm(prompt))return;
       const next=removeDraftPlace(catalog,place.id,{schedule,paidSlots});
-      onChange(next.catalog,next.schedule);
+      const saved=onChange(next.catalog,next.schedule);
       if(editId===place.id)close();
-      setMessage("Место удалено вместе с его услугами и событиями. Для сохранения после перезагрузки нажмите кнопку ниже.");
+      setMessage(saved?"Место удалено вместе с услугами и событиями календаря. Изменения сохранены.":"Место удалено, но сохранить изменения не удалось.");
     }catch(ex){setError(ex.message||"Не удалось удалить место.");}
   };
   return <section data-testid="my-practice-places" className="mp-places" aria-label="Справочник мест работы врача">
@@ -90,9 +90,7 @@ export default function MyPracticePlacesEditor({
     {error&&<p role="alert" className="mp-editor-error">{error}</p>}
     {message&&<p role="status" className="mp-editor-note">{message}</p>}
     <div className="mp-places-footer">
-      <span>{dirty?"Есть несохранённые изменения справочника / расписания":(storageMessage||"Изменения остаются только в браузере")}</span>
-      <button type="button" className="mp-primary" disabled={!dirty} onClick={onSave}
-        data-testid="mp-save-places">Сохранить</button>
+      <span role="status">{storageMessage || "Места работы сохраняются при добавлении или изменении."}{scheduleDirty?" В календаре есть несохранённые изменения — сохраните их в разделе «Мой календарь».":""}</span>
     </div>
     <p className="mp-footnote">Удаление места требует подтверждения и убирает связанные услуги и события календаря. При наличии платных слотов сначала очистите их отдельно. Не вводите настоящие персональные или медицинские сведения.</p>
   </section>;

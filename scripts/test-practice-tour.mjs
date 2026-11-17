@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
 import {TOUR_STEPS,tourStorageKey,tourStepReady} from "../lib/my-practice/onboarding-tour.js";
 assert.deepEqual(TOUR_STEPS.map(s=>s.id),["places","services","calendar"]);
 assert.equal(new Set(TOUR_STEPS.map(s=>s.target)).size,3);
@@ -9,4 +10,10 @@ assert.equal(tourStepReady(1,{offers:0}),false);
 assert.equal(tourStepReady(2,{events:1,scheduleDirty:true}),false);
 assert.equal(tourStepReady(2,{events:1,scheduleDirty:false}),true);
 assert.notEqual(tourStorageKey("expertA"),tourStorageKey("expertB"));
-console.log("A3.6 product tour: PASS (steps, completion gates, scope isolation)");
+const placesEditor=readFileSync(new URL("../src/pages/specialist/MyPracticePlacesEditor.jsx",import.meta.url),"utf8");
+const pilot=readFileSync(new URL("../src/pages/specialist/MyPracticePilot.jsx",import.meta.url),"utf8");
+assert.ok(!placesEditor.includes('data-testid="mp-save-places"'),"no duplicate places save button");
+assert.ok(placesEditor.includes("onChange(next)"),"place form triggers single save");
+assert.ok(pilot.includes("sessionStorage.setItem(catalogKey,JSON.stringify(nextCatalog))"),"place changes persist immediately");
+assert.ok(pilot.includes("return true;"),"persist result exposed to form");
+console.log("A3.6 product tour: PASS (steps, completion gates, scope isolation, single-save places)");

@@ -175,20 +175,26 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
   const [dirty,setDirty] = useState(false);
   const [storageMessage,setStorageMessage] = useState("");
   const changeCatalog = next => { setCatalog(next); setDirty(true); setStorageMessage(""); };
+  // A place form is its own save action; no second confirmation in the overview.
+  // Persist the new snapshot immediately, including dependent schedule removals.
   const changePlaces = (nextCatalog,nextSchedule) => {
-    changeCatalog(nextCatalog);
-    if(nextSchedule){setSchedule(nextSchedule);setScheduleDirty(true);setScheduleMessage("");}
+    setCatalog(nextCatalog);
+    if(nextSchedule) setSchedule(nextSchedule);
     if(clinicFilter!=="all"&&!nextCatalog.some(c=>c.id===clinicFilter))setClinicFilter("all");
     if(calendarClinic!=="all"&&!nextCatalog.some(c=>c.id===calendarClinic))setCalendarClinic("all");
-  };
-  const savePlaces = () => {
-    try{
-      sessionStorage.setItem(catalogKey,JSON.stringify(catalog));
-      sessionStorage.setItem(scheduleKey,JSON.stringify(schedule));
-      setDirty(false);setScheduleDirty(false);
-      setStorageMessage("места работы, услуги и расписание сохранены в этом браузере.");
-      setScheduleMessage("Расписание сохранено вместе со справочником.");
-    }catch{setStorageMessage("Не удалось записать настройки в браузере.");}
+    try {
+      sessionStorage.setItem(catalogKey,JSON.stringify(nextCatalog));
+      if(nextSchedule) sessionStorage.setItem(scheduleKey,JSON.stringify(nextSchedule));
+      setDirty(false);
+      if(nextSchedule) {setScheduleDirty(false);setScheduleMessage("Расписание обновлено.");}
+      setStorageMessage("Место работы сохранено.");
+      return true;
+    } catch {
+      setDirty(true);
+      if(nextSchedule) setScheduleDirty(true);
+      setStorageMessage("Не удалось сохранить место работы. Разрешите хранение данных в браузере и повторите действие.");
+      return false;
+    }
   };
   const saveDraft = () => {
     try { sessionStorage.setItem(catalogKey,JSON.stringify(catalog)); setDirty(false); setStorageMessage("Настройки сохранены в этом браузере."); }
@@ -258,7 +264,7 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
     </div>
     {tab==="overview" && <div role="tabpanel" id="mp-panel-overview" aria-labelledby="mp-tab-overview">
       <MyPracticePlacesEditor catalog={catalog} schedule={schedule} storageScope={storageScope} onChange={changePlaces}
-        onSave={savePlaces} dirty={dirty||scheduleDirty} storageMessage={storageMessage}
+        scheduleDirty={scheduleDirty} storageMessage={storageMessage}
         onServices={switchToClinic}/>
       <div className="mp-next">
         <h4>Как подключить врача</h4>
@@ -314,9 +320,7 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
     </div>}
     {tourActive && <PracticeTour
       step={tourStep}
-      targetOverride={tourStep===0 && catalog.length>0 && (dirty||scheduleDirty) ? '[data-testid="mp-save-places"]' : null}
-      instructionOverride={tourStep===0 && catalog.length>0 && (dirty||scheduleDirty) ? "Место работы добавлено. Нажмите подсвеченную кнопку «Сохранить», чтобы закрепить изменения и перейти дальше." : null}
-      onNext={() => tourStep===2 ? finishTour() : changeTourStep(tourStep+1)}
+       onNext={() => tourStep===2 ? finishTour() : changeTourStep(tourStep+1)}
       onSkip={() => tourStep===2 ? finishTour() : changeTourStep(tourStep+1)}
       onClose={closeTour}
       ready={tourStepReady(tourStep,{places:catalog.length,offers:countActiveOffers(catalog),events:schedule.length,dirty,scheduleDirty})}
