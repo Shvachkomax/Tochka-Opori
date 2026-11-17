@@ -208,6 +208,8 @@ export default async function handler(req, res) {
         return await handleLogout(req, res);
       case "listClients":
         return await handleListClients(req, res);
+      case "revokePatientLink":
+        return await handleRevokePatientLink(req, res);
       case "getMyPracticeWorkspace":
       case "saveMyPracticeWorkspace":
         return await handleMyPracticeWorkspace(req, res, { authorizeSpecialist, getSupabase });
@@ -882,6 +884,63 @@ async function handleListClients(req, res) {
   return res.status(200).json({ ok: true, clients: result });
 }
 
+async function handleRevokePatientLink(req, res) {
+  const authResult = await authorizeSpecialist(req);
+  if (authResult.error) {
+    return res.status(authResult.status).json({ ok: false, error: authResult.error });
+  }
+
+  const { expert, memberships } = authResult;
+  const { client_ref: clientRef, organization_id: orgId = null, module } = req.body || {};
+  if (typeof clientRef !== "string") {
+    return res.status(400).json({ ok: false, error: "Укажите связь с пациентом" });
+  }
+  const ctx = validateSpecialistContext({
+    memberships, organizationId: orgId, module, allowedModules: expert.allowed_modules,
+  });
+  if (!ctx.ok) return res.status(403).json({ ok: false, error: ctx.error });
+
+  const resolved = await resolveAuthorizedSpecialistClient({
+    expert, memberships, clientRef, organizationId: orgId, module,
+  });
+  if (!resolved.ok) {
+    return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
+  }
+
+  const supabase = getSupabase();
+  let ownerType = resolved.ownerType;
+  let ownerId = resolved.ownerId;
+  if (module === "support" && !ownerId && resolved.publicCode) {
+    const { data: session } = await supabase.from("sessions")
+      .select("anonymous_owner_id")
+      .eq("public_code", resolved.publicCode)
+      .eq("module", "support")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    ownerType = "anonymous_case";
+    ownerId = session?.anonymous_owner_id || null;
+  }
+  if (!ownerType || !ownerId) {
+    return res.status(409).json({ ok: false, error: "Не удалось определить профиль пациента" });
+  }
+
+  const { data, error } = await supabase.rpc("revoke_patient_specialist_link", {
+    p_owner_type: ownerType,
+    p_owner_id: ownerId,
+    p_public_code: resolved.publicCode || null,
+    p_module: module,
+    p_expert_id: expert.id,
+    p_organization_id: orgId,
+  });
+  if (error) {
+    console.error("[specialist:revokePatientLink] RPC error:", error.code);
+    return res.status(503).json({ ok: false, error: "Не удалось отозвать доступ" });
+  }
+  if (!data?.ok) return res.status(400).json({ ok: false, error: data?.error || "Не удалось отозвать доступ" });
+  return res.status(200).json({ ok: true, revoked: Number(data.revoked || 0) });
+}
+
 // ── CLIENT REF RESOLUTION ─────────────────────────────────
 
 async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRef, organizationId, module }) {
@@ -928,6 +987,8 @@ async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRe
       ownerId = assignment.owner_id;
     } else {
       publicCode = assignment.public_code;
+      ownerType = assignment.owner_type || "anonymous_case";
+      ownerId = assignment.owner_id;
     }
     relationship = "primary";
     accessRole = "owner";
@@ -966,6 +1027,8 @@ async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRe
       ownerId = accessRow.owner_id;
     } else {
       publicCode = accessRow.public_code;
+      ownerType = accessRow.owner_type || "anonymous_case";
+      ownerId = accessRow.owner_id;
     }
     relationship = "shared";
     accessRole = accessRow.access_role;
@@ -1916,6 +1979,7 @@ function invitationAcceptStatus(code) {
     OWNER_MISMATCH: 403,
     EXPERT_UNAVAILABLE: 400,
     NO_MODULE_ENTITLEMENT: 400,
+    ORGANIZATION_MISMATCH: 403,
     ASSIGNMENT_CONFLICT: 409,
   }[code] || 400;
 }

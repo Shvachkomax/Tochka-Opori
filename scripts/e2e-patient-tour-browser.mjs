@@ -42,12 +42,16 @@ async function assertNoControlOverlap(page, target) {
   const result = await page.evaluate((selector) => {
     const dialog = document.querySelector('[data-testid^="patient-tour-dialog-"]')?.getBoundingClientRect();
     const controls = [...document.querySelectorAll(`${selector} button,${selector} input,${selector} select,${selector} textarea`)]
-      .map((element) => element.getBoundingClientRect())
-      .filter((rect) => rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight);
+      .map((element) => ({ label: element.textContent?.trim() || element.getAttribute("aria-label") || element.tagName, rect: element.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight);
     if (!dialog) return { ok: false, reason: "dialog missing" };
-    const overlapping = controls.filter((rect) => Math.min(dialog.right, rect.right) > Math.max(dialog.left, rect.left)
+    const overlapping = controls.filter(({ rect }) => Math.min(dialog.right, rect.right) > Math.max(dialog.left, rect.left)
       && Math.min(dialog.bottom, rect.bottom) > Math.max(dialog.top, rect.top));
-    return { ok: overlapping.length === 0, dialog: { top: dialog.top, bottom: dialog.bottom }, overlaps: overlapping.length };
+    return {
+      ok: overlapping.length === 0,
+      dialog: { left: dialog.left, right: dialog.right, top: dialog.top, bottom: dialog.bottom },
+      overlaps: overlapping.map(({ label, rect }) => ({ label, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom })),
+    };
   }, target);
   assert.equal(result.ok, true, `tour dialog overlaps controls for ${target}: ${JSON.stringify(result)}`);
 }

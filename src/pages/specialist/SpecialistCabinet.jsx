@@ -6,7 +6,6 @@ import { buildSpecialistContextKey, isCurrentSpecialistContext } from "./special
 import { APP_BRAND } from "../../lib/appBrand.js";
 import PartnerProgram from "./PartnerProgram.jsx";
 import ClinicalTimelinePanel from "./ClinicalTimelinePanel.jsx";
-import MyPracticePilot from "./MyPracticePilot.jsx";
 import PracticeBookingPanel from "./PracticeBookingPanel.jsx";
 
 // ── Styles ────────────────────────────────────────────────
@@ -94,7 +93,6 @@ export default function SpecialistCabinet() {
   const [loginCode, setLoginCode] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [toast, setToast] = useState({ message: "", type: "" });
-  const [serverBookings, setServerBookings] = useState(null);
 
   // Working context (NOT secrets — sessionStorage is fine)
   const [orgId, setOrgId] = useState(() => {
@@ -174,7 +172,6 @@ export default function SpecialistCabinet() {
     setServiceRequestUpdating(null);
     setServiceRequestPendingAction(null);
     setServiceRequestFeedback({});
-    setServerBookings(null);
     setServiceRequestsFilter("all");
     setClients([]);
     setClientsLoading(false);
@@ -644,6 +641,29 @@ export default function SpecialistCabinet() {
     }
   }
 
+  async function revokePatientLink(client) {
+    if (!window.confirm(`Отозвать доступ к профилю «${client.display_name}»? Связь исчезнет у пациента и специалиста.`)) return;
+    try {
+      const res = await fetch("/api/specialist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          action: "revokePatientLink",
+          client_ref: client.client_ref,
+          organization_id: orgId,
+          module,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Не удалось отозвать доступ");
+      setClients((current) => current.filter((item) => item.client_ref !== client.client_ref));
+      showToast("Доступ пациента отозван в обоих кабинетах");
+    } catch (error) {
+      showToast(error.message || "Ошибка сети", "error");
+    }
+  }
+
   useEffect(() => {
     if (auth) loadInvitations();
   }, [auth]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -828,14 +848,15 @@ export default function SpecialistCabinet() {
           </div>
         </div>
 
-        {/* Только синтетический пилот; Preview-флаг по умолчанию выключен. */}
+        {/* Авторизованный кабинет использует только серверный каталог Test Supabase. */}
         {import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && !selectedClient && (
-          <>
-            <MyPracticePilot doctor={expert} key={`${expert.id}:${orgId || "private"}`} storageScope={`${expert.id}:${orgId || "private"}`} serverBookings={serverBookings} />
-            <div style={{ marginTop: 20 }}>
-              <PracticeBookingPanel organizationId={orgId} onBookingsChange={setServerBookings} />
-            </div>
-          </>
+          <div style={{ marginBottom: 20 }}>
+            <PracticeBookingPanel
+              key={`${expert.id}:${orgId || "private"}`}
+              organizationId={orgId}
+              storageScope={`${expert.id}:${orgId || "private"}`}
+            />
+          </div>
         )}
 
         {/* Context selection */}
@@ -1077,6 +1098,10 @@ export default function SpecialistCabinet() {
                         <span> · Последняя активность: {new Date(c.last_activity_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}</span>
                       )}
                     </div>
+                    <button type="button" style={{ ...S.actionBtn, marginTop: 8, color: "#B85C4A" }}
+                      onClick={(event) => { event.stopPropagation(); revokePatientLink(c); }}>
+                      Отозвать доступ
+                    </button>
                   </div>
                 ))}
               </div>

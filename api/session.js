@@ -4287,6 +4287,7 @@ async function executeInvitationAccept({ supabase, tokenHash, owner }) {
       FORBIDDEN: 403,
       EXPERT_UNAVAILABLE: 400,
       NO_MODULE_ENTITLEMENT: 400,
+      ORGANIZATION_MISMATCH: 403,
       ASSIGNMENT_CONFLICT: 409,
       OWNER_MISMATCH: 403,
     };

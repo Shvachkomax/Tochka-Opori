@@ -389,6 +389,17 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
                       onClick={() => setSelected(selected === key ? "" : key)}>
                       {selected === key ? "Скрыть услуги" : "Услуги и запись"}
                     </button>
+                    <button type="button" className="practice-patient-secondary" disabled={busy}
+                      onClick={() => {
+                        if (!window.confirm(`Открепить специалиста «${specialist.name}»? Доступ к данным будет отозван в обоих кабинетах.`)) return;
+                        setSelected("");
+                        perform(() => request("revokePracticeSpecialist", {
+                          expert_id: specialist.expert_id,
+                          organization_id: specialist.organization_id || null,
+                        }), "Связь со специалистом отозвана в обоих кабинетах.");
+                      }}>
+                      Открепить специалиста
+                    </button>
                     {selected === key && (specialist.services.length ? (
                       <NewBookingForm
                         key={specialist.services.map(({ service_id }) => service_id).join(",")}

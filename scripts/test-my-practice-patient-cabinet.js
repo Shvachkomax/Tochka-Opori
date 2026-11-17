@@ -17,7 +17,7 @@ const other = { ...support, ownerId: "other", sessionId: "other-session" };
 const startsAt = "2099-01-19T10:00:00.000Z";
 const booking = {
   id: "booking", owner_id: health.ownerId, owner_type: health.ownerType,
-  session_id: health.sessionId, status: "confirmed", starts_at: startsAt, expert_id: "doctor-h",
+  session_id: health.sessionId, status: "confirmed", starts_at: startsAt, expert_id: "doctor-h", organization_id: "clinic",
 };
 const tables = {
   practice_patient_profile_links: [],
@@ -77,6 +77,19 @@ const supabase = {
   from,
   async rpc(action, input) {
     if (action === "ensure_usage_wallet") return { data: { balance: 20000, status: "active" } };
+    if (action === "revoke_patient_specialist_link") {
+      let revoked = 0;
+      for (const table of ["patient_assignments", "patient_access"]) {
+        for (const row of tables[table]) {
+          const expertId = row.primary_expert_id || row.expert_id;
+          if (row.status === "active" && expertId === input.p_expert_id && row.module === input.p_module
+            && row.organization_id === input.p_organization_id && row.owner_id === input.p_owner_id) {
+            row.status = "revoked"; revoked++;
+          }
+        }
+      }
+      return { data: { ok: true, revoked } };
+    }
     assert.equal(action, "cancel_practice_booking_with_credits");
     assert.equal(input.p_booking_id, booking.id);
     booking.status = "cancelled";
@@ -88,7 +101,7 @@ const deps = {
   getSupabase: () => supabase,
   resolvePatient: (session, token) => token === "verified"
     ? [support, health, other].find(({ sessionId }) => sessionId === session) : null,
-  authorizeSpecialist: async () => ({ expert: { id: "doctor-h" }, memberships: [] }),
+  authorizeSpecialist: async () => ({ expert: { id: "doctor-h" }, memberships: [{ organization_id: "clinic", status: "active" }] }),
 };
 
 async function request(action, owner, body = {}, token = "verified") {
@@ -118,11 +131,11 @@ for (const owner of [support, health]) {
   assert.equal(result.data.bookings[0].id, booking.id);
 }
 
-assert.equal((await request("listPracticeBookings", health)).data.bookings[0].status, "confirmed");
+assert.equal((await request("listPracticeBookings", health, { organization_id: "clinic" })).data.bookings[0].status, "confirmed");
 assert.equal((await request("cancelPracticeBookingPublic", other, { booking_id: booking.id })).code, 403);
 assert.equal((await request("getPracticePatientCabinet", other)).data.bookings.length, 0);
 assert.equal((await request("cancelPracticeBookingPublic", support, { booking_id: booking.id })).data.status, "cancelled");
-assert.equal((await request("listPracticeBookings", health)).data.bookings[0].status, "cancelled");
+assert.equal((await request("listPracticeBookings", health, { organization_id: "clinic" })).data.bookings[0].status, "cancelled");
 
 process.env.PILOT_ID = "partner";
 assert.deepEqual((await request("getPracticePatientCabinet", support)).data.bookings, []);
@@ -132,6 +145,10 @@ delete process.env.PILOT_ID;
 assert.equal((await request("unlinkPracticePatientProfiles", support)).code, 200);
 assert.deepEqual((await request("getPracticePatientCabinet", support)).data.bookings, []);
 assert.equal((await request("getPracticePatientCabinet", health)).data.bookings[0].id, booking.id);
+const revoked = await request("revokePracticeSpecialist", health, { expert_id: "doctor-h", organization_id: "clinic" });
+assert.equal(revoked.code, 200);
+assert.equal(revoked.data.revoked, 1);
+assert.deepEqual((await request("getPracticePatientCabinet", health)).data.specialists, []);
 // Financial actions must validate acceptance, then use the credit RPC.
 assert.equal((await request("reservePracticeBooking", health, { service_id: "correct", day: "2099-01-19", start_time: "10:00", idempotency_key: "key" })).code, 400);
 const oldRpc = supabase.rpc;

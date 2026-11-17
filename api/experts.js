@@ -1031,11 +1031,15 @@ async function handleAssignPatientToExpert(req, res) {
   }
 
   // Check if there's already a patient_assignment for this code + module
-  const { data: existingAssignment } = await supabase
+  let existingAssignmentQuery = supabase
     .from("patient_assignments")
     .select("id, primary_expert_id, organization_id, status")
     .eq("public_code", normalizedCode)
-    .eq("module", module)
+    .eq("module", module);
+  existingAssignmentQuery = orgId === null
+    ? existingAssignmentQuery.is("organization_id", null)
+    : existingAssignmentQuery.eq("organization_id", orgId);
+  const { data: existingAssignment } = await existingAssignmentQuery
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -1083,30 +1087,20 @@ async function handleAssignPatientToExpert(req, res) {
     }
   }
 
-  // Ensure patient_access exists for the target expert
-  const { data: existingAccess } = await supabase
+  // patient_assignments is the primary relationship. patient_access is reserved
+  // for additional specialists, so an old exact compatibility row must not make
+  // the same attachment appear twice.
+  let duplicateAccess = supabase
     .from("patient_access")
-    .select("id")
+    .update({ status: "revoked" })
     .eq("public_code", normalizedCode)
-    .eq("organization_id", orgId)
     .eq("expert_id", targetExpertId)
     .eq("module", module)
-    .maybeSingle();
-
-  if (!existingAccess) {
-    await supabase
-      .from("patient_access")
-      .insert({
-        public_code: normalizedCode,
-        organization_id: orgId,
-        expert_id: targetExpertId,
-        access_role: "owner",
-        granted_by_expert_id: assignerExpertId,
-        granted_by_expert_name: assignerName,
-        module,
-      })
-      .then(() => {});
-  }
+    .eq("status", "active");
+  duplicateAccess = orgId === null
+    ? duplicateAccess.is("organization_id", null)
+    : duplicateAccess.eq("organization_id", orgId);
+  await duplicateAccess.then(() => {});
 
   // Update existing sessions/reviews with org and expert
   await supabase

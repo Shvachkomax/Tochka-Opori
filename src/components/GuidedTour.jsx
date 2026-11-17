@@ -46,21 +46,47 @@ export default function GuidedTour({
       const gutter = 16;
       const rightX = panel.right + gutter;
       const leftX = panel.left - width - gutter;
-      const side = rightX + width + 12 <= window.innerWidth ? "right" : leftX >= 12 ? "left" : "top";
-      const interactiveRects = [...el.querySelectorAll("button,input,select,textarea,[role=button]")]
+      const interactiveRects = [...document.querySelectorAll("button,input,select,textarea,[role=button]")]
+        .filter((control) => !dialogRef.current?.contains(control))
         .map((control) => control.getBoundingClientRect())
         .filter((rect) => rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight);
-      const overlapArea = (candidateTop) => interactiveRects.reduce((total, rect) => {
-        const overlapWidth = Math.max(0, Math.min(window.innerWidth - 12, rect.right) - Math.max(window.innerWidth - width - 12, rect.left));
+      const overlapArea = (candidateLeft, candidateTop) => interactiveRects.reduce((total, rect) => {
+        const overlapWidth = Math.max(0, Math.min(candidateLeft + width, rect.right) - Math.max(candidateLeft, rect.left));
         const overlapHeight = Math.max(0, Math.min(candidateTop + height, rect.bottom) - Math.max(candidateTop, rect.top));
         return total + overlapWidth * overlapHeight;
       }, 0);
       const topCandidate = 12;
       const bottomCandidate = Math.max(12, window.innerHeight - height - 12);
-      const verticalTop = overlapArea(bottomCandidate) < overlapArea(topCandidate) ? bottomCandidate : topCandidate;
-      const popStyle = side === "right" || side === "left"
-        ? { top: Math.min(Math.max(12, r.top), Math.max(12, window.innerHeight - height - 12)), left: side === "right" ? rightX : leftX, bottom: "auto" }
-        : { top: verticalTop, left: Math.max(12, window.innerWidth - width - 12), bottom: "auto" };
+      const clampTop = (value) => Math.min(Math.max(12, value), bottomCandidate);
+      const sampledTops = [];
+      for (let candidate = topCandidate; candidate <= bottomCandidate; candidate += 64) sampledTops.push(candidate);
+      const controlEdgeCandidates = interactiveRects.flatMap((rect) => [
+        clampTop(rect.top - height - gutter),
+        clampTop(rect.bottom + gutter),
+      ]);
+      const verticalCandidates = [...new Set([
+        clampTop(r.top),
+        clampTop(r.bottom - height),
+        topCandidate,
+        ...controlEdgeCandidates,
+        ...sampledTops,
+        bottomCandidate,
+      ])];
+      const sideOptions = [
+        ...(rightX + width + 12 <= window.innerWidth ? [{ side: "right", left: rightX }] : []),
+        ...(leftX >= 12 ? [{ side: "left", left: leftX }] : []),
+        { side: "top", left: Math.max(12, window.innerWidth - width - 12) },
+      ];
+      const placements = sideOptions.map((option) => {
+        const top = verticalCandidates.reduce((best, candidate) =>
+          overlapArea(option.left, candidate) < overlapArea(option.left, best) ? candidate : best,
+        verticalCandidates[0]);
+        return { ...option, top, overlap: overlapArea(option.left, top) };
+      });
+      const placement = placements.reduce((best, candidate) => candidate.overlap < best.overlap ? candidate : best, placements[0]);
+      const side = placement.side;
+      const candidateLeft = side === "right" ? rightX : side === "left" ? leftX : placement.left;
+      const popStyle = { top: placement.top, left: candidateLeft, bottom: "auto", boxSizing: "border-box" };
       setPosition({
         highlight: {
           top: Math.max(0, r.top - 7),
@@ -73,7 +99,9 @@ export default function GuidedTour({
       });
     };
     const el = document.querySelector(target);
-    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // An immediate scroll keeps measurement deterministic: smooth scrolling can
+    // move the target underneath an already positioned popover between frames.
+    el?.scrollIntoView({ behavior: "auto", block: "center" });
     const update = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(measure);
@@ -83,6 +111,8 @@ export default function GuidedTour({
     window.addEventListener("scroll", update, true);
     const observer = typeof MutationObserver === "undefined" ? null : new MutationObserver(update);
     if (observer && document.body) observer.observe(document.body, { childList: true, subtree: true });
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    if (resizeObserver && dialogRef.current) resizeObserver.observe(dialogRef.current);
     const timeout = setTimeout(update, 400);
     const onKey = (event) => {
       if (event.key === "Escape") onClose();
@@ -94,6 +124,7 @@ export default function GuidedTour({
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
       observer?.disconnect();
+      resizeObserver?.disconnect();
       document.removeEventListener("keydown", onKey);
     };
   }, [containerSelector, item, onClose, step, target]);

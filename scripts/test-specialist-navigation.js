@@ -18,5 +18,6 @@ assert(demo.includes("<SpecialistPageNavigation />"));
 assert(library.includes("<SpecialistPageNavigation />"));
 assert(main.includes("? <MyPracticePilot standalone />"));
 assert(practice.includes("standalone && <SpecialistPageNavigation />"));
-assert(cabinet.includes("<MyPracticePilot doctor={expert} key="));
-console.log("Specialist navigation: PASS (back, cabinet, library, practice demo)");
+assert(cabinet.includes("<PracticeBookingPanel"));
+assert(!cabinet.includes("<MyPracticePilot doctor={expert}"));
+console.log("Specialist navigation: PASS (back, cabinet, library, standalone practice demo, server practice cabinet)");
