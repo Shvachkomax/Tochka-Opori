@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PracticeTour from "./PracticeTour.jsx";
-import { tourStorageKey, tourStepReady } from "../../../lib/my-practice/onboarding-tour.js";
+import { tourStorageKey, tourStepReady, tourInviteDismissKey, shouldInviteToPracticeTour, TOUR_INVITE_DELAY_MS, TOUR_INVITE_PULSE_MS } from "../../../lib/my-practice/onboarding-tour.js";
 import {
   DEMO_DOCTOR, DEMO_CLINICS,
   filterOffers, canPublishBookingLink, rubles,
@@ -140,12 +140,13 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
   const scheduleKey = SCHEDULE_DRAFT_STORAGE_KEY + ":" + storageScope;
   const [tab,setTab] = useState("overview");
   const tourKey = tourStorageKey(storageScope);
+  const tourInviteKey = tourInviteDismissKey(storageScope);
   const [tourActive,setTourActive] = useState(false);
   const [tourStep,setTourStep] = useState(() => {
     try { const n = Number(localStorage.getItem(tourKey)); return Number.isInteger(n) && n >= 0 && n < 3 ? n : 0; }
     catch { return 0; }
   });
-  const openTour = () => { setTourStep(0); setTab("overview"); setTourActive(true); };
+  const openTour = () => { dismissTourInvite(); setTourStep(0); setTab("overview"); setTourActive(true); };
   const changeTourStep = next => {
     setTourStep(next);
     setTab(["overview","services","calendar"][next]);
@@ -161,6 +162,26 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
     try {const saved=sessionStorage.getItem(scheduleKey);return saved?restoreScheduleDraft(saved,catalog):initialSchedule(catalog);}
     catch {return initialSchedule(catalog);}
   });
+  const [inviteDismissed,setInviteDismissed] = useState(() => {
+    try {return localStorage.getItem(tourInviteKey)==="dismissed";} catch {return false;}
+  });
+  const [invitePulse,setInvitePulse] = useState(false);
+  const [inviteTip,setInviteTip] = useState(false);
+  const inviteEligible=shouldInviteToPracticeTour({dismissed:inviteDismissed,places:catalog.length,
+    offers:countActiveOffers(catalog),events:schedule.length,standalone});
+  const dismissTourInvite=()=>{
+    setInviteDismissed(true);
+    setInvitePulse(false);
+    setInviteTip(false);
+    try {localStorage.setItem(tourInviteKey,"dismissed");}catch{}
+  };
+  useEffect(()=>{
+    if(!inviteEligible || tourActive){setInvitePulse(false);setInviteTip(false);return;}
+    setInvitePulse(true);
+    const tipTimer=setTimeout(()=>setInviteTip(true),TOUR_INVITE_DELAY_MS);
+    const pulseTimer=setTimeout(()=>setInvitePulse(false),TOUR_INVITE_PULSE_MS);
+    return ()=>{clearTimeout(tipTimer);clearTimeout(pulseTimer);};
+  },[inviteEligible,tourActive,tourInviteKey]);
   const [scheduleDirty,setScheduleDirty] = useState(false);
   const [scheduleMessage,setScheduleMessage] = useState("");
   const changeSchedule = next => {setSchedule(next);setScheduleDirty(true);setScheduleMessage("");};
@@ -239,9 +260,17 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
       </div>
     </header>
     <div className="mp-tour-launch">
-      <button type="button" className="mp-secondary" onClick={openTour} data-testid="mp-start-tour">
-        ▶ Обучение по кабинету
-      </button>
+      <div className="mp-tour-invite-wrap">
+        <button type="button" className={`mp-tour-entry ${inviteEligible?"mp-tour-entry-highlight":""} ${inviteEligible&&invitePulse?"mp-tour-entry-pulse":""}`}
+          onClick={openTour} data-testid="mp-start-tour">
+          <span aria-hidden="true">▶</span> Обучение по кабинету
+        </button>
+        {inviteEligible && <span className="mp-tour-invite-label" data-testid="mp-tour-invite-label">Начните здесь</span>}
+        {inviteEligible && inviteTip && !tourActive && <div className="mp-tour-invite-tip" role="status" data-testid="mp-tour-invite-tip">
+          <span>Поможем быстро настроить места работы, услуги и расписание.</span>
+          <button type="button" onClick={dismissTourInvite} aria-label="Скрыть приглашение к обучению">×</button>
+        </div>}
+      </div>
       <span>Три шага: место работы, услуга, расписание. Можно прервать в любой момент.</span>
     </div>
     <div className="mp-doctor">

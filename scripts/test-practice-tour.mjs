@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {TOUR_STEPS,tourStorageKey,tourStepReady} from "../lib/my-practice/onboarding-tour.js";
+import {TOUR_STEPS,tourStorageKey,tourStepReady,shouldInviteToPracticeTour,tourInviteDismissKey,TOUR_INVITE_DELAY_MS,TOUR_INVITE_PULSE_MS} from "../lib/my-practice/onboarding-tour.js";
 assert.deepEqual(TOUR_STEPS.map(s=>s.id),["places","services","calendar"]);
 assert.equal(new Set(TOUR_STEPS.map(s=>s.target)).size,3);
 assert.equal(tourStepReady(0,{places:1,dirty:true}),false);
@@ -22,4 +22,18 @@ assert.ok(tourSource.includes('panel.right+gutter'),"tour docks to right outside
 assert.ok(tourSource.includes('panel.left-width-gutter'),"tour can dock to left outside cabinet");
 assert.ok(tourSource.includes('side==="right"'),"tour chooses available gutter");
 
-console.log("A3.6 product tour: PASS (steps, completion gates, scope isolation, single-save places)");
+
+assert.equal(shouldInviteToPracticeTour(),true);
+assert.equal(shouldInviteToPracticeTour({dismissed:true}),false);
+assert.equal(shouldInviteToPracticeTour({places:1}),false);
+assert.equal(shouldInviteToPracticeTour({offers:1}),false);
+assert.equal(shouldInviteToPracticeTour({events:1}),false);
+assert.equal(shouldInviteToPracticeTour({standalone:true}),false);
+assert.notEqual(tourInviteDismissKey("doctorA"),tourInviteDismissKey("doctorB"));
+assert.equal(TOUR_INVITE_DELAY_MS,1600);
+assert.equal(TOUR_INVITE_PULSE_MS,10000);
+assert.ok(pilot.includes('localStorage.setItem(tourInviteKey,"dismissed")'),"invitation dismissed persistently");
+assert.ok(pilot.includes("onClick={openTour}"),"invitation remains an opt-in, not auto-start");
+const tourCss=readFileSync(new URL("../src/pages/specialist/PracticeTour.css",import.meta.url),"utf8");
+assert.ok(tourCss.includes("prefers-reduced-motion:reduce"),"reduced motion disables pulse");
+console.log("A3.6 product tour: PASS (steps, completion, single save, smart invitation, reduced motion)");
