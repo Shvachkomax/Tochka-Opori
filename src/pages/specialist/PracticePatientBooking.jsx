@@ -95,7 +95,7 @@ function NewBookingForm({ services, request, onSaved, balance, walletActive, onT
   }
 
   return (
-    <form className="practice-patient-fields" onSubmit={reserve} data-testid="a2-patient-booking">
+    <form className="practice-patient-fields" onSubmit={reserve} data-testid="a2-patient-booking" data-tour-target="patient-booking-form">
       <label>Услуга и место приёма
         <select data-testid="a2-patient-service" value={serviceId} disabled={busy}
           onChange={(event) => { resetSlot(); setServiceId(event.target.value); }}>
@@ -253,8 +253,38 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
     }), "Профили связаны. Специалисты и записи теперь видны в обоих разделах.");
   }
 
-  if (unavailable || (!cabinet && !error)) return null;
   const bookings = cabinet?.bookings || [];
+  const specialists = cabinet?.specialists || [];
+  const serviceCount = specialists.reduce((total, specialist) => total + (specialist.services?.length || 0), 0);
+  const tourState = {
+    "data-tour-unavailable": unavailable ? "true" : "false",
+    "data-tour-specialist-count": cabinet ? specialists.length : undefined,
+    "data-tour-service-count": cabinet ? serviceCount : undefined,
+  };
+
+  if (!cabinet) {
+    return (
+      <section className="practice-patient" data-testid="a2-patient-panel" data-tour-target="patient-specialist" {...tourState}>
+        <h3>Мои специалисты и запись</h3>
+        <div data-tour-target="patient-booking" {...tourState}>
+          {unavailable ? (
+            <p role="status">Серверный раздел записи временно недоступен. Это не означает, что прикреплённый специалист отсутствует.</p>
+          ) : error ? (
+            <p role="alert">{error}</p>
+          ) : (
+            <p role="status" aria-live="polite">Загружаем прикреплённых специалистов и доступные услуги…</p>
+          )}
+          {(unavailable || error) && (
+            <button type="button" className="practice-patient-secondary" onClick={() => {
+              setUnavailable(false);
+              setError("");
+              refresh();
+            }}>Повторить загрузку</button>
+          )}
+        </div>
+      </section>
+    );
+  }
   const upcoming = bookings.filter((booking) => isActive(booking.status)
     && Date.parse(booking.starts_at) > Date.now()
     && (booking.status !== "held" || Date.parse(booking.expires_at) > Date.now()));
@@ -291,7 +321,7 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
   }
 
   return (
-    <section className="practice-patient" data-testid="a2-patient-panel">
+    <section className="practice-patient" data-testid="a2-patient-panel" data-tour-target="patient-specialist" {...tourState}>
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
       {topUp !== null && (
@@ -340,37 +370,44 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
           <p><strong>Доступно {creditLabel(cabinet.available_credits)}</strong> · {(cabinet.available_credits / 10).toLocaleString("ru-RU")} ₽</p>
           <p>10 кредитов = 1 ₽. Кошелёк {module === "body" ? "Health" : "Support"}.</p>
           <button type="button" className="practice-patient-secondary" onClick={() => setTopUp(0)}>Пополнить баланс</button>
-          <h3>Мои специалисты</h3>
-          {cabinet.specialists.length === 0 && <p>У вас пока нет прикреплённых специалистов.</p>}
-          <ul className="practice-patient-list">
-            {cabinet.specialists.map((specialist) => {
-              const key = `${specialist.expert_id}:${specialist.organization_id || ""}`;
-              return (
-                <li key={key} className="practice-patient-card">
-                  <strong>{specialist.name}</strong>
-                  <span>{[specialist.specialty, specialist.organization_name].filter(Boolean).join(" · ")}</span>
-                  <button type="button" className="practice-patient-secondary" aria-expanded={selected === key}
-                    onClick={() => setSelected(selected === key ? "" : key)}>
-                    {selected === key ? "Скрыть услуги" : "Услуги и запись"}
-                  </button>
-                  {selected === key && (specialist.services.length ? (
-                    <NewBookingForm
-                      key={specialist.services.map(({ service_id }) => service_id).join(",")}
-                      services={specialist.services} request={request}
-                      balance={cabinet.available_credits} walletActive={cabinet.wallet_status === "active"} onRefresh={refresh}
-                      onTopUp={(amount) => { setTopUp(amount || 0); refresh(); }}
-                      onSaved={() => { setNotice("Запись оплачена кредитами и подтверждена."); return refresh(); }}
-                    />
-                  ) : <p>У этого специалиста пока нет услуг для записи.</p>)}
-                </li>
-              );
-            })}
-          </ul>
+          <div data-tour-target="patient-booking" {...tourState}>
+            <h3>Мои специалисты</h3>
+            {specialists.length === 0 && (
+              <p>У вас пока нет прикреплённых специалистов для серверной записи. В Support можно пригласить своего специалиста или запросить подбор. Если связь уже есть в другом профиле, свяжите профили ниже.</p>
+            )}
+            {specialists.length > 0 && serviceCount === 0 && (
+              <p role="status">Специалист прикреплён, но активных серверных услуг для записи пока нет. Связь со специалистом сохранена.</p>
+            )}
+            <ul className="practice-patient-list">
+              {specialists.map((specialist) => {
+                const key = `${specialist.expert_id}:${specialist.organization_id || ""}`;
+                return (
+                  <li key={key} className="practice-patient-card">
+                    <strong>{specialist.name}</strong>
+                    <span>{[specialist.specialty, specialist.organization_name].filter(Boolean).join(" · ")}</span>
+                    <button type="button" className="practice-patient-secondary" aria-expanded={selected === key}
+                      onClick={() => setSelected(selected === key ? "" : key)}>
+                      {selected === key ? "Скрыть услуги" : "Услуги и запись"}
+                    </button>
+                    {selected === key && (specialist.services.length ? (
+                      <NewBookingForm
+                        key={specialist.services.map(({ service_id }) => service_id).join(",")}
+                        services={specialist.services} request={request}
+                        balance={cabinet.available_credits} walletActive={cabinet.wallet_status === "active"} onRefresh={refresh}
+                        onTopUp={(amount) => { setTopUp(amount || 0); refresh(); }}
+                        onSaved={() => { setNotice("Запись оплачена кредитами и подтверждена."); return refresh(); }}
+                      />
+                    ) : <p>У этого специалиста пока нет активных серверных услуг для записи.</p>)}
+                  </li>
+                );
+              })}
+            </ul>
 
-          <h3>Мои записи</h3>
-          {!bookings.length && <p>Здесь появятся ваши записи на приём.</p>}
-          <AppointmentList title="Ближайшие" bookings={[...upcoming].reverse()} busy={busy} onAction={onAction} />
-          <AppointmentList title="История" bookings={history} busy={busy} onAction={onAction} />
+            <h3>Мои записи</h3>
+            {!bookings.length && <p>Здесь появятся ваши записи на приём.</p>}
+            <AppointmentList title="Ближайшие" bookings={[...upcoming].reverse()} busy={busy} onAction={onAction} />
+            <AppointmentList title="История" bookings={history} busy={busy} onAction={onAction} />
+          </div>
 
           {cabinet.linking_available && (
             <details>

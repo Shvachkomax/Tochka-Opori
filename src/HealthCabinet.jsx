@@ -2,6 +2,7 @@ import HealthLiveConversation from "./HealthLiveConversation.jsx";
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createVoiceRecording, isUsableVoiceBlob } from "./lib/voiceRecording.js";
 import { getClientToken } from "./lib/clientToken.js";
+import PatientCabinetTour from "./components/PatientCabinetTour.jsx";
 
 function getLocalDateString() {
   const d = new Date();
@@ -656,7 +657,7 @@ export default function HealthCabinet({
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <div style={{ width: "100%" }}>
+    <div style={{ width: "100%" }} data-tour-container>
       {import.meta.env.VITE_HEALTH_LIVE_ENABLED === 'true' && <div className="health-talk-entry">
         <div><strong>Живое общение · тест</strong><p>Расскажите о вашем дне, питании и самочувствии. До 3 минут.</p></div>
         <button disabled={chatLoading || recording || transcribing} onClick={() => setLiveOpen(true)}>Живое общение</button>
@@ -665,7 +666,7 @@ export default function HealthCabinet({
 
 
       {/* Compact Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", marginBottom: 16, borderBottom: "1px solid #e8e2d8" }}>
+      <div data-tour-target="patient-overview" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", marginBottom: 16, borderBottom: "1px solid #e8e2d8" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: "#7D9A89", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 700 }}>О</div>
           <div>
@@ -691,8 +692,10 @@ export default function HealthCabinet({
         </div>
       </div>
 
+      <PatientCabinetTour profile="health" scope={sessionId} />
+
       {/* Today CTA */}
-      <div style={{ marginBottom: 20 }}>
+      <div data-tour-target="patient-diary" style={{ marginBottom: 20 }}>
         <button onClick={onNewDiary} style={{ width: "100%", padding: "14px 22px", borderRadius: 14, border: 0, background: "#7D9A89", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
           {todayLog ? "Изменить запись сегодня" : "Заполнить дневник"}
         </button>
@@ -819,7 +822,7 @@ export default function HealthCabinet({
       )}
 
       {/* AI Companion — always visible */}
-      <div style={{ marginBottom: 24, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", borderRadius: 16, padding: 20 }}>
+      <div data-tour-target="patient-ai" style={{ marginBottom: 24, background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)", borderRadius: 16, padding: 20 }}>
         <div style={{ fontSize: 17, fontWeight: 700, color: "#2f2925", marginBottom: 4 }}>Спросить AI-компаньона</div>
         <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 12 }}>
           Можно задать вопрос о питании, активности, сне, дневнике или самочувствии.
@@ -1245,7 +1248,7 @@ export default function HealthCabinet({
       )}
 
       {/* Health Context */}
-      <div style={{ marginBottom: 24, padding: 16, borderRadius: 12, border: "1px solid #e8e2d8", background: "#faf6ef" }}>
+      <div data-tour-target="patient-health" style={{ marginBottom: 24, padding: 16, borderRadius: 12, border: "1px solid #e8e2d8", background: "#faf6ef" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: "#2f2925" }}>Здоровье, анализы и препараты</div>
         </div>

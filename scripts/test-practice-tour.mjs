@@ -18,9 +18,11 @@ assert.ok(pilot.includes("sessionStorage.setItem(catalogKey,JSON.stringify(nextC
 assert.ok(pilot.includes("return true;"),"persist result exposed to form");
 assert.ok(pilot.includes('my-practice-offer-form'),"tour follows the opened service form");
 const tourSource=readFileSync(new URL("../src/pages/specialist/PracticeTour.jsx",import.meta.url),"utf8");
-assert.ok(tourSource.includes('panel.right+gutter'),"tour docks to right outside cabinet");
-assert.ok(tourSource.includes('panel.left-width-gutter'),"tour can dock to left outside cabinet");
-assert.ok(tourSource.includes('side==="right"'),"tour chooses available gutter");
+const sharedTourSource=readFileSync(new URL("../src/components/GuidedTour.jsx",import.meta.url),"utf8");
+assert.ok(tourSource.includes("GuidedTour"),"specialist tour uses the shared safe shell");
+assert.ok(sharedTourSource.includes("panel.right + gutter"),"tour docks to right outside cabinet");
+assert.ok(sharedTourSource.includes("panel.left - width - gutter"),"tour can dock to left outside cabinet");
+assert.ok(sharedTourSource.includes('side === "right"'),"tour chooses available gutter");
 
 
 assert.equal(shouldInviteToPracticeTour(),true);

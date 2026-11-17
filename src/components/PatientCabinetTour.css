@@ -1,0 +1,10 @@
+.patient-tour-launch{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:10px 0 18px}
+.patient-tour-invite-wrap{display:flex;align-items:center;flex-wrap:wrap;gap:9px;position:relative}
+.patient-tour-entry{display:inline-flex;gap:7px;align-items:center;justify-content:center;padding:10px 13px;border:1px solid #cfdacf;border-radius:10px;background:#f8faf7;color:#365b4e;font:inherit;font-size:13px;font-weight:650;cursor:pointer;transition:background .2s,border-color .2s,box-shadow .2s}
+.patient-tour-entry:hover{background:#eef4ed}.patient-tour-entry-highlight{background:#f9f0e9;border-color:#bc765c;color:#784c3c;box-shadow:0 0 0 2px rgba(188,118,92,.12)}
+.patient-tour-invite-label{font-size:11px;font-weight:750;color:#a25845;background:#faeae0;border:1px solid #f0d1c1;padding:5px 8px;border-radius:999px;white-space:nowrap}
+.patient-tour-entry-pulse{animation:patient-tour-attention 2s ease-in-out infinite}@keyframes patient-tour-attention{0%,100%{box-shadow:0 0 0 2px rgba(188,118,92,.15)}50%{box-shadow:0 0 0 7px rgba(188,118,92,.24)}}
+.patient-tour-invite-tip{display:flex;align-items:center;gap:10px;max-width:420px;padding:10px 12px;background:#fffdf8;border:1px solid #e8d9c9;border-radius:10px;box-shadow:0 7px 24px rgba(60,50,35,.1);font-size:12px;line-height:1.4;color:#46594e}
+.patient-tour-invite-tip button{align-self:flex-start;border:0;background:transparent;color:#65736b;font-size:20px;line-height:1;cursor:pointer}
+@media(prefers-reduced-motion:reduce){.patient-tour-entry-pulse{animation:none}.patient-tour-entry{transition:none}}
+@media(max-width:650px){.patient-tour-invite-wrap{align-items:flex-start}.patient-tour-invite-tip{flex-basis:100%;max-width:100%}}

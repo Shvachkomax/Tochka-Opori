@@ -21,6 +21,7 @@ import ExpertCabinet from "./pages/expert/ExpertCabinet.jsx";
 import SpecialistCabinet from "./pages/specialist/SpecialistCabinet.jsx";
 import { APP_BRAND } from "./lib/appBrand.js";
 import PracticePatientBooking from "./pages/specialist/PracticePatientBooking.jsx";
+import PatientCabinetTour from "./components/PatientCabinetTour.jsx";
 
 class AdminErrorBoundary extends Component {
   constructor(props) {
@@ -11522,9 +11523,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
             const wallet = !APP_BRAND.isSupportPilot && supportCabinet.wallet?.visible ? supportCabinet.wallet : null;
 
             return (
-              <section style={{ width: "100%" }} className="app-card-support">
+              <section style={{ width: "100%" }} className="app-card-support" data-tour-container>
                 {/* Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, flexWrap: "wrap", gap: 10 }}>
+                <div data-tour-target="patient-overview" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, flexWrap: "wrap", gap: 10 }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 15, fontWeight: 600, color: "#2E2A25" }}>
                       Личный кабинет{supportDisplayName ? ` ${supportDisplayName}` : ""}
@@ -11543,8 +11544,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 </div>
 
-                <PatientMedicationOrders module="support" />
-                <MedicationCard cards={supportCabinet.medication_cards} />
+                <PatientCabinetTour profile="support" scope={getSupportSession().sessionId} />
+
+                <div data-tour-target="patient-health">
+                  <PatientMedicationOrders module="support" />
+                  <MedicationCard cards={supportCabinet.medication_cards} />
+                </div>
 
                 {import.meta.env.VITE_SUPPORT_LIVE_ENABLED === 'true' && <div className="health-talk-entry">
                   <div><strong>Живое общение · тест</strong><p>Расскажите, что вас волнует. Можно говорить и перебивать. До 3 минут.</p></div>
@@ -11607,7 +11612,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                     </div>
 
                     {/* Поговорим? — Quick AI Chat */}
-                    <div style={{
+                    <div data-tour-target="patient-ai" style={{
                       background: "#FAF6EF", border: "1px solid rgba(46,42,37,.1)",
                       borderRadius: 16, padding: 20, display: "flex", flexDirection: "column",
                     }}>
@@ -11777,7 +11782,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                 )}
 
                 {/* ROW: Как вы сегодня? — Daily check-in */}
-                <div style={{ marginBottom: 24 }}>
+                <div data-tour-target="patient-diary" style={{ marginBottom: 24 }}>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#2E2A25", marginBottom: 4 }}>Как вы себя чувствуете сегодня?</div>
                   <div style={{ fontSize: 13, color: "#7A7268", marginBottom: 14 }}>Отметьте общее состояние — это поможет увидеть изменения со временем.</div>
 
