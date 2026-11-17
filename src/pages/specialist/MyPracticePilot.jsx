@@ -314,6 +314,8 @@ export default function MyPracticePilot({ standalone = false, storageScope = "pu
     </div>}
     {tourActive && <PracticeTour
       step={tourStep}
+      targetOverride={tourStep===0 && catalog.length>0 && (dirty||scheduleDirty) ? '[data-testid="mp-save-places"]' : null}
+      instructionOverride={tourStep===0 && catalog.length>0 && (dirty||scheduleDirty) ? "Место работы добавлено. Нажмите подсвеченную кнопку «Сохранить», чтобы закрепить изменения и перейти дальше." : null}
       onNext={() => tourStep===2 ? finishTour() : changeTourStep(tourStep+1)}
       onSkip={() => tourStep===2 ? finishTour() : changeTourStep(tourStep+1)}
       onClose={closeTour}
