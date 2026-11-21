@@ -139,9 +139,11 @@ try {
   await login(page);
   assert.equal(await page.getByTestId("my-practice-pilot").count(), 0, "authenticated cabinet has no browser-only pilot");
 
+  await page.getByTestId("specialist-nav-places").click();
   await page.getByTestId("a2-place-name").fill("A38 Synthetic Place");
   await page.getByTestId("a2-place-save").click();
   await page.getByTestId("a2-place-row").waitFor();
+  await page.getByTestId("specialist-nav-services").click();
   await page.getByTestId("a2-service-name").fill("A38 Synthetic Service");
   await page.getByTestId("a2-service-price").fill("0");
   await page.getByTestId("a2-service-place").selectOption("a38-place");
@@ -151,6 +153,7 @@ try {
   await page.getByText("Опубликована").waitFor();
   assert.equal(serverServiceWrites, 1, "service was persisted through the server action");
   assert.deepEqual(state.services[0].modules.sort(), ["body", "support"], "doctor can publish one server service for Support and Health");
+  await page.getByTestId("specialist-nav-calendar").click();
   assert.equal(await page.getByTestId("a2-availability-row").count(), 7, "new cabinet shows seven default days");
   const mondayRow = page.getByTestId("a2-availability-row").first();
   await mondayRow.getByRole("button", { name: "Редактировать" }).click();
@@ -169,6 +172,7 @@ try {
   assert.equal(await page.getByTestId("a2-availability-row").count(), 7, "explicit reset restores seven days");
   assert.equal(await page.getByTestId("a2-availability-exception-row").count(), 0, "explicit reset clears active exceptions");
 
+  await page.getByTestId("specialist-nav-services").click();
   const serviceRow = page.getByTestId("a2-service-row");
   await serviceRow.getByRole("button", { name: "Редактировать" }).click();
   await page.getByTestId("a2-service-price").fill("100");
@@ -176,6 +180,7 @@ try {
   await page.getByText("1 000 кредитов").waitFor();
   assert.equal(serverServiceWrites, 2, "service edit was persisted through the server action");
 
+  await page.getByTestId("specialist-nav-overview").click();
   await page.getByTestId("mp-start-tour").click();
   for (let step = 1; step <= 3; step++) {
     await page.getByText(`Шаг ${step} из 3`).waitFor();

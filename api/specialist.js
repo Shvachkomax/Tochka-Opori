@@ -811,11 +811,14 @@ async function handleListClients(req, res) {
   const { expert, memberships } = authResult;
   const { organization_id: orgId, module } = req.body || {};
 
-  // Validate working context
-  const ctx = validateSpecialistContext({ memberships, organizationId: orgId, module, allowedModules: expert.allowed_modules });
+  // "All directions" is a list-only aggregate. It is permitted exclusively
+  // for experts entitled to both modules and never unlocks a combined medical
+  // record: every returned row retains its own module and opaque client_ref.
+  const ctx = validateSpecialistWorkspaceContext({ memberships, organizationId: orgId, module, allowedModules: expert.allowed_modules });
   if (!ctx.ok) {
     return res.status(403).json({ ok: false, error: ctx.error });
   }
+  const modules = module === "all" ? ["support", "body"] : [module];
 
   const supabase = getSupabase();
   // ── 1. Primary assignments ──────────────────────────────
@@ -823,7 +826,7 @@ async function handleListClients(req, res) {
     .from("patient_assignments")
     .select("id, public_code, owner_type, owner_id, organization_id, primary_expert_id, status, module, patient_label, updated_at")
     .eq("primary_expert_id", expert.id)
-    .eq("module", module)
+    .in("module", modules)
     .eq("status", "active");
 
   // organization_id: NULL means private practice — use .is() for NULL
@@ -840,7 +843,7 @@ async function handleListClients(req, res) {
     .from("patient_access")
     .select("id, public_code, owner_type, owner_id, organization_id, expert_id, access_role, status, module")
     .eq("expert_id", expert.id)
-    .eq("module", module)
+    .in("module", modules)
     .eq("status", "active");
 
   if (orgId === null) {
@@ -875,13 +878,42 @@ async function handleListClients(req, res) {
     }
   }
 
-  const result = buildSpecialistClientList({
-    module,
-    assignments: assignments || [],
-    accessRows: accessRows || [],
+  const result = modules.flatMap((currentModule) => buildSpecialistClientList({
+    module: currentModule,
+    assignments: (assignments || []).filter((row) => row.module === currentModule),
+    accessRows: (accessRows || []).filter((row) => row.module === currentModule),
     bodyDisplayNames,
-  });
-  return res.status(200).json({ ok: true, clients: result });
+  }));
+
+  // This is metadata for the list only. It is deliberately derived from the
+  // already-authorized relationship rows and never reads clinical content.
+  const clientByOwner = new Map();
+  for (const row of [...(assignments || []), ...(accessRows || [])]) {
+    if (row.owner_type && row.owner_id) {
+      clientByOwner.set(`${row.module}:${row.owner_type}:${row.owner_id}`, row.primary_expert_id ? `assignment:${row.id}` : `access:${row.id}`);
+    }
+  }
+  let bookingQuery = supabase
+    .from("practice_bookings")
+    .select("owner_type, owner_id, starts_at, status, organization_id")
+    .eq("expert_id", expert.id)
+    .eq("status", "confirmed")
+    .gte("starts_at", new Date().toISOString());
+  bookingQuery = orgId === null ? bookingQuery.is("organization_id", null) : bookingQuery.eq("organization_id", orgId);
+  const { data: upcomingBookings } = await bookingQuery.order("starts_at", { ascending: true }).limit(200);
+  const nextAppointmentByClient = new Map();
+  for (const booking of upcomingBookings || []) {
+    const bookingModule = booking.owner_type === "anonymous_case" ? "support"
+      : booking.owner_type === "anonymous_profile" ? "body" : null;
+    if (!bookingModule || !modules.includes(bookingModule)) continue;
+    const clientRef = clientByOwner.get(`${bookingModule}:${booking.owner_type}:${booking.owner_id}`);
+    if (clientRef && !nextAppointmentByClient.has(clientRef)) nextAppointmentByClient.set(clientRef, booking.starts_at);
+  }
+  const withUpcomingAppointments = result.map((client) => ({
+    ...client,
+    next_appointment_at: nextAppointmentByClient.get(client.client_ref) || null,
+  }));
+  return res.status(200).json({ ok: true, clients: withUpcomingAppointments });
 }
 
 async function handleRevokePatientLink(req, res) {
@@ -2247,6 +2279,25 @@ export function validateSpecialistContext({ memberships, organizationId, module,
   }
 
   return { ok: true };
+}
+
+// Workspace aggregate validation intentionally lives next to the strict
+// per-module validation. Only list/calendar summary endpoints may use it;
+// card and clinical endpoints continue to call validateSpecialistContext and
+// therefore require one concrete module.
+export function validateSpecialistWorkspaceContext({ memberships, organizationId, module, allowedModules }) {
+  if (module === "all") {
+    if (!Array.isArray(allowedModules) || !allowedModules.includes("support") || !allowedModules.includes("body")) {
+      return { ok: false, error: "Нет доступа ко всем направлениям" };
+    }
+    const org = deploymentOrganizationId();
+    if (org && organizationId !== org) return { ok: false, error: "Нет доступа к указанной организации" };
+    if (organizationId === null || organizationId === undefined) return { ok: true };
+    return memberships.some((membership) => membership.organization_id === organizationId)
+      ? { ok: true }
+      : { ok: false, error: "Нет доступа к указанной организации" };
+  }
+  return validateSpecialistContext({ memberships, organizationId, module, allowedModules });
 }
 
 // Resolve every request through the current patient grant; pairing booking profiles

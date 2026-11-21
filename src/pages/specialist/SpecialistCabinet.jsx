@@ -6,6 +6,7 @@ import { buildSpecialistContextKey, isCurrentSpecialistContext } from "./special
 import { APP_BRAND } from "../../lib/appBrand.js";
 import ClinicalTimelinePanel from "./ClinicalTimelinePanel.jsx";
 import PracticeBookingPanel from "./PracticeBookingPanel.jsx";
+import { tourStorageKey } from "../../../lib/my-practice/onboarding-tour.js";
 
 // ── Styles ────────────────────────────────────────────────
 
@@ -100,6 +101,11 @@ export default function SpecialistCabinet() {
   const [module, setModule] = useState(() => {
     try { return sessionStorage.getItem("specialist_module") || "support"; } catch { return "support"; }
   });
+  const [activeScreen, setActiveScreen] = useState("overview");
+  const [clientSearch, setClientSearch] = useState("");
+  const [clientModuleFilter, setClientModuleFilter] = useState("all");
+  const [practiceTour, setPracticeTour] = useState({ active: false, step: 0 });
+  const pendingClientRef = useRef(null);
 
   const showToast = useCallback((message, type = "success") => {
     setToast({ message, type });
@@ -213,7 +219,7 @@ export default function SpecialistCabinet() {
           // Validate persisted module against allowed_modules
           const allowed = data.expert?.allowed_modules || ["support"];
           const stored = sessionStorage.getItem("specialist_module") || "support";
-          if (!allowed.includes(stored)) {
+          if (!(allowed.includes(stored) || (stored === "all" && allowed.includes("support") && allowed.includes("body")))) {
             const fallback = allowed[0] || "support";
             setModule(fallback);
             try { sessionStorage.setItem("specialist_module", fallback); } catch {}
@@ -261,7 +267,14 @@ export default function SpecialistCabinet() {
         const data = await res.json();
         if (!cancelled) {
           if (data.ok) {
-            setClients(data.clients || []);
+            const nextClients = data.clients || [];
+            setClients(nextClients);
+            const pending = pendingClientRef.current;
+            if (pending && pending.module === module && nextClients.some((client) => client.client_ref === pending.client_ref)) {
+              pendingClientRef.current = null;
+              setSelectedClient(pending.client_ref);
+              setDetailRefreshKey((key) => key + 1);
+            }
           } else {
             setClientsError(data.error || "Ошибка загрузки");
             setClients([]);
@@ -282,7 +295,7 @@ export default function SpecialistCabinet() {
   // ── Fetch client detail when selected ─────────────────────
 
   useEffect(() => {
-    if (!auth || !selectedClient) {
+    if (!auth || !selectedClient || module === "all") {
       setClientDetail(null);
       return;
     }
@@ -383,7 +396,7 @@ export default function SpecialistCabinet() {
         // Validate stored module against allowed_modules
         const allowed = data.expert?.allowed_modules || ["support"];
         const stored = sessionStorage.getItem("specialist_module") || "support";
-        if (!allowed.includes(stored)) {
+        if (!(allowed.includes(stored) || (stored === "all" && allowed.includes("support") && allowed.includes("body")))) {
           const fallback = allowed[0] || "support";
           setModule(fallback);
           try { sessionStorage.setItem("specialist_module", fallback); } catch {}
@@ -445,10 +458,51 @@ export default function SpecialistCabinet() {
 
   function selectModule(m) {
     const allowed = auth?.expert?.allowed_modules || ["support"];
-    if (!allowed.includes(m)) return; // refuse forbidden module
+    const canSelectAll = m === "all" && allowed.includes("support") && allowed.includes("body");
+    if (!allowed.includes(m) && !canSelectAll) return; // refuse forbidden module
     invalidateSpecialistContext();
     setModule(m);
     try { sessionStorage.setItem("specialist_module", m); } catch {}
+  }
+
+  function openClient(client) {
+    setActiveScreen("patient-card");
+    if (module !== client.module) {
+      pendingClientRef.current = client;
+      selectModule(client.module);
+      return;
+    }
+    setSelectedClient(client.client_ref);
+    setDetailRefreshKey((key) => key + 1);
+  }
+
+  function practiceTourKey() {
+    return tourStorageKey(`${auth?.expert?.id || "specialist"}:${orgId || "private"}`);
+  }
+
+  function startPracticeTour() {
+    try { localStorage.setItem(practiceTourKey(), "0"); } catch {}
+    setPracticeTour({ active: true, step: 0 });
+    setActiveScreen("places");
+  }
+
+  function setPracticeTourStep(step) {
+    const next = Math.max(0, Math.min(2, Number(step) || 0));
+    try { localStorage.setItem(practiceTourKey(), String(next)); } catch {}
+    setPracticeTour({ active: true, step: next });
+    setActiveScreen(["places", "services", "calendar"][next]);
+  }
+
+  function closePracticeTour() {
+    try { localStorage.setItem(practiceTourKey(), String(practiceTour.step)); } catch {}
+    setPracticeTour((current) => ({ ...current, active: false }));
+    setActiveScreen("overview");
+  }
+
+  function finishPracticeTour() {
+    try { localStorage.removeItem(practiceTourKey()); } catch {}
+    setPracticeTour({ active: false, step: 0 });
+    setActiveScreen("overview");
   }
 
   // ── Service Requests ─────────────────────────────────────
@@ -819,11 +873,22 @@ export default function SpecialistCabinet() {
   const orgName = orgId
     ? memberships.find((m) => m.organization_id === orgId)?.organization_name || "Организация"
     : "Частная практика";
+  const isDualModuleSpecialist = expert.allowed_modules?.includes("support") && expert.allowed_modules?.includes("body");
+  const practiceScreen = ["overview", "calendar", "services", "places", "finance"].includes(activeScreen);
+  const filteredClients = clients.filter((client) => {
+    const matchesModule = clientModuleFilter === "all" || client.module === clientModuleFilter;
+    const needle = clientSearch.trim().toLocaleLowerCase("ru-RU");
+    return matchesModule && (!needle || String(client.display_name || "").toLocaleLowerCase("ru-RU").includes(needle));
+  });
+  const navigation = [
+    ["overview", "Обзор"], ["patients", "Пациенты"], ["calendar", "Календарь"],
+    ["services", "Услуги и цены"], ["places", "Места работы"], ["finance", "Финансы"],
+  ];
 
   return (
     <div style={S.page} data-testid="specialist-cabinet">
       <SpecialistPilotNotice />
-      <div style={{ maxWidth: 800, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -843,22 +908,9 @@ export default function SpecialistCabinet() {
             {expert.city && <span> · {expert.city}</span>}
           </div>
           <div data-testid="active-specialist-context" style={{ fontSize: 13, color: "#5F7D6C", marginTop: 10, fontWeight: 600 }}>
-            Рабочее пространство: {module === "body" ? "Здоровье & Стройность" : supportWorkspaceName}
+            Рабочее пространство: {module === "all" ? "Все разрешённые направления" : module === "body" ? "Здоровье & Стройность" : supportWorkspaceName} · {orgName}
           </div>
         </div>
-
-        {/* Авторизованный кабинет использует только серверный каталог Test Supabase. */}
-        {import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && !selectedClient && (
-          <div style={{ marginBottom: 20 }}>
-            <PracticeBookingPanel
-              key={`${expert.id}:${orgId || "private"}:${module}`}
-              organizationId={orgId}
-              module={module}
-              allowedModules={expert.allowed_modules}
-              storageScope={`${expert.id}:${orgId || "private"}`}
-            />
-          </div>
-        )}
 
         {/* Context selection */}
         <div style={S.card}>
@@ -904,6 +956,13 @@ export default function SpecialistCabinet() {
             // Multi-module — show switcher
             return (
               <div style={S.moduleRow}>
+                {isDualModuleSpecialist && <div
+                  style={{ ...S.moduleBtn, ...(module === "all" ? S.moduleBtnActive : {}) }}
+                  onClick={() => selectModule("all")}
+                  data-testid="module-all"
+                >
+                  Все направления
+                </div>}
                 <div
                   style={{ ...S.moduleBtn, ...(module === "support" ? S.moduleBtnActive : {}) }}
                   onClick={() => selectModule("support")}
@@ -923,12 +982,39 @@ export default function SpecialistCabinet() {
           })()}
         </div>
 
+        <nav aria-label="Разделы кабинета" data-testid="specialist-workspace-nav" style={{ ...S.card, padding: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {navigation.map(([screen, label]) => <button key={screen} type="button" data-testid={`specialist-nav-${screen}`}
+            onClick={() => { setActiveScreen(screen); if (screen !== "patient-card") clearSelectedClientDetail(); }}
+            style={{ ...S.btnSecondary, borderColor: activeScreen === screen ? "#B85C4A" : "rgba(46,42,37,.15)", color: activeScreen === screen ? "#B85C4A" : "#7A7268", fontWeight: activeScreen === screen ? 700 : 500 }}>
+            {label}
+          </button>)}
+        </nav>
 
-        {selectedClient && import.meta.env.VITE_ENABLE_MY_PRACTICE_SERVER_UI === "true" && <MedicalRecordPanel
+        {import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && practiceScreen && !selectedClient && (
+          <div style={{ marginBottom: 20 }}>
+            <PracticeBookingPanel
+              key={`${expert.id}:${orgId || "private"}:${module}:${activeScreen}`}
+              organizationId={orgId}
+              module={module}
+              allowedModules={expert.allowed_modules}
+              storageScope={`${expert.id}:${orgId || "private"}`}
+              section={activeScreen}
+              bookingScope={activeScreen === "calendar" ? "all" : "current"}
+              financeScope={activeScreen === "finance" ? "all" : "current"}
+              organizationName={orgName}
+              memberships={memberships}
+              onOpenClient={openClient}
+              tour={{ active: practiceTour.active, step: practiceTour.step, onStart: startPracticeTour, onStep: setPracticeTourStep, onClose: closePracticeTour, onFinish: finishPracticeTour }}
+            />
+          </div>
+        )}
+
+
+        {activeScreen === "patient-card" && selectedClient && import.meta.env.VITE_ENABLE_MY_PRACTICE_SERVER_UI === "true" && <MedicalRecordPanel
           key={`medical:${expert.id}:${orgId || "private"}:${module}:${selectedClient}`}
           module={module} organizationId={orgId} clientRef={selectedClient} /> }
 
-        {selectedClient && <ClinicalTimelinePanel
+        {activeScreen === "patient-card" && selectedClient && <ClinicalTimelinePanel
           key={`${expert.id}:${orgId || "private"}:${module}:${selectedClient || "none"}`}
           module={module}
           organizationId={orgId}
@@ -936,7 +1022,7 @@ export default function SpecialistCabinet() {
         />}
 
         {/* ── Service Requests ─────────────────────────── */}
-        {!selectedClient && (
+        {activeScreen === "overview" && !selectedClient && (
           <div style={S.card} data-testid="service-requests-section">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 700 }}>Запросы</div>
@@ -997,7 +1083,7 @@ export default function SpecialistCabinet() {
         )}
 
         {/* ── Invitations ──────────────────────────────── */}
-        {!selectedClient && module === "support" && (
+        {activeScreen === "overview" && !selectedClient && module === "support" && (
           <div style={S.card} data-testid="invitations-section">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div style={{ fontSize: 16, fontWeight: 700 }}>Приглашения</div>
@@ -1035,7 +1121,7 @@ export default function SpecialistCabinet() {
         )}
 
         {/* Client detail or Client list */}
-        {selectedClient ? (
+        {["patients", "patient-card"].includes(activeScreen) && (selectedClient ? (
           module === "body" ? (
             <HealthClientDetail
               detail={clientDetail}
@@ -1043,7 +1129,7 @@ export default function SpecialistCabinet() {
               error={clientDetailError}
               patientReportedMedicationData={patientReportedMedicationData}
               patientReportedMedicationLoading={patientReportedMedicationLoading}
-              onBack={clearSelectedClientDetail}
+              onBack={() => { clearSelectedClientDetail(); setActiveScreen("patients"); }}
             />
           ) : (
             <ClientDetail
@@ -1052,7 +1138,7 @@ export default function SpecialistCabinet() {
               error={clientDetailError}
               tab={clientTab}
               onTabChange={setClientTab}
-              onBack={clearSelectedClientDetail}
+              onBack={() => { clearSelectedClientDetail(); setActiveScreen("patients"); }}
               profAnalysis={profAnalysis}
               profAnalysisLoading={profAnalysisLoading}
               medicationData={medicationData || { orders: [], concepts: [], can_manage: false }}
@@ -1066,25 +1152,36 @@ export default function SpecialistCabinet() {
           )
         ) : (
           <div style={S.card}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Мои клиенты</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>Мои пациенты</div>
+            <p style={{ ...S.small, marginTop: 0 }}>Профили Support и Health отображаются отдельными строками и открываются только в соответствующем направлении.</p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+              <input value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} placeholder="Поиск по разрешённому имени" aria-label="Поиск пациентов" style={{ ...S.input, flex: "1 1 220px", width: "auto", padding: "8px 10px" }} />
+              <select value={clientModuleFilter} onChange={(event) => setClientModuleFilter(event.target.value)} aria-label="Фильтр направления" style={{ ...S.input, width: "auto", padding: "8px 10px" }}>
+                <option value="all">Все направления</option>
+                <option value="support">Support</option>
+                <option value="body">Health</option>
+              </select>
+            </div>
             <div style={S.divider} />
 
             {clientsLoading ? (
               <p style={{ fontSize: 13, color: "#7A7268" }}>Загрузка...</p>
             ) : clientsError ? (
               <p style={{ fontSize: 13, color: "#991B1B" }}>{clientsError}</p>
-            ) : clients.length === 0 ? (
+            ) : filteredClients.length === 0 ? (
               <p style={{ fontSize: 13, color: "#7A7268" }}>
-                {APP_BRAND.isSupportPilot
+                {clients.length > 0
+                  ? "По выбранному фильтру пациентов нет."
+                  : APP_BRAND.isSupportPilot
                   ? "Здесь появляются пациенты после того, как они отправят запрос этому специалисту или примут ваше приглашение. Пока пациент не подтвердил связь, его разговоры и отчёты здесь не отображаются."
                   : "В этом рабочем пространстве пока нет закреплённых клиентов."}
               </p>
             ) : (
               <div>
-                {clients.map((c) => (
+                {filteredClients.map((c) => (
                   <div
                     key={c.client_ref}
-                    onClick={() => { setSelectedClient(c.client_ref); setDetailRefreshKey((k) => k + 1); }}
+                    onClick={() => openClient(c)}
                     style={{ padding: "12px 0", borderBottom: "1px solid rgba(46,42,37,.06)", cursor: "pointer" }}
                   >
                     <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>
@@ -1092,10 +1189,13 @@ export default function SpecialistCabinet() {
                     </div>
                     <div style={{ fontSize: 12, color: "#7A7268" }}>
                       {c.relationship === "primary" ? "Основной специалист" : "Совместный доступ"}
+                      <span> · {c.module === "body" ? "Health" : "Support"} · {orgName} · {c.status === "active" ? "Прикреплён" : c.status}</span>
                       {c.last_activity_at && (
                         <span> · Последняя активность: {new Date(c.last_activity_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}</span>
                       )}
                     </div>
+                    {c.next_appointment_at && <div style={{ fontSize: 12, color: "#5F7D6C", marginTop: 3 }}>Ближайшая запись: {new Date(c.next_appointment_at).toLocaleString("ru-RU")}</div>}
+                    <button type="button" style={{ ...S.actionBtn, marginTop: 8, marginRight: 6 }} onClick={(event) => { event.stopPropagation(); openClient(c); }}>Открыть карту</button>
                     <button type="button" style={{ ...S.actionBtn, marginTop: 8, color: "#B85C4A" }}
                       onClick={(event) => { event.stopPropagation(); revokePatientLink(c); }}>
                       Отозвать доступ
@@ -1105,7 +1205,7 @@ export default function SpecialistCabinet() {
               </div>
             )}
           </div>
-        )}
+        ))}
 
         <div style={S.small}>Информация сервиса не заменяет медицинскую консультацию.</div>
       </div>

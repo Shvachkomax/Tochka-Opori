@@ -55,7 +55,8 @@ function ServiceForm({ item, places, organizationId, module, allowedModules, onS
   const [duration, setDuration] = useState(String(item?.duration_min || 60));
   const [placeId, setPlaceId] = useState(item?.place_id || "");
   const [format, setFormat] = useState(item?.format || "offline");
-  const [modules, setModules] = useState(item?.modules?.length ? item.modules : [module]);
+  const defaultModules = module === "all" ? allowedModules : [module];
+  const [modules, setModules] = useState(item?.modules?.length ? item.modules : defaultModules);
   const [published, setPublished] = useState(item?.is_active === true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -63,8 +64,8 @@ function ServiceForm({ item, places, organizationId, module, allowedModules, onS
     setName(item?.name || ""); setPrice(item ? String(item.price_kop / 100) : "");
     setDuration(String(item?.duration_min || 60)); setPlaceId(item?.place_id || "");
     setFormat(item?.format || "offline"); setPublished(item?.is_active === true);
-    setModules(item?.modules?.length ? item.modules : [module]);
-  }, [item, module]);
+    setModules(item?.modules?.length ? item.modules : (module === "all" ? allowedModules : [module]));
+  }, [item, module, allowedModules]);
   async function submit(event) {
     event.preventDefault();
     if (!modules.length) { setError("Выберите Support, Health или оба раздела."); return; }
@@ -184,7 +185,20 @@ function AvailabilityExceptionForm({ organizationId, onSaved, onCancel }) {
   </form>;
 }
 
-export default function PracticeBookingPanel({ organizationId = null, module = "support", allowedModules = ["support", "body"], storageScope = "server-practice", onBookingsChange }) {
+export default function PracticeBookingPanel({
+  organizationId = null,
+  module = "support",
+  allowedModules = ["support", "body"],
+  storageScope = "server-practice",
+  onBookingsChange,
+  section = "all",
+  bookingScope = "current",
+  financeScope = "current",
+  organizationName = "Частная практика",
+  memberships = [],
+  onOpenClient,
+  tour,
+}) {
   const serviceAllowedModules = Array.isArray(allowedModules) && allowedModules.length ? allowedModules : [module];
   const [places, setPlaces] = useState([]);
   const [services, setServices] = useState([]);
@@ -199,6 +213,7 @@ export default function PracticeBookingPanel({ organizationId = null, module = "
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [calendarView, setCalendarView] = useState("list");
 
   const reload = useCallback(async () => {
     setError(""); setInfo(""); setLoading(true);
@@ -206,8 +221,9 @@ export default function PracticeBookingPanel({ organizationId = null, module = "
     try {
       const [placeResult, serviceResult, availabilityResult, bookingResult, financeResult] = await Promise.all([
         callPractice("listPracticePlaces", context), callPractice("listPracticeServices", context),
-        callPractice("listPracticeAvailability", context), callPractice("listPracticeBookings", context),
-        callPractice("getPracticeFinance", context),
+        callPractice("listPracticeAvailability", context),
+        callPractice("listPracticeBookings", { ...context, module, organization_scope: bookingScope === "all" ? "all" : undefined }),
+        callPractice("getPracticeFinance", { ...context, module, organization_scope: financeScope === "all" ? "all" : undefined }),
       ]);
       setPlaces(placeResult.places || []); setServices(serviceResult.services || []);
       setAvailability(availabilityResult.availability || []); setBookings(bookingResult.bookings || []);
@@ -215,7 +231,7 @@ export default function PracticeBookingPanel({ organizationId = null, module = "
     } catch (err) {
       setError(`${err.message || "Не удалось загрузить."} Данные не заменены пустым состоянием.`);
     } finally { setLoading(false); }
-  }, [organizationId, onBookingsChange]);
+  }, [organizationId, module, bookingScope, financeScope, onBookingsChange]);
   useEffect(() => { reload(); }, [reload]);
 
   async function mutate(action, payload, success) {
@@ -225,7 +241,7 @@ export default function PracticeBookingPanel({ organizationId = null, module = "
       await reload(); setInfo(success);
     } catch (err) { setError(err.message); }
   }
-  async function complete(id) { await mutate("completePracticeBooking", { booking_id: id }, "Приём завершён."); }
+  async function complete(booking) { await mutate("completePracticeBooking", { booking_id: booking.id, module: booking.module }, "Приём завершён."); }
   async function restoreDefaultAvailability() {
     const confirmed = window.confirm("Восстановить расписание 09:00–18:00 на все дни недели? Текущие часы и исключения будут отключены. Существующие записи пациентов сохранятся.");
     if (!confirmed) return;
@@ -239,25 +255,61 @@ export default function PracticeBookingPanel({ organizationId = null, module = "
     try { const value = Number(localStorage.getItem(tourKey)); return Number.isInteger(value) && value >= 0 && value < 3 ? value : 0; }
     catch { return 0; }
   });
-  function openTour() { setTourStep(0); setTourActive(true); }
-  function changeTourStep(next) { setTourStep(next); try { localStorage.setItem(tourKey, String(next)); } catch {} }
-  function closeTour() { setTourActive(false); try { localStorage.setItem(tourKey, String(tourStep)); } catch {} }
-  function finishTour() { setTourActive(false); setTourStep(0); try { localStorage.removeItem(tourKey); } catch {} }
+  const controlledTour = Boolean(tour);
+  const currentTourStep = controlledTour ? tour.step : tourStep;
+  const currentTourActive = controlledTour ? tour.active : tourActive;
+  function openTour() {
+    if (controlledTour) return tour.onStart?.();
+    setTourStep(0); setTourActive(true);
+  }
+  function changeTourStep(next) {
+    if (controlledTour) return tour.onStep?.(next);
+    setTourStep(next); try { localStorage.setItem(tourKey, String(next)); } catch {}
+  }
+  function closeTour() {
+    if (controlledTour) return tour.onClose?.();
+    setTourActive(false); try { localStorage.setItem(tourKey, String(tourStep)); } catch {}
+  }
+  function finishTour() {
+    if (controlledTour) return tour.onFinish?.();
+    setTourActive(false); setTourStep(0); try { localStorage.removeItem(tourKey); } catch {}
+  }
   const activeServices = services.filter((service) => service.is_active);
   const weeklyAvailability = availability.filter((entry) => !entry.exception_date && entry.weekday >= 1 && entry.weekday <= 7);
   const availabilityExceptions = availability.filter((entry) => entry.exception_date && entry.is_active !== false);
   const savedWeekdays = new Set(weeklyAvailability.map((entry) => entry.weekday));
 
-  return <section className="my-practice-pilot" data-testid="a2-booking-panel" style={{ border: "1px solid #e3ddcf", borderRadius: 16, padding: 20, background: "#FFFEFB", maxWidth: 640, margin: "0 auto" }}>
-    <h2 style={{ margin: "0 0 8px" }}>Моя практика</h2>
-    <p style={{ fontSize: 13, color: "#666", marginTop: 0 }}>Управляйте местами работы, услугами, расписанием и записями пациентов.</p>
-    <button type="button" onClick={openTour} data-testid="mp-start-tour" style={secondaryStyle}>▶ Обучение по кабинету</button>
+  const showOverview = section === "overview";
+  const showPlaces = section === "all" || section === "places" || (currentTourActive && currentTourStep === 0);
+  const showServices = section === "all" || section === "services" || (currentTourActive && currentTourStep === 1);
+  const showCalendar = section === "all" || section === "calendar" || (currentTourActive && currentTourStep === 2);
+  const showFinance = section === "all" || section === "finance";
+  const upcomingBookings = bookings.filter((booking) => new Date(booking.starts_at).getTime() >= Date.now()).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const weekEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const visibleBookings = calendarView === "day"
+    ? upcomingBookings.filter((booking) => String(booking.starts_at).slice(0, 10) === todayKey)
+    : calendarView === "week"
+      ? upcomingBookings.filter((booking) => new Date(booking.starts_at) < weekEnd)
+      : upcomingBookings;
+
+  return <section className="my-practice-pilot" data-testid="a2-booking-panel" style={{ border: "1px solid #e3ddcf", borderRadius: 16, padding: 20, background: "#FFFEFB", maxWidth: 860, margin: "0 auto" }}>
+    <h2 style={{ margin: "0 0 8px" }}>{showOverview ? "Практика" : section === "calendar" ? "Календарь и расписание" : section === "services" ? "Услуги и цены" : section === "places" ? "Места работы" : section === "finance" ? "Финансы" : "Моя практика"}</h2>
+    <p style={{ fontSize: 13, color: "#666", marginTop: 0 }}>Данные сохраняются на сервере и показываются только в разрешённом рабочем контексте.</p>
+    {showOverview && <>
+      <button type="button" onClick={openTour} data-testid="mp-start-tour" style={secondaryStyle}>▶ Обучение по кабинету</button>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16, fontSize: 13, color: "#4D5D55" }}>
+        <span>Мест: {places.length}</span><span>·</span><span>Опубликованных услуг: {activeServices.length}</span><span>·</span><span>Предстоящих записей: {upcomingBookings.length}</span>
+      </div>
+    </>}
     {loading && <p role="status">Обновляем серверные данные…</p>}
     {error && <p role="alert" style={{ color: "#a33" }}>{error}</p>}
     {info && <p role="status" style={{ color: "#2F5D50" }}>{info}</p>}
 
-    <div data-tour-target="places">
+    {showPlaces && <div data-tour-target="places">
       <h3>Места работы</h3>
+      <p style={{ fontSize: 13, color: "#666" }}>Текущий рабочий контекст: <strong>{organizationName}</strong>. Физическое место приёма не даёт доступа к данным организации.</p>
+      {memberships.length > 0 && <p style={{ fontSize: 12, color: "#777" }}>Подтверждённые организации: {memberships.map((membership) => membership.organization_name || "Организация").join(", ")}.</p>}
       {!places.length && !loading && <p>Добавьте место работы или онлайн-приём.</p>}
       {places.map((place) => <div key={place.id} data-testid="a2-place-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee" }}>
         <strong>{place.name}</strong>{place.address ? <span style={{ color: "#777" }}> · {place.address}</span> : null}
@@ -265,9 +317,9 @@ export default function PracticeBookingPanel({ organizationId = null, module = "
         <button type="button" onClick={() => mutate("deletePracticePlace", { id: place.id }, "Место удалено.")} style={{ ...secondaryStyle, marginLeft: 6 }}>Удалить</button>
       </div>)}
       <PlaceForm key={editingPlace?.id || "new-place"} item={editingPlace} organizationId={organizationId} onSaved={reload} onCancel={() => setEditingPlace(null)} />
-    </div>
+    </div>}
 
-    <div data-tour-target="services">
+    {showServices && <div data-tour-target="services">
       <h3>Услуги</h3>
       {!services.length && !loading && <p>Услуг пока нет. Новая услуга остаётся черновиком, пока вы явно не включите публикацию.</p>}
       {services.map((service) => <div key={service.id} data-testid="a2-service-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
@@ -276,9 +328,9 @@ export default function PracticeBookingPanel({ organizationId = null, module = "
         {service.is_active && <button type="button" onClick={() => mutate("deactivatePracticeService", { id: service.id }, "Публикация услуги остановлена.")} style={{ ...secondaryStyle, marginLeft: 6 }}>Снять с публикации</button>}
       </div>)}
       <ServiceForm key={editingService?.id || `new-service-${module}`} item={editingService} places={places} organizationId={organizationId} module={module} allowedModules={serviceAllowedModules} onSaved={reload} onCancel={() => setEditingService(null)} />
-    </div>
+    </div>}
 
-    <div data-tour-target="calendar">
+    {showCalendar && <div data-tour-target="calendar">
       <h3>Расписание</h3>
       <p style={{ fontSize: 13, color: "#666" }}>Рабочие часы сохраняются на сервере. Выходные и исключения не создают свободных слотов.</p>
       {!weeklyAvailability.length && !loading && <p style={{ fontSize: 13, color: "#777" }}>Рабочие часы пока не заданы.</p>}
@@ -304,25 +356,38 @@ export default function PracticeBookingPanel({ organizationId = null, module = "
         {showExceptionForm && <AvailabilityExceptionForm organizationId={organizationId} onSaved={reload} onCancel={() => setShowExceptionForm(false)} />}
       </div>
       <button type="button" onClick={restoreDefaultAvailability} data-testid="a2-availability-reset" style={{ ...secondaryStyle, marginTop: 14 }}>Восстановить 09:00–18:00 на всю неделю</button>
-    </div>
+      <h3 style={{ marginTop: 22 }}>Записи пациентов</h3>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }} aria-label="Вид календаря">
+        {[["day", "День"], ["week", "Неделя"], ["list", "Список"]].map(([value, label]) => <button key={value} type="button" onClick={() => setCalendarView(value)} style={{ ...secondaryStyle, ...(calendarView === value ? { borderColor: "#2F5D50", color: "#2F5D50", fontWeight: 700 } : {}) }}>{label}</button>)}
+        <button type="button" onClick={reload} data-testid="a2-refresh-bookings" style={secondaryStyle}>Обновить</button>
+      </div>
+      {!visibleBookings.length && !loading && <p style={{ fontSize: 13, color: "#777" }}>Предстоящих записей для выбранного вида нет.</p>}
+      {visibleBookings.map((booking) => <div key={booking.id} data-testid="a2-booking-row" style={{ padding: "9px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
+        <div><strong>{new Date(booking.starts_at).toLocaleString("ru-RU")}</strong> · {booking.practice_services?.name || "Приём"}</div>
+        <div style={{ color: "#666", fontSize: 12, marginTop: 3 }}>{booking.module === "body" ? "Health" : "Support"} · {booking.organization_name || "Частная практика"}{booking.place_name ? ` · ${booking.place_name}` : ""} · {booking.status}</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 7 }}>
+          {booking.client_ref && <button type="button" onClick={() => onOpenClient?.({ client_ref: booking.client_ref, module: booking.module })} style={secondaryStyle}>Открыть карту</button>}
+          {booking.status === "confirmed" && (booking.organization_id || null) === (organizationId || null) && <button onClick={() => complete(booking)} data-testid="a2-complete" style={primaryStyle}>Приём завершён</button>}
+        </div>
+      </div>)}
+    </div>}
 
-    <h3>Записи пациентов</h3>
-    <button type="button" onClick={reload} data-testid="a2-refresh-bookings" style={secondaryStyle}>Обновить записи</button>
-    {!bookings.length && !loading && <p style={{ fontSize: 13, color: "#777" }}>Записей пока нет.</p>}
-    {bookings.map((booking) => <div key={booking.id} data-testid="a2-booking-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
-      <span>{new Date(booking.starts_at).toLocaleString("ru-RU")}</span> · {booking.practice_services?.name || "Приём"} · {booking.status}
-      {booking.status === "confirmed" && <button onClick={() => complete(booking.id)} data-testid="a2-complete" style={{ ...primaryStyle, marginLeft: 10 }}>Приём завершён</button>}
-    </div>)}
+    {showFinance && <div data-testid="practice-finance-section">
+      <h3>Финансы</h3>
+      {!finance?.transactions?.length && !loading ? <p style={{ fontSize: 13, color: "#777" }}>Проведённых операций в выбранном контексте пока нет.</p> : <>
+        <p>Начислено специалисту (условные кредиты): <strong>{Number(finance?.specialist_credits || 0).toLocaleString("ru-RU")} кредитов</strong>.</p>
+        <p>Комиссия сервиса по проведённым операциям: {Number(finance?.service_fee_credits || 0).toLocaleString("ru-RU")} кредитов. Выплаты в рублях не подключены.</p>
+        {(finance?.breakdown || []).map((item) => <div key={`${item.module}:${item.organization_id || "private"}`} style={{ padding: "9px 0", borderBottom: "1px solid #eee", fontSize: 13 }}>
+          <strong>{item.module === "body" ? "Health" : "Support"}</strong> · {item.organization_name}: {Number(item.booking_cost_kop / 100).toLocaleString("ru-RU")} ₽ записей, комиссия {Number(item.commission_kop / 100).toLocaleString("ru-RU")} ₽, списано {Number(item.charged_credits).toLocaleString("ru-RU")} кредитов, возврат {Number(item.refunded_credits).toLocaleString("ru-RU")}
+        </div>)}
+      </>}
+      <p style={{ fontSize: 12, color: "#999" }}>Суммы основаны на сохранённых кредитных операциях; внешние платежи и выплаты не имитируются.</p>
+    </div>}
 
-    <h3>Финансы</h3>
-    <p>Начислено специалисту: <strong>{Number(finance?.specialist_credits || 0).toLocaleString("ru-RU")} кредитов</strong>.</p>
-    <p>Комиссия сервиса: {Number(finance?.service_fee_credits || 0).toLocaleString("ru-RU")} кредитов. Выплаты в рублях не подключены.</p>
-    <p style={{ fontSize: 12, color: "#999" }}>Опубликовано услуг: {activeServices.length}. Рабочих интервалов: {availability.length}.</p>
-
-    {tourActive && <PracticeTour step={tourStep}
-      onNext={() => tourStep === 2 ? finishTour() : changeTourStep(tourStep + 1)}
-      onSkip={() => tourStep === 2 ? finishTour() : changeTourStep(tourStep + 1)}
+    {currentTourActive && <PracticeTour step={currentTourStep}
+      onNext={() => currentTourStep === 2 ? finishTour() : changeTourStep(currentTourStep + 1)}
+      onSkip={() => currentTourStep === 2 ? finishTour() : changeTourStep(currentTourStep + 1)}
       onClose={closeTour}
-      ready={tourStepReady(tourStep, { places: places.length, offers: activeServices.length, events: weeklyAvailability.filter((entry) => entry.is_active !== false).length, dirty: false, scheduleDirty: false })} />}
+      ready={tourStepReady(currentTourStep, { places: places.length, offers: activeServices.length, events: weeklyAvailability.filter((entry) => entry.is_active !== false).length, dirty: false, scheduleDirty: false })} />}
   </section>;
 }
