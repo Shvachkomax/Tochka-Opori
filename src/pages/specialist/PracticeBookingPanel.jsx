@@ -194,7 +194,7 @@ export default function PracticeBookingPanel({ organizationId = null, storageSco
 
   return <section className="my-practice-pilot" data-testid="a2-booking-panel" style={{ border: "1px solid #e3ddcf", borderRadius: 16, padding: 20, background: "#FFFEFB", maxWidth: 640, margin: "0 auto" }}>
     <h2 style={{ margin: "0 0 8px" }}>Моя практика</h2>
-    <p style={{ fontSize: 13, color: "#666", marginTop: 0 }}>Серверный каталог тестового контура: места, услуги, рабочие часы и записи пациентов.</p>
+    <p style={{ fontSize: 13, color: "#666", marginTop: 0 }}>Управляйте местами работы, услугами, расписанием и записями пациентов.</p>
     <button type="button" onClick={openTour} data-testid="mp-start-tour" style={secondaryStyle}>▶ Обучение по кабинету</button>
     {loading && <p role="status">Обновляем серверные данные…</p>}
     {error && <p role="alert" style={{ color: "#a33" }}>{error}</p>}
