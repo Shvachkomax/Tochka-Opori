@@ -51,11 +51,14 @@ assert(!bookedSlots.some((slot) => slot.start_time === "09:00"));
 assert.equal(slotsForServiceDay({ service, availabilityRows: withExceptions, bookingsRows: [], day: monday }).length, 0);
 
 const migration = readFileSync(new URL("../supabase/migrations/20261121081127_a381_default_practice_availability.sql", import.meta.url), "utf8");
+const bookingScopeMigration = readFileSync(new URL("../supabase/migrations/20261121083234_a381_scope_booking_availability.sql", import.meta.url), "utf8");
 assert(migration.includes("pg_advisory_xact_lock"));
 assert(migration.includes("generate_series(1, 7)"));
 assert(migration.includes("organization_id is not distinct from p_organization_id"));
 assert(migration.includes("grant execute on function public.ensure_default_practice_availability"));
 assert(migration.includes("grant execute on function public.reset_default_practice_availability"));
+assert.equal((bookingScopeMigration.match(/organization_id is not distinct from p_organization_id/g) || []).length, 3);
+assert(bookingScopeMigration.includes("grant execute on function public.reserve_practice_booking"));
 
 const handler = readFileSync(new URL("../lib/my-practice/booking-handler.js", import.meta.url), "utf8");
 const ui = readFileSync(new URL("../src/pages/specialist/PracticeBookingPanel.jsx", import.meta.url), "utf8");
