@@ -4,7 +4,6 @@ import SpecialistMedicationOrders from "../../SpecialistMedicationOrders.jsx";
 import PatientReportedMedicationSummary from "../../PatientReportedMedicationSummary.jsx";
 import { buildSpecialistContextKey, isCurrentSpecialistContext } from "./specialistContext.js";
 import { APP_BRAND } from "../../lib/appBrand.js";
-import PartnerProgram from "./PartnerProgram.jsx";
 import ClinicalTimelinePanel from "./ClinicalTimelinePanel.jsx";
 import PracticeBookingPanel from "./PracticeBookingPanel.jsx";
 
@@ -928,14 +927,11 @@ export default function SpecialistCabinet() {
           module={module} organizationId={orgId} clientRef={selectedClient} /> }
 
         {selectedClient && <ClinicalTimelinePanel
-          key={`${expert.id}:${orgId || "private"}:${module}:${selectedClient || "demo"}`}
+          key={`${expert.id}:${orgId || "private"}:${module}:${selectedClient || "none"}`}
           module={module}
           organizationId={orgId}
           clientRef={selectedClient}
         />}
-
-        {!selectedClient && <PartnerProgram key={`${expert.id}:${orgId || "private"}:${module}`}
-          module={module} organizationId={orgId} styles={S} />}
 
         {/* ── Service Requests ─────────────────────────── */}
         {!selectedClient && (
@@ -1215,7 +1211,7 @@ function ServiceRequestCard({ request: r, onAction, updating, pendingAction, fee
       )}
       {r.price_credits === null && r.service_code === null && (
         <div style={{ fontSize: 12, color: "#7A7268", marginTop: 4, fontStyle: "italic" }}>
-          Стоимость не зафиксирована (legacy)
+          Стоимость не зафиксирована
         </div>
       )}
 

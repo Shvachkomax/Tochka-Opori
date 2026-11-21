@@ -43,7 +43,14 @@ const cases = await searchSimilarCases({ symptoms: ["снижение настр
 assert.equal(cases.ok, true);
 assert.equal(cases.results.length, 1);
 assert.ok(cases.results[0].source_link);
+assert.equal(cases.results[0].source_type, "synthetic_case");
+assert.equal(cases.results[0].is_mock, true);
+assert.equal(cases.is_mock, true);
 assert.equal(cases.no_confirmed_sources_message, null);
+
+// The authenticated user route explicitly disables synthetic fallback.
+const userFacingCases = await searchSimilarCases({ symptoms: ["снижение настроения"], ageGroup: "adult", actor: { id: "u1", role: "specialist" }, organizationId: "org-1", memberships: [{ organization_id: "org-1", status: "active" }], allowSyntheticFallback: false });
+assert.equal(userFacingCases.results.some((item) => item.source_type === "synthetic_case"), false);
 
 // Empty sources message
 const empty = await searchSimilarCases({ symptoms: ["несуществующий симптом xyz"], ageGroup: "adult", actor: { id: "u1", role: "specialist" }, organizationId: "org-1", memberships: [{ organization_id: "org-1", status: "active" }] });

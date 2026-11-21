@@ -42,6 +42,8 @@ export default async function handler(req, res) {
       return handlePracticeServices(req, res, deps);
     case "listPracticeAvailability":
     case "savePracticeAvailability":
+    case "setPracticeAvailabilityStatus":
+    case "resetPracticeAvailabilityDefaults":
     case "deletePracticeAvailability":
       return handlePracticeAvailability(req, res, deps);
     case "getPracticePatientCabinet":

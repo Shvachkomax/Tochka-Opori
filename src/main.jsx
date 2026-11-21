@@ -1,48 +1,41 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
-import ClinicalKnowledgeDemo from './pages/specialist/ClinicalKnowledgeDemo.jsx'
 import ClinicalKnowledge from './pages/specialist/ClinicalKnowledge.jsx'
-import MyPracticePilot from './pages/specialist/MyPracticePilot.jsx'
-import { MyPracticePatientBookingDemo } from './pages/specialist/MyPracticePaidBookingDemo.jsx'
 import './style.css'
 
-window.addEventListener('error', function (e) {
-  const root = document.getElementById('root');
-  if (root) {
-    root.innerHTML =
-      '<div style="padding:40px;font-family:monospace;background:#050817;color:#fecaca;min-height:100vh">' +
-      '<h2 style="color:#fca5a5;margin-bottom:16px">JavaScript ошибка</h2>' +
-      '<div style="background:rgba(239,68,68,.1);padding:16px;border-radius:12;border:1px solid rgba(239,68,68,.3);margin-bottom:16px">' +
-      '<strong style="color:#fca5a5">' + (e.error?.message || e.message || 'Неизвестная ошибка') + '</strong></div>' +
-      '<pre style="font-size:12px;color:#94a3b8;white-space:pre-wrap;max-height:400px;overflow:auto;background:rgba(0,0,0,.3);padding:16px;border-radius:8px">' +
-      (e.error?.stack || '') + '</pre></div>';
-  }
-});
+function showFatalError() {
+  const root = document.getElementById('root')
+  if (!root) return
 
-window.addEventListener('unhandledrejection', function (e) {
-  const root = document.getElementById('root');
-  if (root) {
-    root.innerHTML =
-      '<div style="padding:40px;font-family:monospace;background:#050817;color:#fecaca;min-height:100vh">' +
-      '<h2 style="color:#fca5a5;margin-bottom:16px">Unhandled Promise Rejection</h2>' +
-      '<div style="background:rgba(239,68,68,.1);padding:16px;border-radius:12;border:1px solid rgba(239,68,68,.3);margin-bottom:16px">' +
-      '<strong style="color:#fca5a5">' + (e.reason?.message || e.reason || 'Неизвестная ошибка') + '</strong></div>' +
-      '<pre style="font-size:12px;color:#94a3b8;white-space:pre-wrap;max-height:400px;overflow:auto;background:rgba(0,0,0,.3);padding:16px;border-radius:8px">' +
-      (e.reason?.stack || '') + '</pre></div>';
-  }
-});
+  const panel = document.createElement('main')
+  panel.style.cssText = 'min-height:100vh;box-sizing:border-box;padding:40px 20px;background:#F6F0E7;color:#2E2A25;font-family:Inter,system-ui,sans-serif;display:grid;place-items:center'
+  const card = document.createElement('section')
+  card.style.cssText = 'width:min(100%,520px);background:#fff;border:1px solid #E1D6C9;border-radius:20px;padding:28px;box-sizing:border-box;text-align:center'
+  const title = document.createElement('h1')
+  title.textContent = 'Не удалось открыть раздел'
+  title.style.cssText = 'font-size:24px;margin:0 0 12px'
+  const message = document.createElement('p')
+  message.textContent = 'Обновите страницу. Если проблема повторится, обратитесь в поддержку.'
+  message.style.cssText = 'font-size:14px;line-height:1.6;color:#625A50;margin:0 0 18px'
+  const reload = document.createElement('button')
+  reload.type = 'button'
+  reload.textContent = 'Обновить страницу'
+  reload.style.cssText = 'border:0;border-radius:12px;padding:11px 16px;background:#B85C4A;color:#fff;font-weight:700;cursor:pointer'
+  reload.addEventListener('click', () => window.location.reload())
+
+  card.append(title, message, reload)
+  panel.append(card)
+  root.replaceChildren(panel)
+}
+
+window.addEventListener('error', showFatalError)
+window.addEventListener('unhandledrejection', showFatalError)
+
+const pathname = window.location.pathname.replace(/\/+$/, '')
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && window.location.pathname.replace(/\/+$/, '') === '/specialist/my-practice/booking-demo'
-      ? <MyPracticePatientBookingDemo />
-      : import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && window.location.pathname.replace(/\/+$/, '') === '/specialist/my-practice/demo'
-      ? <MyPracticePilot standalone />
-      : window.location.pathname.replace(/\/+$/, '') === '/specialist/knowledge/demo'
-      ? <ClinicalKnowledgeDemo />
-      : window.location.pathname.replace(/\/+$/, '') === '/specialist/knowledge'
-        ? <ClinicalKnowledge />
-        : <App />}
+    {pathname === '/specialist/knowledge' ? <ClinicalKnowledge /> : <App />}
   </React.StrictMode>,
 )

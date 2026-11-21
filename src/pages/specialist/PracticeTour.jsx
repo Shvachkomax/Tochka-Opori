@@ -23,5 +23,6 @@ export default function PracticeTour({step,ready,targetOverride,instructionOverr
     dialogTestId="mp-tour-dialog"
     nextTestId="mp-tour-next"
     finalLabel="Завершить"
+    reserveMobileSpace
   />;
 }

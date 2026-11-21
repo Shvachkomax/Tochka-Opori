@@ -43,3 +43,6 @@ try {
   if (oldPatientFlag === undefined) delete process.env.MEDICAL_STAGING_NO_PATIENT_DATA; else process.env.MEDICAL_STAGING_NO_PATIENT_DATA = oldPatientFlag;
 }
 console.log("Clinical Preview synthetic UI and closed API contract passed.");
+
+// The imported specialist authorization module owns a recurring cleanup timer.
+process.exit(0);

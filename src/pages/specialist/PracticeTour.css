@@ -4,10 +4,10 @@
 .mp-tour-top{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#607267}.mp-tour-top button{border:0;background:transparent;font-size:25px;cursor:pointer}.mp-tour-popover h3{font-size:18px;margin:9px 0}.mp-tour-popover p{font-size:13px;line-height:1.5}.mp-tour-status{background:#f3f6f0;padding:9px;border-radius:8px}.mp-tour-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}.mp-tour-actions button:disabled{opacity:.45;cursor:not-allowed}
 
 
-/* Tablet and phone: move the tour to a compact top band, with the active form
-   below it rather than covering fields. The spotlight remains click-through. */
+/* Tablet and phone: keep the popover compact. GuidedTour calculates the safest
+   vertical position after measuring visible controls; do not override it here. */
 @media(max-width:1199px){
-  .mp-tour-popover.mp-tour-placement-top{top:10px!important;bottom:auto!important;left:10px!important;width:min(354px,calc(100vw - 20px));max-height:170px;overflow:auto}
+  .mp-tour-popover.mp-tour-placement-top{width:min(354px,calc(100vw - 20px));max-height:170px;overflow:auto}
   .mp-tour-popover.mp-tour-placement-top .mp-tour-status{display:none}
 }
 @media(max-width:650px){

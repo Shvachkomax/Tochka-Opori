@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-// UI for an explicitly synthetic example or authorized read-only patient chronology.
+// Authorized read-only patient chronology.
 // No clinical records are stored in localStorage/sessionStorage or sent to analytics.
 const COLORS = { ink: "#294338", accent: "#B85C4A", faint: "#F6F0E7", line: "#E1D6C9" };
 const TYPES = {
@@ -24,47 +24,6 @@ const SOURCES = {
   ai_inferred: "Гипотеза ИИ — не подтверждена", system_generated: "Событие сервиса",
   unknown: "Источник не установлен",
 };
-const D = (day) => `2026-10-${String(day).padStart(2, "0")}T12:00:00.000Z`;
-const SYNTHETIC = Object.freeze({
-  support: [
-    { at: D(1), type: "initial_or_followup_contact", provenance: "patient_reported",
-      details: { note: "Жалобы на тревогу и плохой сон. ИИ не ставил диагноз." } },
-    { at: D(3), type: "clinician_decision", provenance: "clinician_entered",
-      details: { note: "Врач описал предварительную оценку и план наблюдения." } },
-    { at: D(4), type: "medication_prescribed", provenance: "clinician_ordered",
-      details: { note: "Условное назначение «Препарат А», без рекомендаций по дозировке." } },
-    { at: D(14), type: "checkin_recorded", provenance: "patient_reported",
-      details: { note: "Пациент сообщает об улучшении сна и сохранении тревоги." } },
-    { at: D(21), type: "clinical_outcome", provenance: "clinician_entered",
-      details: { note: "Врач повторно оценил состояние; причинный эффект терапии не установлен." } },
-  ],
-  body: [
-    { at: D(2), type: "initial_or_followup_contact", provenance: "patient_reported",
-      details: { note: "Жалобы на нарушение сна и увеличение веса." } },
-    { at: D(5), type: "health_diary", provenance: "patient_reported",
-      details: { weight_kg: 83.4, sleep_hours: 6.5, note: "Первая запись в дневнике." } },
-    { at: D(12), type: "medication_reported", provenance: "patient_reported",
-      details: { note: "Пациент сообщил о ранее полученном назначении; врач его пока не подтвердил." } },
-    { at: D(22), type: "health_diary", provenance: "patient_reported",
-      details: { weight_kg: 82.1, sleep_hours: 7.2, note: "Повторная запись в дневнике." } },
-    { at: D(25), type: "clinical_outcome", provenance: "clinician_entered",
-      details: { note: "Изменение показателей зарегистрировано. Причина изменений неизвестна." } },
-  ],
-});
-// Educational example, not a treatment instruction.
-const SYNTHETIC_TREATMENT = [{
-  latest_recorded_state: "revoked",
-  versions: [
-    { version: 1, issued_at: D(4), medication_name: "Препарат А",
-      formulation_strength: 20, strength_unit: "мг",
-      order_record_state: "superseded",author_status: "prescriber_recorded_not_signed",
-      schedules: [{phase_number:1,dose_amount:5,dose_unit:"мг",frequency_code:"once_daily"}] },
-    { version: 2, issued_at: D(20), medication_name: "Препарат А",
-      formulation_strength: 20, strength_unit: "мг",
-      order_record_state: "revoked",author_status: "prescriber_recorded_not_signed",
-      schedules: [{phase_number:1,dose_amount:10,dose_unit:"мг",frequency_code:"once_daily"}] },
-  ],
-}];
 const MEDICATION_STATES = {
   revoked:"отменено врачом", superseded:"заменено последующей версией",
   activation_recorded:"начало назначения зарегистрировано",not_confirmed:"статус не подтверждён",
@@ -119,8 +78,6 @@ function EventCard({ entry: item }) {
 }
 export default function ClinicalTimelinePanel({ module = "support", clientRef = null, organizationId = null }) {
   const [expanded, setExpanded] = useState(false);
-  const [view, setView] = useState("demo");
-  const [demoModule, setDemoModule] = useState(module === "body" ? "body" : "support");
   const [history, setHistory] = useState(null);
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
@@ -150,10 +107,8 @@ export default function ClinicalTimelinePanel({ module = "support", clientRef = 
       }
     }
   };
-  const demo = view === "demo";
-  const events = demo ? SYNTHETIC[demoModule] : (history?.events || []);
-  const courses = demo ? (demoModule === "support" ? SYNTHETIC_TREATMENT : [])
-    : (history?.treatment_courses || []);
+  const events = history?.events || [];
+  const courses = history?.treatment_courses || [];
   return <section data-testid="clinical-timeline-panel" style={{
     marginBottom: 20, padding: 20, border: `1px solid ${COLORS.line}`, borderRadius: 16,
     background: "#FFFDF9", color: COLORS.ink,
@@ -171,38 +126,19 @@ export default function ClinicalTimelinePanel({ module = "support", clientRef = 
     </div>
     {expanded && <>
       <p style={{ color: "#836750", fontSize: 13 }}>
-        Учебный пример использует только вымышленные данные. История пациента доступна только
-        после отдельного включения защищённого сервера и проверки разрешений.
+        История выбранного пациента доступна только после проверки ваших прав. Данные не
+        загружаются автоматически.
       </p>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-        <button type="button" onClick={() => setView("demo")}
-          style={{ padding: "7px 12px", borderRadius: 8, cursor: "pointer",
-            color: demo ? "#fff" : COLORS.ink, background: demo ? COLORS.accent : COLORS.faint, border: 0 }}>
-          Учебный пример
-        </button>
-        {clientRef && <button type="button" onClick={() => setView("patient")}
-          style={{ padding: "7px 12px", borderRadius: 8, cursor: "pointer",
-            color: !demo ? "#fff" : COLORS.ink, background: !demo ? COLORS.accent : COLORS.faint, border: 0 }}>
-          История выбранного пациента
-        </button>}
-      </div>
-      {demo && <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        <button type="button" onClick={() => setDemoModule("support")} aria-pressed={demoModule === "support"}
-          style={{ padding: "6px 10px", borderRadius: 8, cursor: "pointer",
-            border: `1px solid ${COLORS.line}`, background: demoModule === "support" ? "#FCEDE8" : "white" }}>Support</button>
-        <button type="button" onClick={() => setDemoModule("body")} aria-pressed={demoModule === "body"}
-          style={{ padding: "6px 10px", borderRadius: 8, cursor: "pointer",
-            border: `1px solid ${COLORS.line}`, background: demoModule === "body" ? "#FCEDE8" : "white" }}>Health</button>
-      </div>}
-      {!demo && <>
+      {clientRef ? <>
         <button type="button" disabled={status === "loading"} onClick={load}
-          style={{ padding: "8px 12px", borderRadius: 8, border: 0, cursor: "pointer",
+          style={{ padding: "8px 12px", borderRadius: 8, border: 0,
+            cursor: status === "loading" ? "wait" : "pointer",
             background: COLORS.ink, color: "white", marginBottom: 12 }}>
-          {status === "loading" ? "Проверяем доступ…" : "Загрузить защищённую историю"}
+          {status === "loading" ? "Проверяем доступ…" : history ? "Обновить историю" : "Загрузить историю"}
         </button>
         {error && <p role="alert" style={{ color: "#A03030", fontSize: 13 }}>{error}</p>}
-        {!history && <p style={{ fontSize: 13, color: "#817B70" }}>
-          Данные не загружаются автоматически. Доступ может быть закрыт до проверки российского медицинского контура.
+        {!history && status !== "loading" && !error && <p style={{ fontSize: 13, color: "#817B70" }}>
+          Нажмите кнопку, чтобы запросить доступ к истории выбранного пациента.
         </p>}
         {history?.summary && <p style={{ fontSize: 13 }}>
           Последние данные от пациента: {history.summary.last_patient_contact_at
@@ -212,12 +148,14 @@ export default function ClinicalTimelinePanel({ module = "support", clientRef = 
         {history?.integrity?.reconciliation_required && <p role="status" style={{ fontSize: 13, color: "#9F5E36" }}>
           Найдены расхождения между первичными записями и клиническим журналом; нужна проверка.
         </p>}
-      </>}
-      {(demo || history) && <div style={{ borderLeft: `2px solid ${COLORS.line}`, paddingTop: 5, paddingLeft: 18, marginLeft: 7 }}>
+      </> : <p role="status" style={{ fontSize: 13, color: "#817B70" }}>
+        Сначала выберите пациента.
+      </p>}
+      {history && <div style={{ borderLeft: `2px solid ${COLORS.line}`, paddingTop: 5, paddingLeft: 18, marginLeft: 7 }}>
         {events.length ? events.map((e, i) => <EventCard key={`${e.at}:${e.source || e.type}:${i}`} entry={e} />)
           : <p style={{ fontSize: 13 }}>Клинических событий пока нет.</p>}
       </div>}
-      {(demo || history) && courses.length > 0 && (
+      {history && courses.length > 0 && (
         <div style={{ marginTop: 16, padding: 12,
           border: `1px solid ${COLORS.line}`, borderRadius: 12 }}>
           <strong style={{ display: "block", marginBottom: 10 }}>
@@ -227,7 +165,7 @@ export default function ClinicalTimelinePanel({ module = "support", clientRef = 
             <div style={{ fontSize: 13, color: "#765F54" }}>
               Курс {ci + 1}: {MEDICATION_STATES[course.latest_recorded_state] || "статус неизвестен"}
             </div>
-            {course.versions.map((version, vi) => <div key={vi}
+            {(course.versions || []).map((version, vi) => <div key={vi}
               style={{ padding: "10px 12px", borderLeft: `2px solid ${COLORS.accent}`,
                 background: COLORS.faint, borderRadius: 8, marginTop: 9 }}>
               <div style={{ fontWeight: 650 }}>
@@ -237,7 +175,7 @@ export default function ClinicalTimelinePanel({ module = "support", clientRef = 
                 {version.medication_name || "Название не указано"}
                 {" · "}Сила формы: {version.formulation_strength ?? "?"} {version.strength_unit || ""}
               </div>
-              {version.schedules.map((phase, pi) => <div key={pi}
+              {(version.schedules || []).map((phase, pi) => <div key={pi}
                 style={{ fontSize: 13, marginTop: 4 }}>
                 Этап {phase.phase_number ?? pi + 1}: доза приёма {phase.dose_amount ?? "?"}
                 {" "}{phase.dose_unit || ""}
@@ -251,14 +189,11 @@ export default function ClinicalTimelinePanel({ module = "support", clientRef = 
               </div>
             </div>)}
           </div>)}
-          <div style={{ fontSize: 12, color: "#7B746A" }}>
-            Пример не является рекомендацией по дозировке или лечению.
-          </div>
         </div>
       )}
       <p style={{ fontSize: 12, color: "#817B70" }}>
-        Это хронология записей, а не подтверждение диагноза, эффективности терапии или выздоровления.
-        Публикация в Clinical Knowledge и исследовательский экспорт здесь отключены.
+        Хронология не подтверждает диагноз, эффективность терапии или выздоровление. Не изменяйте
+        назначения и дозировки без согласования с лечащим врачом. Данные доступны только для просмотра.
       </p>
     </>}
   </section>;

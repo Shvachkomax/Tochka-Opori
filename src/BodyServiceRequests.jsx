@@ -185,7 +185,7 @@ export default function BodyServiceRequests({ onBack }) {
                   <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.message}</div>
                   <div style={{ fontSize: 12, color: "#8a7e72" }}>
                     {new Date(r.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
-                    {r.price_credits != null ? ` · ${r.price_credits.toLocaleString("ru-RU")} кредитов` : " · Legacy"}
+                    {r.price_credits != null ? ` · ${r.price_credits.toLocaleString("ru-RU")} кредитов` : " · Стоимость не зафиксирована"}
                   </div>
                 </div>
               ))}
@@ -278,7 +278,7 @@ export default function BodyServiceRequests({ onBack }) {
           )}
 
           <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 12, lineHeight: 1.5 }}>
-             Стоимость фиксируется в запросе. Сейчас резервирование и списание кредитов не выполняются — это тестовый режим.
+             Стоимость фиксируется в запросе. Резервирование и списание кредитов пока не подключены; отправка запроса не списывает средства.
           </div>
 
           {submitError && <div style={{ color: "#b5473f", fontSize: 14, marginBottom: 12 }}>{submitError}</div>}
@@ -313,7 +313,7 @@ export default function BodyServiceRequests({ onBack }) {
               {selectedRequest.specialist_name && ` · ${selectedRequest.specialist_name}`}
               {selectedRequest.service_topic && ` · тема: ${TOPIC_LABELS[selectedRequest.service_topic] || selectedRequest.service_topic}`}
               {selectedRequest.meeting_format && ` · формат: ${FORMAT_LABELS[selectedRequest.meeting_format] || selectedRequest.meeting_format}`}
-              {selectedRequest.price_credits != null ? ` · Стоимость: ${selectedRequest.price_credits.toLocaleString("ru-RU")} кредитов` : " · Legacy без snapshot-цены"}
+              {selectedRequest.price_credits != null ? ` · Стоимость: ${selectedRequest.price_credits.toLocaleString("ru-RU")} кредитов` : " · Стоимость не зафиксирована"}
             </div>
             <div style={{ fontSize: 14, color: "#2f2925", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{selectedRequest.message}</div>
             {/* Contact info */}

@@ -24,6 +24,7 @@ export default function GuidedTour({
   dialogTestId = "cabinet-tour-dialog",
   nextTestId = "cabinet-tour-next",
   finalLabel = "Завершить обучение",
+  reserveMobileSpace = false,
 }) {
   const item = steps[step];
   const target = targetOverride || item?.target;
@@ -33,6 +34,15 @@ export default function GuidedTour({
   useEffect(() => {
     if (!item || !target) return undefined;
     let frame = 0;
+    const targetElement = document.querySelector(target);
+    let mobileSpacer = null;
+    if (reserveMobileSpace && window.innerWidth <= 650 && targetElement?.parentNode) {
+      mobileSpacer = document.createElement("div");
+      mobileSpacer.setAttribute("aria-hidden", "true");
+      mobileSpacer.className = `${classPrefix}-mobile-spacer`;
+      mobileSpacer.style.cssText = "height:170px;pointer-events:none;flex:0 0 170px";
+      targetElement.parentNode.insertBefore(mobileSpacer, targetElement);
+    }
     const measure = () => {
       const el = document.querySelector(target);
       if (!el) {
@@ -44,6 +54,27 @@ export default function GuidedTour({
       const width = Math.min(354, window.innerWidth - 24);
       const height = Math.min(dialogRef.current?.getBoundingClientRect().height || 300, window.innerHeight - 24);
       const gutter = 16;
+      if (mobileSpacer) {
+        const spacerRect = mobileSpacer.getBoundingClientRect();
+        const top = window.scrollY + spacerRect.top + Math.max(10, (spacerRect.height - height) / 2);
+        setPosition({
+          highlight: {
+            top: Math.max(0, r.top - 7),
+            left: Math.max(0, r.left - 7),
+            width: Math.max(1, r.width + 14),
+            height: Math.max(1, r.height + 14),
+          },
+          popStyle: {
+            position: "absolute",
+            top,
+            left: Math.max(12, (window.innerWidth - width) / 2),
+            bottom: "auto",
+            boxSizing: "border-box",
+          },
+          side: "top",
+        });
+        return;
+      }
       const rightX = panel.right + gutter;
       const leftX = panel.left - width - gutter;
       const interactiveRects = [...document.querySelectorAll("button,input,select,textarea,[role=button]")]
@@ -98,10 +129,10 @@ export default function GuidedTour({
         side,
       });
     };
-    const el = document.querySelector(target);
+    const el = targetElement;
     // An immediate scroll keeps measurement deterministic: smooth scrolling can
     // move the target underneath an already positioned popover between frames.
-    el?.scrollIntoView({ behavior: "auto", block: "center" });
+    (mobileSpacer || el)?.scrollIntoView({ behavior: "auto", block: mobileSpacer ? "start" : "center" });
     const update = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(measure);
@@ -126,8 +157,9 @@ export default function GuidedTour({
       observer?.disconnect();
       resizeObserver?.disconnect();
       document.removeEventListener("keydown", onKey);
+      mobileSpacer?.remove();
     };
-  }, [containerSelector, item, onClose, step, target]);
+  }, [classPrefix, containerSelector, item, onClose, reserveMobileSpace, step, target]);
 
   if (!item) return null;
   const last = step === steps.length - 1;

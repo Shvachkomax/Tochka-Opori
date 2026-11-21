@@ -140,6 +140,34 @@ function AvailabilityForm({ item, organizationId, onSaved, onCancel }) {
   </form>;
 }
 
+function AvailabilityExceptionForm({ organizationId, onSaved, onCancel }) {
+  const [date, setDate] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function submit(event) {
+    event.preventDefault(); setBusy(true); setError("");
+    try {
+      await callPractice("savePracticeAvailability", {
+        organization_id: organizationId, weekday: 0, exception_date: date,
+        start_time: "00:00", end_time: "23:59", note,
+      });
+      await onSaved(); onCancel?.();
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
+  return <form onSubmit={submit} data-testid="a2-availability-exception-form" style={{ marginTop: 10, padding: 12, background: "#F8F4EC", borderRadius: 10 }}>
+    <label style={{ display: "block", fontSize: 13, marginBottom: 6 }}>Дата выходного или исключения
+      <input data-testid="a2-availability-exception-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required style={fieldStyle} />
+    </label>
+    <label style={{ display: "block", fontSize: 13, marginBottom: 6 }}>Комментарий (необязательно)
+      <input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Например: отпуск" style={fieldStyle} />
+    </label>
+    <button disabled={busy} data-testid="a2-availability-exception-save" style={primaryStyle}>{busy ? "Сохраняем…" : "Добавить исключение"}</button>
+    <button type="button" onClick={onCancel} style={{ ...secondaryStyle, marginLeft: 8 }}>Отмена</button>
+    {error && <p role="alert" style={{ color: "#a33" }}>{error}</p>}
+  </form>;
+}
+
 export default function PracticeBookingPanel({ organizationId = null, storageScope = "server-practice", onBookingsChange }) {
   const [places, setPlaces] = useState([]);
   const [services, setServices] = useState([]);
@@ -149,6 +177,8 @@ export default function PracticeBookingPanel({ organizationId = null, storageSco
   const [editingPlace, setEditingPlace] = useState(null);
   const [editingService, setEditingService] = useState(null);
   const [editingAvailability, setEditingAvailability] = useState(null);
+  const [showAvailabilityForm, setShowAvailabilityForm] = useState(false);
+  const [showExceptionForm, setShowExceptionForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -179,6 +209,12 @@ export default function PracticeBookingPanel({ organizationId = null, storageSco
     } catch (err) { setError(err.message); }
   }
   async function complete(id) { await mutate("completePracticeBooking", { booking_id: id }, "Приём завершён."); }
+  async function restoreDefaultAvailability() {
+    const confirmed = window.confirm("Восстановить расписание 09:00–18:00 на все дни недели? Текущие часы и исключения будут отключены. Существующие записи пациентов сохранятся.");
+    if (!confirmed) return;
+    await mutate("resetPracticeAvailabilityDefaults", { confirmed: true }, "Стандартное расписание восстановлено.");
+    setEditingAvailability(null); setShowAvailabilityForm(false); setShowExceptionForm(false);
+  }
 
   const tourKey = tourStorageKey(storageScope);
   const [tourActive, setTourActive] = useState(false);
@@ -191,6 +227,9 @@ export default function PracticeBookingPanel({ organizationId = null, storageSco
   function closeTour() { setTourActive(false); try { localStorage.setItem(tourKey, String(tourStep)); } catch {} }
   function finishTour() { setTourActive(false); setTourStep(0); try { localStorage.removeItem(tourKey); } catch {} }
   const activeServices = services.filter((service) => service.is_active);
+  const weeklyAvailability = availability.filter((entry) => !entry.exception_date && entry.weekday >= 1 && entry.weekday <= 7);
+  const availabilityExceptions = availability.filter((entry) => entry.exception_date && entry.is_active !== false);
+  const savedWeekdays = new Set(weeklyAvailability.map((entry) => entry.weekday));
 
   return <section className="my-practice-pilot" data-testid="a2-booking-panel" style={{ border: "1px solid #e3ddcf", borderRadius: 16, padding: 20, background: "#FFFEFB", maxWidth: 640, margin: "0 auto" }}>
     <h2 style={{ margin: "0 0 8px" }}>Моя практика</h2>
@@ -224,13 +263,30 @@ export default function PracticeBookingPanel({ organizationId = null, storageSco
 
     <div data-tour-target="calendar">
       <h3>Расписание</h3>
-      {!availability.length && !loading && <p style={{ fontSize: 13, color: "#777" }}>Рабочие часы пока не заданы.</p>}
-      {availability.map((entry) => <div key={entry.id} data-testid="a2-availability-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
-        {entry.weekday >= 1 && entry.weekday <= 7 ? weekdays[entry.weekday - 1] : "Дата"} · {entry.start_time}–{entry.end_time}
-        <button type="button" onClick={() => setEditingAvailability(entry)} style={{ ...secondaryStyle, marginLeft: 8 }}>Редактировать</button>
-        <button type="button" onClick={() => mutate("deletePracticeAvailability", { id: entry.id }, "Рабочие часы удалены.")} style={{ ...secondaryStyle, marginLeft: 6 }}>Удалить</button>
+      <p style={{ fontSize: 13, color: "#666" }}>Рабочие часы сохраняются на сервере. Выходные и исключения не создают свободных слотов.</p>
+      {!weeklyAvailability.length && !loading && <p style={{ fontSize: 13, color: "#777" }}>Рабочие часы пока не заданы.</p>}
+      {weeklyAvailability.map((entry) => <div key={entry.id} data-testid="a2-availability-row" style={{ padding: "9px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
+        <strong>{weekdays[entry.weekday - 1]}</strong> · {entry.is_active === false ? "Выходной" : `${entry.start_time}–${entry.end_time}`}
+        <button type="button" onClick={() => { setEditingAvailability(entry); setShowAvailabilityForm(true); }} style={{ ...secondaryStyle, marginLeft: 8 }}>Редактировать</button>
+        <button type="button" onClick={() => mutate("setPracticeAvailabilityStatus", { id: entry.id, is_active: entry.is_active === false }, entry.is_active === false ? "День снова рабочий." : "День отмечен выходным.")} style={{ ...secondaryStyle, marginLeft: 6 }}>
+          {entry.is_active === false ? "Сделать рабочим" : "Сделать выходным"}
+        </button>
       </div>)}
-      <AvailabilityForm key={editingAvailability?.id || "new-availability"} item={editingAvailability} organizationId={organizationId} onSaved={reload} onCancel={() => setEditingAvailability(null)} />
+      {savedWeekdays.size < 7 && !showAvailabilityForm && <button type="button" onClick={() => { setEditingAvailability(null); setShowAvailabilityForm(true); }} style={{ ...secondaryStyle, marginTop: 10 }}>Добавить рабочий интервал</button>}
+      {showAvailabilityForm && <AvailabilityForm key={editingAvailability?.id || "new-availability"} item={editingAvailability} organizationId={organizationId} onSaved={reload} onCancel={() => { setEditingAvailability(null); setShowAvailabilityForm(false); }} />}
+
+      <div style={{ marginTop: 16 }}>
+        <strong style={{ fontSize: 14 }}>Исключения</strong>
+        {!availabilityExceptions.length && <p style={{ fontSize: 13, color: "#777" }}>Исключений пока нет.</p>}
+        {availabilityExceptions.map((entry) => <div key={entry.id} data-testid="a2-availability-exception-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
+          {new Date(`${entry.exception_date}T12:00:00Z`).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}
+          {entry.note ? ` · ${entry.note}` : " · выходной"}
+          <button type="button" onClick={() => mutate("deletePracticeAvailability", { id: entry.id }, "Исключение удалено.")} style={{ ...secondaryStyle, marginLeft: 8 }}>Удалить исключение</button>
+        </div>)}
+        {!showExceptionForm && <button type="button" onClick={() => setShowExceptionForm(true)} style={{ ...secondaryStyle, marginTop: 10 }}>Добавить исключение</button>}
+        {showExceptionForm && <AvailabilityExceptionForm organizationId={organizationId} onSaved={reload} onCancel={() => setShowExceptionForm(false)} />}
+      </div>
+      <button type="button" onClick={restoreDefaultAvailability} data-testid="a2-availability-reset" style={{ ...secondaryStyle, marginTop: 14 }}>Восстановить 09:00–18:00 на всю неделю</button>
     </div>
 
     <h3>Записи пациентов</h3>
@@ -250,6 +306,6 @@ export default function PracticeBookingPanel({ organizationId = null, storageSco
       onNext={() => tourStep === 2 ? finishTour() : changeTourStep(tourStep + 1)}
       onSkip={() => tourStep === 2 ? finishTour() : changeTourStep(tourStep + 1)}
       onClose={closeTour}
-      ready={tourStepReady(tourStep, { places: places.length, offers: activeServices.length, events: availability.length, dirty: false, scheduleDirty: false })} />}
+      ready={tourStepReady(tourStep, { places: places.length, offers: activeServices.length, events: weeklyAvailability.filter((entry) => entry.is_active !== false).length, dirty: false, scheduleDirty: false })} />}
   </section>;
 }

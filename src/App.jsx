@@ -6776,7 +6776,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                              {r.service_code && ` · ${r.service_code}`}
                              {r.service_topic && ` · тема: ${r.service_topic}`}
                              {r.meeting_format && ` · формат: ${r.meeting_format}`}
-                             {r.price_credits != null ? ` · Стоимость: ${r.price_credits.toLocaleString("ru-RU")} кредитов` : " · Legacy без snapshot-цены"}
+                             {r.price_credits != null ? ` · Стоимость: ${r.price_credits.toLocaleString("ru-RU")} кредитов` : " · Стоимость не зафиксирована"}
                              {` · Зарезервировано: ${r.reserved_credits || 0}`}
                              {` · Списано: ${r.charged_credits || 0}`}
                             {r.due_at && ` · срок: ${new Date(r.due_at).toLocaleDateString("ru-RU")}`}
@@ -6798,7 +6798,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           )}
                           {r.status === "completed" && (
                             <div style={{ fontSize: 11, color: "#8a7e72", marginBottom: 8 }}>
-                              Тестовый режим: фактическое списание кредитов пока не выполняется
+                              Фактическое списание кредитов для этого запроса не выполнялось
                             </div>
                           )}
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -6858,7 +6858,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                           <div>
                             <div style={{ fontWeight: 600, fontSize: 14 }}>{c.display_name}</div>
                             <div style={{ fontSize: 12, color: t.muted }}>
-                              {c.legacy_specialist_name ? `Legacy: ${c.legacy_specialist_name}` : "Без legacy-метки"}
+                              {c.legacy_specialist_name ? `Ранее указан: ${c.legacy_specialist_name}` : "Специалист не указан"}
                               {c.assignment_status.assigned ? (
                                 <span style={{ marginLeft: 8, color: "#7D9A89" }}>
                                   → {c.assignment_status.expert_name} ({c.assignment_status.organization_name})
