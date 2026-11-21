@@ -163,7 +163,42 @@ async function resolveSupportSpecialistRelation(ownerId) {
   let expertId = latest.primary_expert_id;
   let orgId = latest.organization_id;
 
-  // If session doesn't have expert, check patient_assignments
+  // Prefer the canonical owner-scoped links created by invitation acceptance.
+  if (!expertId) {
+    const { data: assignment } = await supabase
+      .from("patient_assignments")
+      .select("primary_expert_id, organization_id")
+      .eq("owner_type", "anonymous_case")
+      .eq("owner_id", ownerId)
+      .eq("module", "support")
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (assignment) {
+      expertId = assignment.primary_expert_id;
+      orgId = orgId || assignment.organization_id;
+    }
+  }
+
+  if (!expertId) {
+    const { data: access } = await supabase
+      .from("patient_access")
+      .select("expert_id, organization_id")
+      .eq("owner_type", "anonymous_case")
+      .eq("owner_id", ownerId)
+      .eq("module", "support")
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (access) {
+      expertId = access.expert_id;
+      orgId = orgId || access.organization_id;
+    }
+  }
+
+  // Legacy Support links can still be keyed by public_code only.
   if (!expertId && latest.public_code) {
     const { data: assignment } = await supabase
       .from("patient_assignments")
@@ -3827,6 +3862,13 @@ const REQUEST_TYPE_CONFIG = {
 };
 
 const BODY_TOPICS = ["labs", "medications_supplements", "diary_nutrition", "general_health", "other"];
+const BODY_TOPIC_LABELS = {
+  labs: "Анализы",
+  medications_supplements: "Лекарства и БАДы",
+  diary_nutrition: "Питание / дневник",
+  general_health: "Общее самочувствие",
+  other: "Другой вопрос",
+};
 const BODY_REQUEST_TYPE_BY_FORMAT = {
   text: "text_question",
   phone: "phone_call",
@@ -3873,7 +3915,22 @@ async function handleCreateBodyServiceRequest(req, res, { legacy = false } = {})
     let reservedCredits = 0;
     let pricingNote = null;
 
-    if (effectiveServiceCode) {
+    if (!legacy) {
+      if (!BODY_TOPICS.includes(service_topic)) {
+        return res.status(400).json({ ok: false, error: "Укажите корректную тему обращения." });
+      }
+      // A3.8.2 ordinary Health questions are deliberately unpriced. Published
+      // appointments use practice_services through /api/practice-booking.
+      effectiveServiceCode = null;
+      effectiveServiceTopic = service_topic;
+      effectiveMeetingFormat = "text";
+      requestType = "text_question";
+      config = {
+        label: `Вопрос специалисту — ${BODY_TOPIC_LABELS[service_topic]}`,
+        meeting_format: "text",
+        sla_hours: 24,
+      };
+    } else if (effectiveServiceCode) {
       const { data: tariff, error: pricingError } = await supabase
         .from("service_pricing")
         .select("service_code, module, label, service_topic, meeting_format, credits, active")
@@ -3901,9 +3958,6 @@ async function handleCreateBodyServiceRequest(req, res, { legacy = false } = {})
       };
       priceSnapshot = tariff.credits;
     } else {
-      if (!legacy) {
-        return res.status(400).json({ ok: false, error: "Укажите canonical service_code услуги." });
-      }
       // Legacy Body clients may still send request_type. Keep this path
       // separate: it does not create a new pricing snapshot.
       config = REQUEST_TYPE_CONFIG[request_type];
@@ -3930,15 +3984,29 @@ async function handleCreateBodyServiceRequest(req, res, { legacy = false } = {})
       .limit(1)
       .maybeSingle();
 
-    if (!assignment?.primary_expert_id) {
+    let assignedExpertId = assignment?.primary_expert_id || null;
+    if (!assignedExpertId) {
+      const { data: access } = await supabase
+        .from("patient_access")
+        .select("expert_id")
+        .eq("owner_type", "anonymous_profile")
+        .eq("owner_id", owner.ownerId)
+        .eq("module", "body")
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      assignedExpertId = access?.expert_id || null;
+    }
+    if (!assignedExpertId) {
       return res.status(400).json({ ok: false, error: "Нет активного назначения специалиста. Обратитесь к администратору." });
     }
 
-    specialistId = String(assignment.primary_expert_id);
+    specialistId = String(assignedExpertId);
     const { data: expert } = await supabase
       .from("experts")
       .select("id, name")
-      .eq("id", assignment.primary_expert_id)
+      .eq("id", assignedExpertId)
       .maybeSingle();
     specialistName = expert?.name || "Специалист";
 
@@ -4719,13 +4787,10 @@ async function handleCreateSupportServiceRequest(req, res) {
       meetingFormat = mapping.meeting_format;
       priceSnapshot = pricing.credits;
     } else {
-      // Legacy: use request_type directly (backward compat)
-      const config = SUPPORT_REQUEST_TYPE_CONFIG[clientRequestType];
-      if (!config) {
-        return res.status(400).json({ ok: false, error: "Укажите тип услуги." });
-      }
-      requestType = clientRequestType;
-      meetingFormat = config.meeting_format;
+      // A3.8.2 ordinary Support questions are unpriced. Old canonical
+      // service_code requests remain readable and accepted for compatibility.
+      requestType = "question";
+      meetingFormat = SUPPORT_REQUEST_TYPE_CONFIG.question.meeting_format;
     }
 
     const config = SUPPORT_REQUEST_TYPE_CONFIG[requestType];

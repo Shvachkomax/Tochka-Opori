@@ -83,9 +83,8 @@ async function main() {
     await ensureHealthCabinet(page, BODY_CODE);
 
     await openServiceRequests(page);
-    await page.locator('button:has-text("Новый запрос")').click();
+    await page.locator('button:has-text("Задать вопрос специалисту")').click();
     await page.locator('button:has-text("Другой вопрос")').click();
-    await page.locator('button:has-text("Формат: письменно")').click();
 
     const textarea = page.locator('textarea[placeholder="Опишите вопрос своими словами..."]');
     await textarea.waitFor({ state: "visible", timeout: 10000 });
@@ -111,12 +110,14 @@ async function main() {
 
     const { data: persisted } = await supabase
       .from("service_requests")
-      .select("id, message, owner_type, module")
+      .select("id, message, owner_type, module, service_code, price_credits, reserved_credits, charged_credits")
       .like("message", `${firstLine.slice(0, 24)}%`)
       .order("created_at", { ascending: false })
       .limit(5);
     const exactRow = (persisted || []).find((r) => r.message === uniqueMsg && r.owner_type === "anonymous_profile" && r.module === "body");
     assert(Boolean(exactRow), "request is persisted in TEST database with full message (owner_type=anonymous_profile, module=body)");
+    assert(exactRow?.service_code === null && exactRow?.price_credits === null, "ordinary Health question has no legacy tariff snapshot");
+    assert(Number(exactRow?.reserved_credits || 0) === 0 && Number(exactRow?.charged_credits || 0) === 0, "ordinary Health question reserves and charges no credits");
     if (exactRow && createResp.id && !cleanupIds.includes(exactRow.id)) cleanupIds.push(exactRow.id);
 
     await page.reload({ waitUntil: "networkidle", timeout: 30000 });

@@ -851,8 +851,10 @@ export default function SpecialistCabinet() {
         {import.meta.env.VITE_ENABLE_MY_PRACTICE_PILOT === "true" && !selectedClient && (
           <div style={{ marginBottom: 20 }}>
             <PracticeBookingPanel
-              key={`${expert.id}:${orgId || "private"}`}
+              key={`${expert.id}:${orgId || "private"}:${module}`}
               organizationId={orgId}
+              module={module}
+              allowedModules={expert.allowed_modules}
               storageScope={`${expert.id}:${orgId || "private"}`}
             />
           </div>

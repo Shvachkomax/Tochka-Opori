@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getBodySession } from "./lib/sessionAccess.js";
+import PracticePatientBooking from "./pages/specialist/PracticePatientBooking.jsx";
 
 const BODY_TOPICS = [
   { value: "labs", label: "Анализы" },
@@ -29,11 +30,6 @@ const STATUS_COLORS = {
   cancelled: "#b5473f", expired: "#b5473f", refunded: "#8a7e72",
 };
 
-function getLocalDateString() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 async function apiCall(action, body) {
   const saved = getBodySession();
   const res = await fetch("/api/session", {
@@ -46,40 +42,22 @@ async function apiCall(action, body) {
 export default function BodyServiceRequests({ onBack }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState("list"); // list | new | detail
+  const [view, setView] = useState("list"); // list | new | booking | detail
   const [selectedRequest, setSelectedRequest] = useState(null);
 
   // New request form
   const [serviceTopic, setServiceTopic] = useState("");
-  const [serviceCode, setServiceCode] = useState("");
-  const [pricing, setPricing] = useState([]);
-  const [pricingLoading, setPricingLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [includeDiary, setIncludeDiary] = useState(true);
   const [includePlates, setIncludePlates] = useState(false);
   const [includeWeekly, setIncludeWeekly] = useState(false);
   const [includeHealthCtx, setIncludeHealthCtx] = useState(false);
-  const [contactPhone, setContactPhone] = useState("");
-  const [preferredDate, setPreferredDate] = useState("");
-  const [preferredTimeFrom, setPreferredTimeFrom] = useState("");
-  const [preferredTimeTo, setPreferredTimeTo] = useState("");
-  const [preferredTimeText, setPreferredTimeText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
     loadRequests();
-    loadPricing();
   }, []);
-
-  async function loadPricing() {
-    setPricingLoading(true);
-    try {
-      const data = await apiCall("getServicePricing", { module: "body" });
-      if (data.ok) setPricing(data.pricing || []);
-    } catch {}
-    setPricingLoading(false);
-  }
 
   async function loadRequests() {
     setLoading(true);
@@ -91,15 +69,14 @@ export default function BodyServiceRequests({ onBack }) {
   }
 
   async function handleSubmit() {
-    if (!serviceTopic || !serviceCode || !message.trim()) {
-      setSubmitError("Выберите тему, услугу и укажите сообщение.");
+    if (!serviceTopic || !message.trim()) {
+      setSubmitError("Выберите тему и укажите сообщение.");
       return;
     }
     setSubmitting(true);
     setSubmitError("");
     try {
       const data = await apiCall("createBodyServiceRequest", {
-        service_code: serviceCode,
         service_topic: serviceTopic,
         message: message.trim(),
         context_options: {
@@ -108,19 +85,11 @@ export default function BodyServiceRequests({ onBack }) {
           include_weekly_summary: includeWeekly,
           include_health_context: includeHealthCtx,
         },
-        client_contact: {
-          phone: contactPhone || null,
-          preferred_date: preferredDate || null,
-          preferred_time_from: preferredTimeFrom || null,
-          preferred_time_to: preferredTimeTo || null,
-          preferred_time_text: preferredTimeText || null,
-        },
       });
       if (!data.ok) throw new Error(data.error || "Не удалось отправить.");
       setView("list");
       setMessage("");
       setServiceTopic("");
-      setServiceCode("");
       loadRequests();
     } catch (e) {
       setSubmitError(e.message);
@@ -137,14 +106,7 @@ export default function BodyServiceRequests({ onBack }) {
     } catch {}
   }
 
-  const selectedService = pricing.find((item) => item.service_code === serviceCode);
-  const availableServices = pricing.filter((item) => {
-    if (!serviceTopic) return false;
-    if (!item.service_topic) return true;
-    if (item.service_code === "health_written_consultation" && serviceTopic === "other") return true;
-    return item.service_topic === serviceTopic;
-  });
-  const needContact = selectedService && ["phone", "video", "offline"].includes(selectedService.meeting_format);
+  const bodySession = getBodySession();
 
   return (
     <div style={{ maxWidth: 780, margin: "32px auto 64px", padding: "0 16px", width: "100%", boxSizing: "border-box" }}>
@@ -162,9 +124,14 @@ export default function BodyServiceRequests({ onBack }) {
       {/* List view */}
       {view === "list" && (
         <>
-          <button onClick={() => setView("new")} style={{ width: "100%", padding: "12px 20px", borderRadius: 14, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 20, fontFamily: "inherit" }}>
-            Новый запрос
-          </button>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginBottom: 20 }}>
+            <button onClick={() => setView("new")} style={{ padding: "14px 20px", borderRadius: 14, border: 0, background: "#5f8b7a", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
+              Задать вопрос специалисту
+            </button>
+            <button onClick={() => setView("booking")} style={{ padding: "14px 20px", borderRadius: 14, border: "1px solid #7D9A89", background: "#fff", color: "#5f8b7a", fontWeight: 700, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>
+              Записаться к своему специалисту
+            </button>
+          </div>
 
           {loading ? (
             <div style={{ textAlign: "center", color: "#8a7e72", padding: 20 }}>Загрузка...</div>
@@ -185,7 +152,7 @@ export default function BodyServiceRequests({ onBack }) {
                   <div style={{ fontSize: 13, color: "#5f574f", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.message}</div>
                   <div style={{ fontSize: 12, color: "#8a7e72" }}>
                     {new Date(r.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
-                    {r.price_credits != null ? ` · ${r.price_credits.toLocaleString("ru-RU")} кредитов` : " · Стоимость не зафиксирована"}
+                    {r.price_credits != null ? ` · ${r.price_credits.toLocaleString("ru-RU")} кредитов` : " · Стоимость уточняется специалистом"}
                   </div>
                 </div>
               ))}
@@ -201,7 +168,7 @@ export default function BodyServiceRequests({ onBack }) {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
             {BODY_TOPICS.map((topic) => (
-              <button key={topic.value} onClick={() => { setServiceTopic(topic.value); setServiceCode(""); setSubmitError(""); }} style={{
+              <button key={topic.value} onClick={() => { setServiceTopic(topic.value); setSubmitError(""); }} style={{
                 padding: "12px 16px", borderRadius: 12, border: `1px solid ${serviceTopic === topic.value ? "#7D9A89" : "#e8e2d8"}`,
                 background: serviceTopic === topic.value ? "#e8f0ea" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
               }}>
@@ -209,30 +176,6 @@ export default function BodyServiceRequests({ onBack }) {
               </button>
             ))}
           </div>
-
-          {serviceTopic && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Как удобнее получить консультацию?</div>
-              {pricingLoading ? (
-                <div style={{ fontSize: 13, color: "#8a7e72", padding: 12 }}>Загрузка актуальных тарифов...</div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {availableServices.map((service) => (
-                    <button key={service.service_code} onClick={() => setServiceCode(service.service_code)} style={{
-                      padding: "12px 16px", borderRadius: 12, border: `1px solid ${serviceCode === service.service_code ? "#7D9A89" : "#e8e2d8"}`,
-                      background: serviceCode === service.service_code ? "#e8f0ea" : "#fff", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                    }}>
-                      <div className="body-service-request-service-row">
-                        <div className="body-service-request-service-title" style={{ fontSize: 14, fontWeight: 600, color: "#2f2925" }}>{service.label}</div>
-                        <div className="body-service-request-service-price" style={{ fontSize: 13, color: "#5f8b7a", fontWeight: 700 }}>{service.credits.toLocaleString("ru-RU")} кредитов</div>
-                      </div>
-                      <div style={{ fontSize: 12, color: "#8a7e72", marginTop: 3 }}>Формат: {FORMAT_LABELS[service.meeting_format] || service.meeting_format}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {serviceTopic === "medications_supplements" && (
             <div style={{ padding: 12, borderRadius: 10, background: "#fdf6ee", border: "1px solid #e8d5b8", marginBottom: 16, fontSize: 13, color: "#92400e" }}>
@@ -260,25 +203,8 @@ export default function BodyServiceRequests({ onBack }) {
             ))}
           </div>
 
-          {needContact && (
-            <div style={{ marginBottom: 16, padding: 16, borderRadius: 12, background: "#faf6ef", border: "1px solid #e8e2d8" }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#2f2925", marginBottom: 8 }}>Когда вам удобно?</div>
-              <div className="body-service-request-contact-wide" style={{ marginBottom: 8 }}>
-                <input value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="Телефон" className="body-service-request-field" style={{ height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 14, outline: "none", fontFamily: "inherit" }} />
-              </div>
-              <div className="body-service-request-contact-grid">
-                <input value={preferredDate} onChange={e => setPreferredDate(e.target.value)} type="date" placeholder="Дата" className="body-service-request-field" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
-                <input value={preferredTimeFrom} onChange={e => setPreferredTimeFrom(e.target.value)} type="time" placeholder="С" className="body-service-request-field" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
-                <input value={preferredTimeTo} onChange={e => setPreferredTimeTo(e.target.value)} type="time" placeholder="До" className="body-service-request-field" style={{ height: 44, padding: "0 10px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 13, outline: "none", fontFamily: "inherit" }} />
-              </div>
-              <div className="body-service-request-contact-wide">
-                <input value={preferredTimeText} onChange={e => setPreferredTimeText(e.target.value)} placeholder="Например: завтра после 18:00 или в будни утром" className="body-service-request-field" style={{ height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid #d8cec1", background: "#fff", color: "#2f2925", fontSize: 14, outline: "none", fontFamily: "inherit" }} />
-              </div>
-            </div>
-          )}
-
           <div style={{ fontSize: 12, color: "#8a7e72", marginBottom: 12, lineHeight: 1.5 }}>
-             Стоимость фиксируется в запросе. Резервирование и списание кредитов пока не подключены; отправка запроса не списывает средства.
+            Стоимость уточняется специалистом. Отправка вопроса не резервирует и не списывает кредиты.
           </div>
 
           {submitError && <div style={{ color: "#b5473f", fontSize: 14, marginBottom: 12 }}>{submitError}</div>}
@@ -291,6 +217,19 @@ export default function BodyServiceRequests({ onBack }) {
               Отмена
             </button>
           </div>
+        </div>
+      )}
+
+      {view === "booking" && (
+        <div>
+          <button onClick={() => setView("list")} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #d8cec1", background: "#fff", cursor: "pointer", marginBottom: 12 }}>
+            ← К вопросам
+          </button>
+          <PracticePatientBooking
+            sessionId={bodySession.sessionId}
+            accessToken={bodySession.accessToken}
+            module="body"
+          />
         </div>
       )}
 
@@ -313,7 +252,7 @@ export default function BodyServiceRequests({ onBack }) {
               {selectedRequest.specialist_name && ` · ${selectedRequest.specialist_name}`}
               {selectedRequest.service_topic && ` · тема: ${TOPIC_LABELS[selectedRequest.service_topic] || selectedRequest.service_topic}`}
               {selectedRequest.meeting_format && ` · формат: ${FORMAT_LABELS[selectedRequest.meeting_format] || selectedRequest.meeting_format}`}
-              {selectedRequest.price_credits != null ? ` · Стоимость: ${selectedRequest.price_credits.toLocaleString("ru-RU")} кредитов` : " · Стоимость не зафиксирована"}
+              {selectedRequest.price_credits != null ? ` · Стоимость: ${selectedRequest.price_credits.toLocaleString("ru-RU")} кредитов` : " · Стоимость уточняется специалистом"}
             </div>
             <div style={{ fontSize: 14, color: "#2f2925", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{selectedRequest.message}</div>
             {/* Contact info */}

@@ -54,7 +54,7 @@ assert(practice.includes("Начислено специалисту"));
 assert(practice.includes("Комиссия сервиса"));
 
 assert(!patientRequests.includes("это тестовый режим"));
-assert(patientRequests.includes("отправка запроса не списывает средства"));
+assert(patientRequests.includes("Отправка вопроса не резервирует и не списывает кредиты"));
 assert(!app.includes("Тестовый режим: фактическое списание"));
 
 assert(clinicalApi.includes("allowSyntheticFallback: false"), "User searches must never fall back to synthetic clinical cases");

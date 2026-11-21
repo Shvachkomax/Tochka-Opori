@@ -142,9 +142,21 @@ try {
   assert.equal(place.status, 200); assert(place.body.place?.id);
   const service = await invoke(handlePracticeServices, {
     action: "savePracticeService", organization_id: fixture.organization, place_id: place.body.place.id,
-    name: "A38 Synthetic Zero-Price Visit", format: "offline", price_kop: 0, duration_min: 60, is_active: true,
+    name: "A38 Synthetic Zero-Price Visit", format: "offline", price_kop: 0, duration_min: 60,
+    modules: ["support", "body"], is_active: true,
   }, doctorDeps(fixture.expertA));
   assert.equal(service.status, 200); assert.equal(service.body.service?.is_active, true);
+  const supportOnlyService = await invoke(handlePracticeServices, {
+    action: "savePracticeService", organization_id: fixture.organization, place_id: place.body.place.id,
+    name: "A38 Synthetic Support Only", format: "online", price_kop: 0, duration_min: 45,
+    modules: ["support"], is_active: true,
+  }, doctorDeps(fixture.expertA));
+  const healthOnlyService = await invoke(handlePracticeServices, {
+    action: "savePracticeService", organization_id: fixture.organization, place_id: place.body.place.id,
+    name: "A38 Synthetic Health Only", format: "video", price_kop: 0, duration_min: 30,
+    modules: ["body"], is_active: true,
+  }, doctorDeps(fixture.expertA));
+  assert.equal(supportOnlyService.status, 200); assert.equal(healthOnlyService.status, 200);
   const availability = await invoke(handlePracticeAvailability, {
     action: "listPracticeAvailability", organization_id: fixture.organization,
   }, doctorDeps(fixture.expertA));
@@ -160,9 +172,16 @@ try {
   const supportCabinet = await patientRequest("getPracticePatientCabinet");
   assert.equal(supportCabinet.status, 200);
   assert.deepEqual(supportCabinet.body.specialists.map((row) => row.expert_id).sort(), [fixture.expertA, fixture.expertB].sort());
-  assert.equal(supportCabinet.body.specialists.find((row) => row.expert_id === fixture.expertA).services[0].service_id, service.body.service.id);
+  assert.deepEqual(supportCabinet.body.specialists.find((row) => row.expert_id === fixture.expertA).services.map((row) => row.service_id).sort(),
+    [service.body.service.id, supportOnlyService.body.service.id].sort());
   const healthCabinet = await patientRequest("getPracticePatientCabinet", healthOwner);
   assert.deepEqual(healthCabinet.body.specialists.map((row) => row.expert_id), [fixture.expertA]);
+  assert.deepEqual(healthCabinet.body.specialists[0].services.map((row) => row.service_id).sort(),
+    [service.body.service.id, healthOnlyService.body.service.id].sort());
+  assert.equal((await patientRequest("getPracticeSlots", owner, { service_id: healthOnlyService.body.service.id, day })).status, 404,
+    "Support patient cannot enumerate a Health-only service");
+  assert.equal((await patientRequest("getPracticeSlots", healthOwner, { service_id: supportOnlyService.body.service.id, day })).status, 404,
+    "Health patient cannot enumerate a Support-only service");
 
   const slots = await patientRequest("getPracticeSlots", owner, { service_id: service.body.service.id, day });
   assert.equal(slots.status, 200); assert(slots.body.free.length > 0);
@@ -172,6 +191,16 @@ try {
     idempotency_key: `a38-${runId}`, expected_price_credits: 0, cancellation_policy_version: "12h-20-v1",
   });
   assert.equal(reserved.status, 200); assert.equal(reserved.body.status, "confirmed");
+  const repriced = await invoke(handlePracticeServices, {
+    action: "savePracticeService", id: service.body.service.id, organization_id: fixture.organization,
+    place_id: place.body.place.id, name: "A38 Synthetic Repriced Visit", format: "offline",
+    price_kop: 10000, duration_min: 60, modules: ["support", "body"], is_active: true,
+  }, doctorDeps(fixture.expertA));
+  assert.equal(repriced.status, 200); assert.equal(Number(repriced.body.service.price_credits), 1000);
+  const bookingSnapshot = await ensure(await supabase.from("practice_booking_credits")
+    .select("charged_credits, price_kop").eq("booking_id", reserved.body.booking_id).single(), "booking snapshot");
+  assert.equal(Number(bookingSnapshot.charged_credits), 0, "service repricing never changes the booked credit snapshot");
+  assert.equal(Number(bookingSnapshot.price_kop), 0, "service repricing never changes the booked RUB snapshot");
   const slotsAfterBooking = await patientRequest("getPracticeSlots", owner, { service_id: service.body.service.id, day });
   assert(!slotsAfterBooking.body.free.some((slot) => slot.start_time === selectedSlot.start_time), "confirmed interval stays unavailable to the patient");
   const patientAfterBooking = await patientRequest("getPracticePatientCabinet");
@@ -201,7 +230,7 @@ try {
   assert.deepEqual(supportAfterRevoke.body.specialists.map((row) => row.expert_id), [fixture.expertA]);
   assert.equal(await relationCount(fixture.expertA, "body", "anonymous_profile", fixture.healthOwner), 1, "Support revoke never removes Health link");
 
-  console.log("A3.8 TEST E2E PASS: mutual links, multi-specialist, module isolation, server publication, slots, zero-price booking, both schedules, cancellation, unauthorized denial, symmetric revoke, cleanup.");
+  console.log("A3.8.2 TEST E2E PASS: mutual links, module-scoped server catalog, repricing snapshots, slots, booking, both schedules, cancellation, unauthorized denial, symmetric revoke, cleanup.");
 } finally {
   await cleanup();
 }

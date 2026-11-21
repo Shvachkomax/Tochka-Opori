@@ -32,8 +32,11 @@ const tables = {
   experts: [{ id: "doctor-h", name: "Врач Health", is_active: true }, { id: "doctor-s", name: "Врач Support", is_active: true }],
   organizations: [{ id: "clinic", name: "Клиника" }],
   practice_services: [
-    { id: "correct", expert_id: "doctor-h", organization_id: "clinic", is_active: true, practice_places: { name: "Кабинет" } },
-    { id: "excluded", expert_id: "doctor-h", organization_id: null, is_active: true },
+    { id: "correct", expert_id: "doctor-h", organization_id: "clinic", modules: ["body"], is_active: true, price_credits: 20000, practice_places: { name: "Кабинет" } },
+    { id: "wrong-module", expert_id: "doctor-h", organization_id: "clinic", modules: ["support"], is_active: true },
+    { id: "support-service", expert_id: "doctor-s", organization_id: null, modules: ["support"], is_active: true, price_credits: 10000 },
+    { id: "unpublished", expert_id: "doctor-h", organization_id: "clinic", modules: ["body"], is_active: false },
+    { id: "excluded", expert_id: "doctor-h", organization_id: null, modules: ["body"], is_active: true },
   ],
   practice_bookings: [booking],
 };
@@ -49,6 +52,7 @@ function from(table) {
     eq(key, value) { filters.push((row) => row[key] === value); return query; },
     is(key, value) { return query.eq(key, value); },
     in(key, values) { filters.push((row) => values.includes(row[key])); return query; },
+    contains(key, values) { filters.push((row) => Array.isArray(row[key]) && values.every((value) => row[key].includes(value))); return query; },
     or(expression) {
       const owners = [...expression.matchAll(/and\(owner_type\.eq\.([^,]+),owner_id\.eq\.([^)]+)\)/g)];
       filters.push((row) => owners.some(([, type, id]) => row.owner_type === type && row.owner_id === id));
@@ -124,14 +128,22 @@ assert.equal((await changePracticeProfileLink(supabase, support, health)).error,
 assert.deepEqual(await changePracticeProfileLink(supabase, health, support), {});
 assert.equal((await changePracticeProfileLink(supabase, other, health)).conflict, true);
 
-for (const owner of [support, health]) {
-  const result = await request("getPracticePatientCabinet", owner);
-  assert.equal(result.data.linked, true);
-  assert.deepEqual(result.data.specialists.map(({ expert_id }) => expert_id).sort(), ["doctor-h", "doctor-s"]);
-  const specialist = result.data.specialists.find(({ expert_id }) => expert_id === "doctor-h");
-  assert.deepEqual(specialist.services.map(({ service_id }) => service_id), ["correct"]);
-  assert.equal(result.data.bookings[0].id, booking.id);
-}
+const linkedSupport = await request("getPracticePatientCabinet", support);
+assert.equal(linkedSupport.data.linked, true);
+assert.deepEqual(linkedSupport.data.specialists.map(({ expert_id }) => expert_id), ["doctor-s"]);
+assert.deepEqual(linkedSupport.data.specialists[0].services.map(({ service_id }) => service_id), ["support-service"]);
+assert.equal(linkedSupport.data.bookings[0].id, booking.id);
+const linkedHealth = await request("getPracticePatientCabinet", health);
+assert.equal(linkedHealth.data.linked, true);
+assert.deepEqual(linkedHealth.data.specialists.map(({ expert_id }) => expert_id), ["doctor-h"]);
+assert.deepEqual(linkedHealth.data.specialists[0].services.map(({ service_id }) => service_id), ["correct"]);
+assert.equal(linkedHealth.data.bookings[0].id, booking.id);
+assert.deepEqual((await request("listPracticeDoctorServices", health, { expert_id: "doctor-h" })).data.services.map(({ service_id }) => service_id), ["correct"]);
+assert.equal((await request("listPracticeDoctorServices", support, { expert_id: "doctor-h" })).code, 404);
+assert.equal((await request("reservePracticeBooking", health, {
+  service_id: "wrong-module", day: "2099-01-19", start_time: "10:00", idempotency_key: "wrong-module",
+  expected_price_credits: 20000, cancellation_policy_version: "12h-20-v1",
+})).code, 404);
 
 assert.equal((await request("listPracticeBookings", health, { organization_id: "clinic" })).data.bookings[0].status, "confirmed");
 assert.equal((await request("cancelPracticeBookingPublic", other, { booking_id: booking.id })).code, 403);
@@ -151,6 +163,7 @@ const revoked = await request("revokePracticeSpecialist", health, { expert_id: "
 assert.equal(revoked.code, 200);
 assert.equal(revoked.data.revoked, 1);
 assert.deepEqual((await request("getPracticePatientCabinet", health)).data.specialists, []);
+tables.patient_assignments[0].status = "active";
 // Financial actions must validate acceptance, then use the credit RPC.
 assert.equal((await request("reservePracticeBooking", health, { service_id: "correct", day: "2099-01-19", start_time: "10:00", idempotency_key: "key" })).code, 400);
 const oldRpc = supabase.rpc;

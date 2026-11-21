@@ -32,7 +32,7 @@ async function installMocks(context) {
     const body = route.request().postDataJSON();
     if (body.action === "me") return route.fulfill({ status: 401, json: { ok: false, error: "Требуется авторизация" } });
     if (body.action === "login") return ok(route, {
-      expert: { id: "synthetic-a38-doctor", name: "A38 Synthetic Specialist", specialty: "Synthetic", allowed_modules: ["support"] },
+      expert: { id: "synthetic-a38-doctor", name: "A38 Synthetic Specialist", specialty: "Synthetic", allowed_modules: ["support", "body"] },
       memberships: [{ membership_id: "a38-membership", organization_id: organizationId, organization_name: "A38 Synthetic Organization", status: "active" }],
     });
     if (body.action === "listClients") return ok(route, { clients: [] });
@@ -58,7 +58,7 @@ async function installMocks(context) {
       const row = {
         id: body.id || "a38-service", expert_id: "synthetic-a38-doctor", organization_id: organizationId,
         place_id: body.place_id, name: body.name, format: body.format, price_kop: body.price_kop,
-        price_credits: body.price_kop / 10, duration_min: body.duration_min, is_active: body.is_active,
+        price_credits: body.price_kop / 10, duration_min: body.duration_min, modules: body.modules, is_active: body.is_active,
       };
       state.services = [row]; return ok(route, { service: row });
     }
@@ -145,10 +145,12 @@ try {
   await page.getByTestId("a2-service-name").fill("A38 Synthetic Service");
   await page.getByTestId("a2-service-price").fill("0");
   await page.getByTestId("a2-service-place").selectOption("a38-place");
+  await page.getByTestId("a2-service-module-body").check();
   await page.getByTestId("a2-service-published").check();
   await page.getByTestId("a2-service-save").click();
   await page.getByText("Опубликована").waitFor();
   assert.equal(serverServiceWrites, 1, "service was persisted through the server action");
+  assert.deepEqual(state.services[0].modules.sort(), ["body", "support"], "doctor can publish one server service for Support and Health");
   assert.equal(await page.getByTestId("a2-availability-row").count(), 7, "new cabinet shows seven default days");
   const mondayRow = page.getByTestId("a2-availability-row").first();
   await mondayRow.getByRole("button", { name: "Редактировать" }).click();

@@ -166,7 +166,7 @@ export default function App() {
   const [supportSessionLoading, setSupportSessionLoading] = useState(false);
   const [supportNewRequestOpen, setSupportNewRequestOpen] = useState(false);
   const [supportRequestSessionId, setSupportRequestSessionId] = useState(null);
-  const [supportNewRequest, setSupportNewRequest] = useState({ service_code: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
+  const [supportNewRequest, setSupportNewRequest] = useState({ reason: "", message: "", comment: "" });
   const [supportRequestSubmitting, setSupportRequestSubmitting] = useState(false);
   const [accessExpanded, setAccessExpanded] = useState(false);
   const [profileExpanded, setProfileExpanded] = useState(false);
@@ -1705,10 +1705,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       showToast("Нужен код доступа.", "error");
       return;
     }
-    if (!supportNewRequest.service_code) {
-      showToast("Выберите услугу.", "error");
-      return;
-    }
     if (!supportNewRequest.message || supportNewRequest.message.trim().length < 2) {
       showToast("Укажите сообщение.", "error");
       return;
@@ -1722,12 +1718,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
           action: "createSupportServiceRequest",
           session_id: APP_BRAND.isSupportPilot ? supportRequestSessionId || saved.sessionId : saved.sessionId,
           access_token: saved.accessToken,
-          service_code: supportNewRequest.service_code,
+          request_type: "question",
           reason: supportNewRequest.reason,
           message: supportNewRequest.message,
-          preferred_date: supportNewRequest.preferred_date,
-          time_from: supportNewRequest.time_from,
-          time_to: supportNewRequest.time_to,
           comment: supportNewRequest.comment,
         }),
       });
@@ -1738,7 +1731,7 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       showToast("Запрос отправлен специалисту.", "success");
       setSupportNewRequestOpen(false);
       setSupportRequestSessionId(null);
-      setSupportNewRequest({ service_code: "", reason: "", message: "", preferred_date: "", time_from: "", time_to: "", comment: "" });
+      setSupportNewRequest({ reason: "", message: "", comment: "" });
       // Refresh cabinet to show new request
       await refreshSupportCabinet();
     } catch (e) {
@@ -12513,29 +12506,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   </div>
                 )}
 
-                <label style={{ ...s.label, fontWeight: 700 }}>Услуга</label>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
-                  {[
-                    { code: "short_followup", label: "Короткий follow-up", credits: 10000 },
-                    { code: "therapy_review", label: "Разбор терапии / повторная консультация по лечению", credits: 20000 },
-                    { code: "written_consultation", label: "Письменная консультация", credits: 25000 },
-                    { code: "phone_consultation", label: "Телефонный разговор со специалистом", credits: 30000 },
-                    { code: "urgent_contact", label: "Срочная связь со специалистом", credits: 40000 },
-                    { code: "online_consultation", label: "Онлайн-консультация", credits: 50000 },
-                    { code: "offline_consultation", label: "Очная консультация", credits: 75000 },
-                  ].map((opt) => (
-                    <button key={opt.code} style={{
-                      padding: "10px 14px", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left",
-                      border: `1px solid ${supportNewRequest.service_code === opt.code ? "#7D9A89" : "rgba(46,42,37,.15)"}`,
-                      background: supportNewRequest.service_code === opt.code ? "#E2EBE4" : "#fff",
-                      color: supportNewRequest.service_code === opt.code ? "#5F7D6C" : "#2E2A25",
-                    }} onClick={() => setSupportNewRequest({ ...supportNewRequest, service_code: opt.code })}>
-                      <span>{opt.label}</span>
-                      <span style={{ float: "right", fontSize: 12, color: "#7D9A89" }}>{opt.credits.toLocaleString("ru-RU")} кредитов</span>
-                    </button>
-                  ))}
-                </div>
-
                 <label style={{ ...s.label, fontWeight: 700 }}>Причина</label>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
                   {[
@@ -12563,28 +12533,6 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   placeholder="Опишите, что хотите обсудить со специалистом..."
                 />
 
-                {(supportNewRequest.service_code === "phone_consultation" || supportNewRequest.service_code === "urgent_contact" || supportNewRequest.service_code === "online_consultation" || supportNewRequest.service_code === "offline_consultation") && (
-                  <>
-                    <label style={s.label}>Предпочтительная дата</label>
-                    <input
-                      type="date"
-                      style={s.answerInput}
-                      value={supportNewRequest.preferred_date}
-                      onChange={(e) => setSupportNewRequest({ ...supportNewRequest, preferred_date: e.target.value })}
-                    />
-                    <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={s.label}>С</label>
-                        <input type="time" style={s.answerInput} value={supportNewRequest.time_from} onChange={(e) => setSupportNewRequest({ ...supportNewRequest, time_from: e.target.value })} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={s.label}>До</label>
-                        <input type="time" style={s.answerInput} value={supportNewRequest.time_to} onChange={(e) => setSupportNewRequest({ ...supportNewRequest, time_to: e.target.value })} />
-                      </div>
-                    </div>
-                  </>
-                )}
-
                 <label style={s.label}>Комментарий (необязательно)</label>
                 <textarea
                   style={{ ...s.answerInput, minHeight: 50 }}
@@ -12592,6 +12540,10 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
                   onChange={(e) => setSupportNewRequest({ ...supportNewRequest, comment: e.target.value })}
                   placeholder="Дополнительные пожелания..."
                 />
+
+                <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: "#F8FAF8", color: "#5F574F", fontSize: 12, lineHeight: 1.5 }}>
+                  Стоимость уточняется специалистом. Отправка вопроса не резервирует и не списывает кредиты. Для записи на опубликованную услугу используйте раздел «Мои специалисты и запись».
+                </div>
 
                 <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
                   <button

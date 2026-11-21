@@ -49,12 +49,13 @@ function PlaceForm({ item, organizationId, onSaved, onCancel }) {
   </form>;
 }
 
-function ServiceForm({ item, places, organizationId, onSaved, onCancel }) {
+function ServiceForm({ item, places, organizationId, module, allowedModules, onSaved, onCancel }) {
   const [name, setName] = useState(item?.name || "");
   const [price, setPrice] = useState(item ? String(item.price_kop / 100) : "");
   const [duration, setDuration] = useState(String(item?.duration_min || 60));
   const [placeId, setPlaceId] = useState(item?.place_id || "");
   const [format, setFormat] = useState(item?.format || "offline");
+  const [modules, setModules] = useState(item?.modules?.length ? item.modules : [module]);
   const [published, setPublished] = useState(item?.is_active === true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -62,13 +63,16 @@ function ServiceForm({ item, places, organizationId, onSaved, onCancel }) {
     setName(item?.name || ""); setPrice(item ? String(item.price_kop / 100) : "");
     setDuration(String(item?.duration_min || 60)); setPlaceId(item?.place_id || "");
     setFormat(item?.format || "offline"); setPublished(item?.is_active === true);
-  }, [item]);
+    setModules(item?.modules?.length ? item.modules : [module]);
+  }, [item, module]);
   async function submit(event) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault();
+    if (!modules.length) { setError("Выберите Support, Health или оба раздела."); return; }
+    setBusy(true); setError("");
     try {
       await callPractice("savePracticeService", {
         id: item?.id, name, price_kop: Math.round(Number(price) * 100), duration_min: Number(duration),
-        place_id: placeId || null, format, is_active: published, organization_id: organizationId,
+        place_id: placeId || null, format, modules, module, is_active: published, organization_id: organizationId,
       });
       setName(""); setPrice(""); setPublished(false); await onSaved(); onCancel?.();
     } catch (err) { setError(err.message); } finally { setBusy(false); }
@@ -80,7 +84,7 @@ function ServiceForm({ item, places, organizationId, onSaved, onCancel }) {
     <label style={{ display: "block", fontSize: 13, marginBottom: 6 }}>Цена, ₽
       <input data-testid="a2-service-price" type="number" min="0" step="1" value={price} onChange={(event) => setPrice(event.target.value)} required style={fieldStyle} />
     </label>
-    <p>Пациент увидит {Math.ceil(Number(price || 0) * 10).toLocaleString("ru-RU")} кредитов. Курс 10 кредитов = 1 ₽.</p>
+    <p>Кредитный эквивалент рассчитает сервер после сохранения цены.</p>
     <label style={{ display: "block", fontSize: 13, marginBottom: 6 }}>Длительность, минут
       <input type="number" min="15" max="240" step="5" value={duration} onChange={(event) => setDuration(event.target.value)} style={fieldStyle} />
     </label>
@@ -96,6 +100,18 @@ function ServiceForm({ item, places, organizationId, onSaved, onCancel }) {
       </select>
     </label>
     {!places.length && <p>Добавьте место работы или выберите онлайн-формат.</p>}
+    <fieldset style={{ border: 0, padding: 0, margin: "10px 0" }}>
+      <legend style={{ fontSize: 13, marginBottom: 6 }}>Показывать услугу в кабинетах</legend>
+      {[["support", "Support"], ["body", "Health"]].map(([value, label]) => (
+        <label key={value} style={{ display: "inline-flex", gap: 6, alignItems: "center", marginRight: 14 }}>
+          <input type="checkbox" data-testid={`a2-service-module-${value}`} checked={modules.includes(value)} disabled={!allowedModules.includes(value)}
+            onChange={(event) => setModules((current) => event.target.checked
+              ? [...new Set([...current, value])]
+              : current.filter((entry) => entry !== value))} />
+          {label}
+        </label>
+      ))}
+    </fieldset>
     <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "10px 0" }}>
       <input data-testid="a2-service-published" type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} />
       Опубликовать для прикреплённых пациентов
@@ -168,7 +184,8 @@ function AvailabilityExceptionForm({ organizationId, onSaved, onCancel }) {
   </form>;
 }
 
-export default function PracticeBookingPanel({ organizationId = null, storageScope = "server-practice", onBookingsChange }) {
+export default function PracticeBookingPanel({ organizationId = null, module = "support", allowedModules = ["support", "body"], storageScope = "server-practice", onBookingsChange }) {
+  const serviceAllowedModules = Array.isArray(allowedModules) && allowedModules.length ? allowedModules : [module];
   const [places, setPlaces] = useState([]);
   const [services, setServices] = useState([]);
   const [availability, setAvailability] = useState([]);
@@ -254,11 +271,11 @@ export default function PracticeBookingPanel({ organizationId = null, storageSco
       <h3>Услуги</h3>
       {!services.length && !loading && <p>Услуг пока нет. Новая услуга остаётся черновиком, пока вы явно не включите публикацию.</p>}
       {services.map((service) => <div key={service.id} data-testid="a2-service-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
-        <strong>{service.name}</strong> · {formats[service.format]} · {service.duration_min} мин · {(service.price_kop / 100).toLocaleString("ru-RU")} ₽ · {Number(service.price_credits || 0).toLocaleString("ru-RU")} кредитов · <span>{service.is_active ? "Опубликована" : "Черновик"}</span>
+        <strong>{service.name}</strong> · {formats[service.format]} · {service.duration_min} мин · {(service.price_kop / 100).toLocaleString("ru-RU")} ₽ · {Number(service.price_credits || 0).toLocaleString("ru-RU")} кредитов · {(service.modules || ["support", "body"]).map((entry) => entry === "body" ? "Health" : "Support").join(" + ")} · <span>{service.is_active ? "Опубликована" : "Черновик"}</span>
         <button type="button" onClick={() => setEditingService(service)} style={{ ...secondaryStyle, marginLeft: 8 }}>Редактировать</button>
         {service.is_active && <button type="button" onClick={() => mutate("deactivatePracticeService", { id: service.id }, "Публикация услуги остановлена.")} style={{ ...secondaryStyle, marginLeft: 6 }}>Снять с публикации</button>}
       </div>)}
-      <ServiceForm key={editingService?.id || "new-service"} item={editingService} places={places} organizationId={organizationId} onSaved={reload} onCancel={() => setEditingService(null)} />
+      <ServiceForm key={editingService?.id || `new-service-${module}`} item={editingService} places={places} organizationId={organizationId} module={module} allowedModules={serviceAllowedModules} onSaved={reload} onCancel={() => setEditingService(null)} />
     </div>
 
     <div data-tour-target="calendar">

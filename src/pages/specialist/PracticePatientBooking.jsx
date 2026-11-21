@@ -194,6 +194,8 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
   balanceCallback.current = onBalanceChange;
   const peerModule = module === "support" ? "body" : "support";
   const peerLabel = module === "support" ? "Health" : "Support";
+  const creditsPerRuble = Number(cabinet?.credits_per_ruble);
+  const hasServerRate = Number.isFinite(creditsPerRuble) && creditsPerRuble > 0;
 
   const request = React.useCallback((action, body = {}, signal) => post("/api/practice-booking", {
     action, ...body, session_id: sessionId, access_token: accessToken,
@@ -250,7 +252,7 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
     perform(() => post("/api/session", {
       action: "linkPracticePatientProfiles", module: peerModule, continuation_code: input,
       session_id: sessionId, access_token: accessToken,
-    }), "Профили связаны. Специалисты и записи теперь видны в обоих разделах.");
+    }), "Профили связаны. Общая история записей доступна в обоих разделах; специалисты и услуги показываются по назначению Support или Health.");
   }
 
   const bookings = cabinet?.bookings || [];
@@ -327,7 +329,7 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
       {topUp !== null && (
         <div className="practice-patient-card" role="status">
           <strong>Пополните баланс</strong>
-          {topUp > 0 && <p>Нужно добавить {creditLabel(topUp)} — {(topUp / 10).toLocaleString("ru-RU")} ₽.</p>}
+          {topUp > 0 && <p>Нужно добавить {creditLabel(topUp)}{hasServerRate ? ` — ${(topUp / creditsPerRuble).toLocaleString("ru-RU")} ₽` : ""}.</p>}
           <p>Платёжное пополнение подключается. После зачисления кредитов обновите баланс и повторите запись.</p>
           <button type="button" onClick={() => { setTopUp(null); refresh(); }}>Обновить баланс</button>
         </div>
@@ -367,8 +369,8 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
         <button type="button" onClick={() => { setError(""); refresh(); }}>Обновить кабинет</button>
       ) : (
         <>
-          <p><strong>Доступно {creditLabel(cabinet.available_credits)}</strong> · {(cabinet.available_credits / 10).toLocaleString("ru-RU")} ₽</p>
-          <p>10 кредитов = 1 ₽. Кошелёк {module === "body" ? "Health" : "Support"}.</p>
+          <p><strong>Доступно {creditLabel(cabinet.available_credits)}</strong>{hasServerRate ? ` · ${(cabinet.available_credits / creditsPerRuble).toLocaleString("ru-RU")} ₽` : ""}</p>
+          <p>{hasServerRate ? `${creditsPerRuble.toLocaleString("ru-RU")} кредитов = 1 ₽. ` : ""}Кошелёк {module === "body" ? "Health" : "Support"}.</p>
           <button type="button" className="practice-patient-secondary" onClick={() => setTopUp(0)}>Пополнить баланс</button>
           <div data-tour-target="patient-booking" {...tourState}>
             <h3>Мои специалисты</h3>
@@ -430,7 +432,7 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
                 </button>
               ) : (
                 <form className="practice-patient-fields" onSubmit={link}>
-                  <p>После привязки специалисты и записи будут видны в обоих профилях.</p>
+                  <p>После привязки общая история записей будет видна в обоих профилях. Специалисты и опубликованные услуги останутся разделены по Support и Health.</p>
                   <label>Код продолжения {peerLabel}
                     <input type="password" value={code} onChange={(event) => setCode(event.target.value)}
                       autoComplete="off" spellCheck={false} maxLength={64} required />

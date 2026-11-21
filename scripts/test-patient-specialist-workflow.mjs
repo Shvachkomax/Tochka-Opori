@@ -55,9 +55,11 @@ async function installPatientApiMocks(context) {
         createRequestObserved = true;
         assert.equal(body.session_id, sessionId, "service request is linked to the conversation the patient acted from");
         assert.equal(body.access_token, "synthetic-patient-token", "request creation uses the patient's session access token");
+        assert.equal(body.request_type, "question", "ordinary Support contact is an unpriced question");
+        assert.equal(body.service_code, undefined, "ordinary Support contact does not send a legacy tariff code");
         serviceRequest = {
           id: "synthetic-service-request-01",
-          request_type: "text_question",
+          request_type: body.request_type,
           meeting_format: "text",
           title: "Синтетический запрос специалисту",
           message: body.message,
@@ -144,7 +146,6 @@ try {
   await patientPage.getByText("Синтетический специалист").first().waitFor();
 
   await patientPage.getByRole("button", { name: "Связаться", exact: true }).click();
-  await patientPage.getByRole("button", { name: /Короткий follow-up/ }).click();
   await patientPage.getByPlaceholder("Опишите, что хотите обсудить со специалистом...").fill("Синтетический запрос по связанному разговору.");
   await patientPage.getByRole("button", { name: "Отправить запрос" }).click();
   await patientPage.getByText("Отправлен — ожидает ответа").waitFor();
