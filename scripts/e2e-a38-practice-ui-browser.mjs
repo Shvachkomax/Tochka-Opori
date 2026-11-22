@@ -148,12 +148,12 @@ try {
   await page.getByTestId("a2-service-price").fill("0");
   await page.getByTestId("a2-service-place").selectOption("a38-place");
   await page.getByTestId("a2-service-module-body").check();
-  await page.getByTestId("a2-service-published").check();
   await page.getByTestId("a2-service-save").click();
   await page.getByText("Опубликована").waitFor();
   assert.equal(serverServiceWrites, 1, "service was persisted through the server action");
   assert.deepEqual(state.services[0].modules.sort(), ["body", "support"], "doctor can publish one server service for Support and Health");
   await page.getByTestId("specialist-nav-calendar").click();
+  await page.getByTestId("a2-availability-row").first().waitFor();
   assert.equal(await page.getByTestId("a2-availability-row").count(), 7, "new cabinet shows seven default days");
   const mondayRow = page.getByTestId("a2-availability-row").first();
   await mondayRow.getByRole("button", { name: "Редактировать" }).click();

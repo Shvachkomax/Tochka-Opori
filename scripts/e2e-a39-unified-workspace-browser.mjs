@@ -45,6 +45,8 @@ async function installMocks(context) {
       return ok(route, { client: { display_name: "A39 Health Patient" }, overview: {}, recent_days: [], plate_summary: { recent_plates: [] }, weekly_summaries: [], insights: [], service_requests: [] });
     }
     if (body.action === "getClientOverview") return ok(route, { client: { display_name: "A39 Support Patient" }, overview: {}, sessions: [], diary: [], analyses: [] });
+    if (body.action === "listMedicalEncounters") return ok(route, { records: [], next_before: null, can_prescribe: false, author_name: "" });
+    if (body.action === "listPatientReportedMedicationOrders") return ok(route, { orders: [], intake_logs: [] });
     if (["listInvitations", "listServiceRequests"].includes(body.action)) return ok(route, { [body.action === "listInvitations" ? "invitations" : "requests"]: [] });
     return ok(route);
   });
@@ -95,6 +97,7 @@ try {
   assert(state.aggregateCalendarCalls > 0, "calendar requested the server-side aggregate scope");
   await page.getByTestId("a2-booking-row").filter({ hasText: "A39 Health service" }).getByRole("button", { name: "Открыть карту" }).click();
   await page.getByText("Рабочее пространство: Здоровье & Стройность").waitFor();
+  await page.getByTestId("health-client-name").waitFor();
   assert(state.bodyOverviewCalls > 0, "opening a calendar item loads only the Health profile endpoint");
 
   await page.setViewportSize({ width: 390, height: 844 });

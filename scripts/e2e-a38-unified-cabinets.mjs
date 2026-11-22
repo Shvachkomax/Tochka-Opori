@@ -12,9 +12,18 @@ const TEST_REF = "eehyehlhiyztciaezaus";
 const url = process.env.SUPABASE_URL || "";
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const ref = url.match(/^https:\/\/([a-z0-9]{20})\.supabase\.co$/)?.[1];
-assert.equal(ref, TEST_REF, `A3.8 E2E refuses non-test Supabase: ${ref || "unknown"}`);
+const localRehearsal = process.env.SUPABASE_LOCAL_REHEARSAL === "1";
+const localUrl = /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?(?:\/|$)/.test(url);
+if (localRehearsal) {
+  assert(localUrl, `A3.8 local rehearsal refuses non-local Supabase: ${url || "unknown"}`);
+} else {
+  assert.equal(ref, TEST_REF, `A3.8 E2E refuses non-test Supabase: ${ref || "unknown"}`);
+}
 assert(key, "A3.8 E2E requires the Preview service-role key");
-assert.equal(process.env.VERCEL_ENV, "preview", "A3.8 E2E runs only with Preview environment variables");
+assert(
+  localRehearsal || process.env.VERCEL_ENV === "preview",
+  "A3.8 E2E runs only with Preview environment variables or explicit local rehearsal",
+);
 
 const supabase = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 const id = () => crypto.randomUUID();
