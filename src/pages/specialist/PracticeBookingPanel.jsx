@@ -57,13 +57,12 @@ function ServiceForm({ item, places, organizationId, module, allowedModules, onS
   const [format, setFormat] = useState(item?.format || "offline");
   const defaultModules = module === "all" ? allowedModules : [module];
   const [modules, setModules] = useState(item?.modules?.length ? item.modules : defaultModules);
-  const [published, setPublished] = useState(item?.is_active === true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
     setName(item?.name || ""); setPrice(item ? String(item.price_kop / 100) : "");
     setDuration(String(item?.duration_min || 60)); setPlaceId(item?.place_id || "");
-    setFormat(item?.format || "offline"); setPublished(item?.is_active === true);
+    setFormat(item?.format || "offline");
     setModules(item?.modules?.length ? item.modules : (module === "all" ? allowedModules : [module]));
   }, [item, module, allowedModules]);
   async function submit(event) {
@@ -73,9 +72,9 @@ function ServiceForm({ item, places, organizationId, module, allowedModules, onS
     try {
       await callPractice("savePracticeService", {
         id: item?.id, name, price_kop: Math.round(Number(price) * 100), duration_min: Number(duration),
-        place_id: placeId || null, format, modules, module, is_active: published, organization_id: organizationId,
+        place_id: placeId || null, format, modules, module, is_active: true, organization_id: organizationId,
       });
-      setName(""); setPrice(""); setPublished(false); await onSaved(); onCancel?.();
+      setName(""); setPrice(""); await onSaved(); onCancel?.();
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   }
   return <form onSubmit={submit} data-testid="a2-service-form">
@@ -112,10 +111,6 @@ function ServiceForm({ item, places, organizationId, module, allowedModules, onS
         </label>
       ))}
     </fieldset>
-    <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "10px 0" }}>
-      <input data-testid="a2-service-published" type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} />
-      Опубликовать для прикреплённых пациентов
-    </label>
     <button disabled={busy} data-testid="a2-service-save" style={primaryStyle}>{busy ? "Сохранение…" : item ? "Сохранить услугу" : "Добавить услугу"}</button>
     {item && <button type="button" onClick={onCancel} style={{ ...secondaryStyle, marginLeft: 8 }}>Отмена</button>}
     {error && <p role="alert" style={{ color: "#a33" }}>{error}</p>}
