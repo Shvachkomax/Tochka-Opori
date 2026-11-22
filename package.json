@@ -15,6 +15,7 @@
     "e2e:a38": "node scripts/e2e-a38-unified-cabinets.mjs",
     "e2e:a38-ui": "node scripts/e2e-a38-practice-ui-browser.mjs",
     "e2e:a39": "node scripts/e2e-a39-unified-workspace-browser.mjs",
+    "e2e:r21-local": "node scripts/e2e-r21-local-postgres.mjs",
     "e2e:session-pair": "node scripts/e2e-session-pair.js",
     "e2e:service-request-layout": "node scripts/e2e-service-request-layout.js",
     "test:body-pricing": "node scripts/test-body-pricing.js",

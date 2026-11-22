@@ -1,141 +1,147 @@
 # Release Gate R2.1 — локальная репетиция полной схемы Supabase
 
-Дата аудита: 2026-11-22. Ветка: `feature/my-practice-a3-patient-cabinet`.
-Исходный SHA: `a68f1c49df125c7e4c7dc26fbb2d5d0b90d0dd49`.
+Дата: 2026-11-22. Ветка: `feature/my-practice-a3-patient-cabinet`.
+Исходный Git SHA: `f812351d9ff536d91e1bfdc39c919e3289539353`.
 
-## Результат
+## Итог
 
-**R2.1: BLOCKED — NOT VERIFIED.** Полная изолированная репетиция не
-запускалась, потому что на рабочем Mac нет Docker Engine (также нет Podman,
-Colima и локального PostgreSQL). Это не компенсировалось Test/Production
-Supabase: ни одна облачная база не использовалась и не изменялась.
+**R2.1: GO для воспроизводимой локальной схемы и проверенных A3/A5-сценариев.**
+Полная цепочка из 49 миграций, включая baseline, My Practice/A2, A3.8–A3.9
+и A5, успешно применена к новой локальной Supabase/PostgreSQL 17.6 базе два
+раза. Реальные синтетические интеграционные тесты прошли и не оставили данных.
 
-Аппаратное обеспечение совместимо с локальным запуском: Apple Silicon
-(`arm64`), 48 GB RAM, macOS 27.2.1 и около 1.0 TiB свободного места.
-Официальные требования Docker Desktop для Apple Silicon — поддерживаемая
-версия macOS и не менее 4 GB RAM; Docker поддерживает текущий и две предыдущие
-мажорные версии macOS. Поэтому проблема не в ресурсах хоста, а только в
-отсутствии выбранного container runtime.
+Это **не меняет R2 Production verdict: NO-GO**. Причины из
+`release-gate-r2.md` остаются: history drift с существующими Test/Production
+базами и Test-only семантика A2/платежей. R2.1 не выполнял и не предлагает
+автоматический перенос A2 в Production.
 
-## Граница и неизменность окружений
+## Граница работ
 
-* Не выполнялись `supabase start`, `supabase db reset`, `supabase db push`,
-  `supabase link`, `supabase migration repair` или любые удалённые SQL/API
-  операции.
-* Не изменялись Test `eehyehlhiyztciaezaus`, Production, Vercel, GitHub,
-  миграции приложения, контейнеры либо локальные данные проекта.
-* Не создавались проекты, ветки, базы, записи пациентов или платежи.
-* Рабочее дерево до отчёта было чистым; ветка находится на один коммит впереди
-  `origin` из-за уже существующего локального R2-коммита. Push не выполнялся.
+* Использовались только Colima/Docker и `127.0.0.1` локального Mac.
+* Не выполнялись `supabase db push`, `supabase link`, `--linked`, удалённый
+  `db reset`, remote SQL/API, Vercel-операции, Git push или merge.
+* Test `eehyehlhiyztciaezaus`, Production, Vercel и GitHub не изменялись.
+* До запуска Docker не содержал контейнеров или томов; чужие контейнеры и тома
+  не удалялись. Локальные fixtures используют только случайные UUID и labels
+  `A38 Synthetic` / `R21 Synthetic`.
 
-## Диагностика хоста
+## Окружение
 
-| Проверка | Результат | Статус |
+| Компонент | Фактический результат | Статус |
 |---|---|---|
-| Архитектура и ОС | `arm64`, macOS 27.2.1 | PASS |
-| Процессор и RAM | Apple Silicon M5 Max, 48 GB, свободно 86% системной памяти | PASS |
-| Свободный диск | около 1.0 TiB | PASS |
-| Homebrew | установлен, 7.0.14 | PASS |
-| Docker Engine / Desktop | команда `docker` отсутствует | BLOCKED |
-| Podman / Colima | команды отсутствуют | BLOCKED |
-| PostgreSQL (`psql`, `postgres`, `initdb`) | команды отсутствуют | BLOCKED |
-| Supabase CLI | установлен, `2.109.1`; справка `start` и `db` доступна | PASS WITH RISK |
+| Host | Apple Silicon `arm64`, macOS 27.2.1, 48 GB RAM | PASS |
+| Colima | Virtualization.Framework, `aarch64`, Docker runtime | PASS |
+| Docker client / engine | 29.10.0 `darwin/arm64` / 29.5.2 `linux/arm64` | PASS |
+| Docker resources до запуска | контейнеров и томов нет; порты 54320–54327 свободны | PASS |
+| Репозиторный Node/CLI | Node 22.22.3 x64/Rosetta, Supabase CLI 2.109.1 x64 | NOT USED FOR REHEARSAL |
+| R2.1 CLI | временный native `@supabase/cli-darwin-arm64@2.109.1`, Mach-O arm64 | PASS |
+| Local config | PostgreSQL 17; migrations и `seed.sql` включены; API/DB/Studio 54321/54322/54323 | PASS |
 
-`supabase/config.toml` готов для полного локального контура: PostgreSQL 17,
-миграции и `seed.sql` включены; API/DB/Studio используют локальные порты
-54321/54322/54323. В Git отслеживается 49 файлов миграций. Однако проверка
-синтаксиса, порядка и фактических объектов возможна только после старта
-локального Postgres в составе Supabase stack.
+Нативный CLI был подготовлен только в `/private/tmp`: текущие Node и
+глобальный CLI не заменялись. Первая попытка npm-install отказалась с
+`EBADPLATFORM`, потому что npm работал через x64 Node. Минимальное исправление
+— скачать проверенный ARM64 пакет той же версии с `--force` во временный
+каталог; binary затем подтвердил `arm64` и `2.109.1`.
 
-### Риск CLI
+## Команды и развёртывание
 
-На Mac установлены Intel/x64 Node 22.22.3 и Intel/x64 Supabase CLI, запущенные
-через Rosetta, хотя сам Mac `arm64`. `supabase --version`, `--help`,
-`start --help` и `db --help` завершились успешно, но каждый вызов вывел
-предупреждение Bun об отсутствии AVX. До длительной локальной репетиции
-рекомендуется перейти на нативный ARM64 Node/CLI либо отдельно подтвердить
-стабильность текущего x64 CLI. Это не меняет ни схему, ни данные, но иначе
-результат локального теста был бы менее надёжным.
+CLI справка проверена до запуска: `supabase start --help`,
+`supabase db reset --help`, `supabase migration list --help`,
+`supabase db advisors --help`.
 
-## Требуемое действие владельца
+1. `supabase start --yes` загрузил образы, но после миграций столкнулся с
+   кратким конфликтом имени собственного временного DB-container. Повторная
+   read-only инспекция немедленно подтвердила, что контейнер, тома и сеть уже
+   отсутствуют; ничего вручную не удалялось.
+2. Повторный полный старт применил все миграции и seed, но Vector Buckets
+   alpha-container не смог bind-mount Unix socket Colima:
+   `mkdir .../.colima/default/docker.sock: operation not supported`.
+3. Официальный CLI поддерживает `supabase start --exclude vector`; Vector
+   Buckets — alpha и не используется A3/A5. Поэтому выполнен
+   `supabase start --yes --exclude vector`.
+4. Core stack успешно запущен: PostgreSQL, Kong/API, Auth, PostgREST,
+   Storage, Realtime, Edge Runtime, Mailpit, pgMeta, Analytics и Studio.
+   `imgproxy` и pooler остановлены конфигурацией; `vector` — единственный
+   явно исключённый сервис.
+5. `supabase migration list --local` показал совпадение local/remote всех
+   49 файлов. В `supabase_migrations.schema_migrations`: `49` строк,
+   `49` уникальных версий, диапазон `20260814000000..20261121133131`.
+6. Второй чистый запуск `supabase db reset --local` повторно применил все
+   49 миграций и `supabase/seed.sql` без пропусков и ошибок.
 
-### Предпочтительный путь: Docker Desktop
+## Минимальное исправление, найденное интеграцией
 
-1. Владелец вручную скачивает вариант **Docker Desktop for Mac with Apple
-   silicon** с официальной страницы Docker.
-2. В интерактивном установщике переносит `Docker.app` в `Applications`,
-   запускает приложение и принимает лицензионные условия.
-3. Дожидается статуса запущенного Docker Engine, не меняя настройки Test,
-   Production или Vercel.
-4. Сообщает, что Docker запущен. Только тогда повторяется R2.1 с проверкой
-   `docker version`/`docker info`, сохранением инвентаря существующих
-   контейнеров и без удаления чего-либо.
+Первый реальный A3.8 E2E запуск получил `503` при сохранении места приёма.
+Причина: сам E2E уже требовал `SUPABASE_LOCAL_REHEARSAL=1` и localhost, но
+`isMyPracticeServerEnabled()` разрешал только Preview с точным cloud-ref.
 
-Интерактивная установка не требует пароля в конфигурации Docker по умолчанию,
-но старые версии или выбранные привилегированные настройки могут запросить
-администратора. Docker Desktop бесплатен для personal use, education,
-non-commercial open source и организаций одновременно меньше 250 сотрудников
-и $10M годовой выручки; соответствие лицензии должен подтвердить владелец.
+Исправление в `lib/my-practice/workspace-handler.js` добавляет двойной
+локальный opt-in только при всех условиях:
 
-### Подтверждённая бесплатная альтернатива
+* `MY_PRACTICE_SERVER_ENABLED=true`;
+* `SUPABASE_LOCAL_REHEARSAL=1`;
+* нет `VERCEL_ENV` и `DEPLOYMENT_PURPOSE`;
+* URL строго `http://localhost:54321` либо `http://127.0.0.1:54321`.
 
-Если лицензирование Docker Desktop не подходит, [Colima](https://github.com/abiosoft/colima)
-поддерживает Apple Silicon, имеет MIT-лицензию и даёт Docker-compatible runtime.
-Он потребует отдельного разрешения владельца на установку `colima` и Docker
-client через Homebrew, а затем отдельной проверки совместимости с Supabase CLI.
-Автоматически эту альтернативу не устанавливать.
+Production/Preview путь, точный Test ref и существующие fail-closed проверки
+не изменены. Unit-тесты дополнительно доказывают отказ для Production и
+другого порта. После исправления A3.8 E2E успешно прошёл.
 
-## План продолжения после установки runtime
+## Фактические интеграционные проверки
 
-Только в этой рабочей копии и только против localhost:
-
-1. Проверить runtime и зафиксировать перечень уже существующих контейнеров;
-   ничего не удалять.
-2. Устранить или явно принять риск x64/Rosetta Supabase CLI.
-3. Запустить `supabase start`, проверить все сервисы и применить полный набор
-   миграций в новую локальную БД.
-4. Выполнить `supabase db reset --local`; зафиксировать порядок миграций,
-   схему таблиц/столбцов/FK/индексов/RLS/grants/RPC и отсутствие дубликатов
-   availability/links.
-5. Запустить изолированные синтетические интеграционные проверки A3/A5:
-   links, invitation/revoke, services, availability, booking,
-   Support/Health isolation, RLS denial, payment credits and cleanup.
-6. Остановить локальный stack и повторить чистый start/reset/deploy. Никакие
-   ключи Test/Production в эти проверки не передавать.
-
-До выполнения этого плана статусы миграций, RLS/RPC, индексов, seed и
-сквозных сценариев остаются **NOT VERIFIED**, а не PASS.
-
-## Проверки R2.1
-
-| Проверка | Статус | Доказательство / причина |
-|---|---|---|
-| Git SHA и чистота до отчёта | PASS | `a68f1c4…`, рабочее дерево чистое |
-| Конфигурация локального Supabase | PASS | PostgreSQL 17, migrations/seed включены |
-| Совместимость аппаратуры | PASS | Apple Silicon, 48 GB RAM, свободный диск |
-| Возможность запустить Docker сейчас | BLOCKED | Docker Engine отсутствует |
-| Совместимость Docker Desktop | READY FOR OWNER ACTION | официальный Apple-silicon installer и требования выполнены |
-| Надёжность Supabase CLI | PASS WITH RISK | команды доступны, но используются x64/Rosetta и AVX warning |
-| Первый чистый start/migration/reset | NOT VERIFIED | намеренно не запущен без runtime |
-| Таблицы, FK, индексы, RLS, grants, RPC | NOT VERIFIED | нужна локальная схема после миграций |
-| Сквозные синтетические тесты и cleanup | NOT VERIFIED | нет локального API/Postgres |
-| Повторная чистая репетиция | NOT VERIFIED | нет локального runtime |
-| Изменения Test/Production/Vercel | PASS | отсутствуют |
-
-## Ошибки и принятые меры
-
-| Наблюдение | Мера |
+| Проверка | Результат |
 |---|---|
-| `docker: command not found` | Не подменять Docker облачной базой; остановиться до миграций и запросить интерактивную установку владельца. |
-| У CLI предупреждение об AVX | Не считать будущий x64/Rosetta запуск полноценной доказательной репетицией без нативного CLI или отдельного подтверждения стабильности. |
-| Нет локального Postgres | Не устанавливать отдельный Postgres: он не заменяет полный Supabase stack (Auth, PostgREST, Storage, Realtime). |
+| A3.8.2 local E2E (`SUPABASE_LOCAL_REHEARSAL=1`) | PASS: приглашения, canonical/shared links, Support/Health isolation, каталог по modules, default schedule (7 строк, без дубликатов), слоты, confirmed booking, snapshot цены, отмена, запрет чужой отмены, symmetric revoke, cleanup |
+| R2.1 real local PostgreSQL | PASS: credit debit/refund, immutable booking snapshot, медицинские draft/confirmed версии и correction reason, service-role path, `anon` denial, rollback cleanup |
+| Очистка E2E | PASS: `a38_fixture_remnants=0`, `r21_fixture_remnants=0` |
+| Дубликаты | PASS: active availability, assignments и access duplicate groups = 0 |
+| RLS/grants | PASS: ключевые practice/A5 tables с RLS; `anon`/`authenticated` без SELECT; проверенные RPC доступны только `service_role` |
+| `npm run build` | PASS: A3.6/A3.7 tours, A3.8.1/2, A3.9, My Practice, booking credits, A5/A5.2, navigation и Vite build |
 
-## Ссылки
+Транзакционный real-Postgres тест запускается как `npm run e2e:r21-local`
+при явно переданном `R21_LOCAL_DB_URL` и расположен в
+`scripts/e2e-r21-local-postgres.mjs`. Он отказывается от non-local URL,
+использует один `BEGIN`/`ROLLBACK`, затем проверяет, что его synthetic rows не
+сохранились. Это не Test fixture и не платеж.
 
-* [Официальная установка и требования Docker Desktop для Mac](https://docs.docker.com/desktop/setup/install/mac-install/)
-* [Supabase CLI changelog: v3 локален по умолчанию и требует подтверждения для hosted-изменений](https://supabase.com/changelog.md)
-* [Colima: Docker-compatible runtime для Apple Silicon/macOS](https://github.com/abiosoft/colima)
+## Security/performance advisor
 
-**Итоговый статус: BLOCKED.** Для продолжения R2.1 требуется только решение
-владельца об установке локального container runtime; никаких облачных
-изменений, push, merge или деплоев не требуется.
+`supabase db advisors --local --type all --level info --fail-on none`:
+
+* `0 ERROR`, `2 WARN`, `238 INFO`.
+* Warnings: performance pattern в policy `usage_reservations_service_role_only`
+  (`current_setting()` следует вынести в scalar subquery) и `btree_gist` в
+  схеме `public`.
+* Для A3/A5 есть INFO о покрывающих индексах отдельных FK (`practice_*` и
+  `medical_encounter_versions.organization_id`). Это рекомендации к отдельной
+  измеренной performance migration, а не основание менять историческую
+  Test-only A2-схему в R2.1.
+* Сообщения `RLS enabled, no policy` для server-only practice/A5 tables
+  ожидаемы: прямые права `anon`/`authenticated` отозваны, что дополнительно
+  подтверждено реальными denial-проверками.
+
+## Оставшиеся ограничения
+
+1. Vector Buckets local alpha service **NOT VERIFIED**: Colima virtiofs не
+   поддерживает требуемый socket bind-mount. Схема и A3/A5 не используют его;
+   core local rehearsal завершён без него.
+2. CLI 2.109.1 успешно применил схему, но CLI сообщает о доступном v3.2.0.
+   Обновление — отдельная задача с повторной репетицией, не выполнялось.
+3. Advisor warnings и INFO об индексах не исправлялись без отдельного
+   production-compatible решения и оценки блокировок.
+4. R2 Production **NO-GO** сохраняется до forward-only production migration
+   design, reconciliation history drift и отдельной production rehearsal.
+
+## Вердикт
+
+| Область | Статус |
+|---|---|
+| Полная локальная миграционная цепочка (49/49), повторный reset | GO |
+| A3/A5 local synthetic integration, RLS, booking, credits, medical records | GO |
+| Local Vector Buckets alpha service | NOT VERIFIED |
+| Test/Production migration и release safety из R2 | NO-GO (не менялся) |
+| Изменения Test/Production/Vercel/GitHub | отсутствуют |
+
+Ссылки: [Supabase local development](https://supabase.com/docs/guides/local-development),
+[CLI `start`/`--exclude`](https://supabase.com/docs/reference/cli/introduction),
+[Vector Buckets local development (alpha)](https://supabase.com/docs/guides/storage/vector/local-development).

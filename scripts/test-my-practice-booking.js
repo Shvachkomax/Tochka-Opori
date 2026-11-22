@@ -11,6 +11,9 @@ assert.equal(
 );
 assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", VERCEL_ENV: "production", MY_PRACTICE_ALLOWED_SUPABASE_REF: "eehyehlhiyztciaezaus", SUPABASE_URL: "https://eehyehlhiyztciaezaus.supabase.co" }), false);
 assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", VERCEL_ENV: "preview", DEPLOYMENT_PURPOSE: "test", MY_PRACTICE_ALLOWED_SUPABASE_REF: "OTHER", SUPABASE_URL: "https://OTHER.supabase.co" }), false);
+assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", SUPABASE_LOCAL_REHEARSAL: "1", SUPABASE_URL: "http://127.0.0.1:54321" }), true);
+assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", SUPABASE_LOCAL_REHEARSAL: "1", VERCEL_ENV: "production", SUPABASE_URL: "http://127.0.0.1:54321" }), false);
+assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", SUPABASE_LOCAL_REHEARSAL: "1", SUPABASE_URL: "http://127.0.0.1:54322" }), false);
 
 // availability lib still consistent
 const entries = [{ id: "b", clinicId: "c1", day: "2026-11-09", start: "10:00", end: "12:00", kind: "busy", reason: "clinic", status: "active", serviceId: null, patientAlias: null, source: "manual" }];
