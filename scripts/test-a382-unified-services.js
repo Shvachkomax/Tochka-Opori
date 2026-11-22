@@ -48,7 +48,7 @@ assert(handler.includes("Сессия пациента не проверена")
 
 assert(doctorUi.includes("a2-service-module-${value}"));
 assert(doctorUi.includes('[["support", "Support"], ["body", "Health"]]'));
-assert(doctorUi.includes("Кредитный эквивалент рассчитает сервер после сохранения цены."));
+assert(!doctorUi.includes("Кредитный эквивалент рассчитает сервер после сохранения цены."));
 assert(!doctorUi.includes("Math.ceil(Number(price || 0) * 10)"));
 assert(patientUi.includes("creditsPerRuble"));
 assert(!patientUi.includes("topUp / 10"));
