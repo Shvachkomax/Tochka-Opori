@@ -13,7 +13,7 @@ import { medicationRpcForClinicalArchive } from "../lib/clinical/medication-arch
 import { getPilotId, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { handlePartnerProgram } from "../lib/partners/program-handler.js";
 import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
-import { handleMyPracticeWorkspace, isMyPracticeServerEnabled } from "../lib/my-practice/workspace-handler.js";
+import { handleMyPracticeWorkspace, isMyPracticeTestServerEnabled } from "../lib/my-practice/workspace-handler.js";
 import { buildSpecialistClientList } from "../lib/specialist-client-list.js";
 import { normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
 import { buildSpecialistRequestContext } from "../lib/specialist/request-context.js";
@@ -145,7 +145,7 @@ export default async function handler(req, res) {
   applyCors(req, res);
 
   // This preview branch must not use inherited Production credentials.
-  if (process.env.MY_PRACTICE_REQUIRE_TEST_DB === "true" && !isMyPracticeServerEnabled(process.env)) {
+  if (process.env.MY_PRACTICE_REQUIRE_TEST_DB === "true" && !isMyPracticeTestServerEnabled(process.env)) {
     res.setHeader("Cache-Control", "no-store");
     return res.status(503).json({
       ok: false,

@@ -60,7 +60,7 @@ async function installMocks(context) {
     if (body.action === "listPracticePlaces") return ok(route, { places: [] });
     if (body.action === "listPracticeServices") return ok(route, { services: [] });
     if (body.action === "listPracticeAvailability") return ok(route, { availability: Array.from({ length: 7 }, (_, index) => ({ id: `day-${index}`, weekday: index + 1, start_time: "09:00", end_time: "18:00", is_active: true })) });
-    if (body.action === "getPracticeFinance") return ok(route, { transactions: [], breakdown: [] });
+    if (body.action === "getPracticeFinance") return ok(route, { financial_mode: "test_credits", payments_available: true, transactions: [], breakdown: [] });
     return ok(route);
   });
 }

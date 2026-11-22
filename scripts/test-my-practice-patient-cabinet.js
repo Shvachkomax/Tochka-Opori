@@ -8,6 +8,7 @@ Object.assign(process.env, {
   DEPLOYMENT_PURPOSE: "test",
   MY_PRACTICE_ALLOWED_SUPABASE_REF: "eehyehlhiyztciaezaus",
   SUPABASE_URL: "https://eehyehlhiyztciaezaus.supabase.co",
+  MY_PRACTICE_FINANCIAL_MODE: "test_credits",
 });
 for (const key of ["VITE_APP_BRAND", "PILOT_ID", "SUPPORT_ONLY", "ANMED_SUPPORT_ONLY"]) delete process.env[key];
 

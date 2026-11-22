@@ -3,7 +3,7 @@ import "./PracticePatientBooking.css";
 
 const formats = { offline: "Очно", online: "Онлайн", phone: "По телефону", video: "Видеосвязь" };
 const statuses = {
-  held: "Ожидает подтверждения", confirmed: "Подтверждена", completed: "Приём состоялся",
+  held: "Ожидает подтверждения", requested: "Заявка без оплаты", confirmed: "Подтверждена", completed: "Приём состоялся",
   cancelled: "Отменена", expired: "Время брони истекло",
 };
 const dateFormat = new Intl.DateTimeFormat("ru-RU", {
@@ -14,7 +14,7 @@ const creditLabel = (amount) => Number(amount).toLocaleString("ru-RU") + " кр�
 const paymentOf = (booking) => Array.isArray(booking.practice_booking_credits)
   ? booking.practice_booking_credits[0] : booking.practice_booking_credits;
 const cancellationPolicy = "При отмене за 12 часов и раньше вернётся вся стоимость. При отмене менее чем за 12 часов удерживается 20% стоимости услуги, возвращается 80%.";
-const isActive = (status) => status === "held" || status === "confirmed";
+const isActive = (status) => status === "held" || status === "requested" || status === "confirmed";
 
 async function post(path, data, signal) {
   const response = await fetch(path, {
@@ -32,7 +32,7 @@ async function post(path, data, signal) {
   return result;
 }
 
-function NewBookingForm({ services, request, onSaved, balance, walletActive, onTopUp, onRefresh }) {
+function NewBookingForm({ services, request, onSaved, balance, walletActive, onTopUp, onRefresh, paymentMode }) {
   const [serviceId, setServiceId] = useState(services[0].service_id);
   const [day, setDay] = useState("");
   const [slots, setSlots] = useState([]);
@@ -43,6 +43,7 @@ function NewBookingForm({ services, request, onSaved, balance, walletActive, onT
   const reservation = useRef(null);
   const [accepted, setAccepted] = useState(false);
   const service = services.find((item) => item.service_id === serviceId);
+  const usesTestCredits = paymentMode === "test_credits";
   const price = Number(service?.price_credits);
   const shortfall = Math.max(0, price - balance);
   const today = new Date().toISOString().slice(0, 10);
@@ -71,23 +72,27 @@ function NewBookingForm({ services, request, onSaved, balance, walletActive, onT
 
   async function reserve(event) {
     event.preventDefault();
-    if (!accepted || busy || !walletActive || !Number.isSafeInteger(price)) return;
-    if (shortfall > 0) return onTopUp(shortfall);
+    if (!accepted || busy || (usesTestCredits && (!walletActive || !Number.isSafeInteger(price)))) return;
+    if (usesTestCredits && shortfall > 0) return onTopUp(shortfall);
     setBusy(true);
     setError("");
     const key = reservation.current ||= crypto.randomUUID();
     try {
-      await request("reservePracticeBooking", {
+      const payload = {
         service_id: serviceId, day, start_time: startTime, idempotency_key: key,
-        expected_price_credits: price, cancellation_policy_version: POLICY_VERSION,
-      });
+      };
+      if (usesTestCredits) {
+        payload.expected_price_credits = price;
+        payload.cancellation_policy_version = POLICY_VERSION;
+      }
+      await request("reservePracticeBooking", payload);
       resetSlot();
       setDay("");
       await onSaved();
     } catch (err) {
       if (err.status === 409 || err.status === 402) reservation.current = null;
-      if (err.status === 402) onTopUp(err.details?.missing_credits);
-      if (err.details?.code === "P0011") { setAccepted(false); await onRefresh(); }
+      if (usesTestCredits && err.status === 402) onTopUp(err.details?.missing_credits);
+      if (usesTestCredits && err.details?.code === "P0011") { setAccepted(false); await onRefresh(); }
       setError(err.message);
     } finally {
       setBusy(false);
@@ -101,7 +106,7 @@ function NewBookingForm({ services, request, onSaved, balance, walletActive, onT
           onChange={(event) => { resetSlot(); setServiceId(event.target.value); }}>
           {services.map((service) => (
             <option key={service.service_id} value={service.service_id}>
-              {[service.name, service.place_name || formats[service.format], creditLabel(service.price_credits), `${service.price_kop / 100} ₽`, `${service.duration_min} мин`].filter(Boolean).join(" · ")}
+              {[service.name, service.place_name || formats[service.format], usesTestCredits ? creditLabel(service.price_credits) : null, `${service.price_kop / 100} ₽`, `${service.duration_min} мин`].filter(Boolean).join(" · ")}
             </option>
           ))}
         </select>
@@ -119,20 +124,24 @@ function NewBookingForm({ services, request, onSaved, balance, walletActive, onT
           </select>
         </label>
       )}
-      <p>К оплате {creditLabel(price)}. Доступно {creditLabel(balance)}.</p>
-      <p>{cancellationPolicy}</p>
+      {usesTestCredits ? <>
+        <p>К оплате {creditLabel(price)}. Доступно {creditLabel(balance)}.</p>
+        <p>{cancellationPolicy}</p>
+      </> : <p>Оплата пока не подключена. Будет создана явная неоплаченная заявка без списания средств.</p>}
       <label className="practice-patient-consent">
         <input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} required />
-        Согласен с условиями отмены и списанием {creditLabel(price)} при бронировании.
+        {usesTestCredits
+          ? `Согласен с условиями отмены и списанием ${creditLabel(price)} при бронировании.`
+          : "Согласен отправить заявку без оплаты. Подтверждения платежа не будет."}
       </label>
-      {shortfall > 0 && <p role="status">Не хватает {creditLabel(shortfall)}. Пополните баланс.</p>}
-      {!walletActive && <p role="alert">Оплата с этого кошелька сейчас недоступна.</p>}
-      {shortfall > 0 ? (
+      {usesTestCredits && shortfall > 0 && <p role="status">Не хватает {creditLabel(shortfall)}. Пополните баланс.</p>}
+      {usesTestCredits && !walletActive && <p role="alert">Оплата с этого кошелька сейчас недоступна.</p>}
+      {usesTestCredits && shortfall > 0 ? (
         <button type="button" onClick={() => onTopUp(shortfall)}>Пополнить баланс</button>
       ) : (
         <button type="submit" data-testid="a2-patient-reserve"
-          disabled={busy || loading || !startTime || !accepted || !walletActive || !Number.isSafeInteger(price)}>
-          {busy ? "Бронируем…" : `Оплатить ${creditLabel(price)} и записаться`}
+          disabled={busy || loading || !startTime || !accepted || (usesTestCredits && (!walletActive || !Number.isSafeInteger(price)))}>
+          {busy ? "Сохраняем…" : usesTestCredits ? `Оплатить ${creditLabel(price)} и записаться` : "Отправить заявку без оплаты"}
         </button>
       )}
       {error && <p role="alert">{error}</p>}
@@ -140,7 +149,7 @@ function NewBookingForm({ services, request, onSaved, balance, walletActive, onT
   );
 }
 
-function AppointmentList({ title, bookings, busy, onAction }) {
+function AppointmentList({ title, bookings, busy, onAction, usesTestCredits }) {
   if (!bookings.length) return null;
   return (
     <>
@@ -157,13 +166,13 @@ function AppointmentList({ title, bookings, busy, onAction }) {
               <span>{[booking.organizations?.name, booking.practice_places?.name, formats[service?.format]].filter(Boolean).join(" · ")}</span>
               <time dateTime={booking.starts_at}>{dateFormat.format(new Date(booking.starts_at))} UTC</time>
               <span>{statuses[status]}</span>
-              {payment && <span>Оплачено {creditLabel(payment.charged_credits)}</span>}
-              {status === "cancelled" && payment && (
+              {usesTestCredits && payment && <span>Оплачено {creditLabel(payment.charged_credits)}</span>}
+              {usesTestCredits && status === "cancelled" && payment && (
                 <span>Возвращено {creditLabel(payment.refunded_credits)} · Удержано {creditLabel(payment.cancellation_fee_credits)}</span>
               )}
               {isActive(status) && Date.parse(booking.starts_at) > Date.now() && (
                 <div className="practice-patient-actions">
-                  {status === "held" && (
+                  {usesTestCredits && status === "held" && (
                     <button type="button" data-testid="a2-patient-pay" disabled={busy}
                       onClick={() => onAction("payPracticeBookingCredits", booking)}>Оплатить кредитами</button>
                   )}
@@ -194,6 +203,7 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
   balanceCallback.current = onBalanceChange;
   const peerModule = module === "support" ? "body" : "support";
   const peerLabel = module === "support" ? "Health" : "Support";
+  const usesTestCredits = cabinet?.financial_mode === "test_credits";
   const creditsPerRuble = Number(cabinet?.credits_per_ruble);
   const hasServerRate = Number.isFinite(creditsPerRuble) && creditsPerRuble > 0;
 
@@ -312,7 +322,9 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
         booking_id: cancellation.booking_id, expected_fee_credits: cancellation.cancellation_fee_credits,
       });
       setCancellation(null);
-      setNotice(`Запись отменена. Возвращено ${creditLabel(result.refund_credits || 0)} на кошелёк оплаты. Удержано ${creditLabel(result.cancellation_fee_credits || 0)}.`);
+      setNotice(usesTestCredits
+        ? `Запись отменена. Возвращено ${creditLabel(result.refund_credits || 0)} на кошелёк оплаты. Удержано ${creditLabel(result.cancellation_fee_credits || 0)}.`
+        : "Неоплаченная заявка отменена. Платёж не выполнялся.");
     } catch (err) {
       setError(err.message);
       if (err.details?.code === "P0013") {
@@ -326,7 +338,7 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
     <section className="practice-patient" data-testid="a2-patient-panel" data-tour-target="patient-specialist" {...tourState}>
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
-      {topUp !== null && (
+      {usesTestCredits && topUp !== null && (
         <div className="practice-patient-card" role="status">
           <strong>Пополните баланс</strong>
           {topUp > 0 && <p>Нужно добавить {creditLabel(topUp)}{hasServerRate ? ` — ${(topUp / creditsPerRuble).toLocaleString("ru-RU")} ₽` : ""}.</p>}
@@ -337,8 +349,10 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
       {cancellation && (
         <section className="practice-patient-card" role="dialog" aria-label="Подтверждение отмены">
           <strong>Отменить запись?</strong>
-          <p>{cancellationPolicy}</p>
-          <p>Будет удержано {creditLabel(cancellation.cancellation_fee_credits)}. На кошелёк оплаты вернётся {creditLabel(cancellation.refund_credits)}.</p>
+          {usesTestCredits ? <>
+            <p>{cancellationPolicy}</p>
+            <p>Будет удержано {creditLabel(cancellation.cancellation_fee_credits)}. На кошелёк оплаты вернётся {creditLabel(cancellation.refund_credits)}.</p>
+          </> : <p>Это неоплаченная заявка. При отмене списаний и возвратов не будет.</p>}
           {cancellation.can_cancel ? (
             <button type="button" disabled={busy} onClick={cancelBooking}>Подтвердить отмену</button>
           ) : <p>Эту запись уже нельзя отменить.</p>}
@@ -369,9 +383,11 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
         <button type="button" onClick={() => { setError(""); refresh(); }}>Обновить кабинет</button>
       ) : (
         <>
-          <p><strong>Доступно {creditLabel(cabinet.available_credits)}</strong>{hasServerRate ? ` · ${(cabinet.available_credits / creditsPerRuble).toLocaleString("ru-RU")} ₽` : ""}</p>
-          <p>{hasServerRate ? `${creditsPerRuble.toLocaleString("ru-RU")} кредитов = 1 ₽. ` : ""}Кошелёк {module === "body" ? "Health" : "Support"}.</p>
-          <button type="button" className="practice-patient-secondary" onClick={() => setTopUp(0)}>Пополнить баланс</button>
+          {usesTestCredits ? <>
+            <p><strong>Доступно {creditLabel(cabinet.available_credits)}</strong>{hasServerRate ? ` · ${(cabinet.available_credits / creditsPerRuble).toLocaleString("ru-RU")} ₽` : ""}</p>
+            <p>{hasServerRate ? `${creditsPerRuble.toLocaleString("ru-RU")} кредитов = 1 ₽. ` : ""}Кошелёк {module === "body" ? "Health" : "Support"}.</p>
+            <button type="button" className="practice-patient-secondary" onClick={() => setTopUp(0)}>Пополнить баланс</button>
+          </> : <p role="status">Оплата не подключена: цены и свободное время доступны, а запись сохраняется только как неоплаченная заявка.</p>}
           <div data-tour-target="patient-booking" {...tourState}>
             <h3>Мои специалисты</h3>
             {specialists.length === 0 && (
@@ -410,7 +426,8 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
                         services={specialist.services} request={request}
                         balance={cabinet.available_credits} walletActive={cabinet.wallet_status === "active"} onRefresh={refresh}
                         onTopUp={(amount) => { setTopUp(amount || 0); refresh(); }}
-                        onSaved={() => { setNotice("Запись оплачена кредитами и подтверждена."); return refresh(); }}
+                        paymentMode={cabinet.financial_mode}
+                        onSaved={() => { setNotice(usesTestCredits ? "Запись оплачена кредитами и подтверждена." : "Неоплаченная заявка сохранена. Подтверждения платежа нет."); return refresh(); }}
                       />
                     ) : <p>У этого специалиста пока нет активных серверных услуг для записи.</p>)}
                   </li>
@@ -420,8 +437,8 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
 
             <h3>Мои записи</h3>
             {!bookings.length && <p>Здесь появятся ваши записи на приём.</p>}
-            <AppointmentList title="Ближайшие" bookings={[...upcoming].reverse()} busy={busy} onAction={onAction} />
-            <AppointmentList title="История" bookings={history} busy={busy} onAction={onAction} />
+            <AppointmentList title="Ближайшие" bookings={[...upcoming].reverse()} busy={busy} onAction={onAction} usesTestCredits={usesTestCredits} />
+            <AppointmentList title="История" bookings={history} busy={busy} onAction={onAction} usesTestCredits={usesTestCredits} />
           </div>
 
           {cabinet.linking_available && (

@@ -48,7 +48,7 @@ async function installMocks(context) {
     if (body.action === "listPracticeServices") return ok(route, { services: state.services });
     if (body.action === "listPracticeAvailability") return ok(route, { availability: state.availability });
     if (body.action === "listPracticeBookings") return ok(route, { bookings: state.bookings });
-    if (body.action === "getPracticeFinance") return ok(route, { specialist_credits: 0, service_fee_credits: 0, cancellation_fee_credits: 0 });
+    if (body.action === "getPracticeFinance") return ok(route, { financial_mode: "test_credits", payments_available: true, specialist_credits: 0, service_fee_credits: 0, cancellation_fee_credits: 0 });
     if (body.action === "savePracticePlace") {
       const row = { id: body.id || "a38-place", name: body.name, address: body.address || null };
       state.places = [row]; return ok(route, { place: row });

@@ -278,6 +278,7 @@ export default function PracticeBookingPanel({
   const showServices = section === "all" || section === "services" || (currentTourActive && currentTourStep === 1);
   const showCalendar = section === "all" || section === "calendar" || (currentTourActive && currentTourStep === 2);
   const showFinance = section === "all" || section === "finance";
+  const usesTestCredits = finance?.financial_mode === "test_credits";
   const upcomingBookings = bookings.filter((booking) => new Date(booking.starts_at).getTime() >= Date.now()).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
   const todayKey = new Date().toISOString().slice(0, 10);
   const weekEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -317,7 +318,7 @@ export default function PracticeBookingPanel({
       <h3>Услуги</h3>
       {!services.length && !loading && <p>Услуг пока нет. Новая услуга остаётся черновиком, пока вы явно не включите публикацию.</p>}
       {services.map((service) => <div key={service.id} data-testid="a2-service-row" style={{ padding: "7px 0", borderBottom: "1px solid #eee", fontSize: 14 }}>
-        <strong>{service.name}</strong> · {formats[service.format]} · {service.duration_min} мин · {(service.price_kop / 100).toLocaleString("ru-RU")} ₽ · {Number(service.price_credits || 0).toLocaleString("ru-RU")} кредитов · {(service.modules || ["support", "body"]).map((entry) => entry === "body" ? "Health" : "Support").join(" + ")} · <span>{service.is_active ? "Опубликована" : "Черновик"}</span>
+        <strong>{service.name}</strong> · {formats[service.format]} · {service.duration_min} мин · {(service.price_kop / 100).toLocaleString("ru-RU")} ₽{usesTestCredits ? ` · ${Number(service.price_credits || 0).toLocaleString("ru-RU")} кредитов` : ""} · {(service.modules || ["support", "body"]).map((entry) => entry === "body" ? "Health" : "Support").join(" + ")} · <span>{service.is_active ? "Опубликована" : "Черновик"}</span>
         <button type="button" onClick={() => setEditingService(service)} style={{ ...secondaryStyle, marginLeft: 8 }}>Редактировать</button>
         {service.is_active && <button type="button" onClick={() => mutate("deactivatePracticeService", { id: service.id }, "Публикация услуги остановлена.")} style={{ ...secondaryStyle, marginLeft: 6 }}>Снять с публикации</button>}
       </div>)}
@@ -368,14 +369,14 @@ export default function PracticeBookingPanel({
 
     {showFinance && <div data-testid="practice-finance-section">
       <h3>Финансы</h3>
-      {!finance?.transactions?.length && !loading ? <p style={{ fontSize: 13, color: "#777" }}>Проведённых операций в выбранном контексте пока нет.</p> : <>
+      {finance?.payments_available === false ? <p style={{ fontSize: 13, color: "#777" }}>Платежи не подключены: неоплаченные заявки и клиническая работа не создают финансовых операций.</p> : !finance?.transactions?.length && !loading ? <p style={{ fontSize: 13, color: "#777" }}>Проведённых операций в выбранном контексте пока нет.</p> : <>
         <p>Начислено специалисту (условные кредиты): <strong>{Number(finance?.specialist_credits || 0).toLocaleString("ru-RU")} кредитов</strong>.</p>
         <p>Комиссия сервиса по проведённым операциям: {Number(finance?.service_fee_credits || 0).toLocaleString("ru-RU")} кредитов. Выплаты в рублях не подключены.</p>
         {(finance?.breakdown || []).map((item) => <div key={`${item.module}:${item.organization_id || "private"}`} style={{ padding: "9px 0", borderBottom: "1px solid #eee", fontSize: 13 }}>
           <strong>{item.module === "body" ? "Health" : "Support"}</strong> · {item.organization_name}: {Number(item.booking_cost_kop / 100).toLocaleString("ru-RU")} ₽ записей, комиссия {Number(item.commission_kop / 100).toLocaleString("ru-RU")} ₽, списано {Number(item.charged_credits).toLocaleString("ru-RU")} кредитов, возврат {Number(item.refunded_credits).toLocaleString("ru-RU")}
         </div>)}
       </>}
-      <p style={{ fontSize: 12, color: "#999" }}>Суммы основаны на сохранённых кредитных операциях; внешние платежи и выплаты не имитируются.</p>
+      {usesTestCredits && <p style={{ fontSize: 12, color: "#999" }}>Суммы основаны на сохранённых кредитных операциях; внешние платежи и выплаты не имитируются.</p>}
     </div>}
 
     {currentTourActive && <PracticeTour step={currentTourStep}

@@ -41,7 +41,7 @@ assert(sessionApi.includes('.from("service_pricing")'), "legacy pricing dependen
 
 assert(patientCatalog.includes('.contains("modules", [module])'));
 assert(patientCatalog.includes("getAttachedPracticeService"));
-assert(handler.includes("listPracticePatientSpecialists(supabase, [owner], owner.module)"));
+assert(handler.includes("includeTestCredits: usesTestCredits"), "test-credit display is explicitly server-mode scoped");
 assert(handler.includes("getAttachedPracticeService(supabase, owner, service_id)"));
 assert(handler.includes("Нет доступа к выбранному разделу"));
 assert(handler.includes("Сессия пациента не проверена"));

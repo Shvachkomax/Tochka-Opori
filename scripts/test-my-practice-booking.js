@@ -10,6 +10,7 @@ assert.equal(
   true,
 );
 assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", VERCEL_ENV: "production", MY_PRACTICE_ALLOWED_SUPABASE_REF: "eehyehlhiyztciaezaus", SUPABASE_URL: "https://eehyehlhiyztciaezaus.supabase.co" }), false);
+assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", VERCEL_ENV: "production", DEPLOYMENT_PURPOSE: "live", MY_PRACTICE_ALLOWED_SUPABASE_REF: "blwogrdezfhprdpdnxtn", SUPABASE_URL: "https://blwogrdezfhprdpdnxtn.supabase.co" }), true);
 assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", VERCEL_ENV: "preview", DEPLOYMENT_PURPOSE: "test", MY_PRACTICE_ALLOWED_SUPABASE_REF: "OTHER", SUPABASE_URL: "https://OTHER.supabase.co" }), false);
 assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", SUPABASE_LOCAL_REHEARSAL: "1", SUPABASE_URL: "http://127.0.0.1:54321" }), true);
 assert.equal(isMyPracticeServerEnabled({ MY_PRACTICE_SERVER_ENABLED: "true", SUPABASE_LOCAL_REHEARSAL: "1", VERCEL_ENV: "production", SUPABASE_URL: "http://127.0.0.1:54321" }), false);
@@ -26,6 +27,8 @@ assert.ok(slots.length >= 8, "server slots generated");
 assert.equal(slots[0].start_time, "09:00");
 const busy = slotsForServiceDay({ service, availabilityRows: av, bookingsRows: [{ status: "held", starts_at: "2026-11-09T09:00:00.000Z", ends_at: "2026-11-09T10:00:00.000Z" }], day: "2026-11-09" });
 assert.ok(!busy.some((s) => s.start_time === "09:00"), "booked slot excluded server-side");
+const requested = slotsForServiceDay({ service, availabilityRows: av, bookingsRows: [{ status: "requested", starts_at: "2026-11-09T10:00:00.000Z", ends_at: "2026-11-09T11:00:00.000Z" }], day: "2026-11-09" });
+assert.ok(!requested.some((s) => s.start_time === "10:00"), "unpaid request excludes its slot server-side");
 const crossClinicBusy = slotsForServiceDay({
   service,
   availabilityRows: av,
