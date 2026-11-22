@@ -386,7 +386,9 @@ export default function PracticePatientBooking({ sessionId, accessToken, module,
                 return (
                   <li key={key} className="practice-patient-card">
                     <strong>{specialist.name}</strong>
-                    <span>{[specialist.specialty, specialist.organization_name].filter(Boolean).join(" · ")}</span>
+                    {((specialist.specialty && specialist.specialty !== "Учебная проверка") || specialist.organization_name) && (
+                      <span>{[specialist.specialty !== "Учебная проверка" ? specialist.specialty : null, specialist.organization_name].filter(Boolean).join(" · ")}</span>
+                    )}
                     <button type="button" className="practice-patient-secondary" aria-expanded={selected === key}
                       onClick={() => setSelected(selected === key ? "" : key)}>
                       {selected === key ? "Скрыть услуги" : "Услуги и запись"}
