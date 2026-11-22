@@ -85,7 +85,6 @@ function ServiceForm({ item, places, organizationId, module, allowedModules, onS
     <label style={{ display: "block", fontSize: 13, marginBottom: 6 }}>Цена, ₽
       <input data-testid="a2-service-price" type="number" min="0" step="1" value={price} onChange={(event) => setPrice(event.target.value)} required style={fieldStyle} />
     </label>
-    <p>Кредитный эквивалент рассчитает сервер после сохранения цены.</p>
     <label style={{ display: "block", fontSize: 13, marginBottom: 6 }}>Длительность, минут
       <input type="number" min="15" max="240" step="5" value={duration} onChange={(event) => setDuration(event.target.value)} style={fieldStyle} />
     </label>
