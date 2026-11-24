@@ -2839,6 +2839,13 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       setLoadingMessage("");
     }
 
+    const expectedReportRequestId = activeModule === "support"
+      && (dialogDepth >= 3 || crisisMode)
+      && analyzeSessionId
+      ? `support-final:${analyzeSessionId}:${dialogDepth}`
+      : null;
+    let responseData = null;
+
     try {
       const mod = activeModule || "support";
       const res = await fetchWithClientToken("/api/analyze", mod, "analyze", {
@@ -2873,7 +2880,8 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         throw new Error(res.error || "Не удалось начать разбор. Попробуйте ещё раз.");
       }
 
-      const data = await res.json();
+      responseData = await res.json();
+      const data = responseData;
 
       if (data.type === "crisis_questions") {
         setCrisisMode(true);
@@ -2933,7 +2941,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         const sid = sessionId || `session-${Date.now()}`;
         if (!sessionId) setSessionId(sid);
         setLoadingMessage("Отчёт ещё формируется. Подождите немного.");
-        await pollReportStatus(sid, (status) => finalizeReportFromStatus(status, inputText));
+        await pollReportStatus(
+          sid,
+          data.report_request_id || expectedReportRequestId,
+          (status) => finalizeReportFromStatus(status, inputText),
+        );
       } else if (data.type === "final") {
         setResult(data.report || "");
         if (data.crisis) setCrisisBlock(data.crisis);
@@ -2948,7 +2960,9 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
         const sid = sessionId || `session-${Date.now()}`;
         if (!sessionId) setSessionId(sid);
 
-        // Backend now saves the report durably. Use tokens/codes from the response.
+        // The access token was issued by /api/start-session and is already stored.
+        // A newly created continuation code is accepted only from this authorized
+        // analyze response; report polling never reissues credential material.
         if (data.public_code) setPublicCode(data.public_code);
         if (data.access_token) saveSupportSession(sid, data.access_token);
         if (data.continuation_code) setContinuationCode(data.continuation_code);
@@ -3000,7 +3014,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
       const msg = e.message || "";
       if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("abort")) {
         // Connection dropped — check backend status before giving up.
-        await attemptReportRecovery(sid || sessionId, inputText, data?.report);
+        await attemptReportRecovery(
+          analyzeSessionId || sessionId,
+          inputText,
+          responseData?.report_request_id || expectedReportRequestId,
+        );
       } else if (dialogDepth < 3 || activeModule !== "support") {
         setError("Не удалось начать разбор. Попробуйте ещё раз.");
       } else {
@@ -3012,25 +3030,59 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     }
   }
 
-  async function getReportStatus(sessionId) {
-    const res = await fetch("/api/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "getReportStatus", sessionId }),
-    });
-    if (!res.ok) return null;
-    return await res.json();
+  function getReportStatusProof(targetSessionId) {
+    if (sessionRef.current?.sessionId === targetSessionId && sessionRef.current.accessToken) {
+      return sessionRef.current;
+    }
+    const saved = getSupportSession();
+    return saved.sessionId === targetSessionId && saved.accessToken ? saved : null;
   }
 
-  async function pollReportStatus(sessionId, onReady) {
+  async function getReportStatus(sessionId, reportRequestId) {
+    const proof = getReportStatusProof(sessionId);
+    if (!proof || !reportRequestId) {
+      return { ok: false, terminal: true, error: "Войдите снова по коду продолжения." };
+    }
+    try {
+      const res = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "getReportStatus",
+          module: "support",
+          sessionId,
+          reportRequestId,
+          access_token: proof.accessToken,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          ok: false,
+          terminal: [401, 403, 409].includes(res.status),
+          error: data.error || "Не удалось проверить статус отчёта.",
+        };
+      }
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  async function pollReportStatus(sessionId, reportRequestId, onReady) {
     let attempts = 0;
     const maxAttempts = 60; // ~60 seconds
     while (attempts < maxAttempts) {
-      const status = await getReportStatus(sessionId);
+      const status = await getReportStatus(sessionId, reportRequestId);
       if (!status) {
         await new Promise((r) => setTimeout(r, 1000));
         attempts += 1;
         continue;
+      }
+      if (status.terminal) {
+        setError(status.error || "Не удалось подтвердить доступ к отчёту.");
+        setLoading(false);
+        return;
       }
       if (status.status === "ready" && status.type === "final") {
         onReady(status);
@@ -3049,16 +3101,21 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setLoading(false);
   }
 
-  async function attemptReportRecovery(sessionId, inputText, fallbackReport) {
-    if (!sessionId) {
+  async function attemptReportRecovery(sessionId, inputText, reportRequestId) {
+    if (!sessionId || !reportRequestId) {
       setError("Не удалось сформировать отчёт. Проверьте соединение и попробуйте ещё раз.");
       return;
     }
     setLoading(true);
     setError("Соединение прервалось. Проверяем, сохранился ли отчёт…");
-    const status = await getReportStatus(sessionId);
+    const status = await getReportStatus(sessionId, reportRequestId);
     if (!status) {
       setError("Не удалось проверить статус отчёта. Попробуйте ещё раз.");
+      setLoading(false);
+      return;
+    }
+    if (status.terminal) {
+      setError(status.error || "Не удалось подтвердить доступ к отчёту.");
       setLoading(false);
       return;
     }
@@ -3069,7 +3126,11 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     if (status.status === "processing" || status.status === "not_started") {
       setError("");
       setLoadingMessage("Отчёт ещё формируется. Подождите немного.");
-      await pollReportStatus(sessionId, (readyStatus) => finalizeReportFromStatus(readyStatus, inputText));
+      await pollReportStatus(
+        sessionId,
+        reportRequestId,
+        (readyStatus) => finalizeReportFromStatus(readyStatus, inputText),
+      );
       return;
     }
     setError(status.message || "Не удалось сформировать отчёт. Попробуйте ещё раз.");
@@ -3085,14 +3146,12 @@ ${doctor.replace(/===DOCTOR_REPORT===/g, "").trim().split("\n").map(l => `<p>${l
     setPhase("report");
     setSupportScreen("report");
     if (status.public_code) setPublicCode(status.public_code);
-    if (status.access_token) saveSupportSession(status.session_id, status.access_token);
-    if (status.continuation_code) setContinuationCode(status.continuation_code);
     setSessionId(status.session_id);
     setLoading(false);
     // Save review
     const review = {
       case_id: status.session_id, sessionId: status.session_id, publicCode: status.public_code || "",
-      access_token: status.access_token || getSupportSession().accessToken || "",
+      access_token: getSupportSession().accessToken || "",
       module: activeModule,
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       environment: window.location.hostname.includes("localhost") ? "local" : "vercel",

@@ -49,16 +49,14 @@ async function validateSessionOwnership(sessionId, module, accessToken) {
       console.log("[transcribe] session ownership check:", check);
       return false;
     }
-    if (!session.legacy_access) {
-      if (!accessToken) {
-        console.log("[transcribe] session ownership check:", check);
-        return false;
-      }
-      const valid = await validateSessionAccess(session.session_id, accessToken);
-      check.validate_access_result = valid;
+    if (!accessToken) {
       console.log("[transcribe] session ownership check:", check);
-      if (!valid) return false;
+      return false;
     }
+    const valid = await validateSessionAccess(session.session_id, accessToken, { expectedModule: "support" });
+    check.validate_access_result = valid;
+    console.log("[transcribe] session ownership check:", check);
+    if (!valid) return false;
     return true;
   }
 
@@ -86,7 +84,7 @@ async function validateSessionOwnership(sessionId, module, accessToken) {
       console.log("[transcribe] session ownership check:", check);
       return false;
     }
-    const valid = await validateSessionAccess(sessionId, accessToken);
+    const valid = await validateSessionAccess(sessionId, accessToken, { expectedModule: "body" });
     check.validate_access_result = valid;
     console.log("[transcribe] session ownership check:", check);
     if (!valid) return false;

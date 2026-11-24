@@ -178,7 +178,8 @@ async function runScenarioA() {
   const r3 = await postAnalyze({ session_id: sessionId, text, depth: 3, answers, conversationHistory: history, module: "support" });
   const duration = Date.now() - t0;
   assert(r3.status === 200 && r3.body.type === "final", "A: final report returned");
-  assert(r3.body.continuation_code && r3.body.access_token, "A: continuation code and access token returned");
+  assert(r3.body.continuation_code, "A: continuation code returned once by authorized finalization");
+  assert(sessionAccessTokens.get(sessionId), "A: bootstrap access token remains available");
   console.log(`  A: final report duration ${duration}ms`);
 
   const session = await getSession(sessionId);
@@ -197,7 +198,7 @@ async function runScenarioA() {
   assert(exchange.body.access_token, "A: exchanged access token returned");
   assert(!exchange.body.anonymous_owner_id, "A: anonymous_owner_id not leaked");
 
-  const getReport = await postSession({ action: "getReportStatus", sessionId, reportRequestId: requestId, access_token: exchange.body.access_token });
+  const getReport = await postSession({ action: "getReportStatus", module: "support", sessionId, reportRequestId: requestId, access_token: exchange.body.access_token });
   assert(getReport.status === 200 && getReport.body.status === "ready", "A: getReportStatus returns ready");
   assert(getReport.body.type === "final" && getReport.body.report, "A: report recovered via getReportStatus");
 
@@ -235,7 +236,13 @@ async function runScenarioB() {
   assert(debitsAfterFirst.length === 1, "B: exactly one debit after first call");
 
   // Simulate recovery: call getReportStatus
-  const status = await postSession({ action: "getReportStatus", sessionId, reportRequestId: requestId });
+  const status = await postSession({
+    action: "getReportStatus",
+    module: "support",
+    sessionId,
+    reportRequestId: requestId,
+    access_token: sessionAccessTokens.get(sessionId),
+  });
   assert(status.status === 200 && status.body.status === "ready", "B: getReportStatus ready");
   assert(status.body.type === "final" && status.body.report, "B: report recovered");
 

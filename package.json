@@ -24,6 +24,8 @@
     "test:medication-reference": "node scripts/test-medication-reference.js",
     "test:medication-reference-provider": "node scripts/test-medication-reference-provider.js",
     "test:medication-reference-ingestion": "node scripts/test-medication-reference-ingestion.js",
+    "test:sec-003": "node scripts/test-sec-003-legacy-access.js",
+    "test:sec-003-fix2": "node scripts/test-sec-003-fix2.js",
     "test:session-access-pair": "node scripts/test-session-access-pair.js",
     "test:usage-auth": "node scripts/test-usage-auth.js",
     "test:specialist-access-policy": "node scripts/test-specialist-access-policy.js",
