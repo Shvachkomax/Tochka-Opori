@@ -1,6 +1,5 @@
 import { deploymentOrganizationId } from "../lib/security/deployment-scope.js";
 import { getSupabase } from "../lib/supabase.js";
-import { createClient } from "@supabase/supabase-js";
 import { maskSensitiveData, getPrivacySafeMode, maskText } from "../lib/sanitize.js";
 import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
 import { normalizeConversationHistory, normalizeSessionDetails, extractUserReport, extractDoctorReport, extractExpertFeedback } from "../lib/conversation.js";
@@ -137,10 +136,7 @@ async function addCanonicalReviewScope(supabase, record) {
 }
 
 async function getSupabaseClient() {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) return null;
-  return createClient(supabaseUrl, serviceKey);
+  return getSupabase();
 }
 
 export default async function handler(req, res) {
@@ -356,17 +352,7 @@ async function handleList(req, res) {
       return res.status(401).json({ ok: false, error: "Доступ запрещён." });
     }
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceKey) {
-      return res.status(500).json({
-        ok: false, error: "Missing Supabase env vars",
-        hasUrl: Boolean(supabaseUrl), hasServiceKey: Boolean(serviceKey),
-      });
-    }
-
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = getSupabase();
 
     const params = req.body || {};
 
@@ -473,13 +459,7 @@ async function handleUpdateStatus(req, res) {
       return res.status(400).json({ ok: false, error: "Invalid status" });
     }
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey) {
-      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
-    }
-
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = getSupabase();
 
     const { data: current, error: fetchError } = await supabase
       .from("case_reviews")
@@ -556,13 +536,7 @@ async function handleSaveCorrection(req, res) {
       return res.status(400).json({ ok: false, error: "Missing review_id" });
     }
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey) {
-      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
-    }
-
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = getSupabase();
 
     const { data: current, error: fetchError } = await supabase
       .from("case_reviews")
@@ -651,13 +625,7 @@ async function handleExportJsonl(req, res) {
       return res.status(401).json({ ok: false, error: "Invalid admin_secret" });
     }
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey) {
-      return res.status(500).json({ ok: false, error: "Missing Supabase env vars" });
-    }
-
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = getSupabase();
 
     const exportStatus = status || "approved";
 

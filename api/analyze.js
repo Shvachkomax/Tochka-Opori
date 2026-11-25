@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { runTask, TASK_TYPES, getActiveProvider } from "../lib/modelRouter.js";
 import { getSupabase } from "../lib/supabase.js";
 import { getModule, isValidModule, DEFAULT_MODULE } from "../lib/modules.js";
@@ -8,11 +7,10 @@ import { rateLimit } from "../lib/security/rate-limit.js";
 import { requireClientToken } from "../lib/security/client-token.js";
 import { validateSessionAccess } from "../lib/security/access-token.js";
 import { validateAnalyzeSessionAccess } from "../lib/security/analyze-session-access.js";
-import { isAnMedSupportFeatureEnabled, rejectUnavailableModule } from "../lib/security/module-availability.js";
-import { debitCreditsForSession, setSessionVisibleAfterCode } from "../lib/usage/debit.js";
-import { ensureWallet, setWalletVisible } from "../lib/usage/wallet.js";
-import { getOrCreateContinuationCredential } from "../lib/session/continuation-store.js";
-import { generateSessionAccessToken } from "../lib/security/access-token.js";
+import { getPilotId, isAnMedSupportFeatureEnabled, rejectUnavailableModule } from "../lib/security/module-availability.js";
+import { debitCreditsForSession } from "../lib/usage/debit.js";
+import { setWalletVisible } from "../lib/usage/wallet.js";
+import { createHealthBootstrap, saveHealthIntakeAnalysis } from "../lib/session/health-bootstrap.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
 import { buildHealthDiaryLogicalSourceId, buildHealthDiaryObservationSnapshot } from "../lib/clinical/observation-mappings.js";
 import { recordClinicalObservation } from "../lib/clinical/projection.js";
@@ -29,12 +27,6 @@ import {
   repairInvalidJson,
   buildReportResponsePayload,
 } from "../lib/report/finalize.js";
-
-function generateBodyCode() {
-  const p1 = crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 4);
-  const p2 = crypto.randomBytes(3).toString("hex").toUpperCase().slice(0, 3);
-  return `HEALTH-${p1}-${p2}`;
-}
 
 function buildAntiRepeatBlock(convHistory, module = "support") {
   if (!Array.isArray(convHistory) || convHistory.length === 0) return "";
@@ -749,74 +741,6 @@ function calcBMI(heightCm, weightKg) {
   return Math.round((w / ((h / 100) * (h / 100))) * 10) / 10;
 }
 
-async function trySaveIntake(intake, bmi, careLevel, routerMeta, sessionCode, source = "self_signup", specialistId = null, specialistName = null) {
-  const targetSessionId = sessionCode || intake.session_id || null;
-  try {
-    const crypto = await import("node:crypto");
-    const { getSupabase } = await import("../lib/supabase.js");
-    const supabase = getSupabase();
-    const answers = { ...intake };
-    delete answers.session_id;
-    const payload = {
-      module: "body",
-      version: "body-intake-v0.1",
-      session_id: targetSessionId,
-      answers,
-      bmi: bmi ?? null,
-      care_recommendation: careLevel || null,
-      provider: routerMeta?.provider || null,
-      ai_model: routerMeta?.model_used || null,
-      task_type: routerMeta?.task_type || null,
-      router_version: routerMeta?.router_version || null,
-      request_duration_ms: routerMeta?.request_duration || null,
-      source,
-      specialist_id: specialistId,
-      specialist_name: specialistName,
-    };
-    await supabase.from("body_intake_forms").insert(payload);
-
-    const displayName = intake.display_name || null;
-    const goal = intake.goal || null;
-
-    const { data: existingClient } = await supabase
-      .from("body_clients")
-      .select("anonymous_owner_id")
-      .eq("session_id", targetSessionId)
-      .maybeSingle();
-
-    let anonymousOwnerId = existingClient?.anonymous_owner_id;
-
-    if (anonymousOwnerId) {
-      await supabase.from("body_clients").update({
-        display_name: displayName,
-        source,
-        specialist_id: specialistId,
-        specialist_name: specialistName,
-        goal,
-        updated_at: new Date().toISOString(),
-      }).eq("session_id", targetSessionId);
-    } else {
-      anonymousOwnerId = crypto.randomUUID();
-      await supabase.from("body_clients").insert({
-        session_id: targetSessionId,
-        anonymous_owner_id: anonymousOwnerId,
-        display_name: displayName,
-        source,
-        specialist_id: specialistId,
-        specialist_name: specialistName,
-        goal,
-        status: "active",
-        updated_at: new Date().toISOString(),
-      });
-    }
-
-    return { success: true, anonymousOwnerId, sessionId: targetSessionId };
-  } catch (err) {
-    console.log("Body intake DB save skipped:", err.message);
-    return { success: false, anonymousOwnerId: null, sessionId: targetSessionId };
-  }
-}
-
 async function handleBodyIntakeAnalysis(req, res, intake) {
   const bmi = calcBMI(intake.height_cm, intake.weight_kg);
 
@@ -833,37 +757,25 @@ async function handleBodyIntakeAnalysis(req, res, intake) {
   if (hasUrgentFlag) redFlagCareLevel = "urgent_help";
   else if (hasMedicalFlag) redFlagCareLevel = "medical_consultation";
 
-  // Generate continuation code
-  const sessionCode = generateBodyCode();
-
-  // Save client record before AI — debit depends on canonical body_clients row
-  const saveResult = await trySaveIntake(intake, bmi, null, null, sessionCode, source, specialistId, specialistName);
+  // One database transaction creates the internal 128-bit session, owner,
+  // intake, continuation credential, token hash, and hidden wallet. A unique
+  // conflict rolls the whole RPC back and is retried with fresh random material.
+  const supabase = getSupabase();
+  const saveResult = await createHealthBootstrap({
+    supabase,
+    intake,
+    bmi,
+    source,
+    specialistId,
+    specialistName,
+    sessionJson: getPilotId() ? { pilot_id: getPilotId() } : {},
+  });
   if (!saveResult.success) {
     return res.status(500).json({ ok: false, error: "Не удалось сохранить данные. Попробуйте позже." });
   }
-
-  // Create owner-level continuation credential on first completed intake.
-  let continuationCode = null;
-  let accessToken = null;
-  try {
-    const { getSupabase } = await import("../lib/supabase.js");
-    const supabase = getSupabase();
-    const credentialResult = await getOrCreateContinuationCredential({
-      module: "body",
-      ownerId: saveResult.anonymousOwnerId,
-      supabase,
-    });
-    if (credentialResult.isNew && credentialResult.combinedCode) {
-      continuationCode = credentialResult.combinedCode;
-    }
-    accessToken = await generateSessionAccessToken(sessionCode, {
-      module: "body",
-      anonymousOwnerId: saveResult.anonymousOwnerId,
-      publicCode: continuationCode,
-    });
-  } catch (credErr) {
-    console.error("Body intake continuation credential creation failed:", credErr.message);
-  }
+  const sessionCode = saveResult.sessionId;
+  const continuationCode = saveResult.continuationCode;
+  const accessToken = saveResult.accessToken;
 
   const DISCLAIMER = "\n\nЭто не диагноз и не медицинское назначение.";
 
@@ -980,8 +892,15 @@ ${conversationStyle}
       };
     }
 
-    // Save intake with care recommendation — await to confirm code persistence
-    const updated = (await trySaveIntake(intake, bmi, careLevel, result, sessionCode, source, specialistId, specialistName)).success;
+    // Update only the intake row created by the atomic bootstrap. Never insert a
+    // second profile or derive ownership from a colliding session ID.
+    const updated = await saveHealthIntakeAnalysis({
+      supabase,
+      intakeId: saveResult.intakeId,
+      sessionId: sessionCode,
+      careLevel,
+      routerMeta: result,
+    });
 
     try {
       await debitCreditsForSession({
@@ -996,14 +915,10 @@ ${conversationStyle}
       console.error("[credits] body_intake_analyze debit failed:", e.message);
     }
 
-    // Only make wallet visible after code is confirmed saved
-    if (updated) {
-      setSessionVisibleAfterCode({ sessionId: sessionCode, module: "body" });
+    // Only make the transaction-created wallet visible after the intake update.
+    if (updated && saveResult.walletId) {
       try {
-        const wallet = await ensureWallet({ ownerType: "anonymous_profile", ownerId: saveResult.anonymousOwnerId, module: "body" });
-        if (wallet) {
-          await setWalletVisible({ walletId: wallet.id });
-        }
+        await setWalletVisible({ walletId: saveResult.walletId });
       } catch (walletErr) {
         console.error("[wallet] body intake set visible failed:", walletErr.message);
       }
@@ -1063,7 +978,7 @@ async function handleDailyLogAnalysis(req, res) {
   }
 
   // Validate session access_token
-  const sessionValid = await validateSessionAccess(session_id, access_token);
+  const sessionValid = await validateSessionAccess(session_id, access_token, { expectedModule: "body" });
   if (!sessionValid) {
     console.warn(`[body-diary-save] request_id=${diagId} stage=auth_denied session=${session_id}`);
     return res.status(401).json({ ok: false, saved: false, error: "Сессия недействительна. Войдите снова по коду продолжения.", request_id: diagId });
@@ -1517,7 +1432,7 @@ async function handleDailyLogAiAnalysis(req, res) {
   }
 
   // Validate session access_token
-  const sessionValid = await validateSessionAccess(session_id, access_token);
+  const sessionValid = await validateSessionAccess(session_id, access_token, { expectedModule: "body" });
   if (!sessionValid) {
     console.warn(`[body-diary-ai] request_id=${diagId} stage=auth_denied session=${session_id}`);
     return res.status(401).json({ ok: false, error: "Сессия недействительна. Войдите снова по коду продолжения.", request_id: diagId });
@@ -1780,7 +1695,7 @@ async function handleCheckSaveStatus(req, res) {
   }
 
   // Validate session access_token
-  const sessionValid = await validateSessionAccess(session_id, access_token);
+  const sessionValid = await validateSessionAccess(session_id, access_token, { expectedModule: "body" });
   if (!sessionValid) {
     console.warn(`[check-save] request_id=${diagId} stage=auth_denied session=${session_id}`);
     return res.status(401).json({ ok: false, error: "Сессия недействительна. Войдите снова по коду продолжения.", request_id: diagId });
@@ -1863,7 +1778,7 @@ async function handlePlatePhotoAnalysis(req, res) {
   // Photo analysis is a protected session operation: it requires the same
   // credential pair as the diary save and must not work from session_id
   // knowledge alone.
-  const sessionValid = await validateSessionAccess(session_id, access_token);
+  const sessionValid = await validateSessionAccess(session_id, access_token, { expectedModule: "body" });
   if (!sessionValid) {
     console.warn(`[plate-analysis] stage=auth_denied session=${session_id}`);
     return res.status(401).json({ ok: false, error: "Сессия недействительна. Войдите снова по коду продолжения." });
@@ -2208,7 +2123,7 @@ AI-assisted summary не сформирован из-за технической
       markers: crisisSignals.markers,
     });
     crisisBlock.emergency_contacts = ["112", "103"];
-    const reportRequestId = `support-crisis:${session_id}:${Date.now()}`;
+    const reportRequestId = getStableReportRequestId(session_id, depth);
     const saved = await saveFinalReportToSession({
       supabase,
       sessionId: session_id,
@@ -2228,7 +2143,13 @@ AI-assisted summary не сформирован из-за технической
     });
     if (!saved) console.error("[analyze] crisis report save failed", session_id);
     const { data: session } = await supabase.from("sessions").select("public_code, anonymous_owner_id").eq("session_id", session_id).maybeSingle();
-    const artifacts = await createReportArtifacts({ supabase, sessionId: session_id, module: "support", anonymousOwnerId: session?.anonymous_owner_id });
+    const artifacts = await createReportArtifacts({
+      supabase,
+      sessionId: session_id,
+      module: "support",
+      anonymousOwnerId: session?.anonymous_owner_id,
+      accessToken,
+    });
     return res.status(200).json({
       ...buildReportResponsePayload({
         userReport: crisisBlock.userReport,
@@ -2242,6 +2163,7 @@ AI-assisted summary не сформирован из-за технической
         publicCode: session?.public_code,
         accessToken: artifacts.accessToken,
         continuationCode: artifacts.continuationCode,
+        reportRequestId,
       }),
       crisis: crisisBlock,
     });
@@ -2605,6 +2527,7 @@ ${antiRepeatBlock}
         sessionId: session_id,
         module: activeModule,
         anonymousOwnerId: finalSession.anonymous_owner_id,
+        accessToken,
       });
       await recordClinicalEvent({
         module: "support",
@@ -2630,6 +2553,7 @@ ${antiRepeatBlock}
         publicCode: statusCheck.data.public_code,
         accessToken: artifacts.accessToken,
         continuationCode: artifacts.continuationCode,
+        reportRequestId: finalReportRequestId,
         debugInfo: { cached: true, report_request_id: finalReportRequestId },
       });
       return res.status(200).json(cachedPayload);
@@ -2929,13 +2853,15 @@ ${antiRepeatBlock}
         }
       }
 
-      // 2. Create access token and continuation credential AFTER save.
+      // 2. Create a continuation credential only after durable save and
+      // re-validation of the bootstrap access token.
       const tStep1 = Date.now();
       const artifacts = await createReportArtifacts({
         supabase,
         sessionId: session_id,
         module: activeModule,
         anonymousOwnerId: session.anonymous_owner_id,
+        accessToken,
       });
       const credentialCreationMs = Date.now() - tStep1;
 
@@ -2981,6 +2907,7 @@ ${antiRepeatBlock}
         publicCode: session.public_code,
         accessToken: artifacts.accessToken,
         continuationCode: artifacts.continuationCode,
+        reportRequestId,
         debugInfo,
         timing: {
           session_lookup_ms: sessionLookupMs,

@@ -96,11 +96,11 @@ run_sql scripts/release-gate-r232/catalog-fingerprint.sql
 echo "FIXTURES scripts/release-gate-r232/pre-migration-fixtures.sql"
 run_sql scripts/release-gate-r232/pre-migration-fixtures.sql >/dev/null
 
-echo "TARGET supabase/migrations/20261123070309_r232_production_clinical_base_a3_a5.sql"
-run_migration supabase/migrations/20261123070309_r232_production_clinical_base_a3_a5.sql >/dev/null
+echo "TARGET supabase/migration-artifacts/production-r234a/20261123070309_r232_production_clinical_base_a3_a5.sql"
+run_migration supabase/migration-artifacts/production-r234a/20261123070309_r232_production_clinical_base_a3_a5.sql >/dev/null
 
-echo "TARGET supabase/migrations/20261123070333_r232_production_payments_disabled_booking.sql"
-run_migration supabase/migrations/20261123070333_r232_production_payments_disabled_booking.sql >/dev/null
+echo "TARGET supabase/migration-artifacts/production-r234a/20261123070333_r232_production_payments_disabled_booking.sql"
+run_migration supabase/migration-artifacts/production-r234a/20261123070333_r232_production_payments_disabled_booking.sql >/dev/null
 
 echo "POST_MIGRATION_TESTS"
 run_sql scripts/release-gate-r232/post-migration-tests.sql

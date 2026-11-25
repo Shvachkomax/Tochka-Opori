@@ -327,7 +327,8 @@ async function runTestA() {
   assert(r3.body.type === "final", "A: final report type");
   assert(r3.body.report, "A: report present");
   assert(r3.body.continuation_code, "A: continuation_code returned");
-  assert(r3.body.access_token, "A: access_token returned");
+  assert(sessionAccessTokens.get(sessionId), "A: bootstrap access_token remains available");
+  assert(!r3.body.access_token, "A: finalization does not reissue access_token");
 
   const session = await getSession(sessionId);
   assert(session.report_generation_status === REPORT_STATUS.READY, "A: status ready in DB");
@@ -423,7 +424,13 @@ async function runTestC() {
   assert(beforeDebitCount === 1, "C: one debit after first call");
 
   // Frontend recovery: getReportStatus
-  const status = await invokeSession({ action: "getReportStatus", sessionId, reportRequestId: requestId });
+  const status = await invokeSession({
+    action: "getReportStatus",
+    module: "support",
+    sessionId,
+    reportRequestId: requestId,
+    access_token: sessionAccessTokens.get(sessionId),
+  });
   assert(status.status === 200, "C: getReportStatus returns 200");
   assert(status.body.status === "ready", "C: status ready");
   assert(status.body.type === "final", "C: report returned via status");

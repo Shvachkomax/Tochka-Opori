@@ -9,7 +9,7 @@ import { applyCors, handleOptions } from "../lib/security/cors.js";
 import { rateLimit } from "../lib/security/rate-limit.js";
 import { canLinkPracticeProfiles, changePracticeProfileLink } from "../lib/my-practice/patient-cabinet.js";
 import { isMyPracticeServerEnabled } from "../lib/my-practice/workspace-handler.js";
-import { accessTokenMatchesHash, validateSessionAccess, generateSessionAccessToken } from "../lib/security/access-token.js";
+import { accessTokenMatchesHash, hashAccessToken, resolveSessionAccess, validateSessionAccess, generateSessionAccessToken } from "../lib/security/access-token.js";
 import {
   parseContinuationCredential,
   verifyContinuationSecret,
@@ -24,7 +24,8 @@ import {
   rotateContinuationCredential,
   fingerprint,
 } from "../lib/session/continuation-store.js";
-import { createReportArtifacts, REPORT_STATUS } from "../lib/report/finalize.js";
+import { resolveContinuationRegenerationOwner } from "../lib/session/continuation-access.js";
+import { REPORT_STATUS } from "../lib/report/finalize.js";
 import { runTask, TASK_TYPES } from "../lib/modelRouter.js";
 import { getInviteUrl } from "../lib/config/site-url.js";
 import { recordClinicalEvent } from "../lib/clinical/projection.js";
@@ -92,7 +93,7 @@ function getClientIp(req) {
 // Exported for reuse from booking actions (same check as session.js).
 export async function resolveSupportOwner(sessionId, accessToken) {
   if (!sessionId || !accessToken) return null;
-  const valid = await validateSessionAccess(sessionId, accessToken);
+  const valid = await validateSessionAccess(sessionId, accessToken, { expectedModule: "support" });
   if (!valid) return null;
   const supabase = getSupabase();
   const { data: session, error } = await supabase
@@ -130,7 +131,7 @@ export async function resolvePracticePatientOwner(sessionId, accessToken) {
 // available to unrelated historical cabinet flows, but cannot expose C2 data.
 async function resolveMedicationSupportOwner(sessionId, accessToken) {
   if (!sessionId || !accessToken) return null;
-  const valid = await validateSessionAccess(sessionId, accessToken);
+  const valid = await validateSessionAccess(sessionId, accessToken, { expectedModule: "support" });
   if (!valid) return null;
   const supabase = getSupabase();
   const { data: session, error } = await supabase
@@ -250,8 +251,8 @@ export async function resolveBodyOwner(sessionId, accessToken) {
   if (!sessionId || !accessToken) {
     return null;
   }
-  const valid = await validateSessionAccess(sessionId, accessToken);
-  if (!valid) {
+  const sessionAccess = await resolveSessionAccess(sessionId, accessToken, { expectedModule: "body" });
+  if (!sessionAccess) {
     return null;
   }
   const supabase = getSupabase();
@@ -263,20 +264,12 @@ export async function resolveBodyOwner(sessionId, accessToken) {
   if (clientError || !client) {
     return null;
   }
-  // If anonymous_owner_id is missing (legacy row), generate and persist one
+  // Missing ownership requires controlled recovery; never invent a new owner as
+  // a side effect of an authenticated read.
   if (!client.anonymous_owner_id) {
-    const { randomUUID } = await import("node:crypto");
-    const newOwnerId = randomUUID();
-    const { error: updateError } = await supabase
-      .from("body_clients")
-      .update({ anonymous_owner_id: newOwnerId })
-      .eq("session_id", sessionId);
-    if (updateError) {
-      console.error("[resolveBodyOwner] failed to assign owner:", updateError.code);
-      return null;
-    }
-    return { ownerId: newOwnerId, sessionId };
+    return null;
   }
+  if (sessionAccess.anonymousOwnerId && sessionAccess.anonymousOwnerId !== client.anonymous_owner_id) return null;
   return { ownerId: client.anonymous_owner_id, sessionId };
 }
 
@@ -569,7 +562,7 @@ export default async function handler(req, res) {
   }
 }
 
-async function handleSave(req, res) {
+export async function handleSave(req, res, dependencies = {}) {
   try {
     const {
       sessionId, patient_text, conversationHistory,
@@ -577,7 +570,7 @@ async function handleSave(req, res) {
       dialogDepth, previousPatientReport, previousDoctorReport,
       homeTasks, resourceFactors, questions, answers,
       voiceObservations, _debug, care_recommendation,
-      invite_token, module: sessionModule,
+      invite_token, module: sessionModule, access_token,
     } = req.body || {};
 
     if (!sessionId) {
@@ -586,8 +579,12 @@ async function handleSave(req, res) {
     if (!isValidSessionId(sessionId)) {
       return res.status(400).json({ ok: false, error: "Invalid sessionId format" });
     }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "owner_id")
+      || Object.prototype.hasOwnProperty.call(req.body || {}, "anonymous_owner_id")) {
+      return res.status(403).json({ ok: false, error: "Владелец сессии определяется только сервером." });
+    }
 
-    const supabase = getSupabase();
+    const supabase = dependencies.supabase || getSupabase();
 
     const privacy = getPrivacySafeMode();
     const maskedPatientText = privacy ? maskText(patient_text || "") : patient_text;
@@ -595,13 +592,9 @@ async function handleSave(req, res) {
     const maskedDoctorReport = privacy ? maskSensitiveData(doctor_report || "") : doctor_report;
     const maskedConversation = privacy ? maskSensitiveData(conversationHistory || []) : conversationHistory;
 
-    const { generatePublicCode } = await import("../lib/publicCode.js");
-    const { validateInviteToken, useInviteToken } = await import("./experts.js");
-    const { ensureWallet, setWalletVisible } = await import("../lib/usage/wallet.js");
-
     const existing = await supabase
       .from("sessions")
-      .select("public_code, organization_id, primary_expert_id, access_token_hash, legacy_access, anonymous_owner_id")
+      .select("id, session_id, module, public_code, organization_id, primary_expert_id, invite_token, access_token_hash, legacy_access, anonymous_owner_id, json_data")
       .eq("session_id", sessionId)
       .maybeSingle();
 
@@ -610,19 +603,49 @@ async function handleSave(req, res) {
       return res.status(500).json({ ok: false, error: "База данных временно недоступна. Попробуйте позже." });
     }
 
-    if (deploymentOrganizationId() && !existing?.data) {
-      return res.status(403).json({ ok: false, error: "Сессия недоступна" });
+    if (!existing?.data) {
+      // A caller-chosen sessionId is not a bootstrap credential. New Support
+      // sessions must be created by /api/start-session, which returns the
+      // server-generated access token before any protected data is saved.
+      return res.status(409).json({
+        ok: false,
+        code: "SESSION_BOOTSTRAP_REQUIRED",
+        error: "Сначала создайте защищённую сессию.",
+      });
     }
-    let publicCode = existing?.data?.public_code;
-    let organizationId = existing?.data?.organization_id || null;
-    let primaryExpertId = existing?.data?.primary_expert_id || null;
-    let inviteToken = existing?.data?.invite_token || null;
-    const isNewSession = !existing?.data;
-    const alreadyHasToken = existing?.data?.access_token_hash != null;
 
-    // Ensure anonymous_owner_id exists (created server-side, never from frontend)
-    let anonymousOwnerId = existing?.data?.anonymous_owner_id || null;
-    const codeJustCreated = !publicCode;
+    const storedSession = existing.data;
+    if (!access_token) {
+      return res.status(401).json({ ok: false, error: "Требуется код доступа." });
+    }
+    if (sessionModule !== storedSession.module || storedSession.module !== "support") {
+      return res.status(403).json({ ok: false, error: "Сессия недоступна." });
+    }
+
+    const sessionAccess = await resolveSessionAccess(sessionId, access_token, {
+      expectedModule: storedSession.module,
+      supabase,
+    });
+    if (!sessionAccess
+      || sessionAccess.legacyAccess
+      || !sessionAccess.anonymousOwnerId
+      || sessionAccess.anonymousOwnerId !== storedSession.anonymous_owner_id
+      || storedSession.legacy_access !== false
+      || !storedSession.access_token_hash
+      || !isPilotSessionMatch(storedSession.json_data)) {
+      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
+    }
+
+    // All canonical security attributes come from the authenticated row.
+    const anonymousOwnerId = storedSession.anonymous_owner_id;
+    let publicCode = storedSession.public_code;
+    let organizationId = storedSession.organization_id || null;
+    let primaryExpertId = storedSession.primary_expert_id || null;
+    let inviteToken = storedSession.invite_token || null;
+    let validatedInvite = null;
+
+    const { generatePublicCode } = await import("../lib/publicCode.js");
+    if (!publicCode) publicCode = generatePublicCode();
 
     if (publicCode && (organizationId || primaryExpertId)) {
       // keep
@@ -640,74 +663,23 @@ async function handleSave(req, res) {
       }
     }
 
-    // Generate anonymous_owner_id for new sessions
-    if (!anonymousOwnerId) {
-      const { randomUUID } = await import("node:crypto");
-      anonymousOwnerId = randomUUID();
-    }
-
-    let newWalletId = null;
-    if (!publicCode) {
-      publicCode = generatePublicCode();
-
-      // Create wallet (hidden) once code is generated.
-      // Visibility set only after DB save confirms code persistence.
-      const wallet = await ensureWallet({ ownerType: "anonymous_case", ownerId: anonymousOwnerId, module: "support" });
-      newWalletId = wallet?.id || null;
-
-      if (invite_token) {
-        const invite = await validateInviteToken(invite_token);
-        if (invite) {
-          organizationId = invite.organization_id;
-          primaryExpertId = invite.expert_id;
-          inviteToken = invite_token;
-
-          const { data: existingAssignment } = await supabase
-            .from("patient_assignments")
-            .select("id")
-            .eq("public_code", publicCode)
-            .eq("module", "support")
-            .maybeSingle();
-
-          if (!existingAssignment) {
-            await supabase.from("patient_assignments").insert({
-              public_code: publicCode,
-              organization_id: organizationId,
-              primary_expert_id: primaryExpertId,
-              assigned_by_expert_id: primaryExpertId,
-              assigned_by_expert_name: "auto",
-              source: "invite_link",
-              status: "active",
-              module: "support",
-            });
-
-            await supabase.from("patient_access").insert({
-              public_code: publicCode,
-              organization_id: organizationId,
-              expert_id: primaryExpertId,
-              access_role: "owner",
-              granted_by_expert_id: primaryExpertId,
-              granted_by_expert_name: "auto",
-              module: "support",
-            });
-          }
-
-          await useInviteToken(invite_token);
-        }
+    if (invite_token && !inviteToken) {
+      const expertTools = dependencies.validateInviteToken && dependencies.useInviteToken
+        ? dependencies
+        : await import("./experts.js");
+      validatedInvite = await expertTools.validateInviteToken(invite_token);
+      if (validatedInvite) {
+        organizationId = validatedInvite.organization_id;
+        primaryExpertId = validatedInvite.expert_id;
+        inviteToken = invite_token;
       }
     }
 
-    const { data: existingRow } = await supabase
-      .from("sessions")
-      .select("id, json_data")
-      .eq("session_id", sessionId)
-      .maybeSingle();
-
-    const existingPairs = existingRow?.json_data?.conversation_pairs || [];
+    const existingPairs = storedSession.json_data?.conversation_pairs || [];
 
     const payload = {
       session_id: sessionId,
-      module: sessionModule || 'support',
+      module: storedSession.module,
       anonymous_owner_id: anonymousOwnerId,
       patient_text: maskedPatientText,
       conversation_history: maskedConversation,
@@ -720,8 +692,8 @@ async function handleSave(req, res) {
       primary_expert_id: primaryExpertId,
       invite_token: inviteToken,
       json_data: {
-        ...(existingRow?.json_data?.pilot_id || getPilotId()
-          ? { pilot_id: getPilotId() || existingRow.json_data.pilot_id }
+        ...(storedSession.json_data?.pilot_id || getPilotId()
+          ? { pilot_id: getPilotId() || storedSession.json_data?.pilot_id }
           : {}),
         dialogDepth: dialogDepth ?? 0,
         previousPatientReport: previousPatientReport || "",
@@ -737,12 +709,20 @@ async function handleSave(req, res) {
       },
     };
 
-    let error;
-    if (existingRow) {
-      ({ error } = await supabase.from("sessions").update(payload).eq("session_id", sessionId));
-    } else {
-      ({ error } = await supabase.from("sessions").insert(payload));
-    }
+    // The authorization attributes are repeated in the UPDATE predicate. If
+    // token/module/owner/legacy state changes after validation, zero rows are
+    // updated and no credential is issued (compare-and-swap authorization).
+    const { data: updatedSession, error } = await supabase
+      .from("sessions")
+      .update(payload)
+      .eq("id", storedSession.id)
+      .eq("session_id", sessionId)
+      .eq("module", storedSession.module)
+      .eq("anonymous_owner_id", anonymousOwnerId)
+      .eq("access_token_hash", storedSession.access_token_hash)
+      .eq("legacy_access", false)
+      .select("session_id, module, anonymous_owner_id, public_code, access_token_hash, legacy_access")
+      .maybeSingle();
 
     if (error) {
       console.error("save-session supabase error", error);
@@ -752,22 +732,61 @@ async function handleSave(req, res) {
         details: process.env.VERCEL ? undefined : error.message,
       });
     }
-
-    // Only make wallet visible after code persistence is confirmed
-    if (newWalletId) {
-      const { setWalletVisible } = await import("../lib/usage/wallet.js");
-      setWalletVisible({ walletId: newWalletId });
+    if (!updatedSession) {
+      return res.status(409).json({
+        ok: false,
+        error: "Сессия изменилась. Войдите снова по коду продолжения.",
+      });
     }
 
-    // Generate access_token for sessions that don't have one yet
-    let accessToken = null;
-    if (isNewSession || !alreadyHasToken) {
-      accessToken = await generateSessionAccessToken(sessionId);
-      if (!accessToken) {
-        console.error("handleSave: failed to generate/store access token for", sessionId);
-        // Don't fail the save — token can be regenerated later.
-        // Legacy access still works until migrations are applied.
+    // Side effects happen only after the authenticated conditional update.
+    if (validatedInvite) {
+      const { data: existingAssignment } = await supabase
+        .from("patient_assignments")
+        .select("id")
+        .eq("public_code", publicCode)
+        .eq("module", "support")
+        .maybeSingle();
+
+      if (!existingAssignment) {
+        await supabase.from("patient_assignments").insert({
+          public_code: publicCode,
+          organization_id: organizationId,
+          primary_expert_id: primaryExpertId,
+          assigned_by_expert_id: primaryExpertId,
+          assigned_by_expert_name: "auto",
+          source: "invite_link",
+          status: "active",
+          module: "support",
+        });
+
+        await supabase.from("patient_access").insert({
+          public_code: publicCode,
+          organization_id: organizationId,
+          expert_id: primaryExpertId,
+          access_role: "owner",
+          granted_by_expert_id: primaryExpertId,
+          granted_by_expert_name: "auto",
+          module: "support",
+        });
       }
+
+      const expertTools = dependencies.useInviteToken
+        ? dependencies
+        : await import("./experts.js");
+      await expertTools.useInviteToken(invite_token);
+    }
+
+    const walletTools = dependencies.ensureWallet
+      ? dependencies
+      : await import("../lib/usage/wallet.js");
+    const wallet = await walletTools.ensureWallet({
+      ownerType: "anonymous_case",
+      ownerId: anonymousOwnerId,
+      module: "support",
+    });
+    if (wallet?.id && walletTools.setWalletVisible) {
+      await walletTools.setWalletVisible({ walletId: wallet.id });
     }
 
     // Create owner-level continuation credential on first completed report (cross-device access)
@@ -775,7 +794,9 @@ async function handleSave(req, res) {
     const moduleForCredential = sessionModule || "support";
     if (moduleForCredential === "support" && anonymousOwnerId) {
       try {
-        const { credential, secret, isNew } = await getOrCreateContinuationCredential({
+        const getOrCreateCredential = dependencies.getOrCreateContinuationCredential
+          || getOrCreateContinuationCredential;
+        const { credential, secret, isNew } = await getOrCreateCredential({
           module: moduleForCredential,
           ownerId: anonymousOwnerId,
           supabase,
@@ -796,10 +817,10 @@ async function handleSave(req, res) {
     // Return wallet balance if visible
     let usageBalance = null;
     try {
-      const wallet = await ensureWallet({ ownerType: "anonymous_case", ownerId: anonymousOwnerId, module: "support" });
       if (wallet) {
-        const { getUsageBalanceForClient } = await import("../lib/usage/wallet.js");
-        usageBalance = await getUsageBalanceForClient({ walletId: wallet.id });
+        const getBalance = dependencies.getUsageBalanceForClient
+          || (await import("../lib/usage/wallet.js")).getUsageBalanceForClient;
+        usageBalance = await getBalance({ walletId: wallet.id });
       }
     } catch (_) { /* non-blocking */ }
 
@@ -811,7 +832,6 @@ async function handleSave(req, res) {
       continuation_code: continuationCode,
       organization_id: organizationId,
       primary_expert_id: primaryExpertId,
-      access_token: accessToken,
       usage_balance: usageBalance,
     });
   } catch (error) {
@@ -841,13 +861,10 @@ async function handleLoad(req, res) {
       });
     }
 
-    const { data, error } = await getSupabase()
+    const supabase = getSupabase();
+    const { data: lookup, error } = await supabase
       .from("sessions")
-      .select("" +
-        "session_id, module, public_code, patient_text, conversation_history, " +
-        "user_report, doctor_report, support_plan, risk_level, json_data, " +
-        "organization_id, primary_expert_id, invite_token, legacy_access, created_at, anonymous_owner_id"
-      )
+      .select("session_id, module")
       .eq("public_code", normalized)
       .maybeSingle();
 
@@ -858,29 +875,45 @@ async function handleLoad(req, res) {
       });
     }
 
-    if (!data) {
+    if (!lookup) {
       return res.status(404).json({
         ok: false,
         error: "Код не найден. Проверьте правильность ввода.",
       });
     }
 
-    if (isHealthCode && data.module !== "body") {
+    if (isHealthCode && lookup.module !== "body") {
       return res.status(404).json({ ok: false, error: "Код не найден." });
     }
-    if (isSupportCode && data.module !== "support" && data.module !== "body") {
+    if (isSupportCode && lookup.module !== "support") {
       return res.status(404).json({ ok: false, error: "Код не найден." });
     }
 
-    // Access token validation
-    if (!data.legacy_access) {
-      if (!access_token) {
-        return res.status(401).json({ ok: false, error: "Требуется код доступа к сессии." });
-      }
-      const valid = await validateSessionAccess(data.session_id, access_token);
-      if (!valid) {
-        return res.status(403).json({ ok: false, error: "Неверный код доступа." });
-      }
+    if (!access_token) {
+      return res.status(401).json({ ok: false, error: "Требуется код доступа к сессии." });
+    }
+    const valid = await validateSessionAccess(lookup.session_id, access_token, { expectedModule: lookup.module });
+    if (!valid) {
+      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
+    }
+
+    // Fetch protected fields only after possession of the session token has been
+    // proven. A public lookup code alone never reads report contents.
+    const { data, error: protectedReadError } = await supabase
+      .from("sessions")
+      .select("" +
+        "session_id, module, public_code, patient_text, conversation_history, " +
+        "user_report, doctor_report, support_plan, risk_level, json_data, " +
+        "organization_id, primary_expert_id, invite_token, legacy_access, created_at, anonymous_owner_id"
+      )
+      .eq("session_id", lookup.session_id)
+      .maybeSingle();
+
+    if (protectedReadError) {
+      return res.status(500).json({ ok: false, error: "База данных временно недоступна. Попробуйте позже." });
+    }
+    if (!data) {
+      return res.status(404).json({ ok: false, error: "Код не найден." });
     }
 
     const jsonData = data.json_data || {};
@@ -903,7 +936,7 @@ async function handleLoad(req, res) {
       resourceFactors: jsonData.resourceFactors || "",
       questions: jsonData.questions || null,
       answers: jsonData.answers || {},
-      // Legacy flag so frontend knows if access_token is needed for writes
+      // Compatibility metadata only. It never permits tokenless reads or writes.
       legacyAccess: data.legacy_access === true,
     };
 
@@ -970,7 +1003,7 @@ async function handleGetCabinet(req, res) {
       if (!resolved) {
         return res.status(404).json({ ok: false, error: "Сессия не найдена." });
       }
-      if (resolved.module !== "support" && resolved.module !== "body") {
+      if (resolved.module !== "support") {
         return res.status(404).json({ ok: false, error: "Сессия не найдена." });
       }
       effectiveSessionId = resolved.session_id;
@@ -980,7 +1013,7 @@ async function handleGetCabinet(req, res) {
       return res.status(400).json({ ok: false, error: "Missing sessionId or publicCode" });
     }
 
-    const valid = await validateSessionAccess(effectiveSessionId, access_token);
+    const valid = await validateSessionAccess(effectiveSessionId, access_token, { expectedModule: "support" });
     if (!valid) {
       return res.status(403).json({ ok: false, error: "Неверный код доступа." });
     }
@@ -1210,7 +1243,7 @@ async function handleGetReport(req, res) {
       if (!resolved) {
         return res.status(404).json({ ok: false, error: "Сессия не найдена." });
       }
-      if (resolved.module !== "support" && resolved.module !== "body") {
+      if (resolved.module !== "support") {
         return res.status(404).json({ ok: false, error: "Сессия не найдена." });
       }
       effectiveSessionId = resolved.session_id;
@@ -1220,23 +1253,26 @@ async function handleGetReport(req, res) {
       return res.status(400).json({ ok: false, error: "Missing sessionId or publicCode" });
     }
 
-    let valid = await validateSessionAccess(effectiveSessionId, access_token);
+    let valid = await validateSessionAccess(effectiveSessionId, access_token, { expectedModule: "support" });
     if (!valid) {
       // Owner-based fallback: token may belong to another session of the same owner (cabinet access).
       const { data: target } = await supabase
         .from("sessions")
-        .select("anonymous_owner_id")
+        .select("anonymous_owner_id, module")
         .eq("session_id", effectiveSessionId)
         .maybeSingle();
-      if (!target?.anonymous_owner_id) {
+      if (!target?.anonymous_owner_id || target.module !== "support") {
         return res.status(404).json({ ok: false, error: "Сессия не найдена." });
       }
       const { data: tokenSession } = await supabase
         .from("sessions")
-        .select("session_id, anonymous_owner_id, access_token_hash, legacy_access")
+        .select("session_id, anonymous_owner_id, access_token_hash, legacy_access, module")
         .eq("access_token_hash", hashToken(access_token))
+        .eq("module", "support")
         .maybeSingle();
-      valid = !!tokenSession && tokenSession.anonymous_owner_id === target.anonymous_owner_id;
+      valid = !!tokenSession
+        && tokenSession.module === "support"
+        && tokenSession.anonymous_owner_id === target.anonymous_owner_id;
     }
     if (!valid) {
       return res.status(403).json({ ok: false, error: "Неверный код доступа." });
@@ -1308,7 +1344,7 @@ async function handleCreateFollowUpSession(req, res) {
       return res.status(401).json({ ok: false, error: "Требуется код доступа." });
     }
 
-    const valid = await validateSessionAccess(previousSessionId, access_token);
+    const valid = await validateSessionAccess(previousSessionId, access_token, { expectedModule: "support" });
     if (!valid) {
       return res.status(403).json({ ok: false, error: "Неверный код доступа." });
     }
@@ -1324,7 +1360,7 @@ async function handleCreateFollowUpSession(req, res) {
       console.error("handleCreateFollowUpSession: SELECT error", parentError);
       return res.status(500).json({ ok: false, error: "База данных временно недоступна." });
     }
-    if (!parent || !parent.anonymous_owner_id) {
+    if (!parent || parent.module !== "support" || !parent.anonymous_owner_id) {
       return res.status(404).json({ ok: false, error: "Сессия не найдена." });
     }
     if (!isPilotSessionMatch(parent.json_data)) {
@@ -1358,7 +1394,10 @@ async function handleCreateFollowUpSession(req, res) {
       return res.status(500).json({ ok: false, error: "Не удалось создать сессию продолжения." });
     }
 
-    const newAccessToken = await generateSessionAccessToken(newSessionId);
+    const newAccessToken = await generateSessionAccessToken(newSessionId, {
+      module: "support",
+      anonymousOwnerId: parent.anonymous_owner_id,
+    });
     if (!newAccessToken) {
       console.error("handleCreateFollowUpSession: failed to generate token for", newSessionId);
       return res.status(500).json({ ok: false, error: "Не удалось создать код доступа." });
@@ -1386,7 +1425,10 @@ async function handleGenerateAccessToken(req, res) {
     }
 
     const supabase = getSupabase();
-    let query = supabase.from("sessions").select("session_id, legacy_access").maybeSingle();
+    let query = supabase
+      .from("sessions")
+      .select("session_id, module, anonymous_owner_id, legacy_access")
+      .maybeSingle();
 
     if (sessionId) {
       query = query.eq("session_id", sessionId);
@@ -1409,7 +1451,10 @@ async function handleGenerateAccessToken(req, res) {
       return res.status(403).json({ ok: false, error: "Неверный код доступа." });
     }
 
-    const rawToken = await generateSessionAccessToken(data.session_id);
+    const rawToken = await generateSessionAccessToken(data.session_id, {
+      module: data.module,
+      anonymousOwnerId: data.anonymous_owner_id,
+    });
     if (!rawToken) {
       return res.status(500).json({ ok: false, error: "Не удалось сгенерировать токен" });
     }
@@ -1428,14 +1473,12 @@ async function handleUpdateSupportPlan(req, res) {
       return res.status(400).json({ ok: false, error: "Missing public_code or session_id" });
     }
 
-    const effectiveSessionId = session_id || public_code;
-
-    // Check access if non-legacy
+    const lookupValue = session_id || public_code;
     const supabase = getSupabase();
     const { data: sessionData, error: sessionError } = await supabase
       .from("sessions")
-      .select("session_id, legacy_access")
-      .eq(session_id ? "session_id" : "public_code", effectiveSessionId)
+      .select("session_id, module")
+      .eq(session_id ? "session_id" : "public_code", lookupValue)
       .maybeSingle();
 
     if (sessionError) {
@@ -1443,25 +1486,23 @@ async function handleUpdateSupportPlan(req, res) {
       return res.status(500).json({ ok: false, error: "База данных временно недоступна. Попробуйте позже." });
     }
 
-    if (sessionData && !sessionData.legacy_access) {
-      if (!access_token) {
-        return res.status(401).json({ ok: false, error: "Требуется код доступа." });
-      }
-      const valid = await validateSessionAccess(sessionData.session_id, access_token);
-      if (!valid) {
-        return res.status(403).json({ ok: false, error: "Неверный код доступа." });
-      }
+    if (!sessionData || sessionData.module !== "support") {
+      return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+    }
+    if (!access_token) {
+      return res.status(401).json({ ok: false, error: "Требуется код доступа." });
+    }
+    const valid = await validateSessionAccess(sessionData.session_id, access_token, { expectedModule: "support" });
+    if (!valid) {
+      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
     }
 
-    let query = supabase.from("sessions").update({ support_plan, updated_at: new Date().toISOString() });
-
-    if (public_code) {
-      query = query.eq("public_code", public_code);
-    } else {
-      query = query.eq("session_id", session_id);
-    }
-
-    const { error: updateError } = await query;
+    // Always update the row that was authenticated. Supplying both identifiers
+    // cannot authenticate one session and mutate another.
+    const { error: updateError } = await supabase
+      .from("sessions")
+      .update({ support_plan, updated_at: new Date().toISOString() })
+      .eq("session_id", sessionData.session_id);
 
     if (updateError) {
       console.error("updateSupportPlan error:", updateError);
@@ -1491,10 +1532,9 @@ async function handleSaveConversationPairs(req, res) {
 
     const supabase = getSupabase();
 
-    // Check access
     const { data: sessionData, error: sessionError } = await supabase
       .from("sessions")
-      .select("legacy_access")
+      .select("id, json_data, module")
       .eq("session_id", sessionId)
       .maybeSingle();
 
@@ -1503,23 +1543,18 @@ async function handleSaveConversationPairs(req, res) {
       return res.status(500).json({ ok: false, error: "База данных временно недоступна. Попробуйте позже." });
     }
 
-    if (sessionData && !sessionData.legacy_access) {
-      if (!access_token) {
-        return res.status(401).json({ ok: false, error: "Требуется код доступа." });
-      }
-      const valid = await validateSessionAccess(sessionId, access_token);
-      if (!valid) {
-        return res.status(403).json({ ok: false, error: "Неверный код доступа." });
-      }
+    if (!sessionData || sessionData.module !== "support") {
+      return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+    }
+    if (!access_token) {
+      return res.status(401).json({ ok: false, error: "Требуется код доступа." });
+    }
+    const valid = await validateSessionAccess(sessionId, access_token, { expectedModule: "support" });
+    if (!valid) {
+      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
     }
 
-    const { data: existingRow } = await supabase
-      .from("sessions")
-      .select("id, json_data")
-      .eq("session_id", sessionId)
-      .maybeSingle();
-
-    const existingJson = existingRow?.json_data || {};
+    const existingJson = sessionData.json_data || {};
     const existingPairs = Array.isArray(existingJson.conversation_pairs) ? existingJson.conversation_pairs : [];
     const merged = mergePairs(existingPairs, pairs);
 
@@ -1528,13 +1563,7 @@ async function handleSaveConversationPairs(req, res) {
       updated_at: new Date().toISOString(),
     };
 
-    let error;
-    if (existingRow) {
-      ({ error } = await supabase.from("sessions").update(payload).eq("session_id", sessionId));
-    } else {
-      payload.session_id = sessionId;
-      ({ error } = await supabase.from("sessions").insert(payload));
-    }
+    const { error } = await supabase.from("sessions").update(payload).eq("session_id", sessionId);
 
     if (error) {
       return res.status(500).json({ ok: false, error: error.message });
@@ -1573,30 +1602,15 @@ async function handleListBodyDailyLogs(req, res) {
       return res.status(400).json({ ok: false, error: "Missing session_id" });
     }
 
+    if (!access_token) {
+      return res.status(401).json({ ok: false, error: "Требуется код доступа." });
+    }
+    const valid = await validateSessionAccess(session_id, access_token, { expectedModule: "body" });
+    if (!valid) {
+      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
+    }
+
     const supabase = getSupabase();
-
-    // Check access if non-legacy
-    const { data: sessionData, error: sessionError } = await supabase
-      .from("sessions")
-      .select("legacy_access")
-      .eq("session_id", session_id)
-      .maybeSingle();
-
-    if (sessionError) {
-      console.error("handleListBodyDailyLogs: SELECT error", sessionError);
-      return res.status(500).json({ ok: false, error: "База данных временно недоступна. Попробуйте позже." });
-    }
-
-    if (sessionData && !sessionData.legacy_access) {
-      if (!access_token) {
-        return res.status(401).json({ ok: false, error: "Требуется код доступа." });
-      }
-      const valid = await validateSessionAccess(session_id, access_token);
-      if (!valid) {
-        return res.status(403).json({ ok: false, error: "Неверный код доступа." });
-      }
-    }
-
     const { data, error } = await supabase
       .from("body_daily_logs")
       .select("*")
@@ -1847,50 +1861,11 @@ async function handleExchangeContinuationCredential(req, res, { linkProfiles = f
     const newAccessToken = await generateSessionAccessToken(targetSession.session_id, {
       module: reqModule,
       anonymousOwnerId: credential.owner_id,
-      publicCode: cabinet.sessions?.[0]?.publicCode || null,
+      publicCode: credential.lookup_code,
     });
     if (!newAccessToken) {
-      console.error("[exchange] token generation returned null, retrying with direct insert");
-      // Fallback: ensure sessions row exists directly
-      const crypto = await import("crypto");
-      const fallbackToken = crypto.randomBytes(32).toString("hex");
-      const fallbackHash = crypto.createHash("sha256").update(fallbackToken).digest("hex");
-      const { error: fallbackErr } = await supabase.from("sessions").upsert({
-        session_id: targetSession.session_id,
-        module: reqModule,
-        anonymous_owner_id: credential.owner_id,
-        public_code: cabinet.sessions?.[0]?.publicCode || null,
-        patient_text: "",
-        conversation_history: [],
-        json_data: getPilotId() ? { pilot_id: getPilotId() } : {},
-        access_token_hash: fallbackHash,
-        access_token_generated_at: new Date().toISOString(),
-        legacy_access: false,
-      }, { onConflict: "session_id" });
-      if (fallbackErr) {
-        console.error("[exchange] fallback insert failed:", fallbackErr.message);
-        return res.status(500).json({ ok: false, error: "Не удалось создать код доступа. Попробуйте позже." });
-      }
-      // Verify the row was created
-      const { data: verifyRow } = await supabase
-        .from("sessions")
-        .select("session_id")
-        .eq("session_id", targetSession.session_id)
-        .maybeSingle();
-      if (!verifyRow) {
-        console.error("[exchange] verification failed after fallback insert");
-        return res.status(500).json({ ok: false, error: "Не удалось создать код доступа. Попробуйте позже." });
-      }
-      console.log("[exchange] fallback token created successfully");
-      return res.status(200).json({
-        ok: true,
-        session_id: targetSession.session_id,
-        access_token: fallbackToken,
-        module: reqModule,
-        public_code: cabinet.sessions?.[0]?.publicCode || null,
-        cabinet,
-        usage_balance: usageBalance,
-      });
+      console.error("[exchange] canonical token issuance failed");
+      return res.status(500).json({ ok: false, error: "Не удалось создать код доступа. Попробуйте позже." });
     }
 
     // Verify sessions row exists after token generation
@@ -1945,42 +1920,32 @@ async function handleRegenerateContinuationCredential(req, res) {
       return res.status(401).json({ ok: false, error: "Требуется код доступа." });
     }
 
-    const valid = await validateSessionAccess(session_id, access_token);
-    if (!valid) {
-      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
-    }
-
     const module = reqModule || "support";
     if (!SUPPORTED_MODULES.includes(module)) {
       return res.status(400).json({ ok: false, error: "Invalid module" });
     }
 
     const supabase = getSupabase();
-    const table = module === "body" ? "body_clients" : "sessions";
-    const { data: session, error: sessionError } = await supabase
-      .from(table)
-      .select("anonymous_owner_id")
-      .eq("session_id", session_id)
-      .maybeSingle();
-
-    if (sessionError) {
-      console.error("[handleRegenerateContinuationCredential] session lookup failed:", sessionError.code, "module:", module);
-      return res.status(500).json({ ok: false, error: "Не удалось проверить сессию. Попробуйте позже." });
-    }
-    if (!session?.anonymous_owner_id) {
-      return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+    const owner = await resolveContinuationRegenerationOwner({
+      sessionId: session_id,
+      accessToken: access_token,
+      module,
+      supabase,
+    });
+    if (!owner) {
+      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
     }
 
     const rotationResult = await rotateContinuationCredential({
       module,
-      ownerId: session.anonymous_owner_id,
+      ownerId: owner.ownerId,
       supabase,
     });
 
     console.log("[rotate]", JSON.stringify({
       action: "rotate",
       credential_id_fingerprint: rotationResult.credentialIdFingerprint,
-      owner_fingerprint: fingerprint(session.anonymous_owner_id),
+      owner_fingerprint: fingerprint(owner.ownerId),
       old_lookup_fingerprint: rotationResult.oldLookupFingerprint,
       new_lookup_fingerprint: rotationResult.newLookupFingerprint,
       old_secret_version: (rotationResult.secretVersion || 1) - 1,
@@ -2003,18 +1968,40 @@ async function handleRegenerateContinuationCredential(req, res) {
   }
 }
 
-async function handleGetReportStatus(req, res) {
+export async function handleGetReportStatus(req, res, dependencies = {}) {
   try {
-    const { sessionId, reportRequestId } = req.body || {};
+    const { sessionId, reportRequestId, access_token, module } = req.body || {};
     if (!sessionId || !isValidSessionId(sessionId)) {
       return res.status(400).json({ ok: false, error: "Missing sessionId" });
     }
+    if (!access_token) {
+      return res.status(401).json({ ok: false, error: "Требуется код доступа." });
+    }
+    if (module !== "support") {
+      return res.status(403).json({ ok: false, error: "Сессия недоступна." });
+    }
 
-    const supabase = getSupabase();
+    const supabase = dependencies.supabase || getSupabase();
+    const sessionAccess = await resolveSessionAccess(sessionId, access_token, {
+      expectedModule: "support",
+      supabase,
+    });
+    if (!sessionAccess
+      || sessionAccess.legacyAccess
+      || !sessionAccess.anonymousOwnerId) {
+      return res.status(403).json({ ok: false, error: "Неверный код доступа." });
+    }
+    const accessTokenHash = hashAccessToken(access_token);
+
+    res.setHeader("Cache-Control", "no-store");
     const { data: session, error } = await supabase
       .from("sessions")
-      .select("session_id, module, anonymous_owner_id, public_code, report_generation_status, report_request_id, user_report, doctor_report, care_recommendation, access_token_hash, json_data")
+      .select("session_id, module, anonymous_owner_id, public_code, report_generation_status, report_request_id")
       .eq("session_id", sessionId)
+      .eq("module", "support")
+      .eq("anonymous_owner_id", sessionAccess.anonymousOwnerId)
+      .eq("access_token_hash", accessTokenHash)
+      .eq("legacy_access", false)
       .maybeSingle();
 
     if (error) {
@@ -2023,6 +2010,11 @@ async function handleGetReportStatus(req, res) {
     }
     if (!session) {
       return res.status(404).json({ ok: false, error: "Сессия не найдена." });
+    }
+    if (!reportRequestId
+      || !session.report_request_id
+      || reportRequestId !== session.report_request_id) {
+      return res.status(409).json({ ok: false, error: "Запрос отчёта изменился. Повторите формирование отчёта." });
     }
 
     const status = session.report_generation_status;
@@ -2034,23 +2026,33 @@ async function handleGetReportStatus(req, res) {
     };
 
     if (status === REPORT_STATUS.READY) {
-      const artifacts = await createReportArtifacts({
-        supabase,
-        sessionId,
-        module: session.module || "support",
-        anonymousOwnerId: session.anonymous_owner_id,
-      });
-      const userPart = session.user_report || "";
-      const doctorPart = session.doctor_report || "";
+      const { data: reportData, error: reportError } = await supabase
+        .from("sessions")
+        .select("user_report, doctor_report, care_recommendation")
+        .eq("session_id", sessionId)
+        .eq("module", "support")
+        .eq("anonymous_owner_id", sessionAccess.anonymousOwnerId)
+        .eq("access_token_hash", accessTokenHash)
+        .eq("legacy_access", false)
+        .eq("report_request_id", reportRequestId)
+        .eq("report_generation_status", REPORT_STATUS.READY)
+        .maybeSingle();
+      if (reportError) {
+        console.error("handleGetReportStatus: protected SELECT error", reportError);
+        return res.status(500).json({ ok: false, error: "База данных временно недоступна." });
+      }
+      if (!reportData) {
+        return res.status(409).json({ ok: false, error: "Статус отчёта изменился. Повторите проверку." });
+      }
+      const userPart = reportData.user_report || "";
+      const doctorPart = reportData.doctor_report || "";
       const report = userPart.includes("===USER_REPORT===")
         ? userPart
         : `===USER_REPORT===\n\n${userPart}\n\n===DOCTOR_REPORT===\n\n${doctorPart}`;
       response.type = "final";
       response.report = report;
-      response.care_recommendation = session.care_recommendation || null;
+      response.care_recommendation = reportData.care_recommendation || null;
       response.public_code = session.public_code;
-      response.access_token = artifacts.accessToken;
-      response.continuation_code = artifacts.continuationCode;
     } else if (status === REPORT_STATUS.PROCESSING) {
       response.message = "Отчёт ещё формируется. Подождите немного.";
     } else if (status === REPORT_STATUS.FAILED) {
@@ -2078,8 +2080,15 @@ async function handleGetBodyCabinet(req, res) {
       : new Date().toISOString().slice(0, 10);
 
     const supabase = getSupabase();
+    const sessionAccess = await resolveSessionAccess(sessionId, accessToken, {
+      expectedModule: "body",
+      supabase,
+    });
+    if (!sessionAccess) {
+      return res.status(403).json({ ok: false, error: "Сессия истекла. Войдите снова по коду продолжения." });
+    }
 
-    // 1. Look up body_clients — only real columns
+    // Look up profile data only after the exact Health session token is proven.
     const { data: client, error: clientError } = await supabase
       .from("body_clients")
       .select("session_id, anonymous_owner_id, display_name, goal, specialist_id, specialist_name, created_at")
@@ -2094,15 +2103,14 @@ async function handleGetBodyCabinet(req, res) {
       return res.status(404).json({ ok: false, error: "Сессия не найдена" });
     }
 
-    // 2. Validate access token against sessions table
-    const valid = await validateSessionAccess(sessionId, accessToken);
-    if (!valid) {
+    if (!client.anonymous_owner_id
+      || (sessionAccess.anonymousOwnerId && sessionAccess.anonymousOwnerId !== client.anonymous_owner_id)) {
       return res.status(403).json({ ok: false, error: "Сессия истекла. Войдите снова по коду продолжения." });
     }
 
     const ownerId = client.anonymous_owner_id;
 
-    // 3. Get all session_ids for this owner
+    // Get all session_ids for this owner.
     const { data: ownerSessions, error: ownerSessionsError } = await supabase
       .from("body_clients")
       .select("session_id")

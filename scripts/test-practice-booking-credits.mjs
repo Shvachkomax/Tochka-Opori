@@ -32,7 +32,7 @@ try {
     "20261109130000_my_practice_bookings_a2_corrective.sql",
     "20261109140000_my_practice_bookings_a2_ttl_semantics.sql",
     "20261110022907_my_practice_bookings_a2_hardening.sql",
-    "20261116084712_practice_booking_credit_payments.sql",
+    "20261116090231_practice_booking_credit_payments.sql",
   ]) await db.exec(await sql(migration));
 
   await db.query("insert into experts values ($1),($2)", [id(1), id(2)]);

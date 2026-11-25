@@ -57,7 +57,10 @@ export default async function handler(req, res) {
     }
 
     const { generateSessionAccessToken } = await import("../lib/security/access-token.js");
-    const accessToken = await generateSessionAccessToken(sessionId);
+    const accessToken = await generateSessionAccessToken(sessionId, {
+      module: "support",
+      anonymousOwnerId,
+    });
 
     if (!accessToken) {
       console.error("start-session: access token generation failed for session", sessionId);

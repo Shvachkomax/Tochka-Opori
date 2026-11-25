@@ -106,8 +106,31 @@ async function runSupportE2E() {
   console.log("\n--- Support E2E ---");
 
   const sessionId = `e2e-support-${Date.now()}`;
+  const ownerId = crypto.randomUUID();
+  const publicCode = `E2E-${Date.now()}`;
 
-  // Save support session
+  // Model the authenticated /api/start-session bootstrap: the server creates
+  // the canonical row first and stores a hash of a cryptographic access token.
+  const { error: bootstrapError } = await supabase.from("sessions").insert({
+    session_id: sessionId,
+    module: "support",
+    anonymous_owner_id: ownerId,
+    public_code: publicCode,
+    patient_text: "",
+    conversation_history: [],
+    json_data: {},
+    legacy_access: false,
+  });
+  assert(!bootstrapError, "support session bootstrapped by server");
+
+  const { generateSessionAccessToken } = await import("../lib/security/access-token.js");
+  const bootstrapAccessToken = await generateSessionAccessToken(sessionId, {
+    module: "support",
+    anonymousOwnerId: ownerId,
+  });
+  assert(bootstrapAccessToken, "bootstrap access token generated");
+
+  // Save the server-created support session using proof of possession.
   const saveResult = await invokeSessionHandler({
     action: "save",
     sessionId,
@@ -117,14 +140,14 @@ async function runSupportE2E() {
     riskLevel: "low",
     dialogDepth: 0,
     module: "support",
+    access_token: bootstrapAccessToken,
   });
   assert(saveResult.status === 200, "save returns 200");
   assert(saveResult.body.ok === true, "save returns ok");
   assert(saveResult.body.continuation_code, "save returns continuation_code");
-  assert(saveResult.body.access_token, "save returns access_token");
+  assert(!saveResult.body.access_token, "save does not reissue access_token");
 
   const continuationCode = saveResult.body.continuation_code;
-  const accessToken = saveResult.body.access_token;
 
   // Exchange continuation code
   const exchangeResult = await invokeSessionHandler({

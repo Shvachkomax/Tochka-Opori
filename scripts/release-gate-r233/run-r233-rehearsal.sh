@@ -74,11 +74,11 @@ done
 echo "PRE_FIX_FAILURES_REPRODUCED PASS"
 
 echo "RPC_FIX_FIRST_APPLY"
-run_migration supabase/migrations/20261123114523_r233_fix_continuation_failed_attempt_rpcs.sql
+run_migration supabase/migration-artifacts/production-r234a/20261123114523_r233_fix_continuation_failed_attempt_rpcs.sql
 run_sql scripts/release-gate-r233/test-continuation-rpc-fix.sql
 
 echo "RPC_FIX_SECOND_APPLY"
-run_migration supabase/migrations/20261123114523_r233_fix_continuation_failed_attempt_rpcs.sql
+run_migration supabase/migration-artifacts/production-r234a/20261123114523_r233_fix_continuation_failed_attempt_rpcs.sql
 run_sql scripts/release-gate-r233/test-continuation-rpc-fix.sql
 echo "RPC_FIX_REPEATABILITY PASS"
 

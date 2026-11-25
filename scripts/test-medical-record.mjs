@@ -19,7 +19,7 @@ r=res();await handleMedicalRecord({body:{}},r,{enabled:()=>false});assert.equal(
 const db=new PGlite();
 try{
  await db.exec('create role anon;create role authenticated;create role service_role bypassrls;create table experts(id uuid primary key);create table organizations(id uuid primary key);');
- await db.exec(await readFile(new URL('../supabase/migrations/20261116173150_medical_encounters_a5.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20261116173440_medical_encounters_a5.sql',import.meta.url),'utf8'));
  await db.query('insert into experts values ($1),($2)',[id(2),id(3)]);
  const save=async(version,status='draft',reason='',author=id(2),owner=id(4),encounter=id(1))=>(await db.query(`select save_medical_encounter_version($1,$2,$3,'anonymous_case',$4,'support',null,'2026-11-01T09:00Z',$5,$6,$7) as saved`,[encounter,version,author,owner,status,{complaints:'Synthetic',medications:[]},reason])).rows[0].saved;
  assert.equal((await save(0)).version,1);

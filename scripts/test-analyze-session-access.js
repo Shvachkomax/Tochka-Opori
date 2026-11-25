@@ -46,6 +46,7 @@ assert.equal(isModuleAvailable("body", { supportOnly: "false", brand: "tochka-op
 assert.equal(isModuleAvailable("body", { supportOnly: "false", brand: "pneumointegration" }), false);
 assert.equal(isModuleAvailable("support", { supportOnly: "false", brand: "pneumointegration" }), true);
 assert.equal(hasBodySessionReference({ previousSessionId: "HEALTH-ABCD-123" }), true);
+assert.equal(hasBodySessionReference({ sessionId: "health_AbCdEfGhIjKlMnOpQrStUv" }), true);
 assert.equal(hasBodySessionReference({ sessionId: "sess_support_123" }), false);
 
 const moduleResponse = {
