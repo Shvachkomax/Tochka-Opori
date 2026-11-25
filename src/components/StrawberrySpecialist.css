@@ -1,0 +1,62 @@
+/* Screen 09: light, unobtrusive patient-to-specialist experience. */
+.strawberry-specialist__brand{border:0;background:none;padding:0;text-align:left}
+.strawberry-specialist__main{padding-top:clamp(46px,7vh,88px);padding-bottom:76px}
+.strawberry-specialist__back{display:block;border:0;padding:0;margin:0 0 31px;background:none;color:#899686;font-size:13px!important}
+.strawberry-specialist__eyebrow{color:#93a092;font-size:10px;letter-spacing:.17em;margin:0 0 22px}
+.strawberry-specialist h1{max-width:740px}
+.strawberry-specialist__lead{max-width:655px;margin-bottom:35px}
+.strawberry-specialist__preview{color:#9ba79d;font-size:12px;margin:0 0 28px}
+.strawberry-specialist__section{width:min(100%,730px);margin:0 0 52px}
+.strawberry-specialist__section h2{font:normal clamp(21px,2vw,26px)/1.4 Georgia,"Times New Roman",serif;color:#556655;margin:0 0 11px}
+.strawberry-specialist__section>p{font-size:14px;line-height:1.8;color:#818e81;margin:0 0 20px}
+.strawberry-specialist__section .strawberry-specialist__doctor{font:normal 20px/1.45 Georgia,"Times New Roman",serif;color:#506350;margin:8px 0 3px}
+.strawberry-specialist__section .strawberry-specialist__subtle{color:#96a092;font-size:13px;margin:0 0 4px}
+.strawberry-specialist__secondary-actions{display:flex;gap:14px 22px;flex-wrap:wrap}
+.strawberry-specialist__secondary-actions button{border:0;background:none;padding:7px 0;color:#687f69;font-size:13px!important}
+.strawberry-specialist__fieldset{border:0;padding:0;margin:0 0 27px;min-width:0}
+.strawberry-specialist__fieldset legend,.strawberry-specialist__form>label:not(.strawberry-specialist__consent){font-size:14px;color:#667967;font-weight:500;display:block;margin:0 0 12px}
+.strawberry-specialist__services{display:flex;flex-direction:column;gap:4px;max-width:695px}
+.strawberry-specialist__services button{display:flex;align-items:center;justify-content:space-between;text-align:left;gap:10px;padding:11px 13px;border:0;border-radius:11px;background:transparent;color:#596a58;font-size:14px!important}
+.strawberry-specialist__services button small{font-size:12px;white-space:nowrap;color:#a3aca0}
+.strawberry-specialist__services button.is-selected{background:#f0f3ed;color:#526b56}
+.strawberry-specialist__services button.is-selected small{color:#6d846c}
+.strawberry-specialist__services button:hover:not(:disabled){background:#f6f8f5}
+.strawberry-specialist__credits-note{font-size:11px;color:#a0aca0;margin:12px 0 0}
+.strawberry-specialist__reasons{display:flex;gap:9px;flex-wrap:wrap}
+.strawberry-specialist__reasons button{border:0;border-radius:999px;padding:9px 13px;background:#f7f8f5;color:#8a9788;font-size:12px!important}
+.strawberry-specialist__reasons button.is-selected{background:#e7eee7;color:#587659}
+.strawberry-specialist__form>textarea{display:block;width:100%;resize:vertical;background:rgba(250,250,248,.83);border:1px solid rgba(102,123,102,.12);border-radius:15px;padding:15px 17px;margin:0 0 23px;color:#4e604d;outline:0;font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+.strawberry-specialist__form>textarea:focus{border-color:#b1c7b3;background:white}
+.strawberry-specialist__form textarea::placeholder{color:#a3aea5}
+.strawberry-specialist__date-block{margin:0 0 23px}
+.strawberry-specialist__date-block label{display:block;font-size:13px;color:#738674;margin:0 0 8px}
+.strawberry-specialist__date-block>input,.strawberry-specialist__times input{display:block;min-height:42px;padding:8px 10px;border:1px solid rgba(102,123,102,.13);border-radius:10px;background:#fcfcfa;color:#4e5f4e;font-size:14px}
+.strawberry-specialist__times{display:flex;gap:20px;flex-wrap:wrap;margin-top:12px}
+.strawberry-specialist__consent{display:flex;align-items:flex-start;gap:12px;max-width:690px;font-size:12px;line-height:1.6;color:#7d8a7d;margin:10px 0 25px}
+.strawberry-specialist__consent input{flex:none;margin-top:3px;accent-color:#879b81;width:17px;height:17px}
+.strawberry-specialist__actions{display:flex;align-items:center;flex-wrap:wrap;gap:14px 22px}
+.strawberry-specialist__actions button:disabled{opacity:.48;cursor:not-allowed}
+.strawberry-specialist__actions span{font-size:12px;color:#a0aaa0}
+.strawberry-specialist__notice{color:#64806b;font-size:13px;line-height:1.6}
+.strawberry-specialist__confirmation{color:#607b64!important;background:#f0f4ee;padding:10px 14px;border-radius:12px}
+.strawberry-specialist__history{margin-top:10px}
+.strawberry-specialist__requests{display:flex;flex-direction:column;gap:28px;margin-top:23px}
+.strawberry-specialist__request-head{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.strawberry-specialist__request-head>span:first-child{font-size:16px;color:#536354}
+.strawberry-specialist__request-head small{display:block;color:#a1aca0;font-size:12px;margin-top:4px}
+.strawberry-specialist__status{color:#aa8884;font-size:12px}
+.strawberry-specialist__request p{font-size:13px;line-height:1.75;color:#838f82;margin:9px 0}
+.strawberry-specialist__reply{margin:15px 0;padding:12px 16px;background:rgba(247,249,246,.9);border-radius:12px}
+.strawberry-specialist__reply>span{font-size:12px;color:#7a917d}
+.strawberry-specialist__cancel{border:0;background:none;color:#ad7772;padding:7px 0;font-size:12px!important}
+.strawberry-specialist__emergency{max-width:720px;background:#fff2ed;border-left:4px solid #ae4c42;padding:22px;margin:0 0 37px;color:#7c3128}
+.strawberry-specialist__emergency p{font-size:14px;line-height:1.65}
+.strawberry-specialist__emergency a{display:inline-flex;min-height:44px;padding:10px 15px;border-radius:10px;background:#ad4239;color:white;margin:4px 12px 4px 0}
+@media(max-width:650px){
+.strawberry-specialist__main{padding-top:39px}
+.strawberry-specialist__services button{font-size:13px!important}
+.strawberry-specialist__actions{align-items:stretch;flex-direction:column;max-width:350px}
+.strawberry-specialist__actions .strawberry-entry__action{width:100%}
+}
+
+.strawberry-specialist__urgent-note{font-size:12px;color:#a76e64;line-height:1.65;margin:-5px 0 19px;max-width:680px}

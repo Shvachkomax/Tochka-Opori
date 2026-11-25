@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { supportMissingModelGuard, supportUnexpectedQuestionsGuard } from "../lib/support/question-loop-guard.js";
 import { runTask, TASK_TYPES, getActiveProvider } from "../lib/modelRouter.js";
 import { getSupabase } from "../lib/supabase.js";
 import { getModule, isValidModule, DEFAULT_MODULE } from "../lib/modules.js";
@@ -2247,6 +2248,12 @@ AI-assisted summary не сформирован из-за технической
     });
   }
 
+  // In Support preview, no model key is not a valid dialogue round.
+  // Do not silently loop through identical fallback questions.
+  const missingModel = supportMissingModelGuard(activeModule, Boolean(process.env.OPENAI_API_KEY));
+  if (missingModel) return res.status(missingModel.status).json(missingModel.payload);
+
+  // Do not change the existing fallback mode of Body/Health in this Support branch.
   if (!process.env.OPENAI_API_KEY) {
     return res.status(200).json({
       type: "questions",
@@ -2698,7 +2705,16 @@ ${antiRepeatBlock}
       return res.status(200).json({ type: "final", user_report: fallbackFinal, doctor_report: "", model_used: modelUsed, fallback_used: fallbackUsed, module: activeModule });
     }
 
-    if (parsed.type === "questions" && Array.isArray(parsed.questions)) {
+    if (parsed?.type === "questions" && Array.isArray(parsed.questions)) {
+      const unexpected = supportUnexpectedQuestionsGuard(activeModule, depth, parsed.type);
+      if (unexpected) {
+        await setReportStatus(finalSupabase, session_id, {
+          status: REPORT_STATUS.FAILED,
+          requestId: finalReportRequestId,
+          errorCode: "model_returned_questions_for_final_report",
+        });
+        return res.status(unexpected.status).json(unexpected.payload);
+      }
       try {
         await debitCreditsForSession({
           sessionId: req.body.session_id,

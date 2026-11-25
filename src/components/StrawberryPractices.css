@@ -1,0 +1,45 @@
+/* Screen 07. Typography and atmosphere inherited from Welcome; no hard cards. */
+.strawberry-practices__brand{padding:0;border:0;background:transparent;text-align:left}
+.strawberry-practices__main{padding-top:clamp(46px,7vh,88px);padding-bottom:70px}
+.strawberry-practices__back{display:block;border:0;padding:0;margin:0 0 31px;background:none;color:#929b90;font-size:13px!important}
+.strawberry-practices__eyebrow{font-size:10px;letter-spacing:.17em;color:#93a08d;margin:0 0 22px}
+.strawberry-practices h1{max-width:710px}
+.strawberry-practices__lead{max-width:660px;margin-bottom:35px}
+.strawberry-practices__preview{font-size:12px;color:#9da79e;margin:0 0 33px}
+.strawberry-practices__section{width:min(100%,720px);margin-bottom:42px}
+.strawberry-practices__section h2{font:normal clamp(21px,2vw,25px)/1.35 Georgia,"Times New Roman",serif;color:#5b6957;margin:0 0 8px}
+.strawberry-practices__section>p{font-size:14px;line-height:1.75;color:#879187;margin:0 0 24px}
+.strawberry-practices__items{display:flex;flex-direction:column;gap:4px}
+.strawberry-practices__item{padding:0}
+.strawberry-practices__item-button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:17px;text-align:left;border:0;background:transparent;padding:18px 0;color:#4d5b4c}
+.strawberry-practices__item-content{display:flex;flex-direction:column;min-width:0;gap:4px}
+.strawberry-practices__item-caption{font-size:11px;letter-spacing:.02em;color:#9ba79a}
+.strawberry-practices__item-caption span{margin:0 6px}
+.strawberry-practices__item-title{font:normal clamp(20px,1.9vw,24px)/1.4 Georgia,"Times New Roman",serif;color:#4f6050}
+.strawberry-practices__item-desc{font-size:13px;color:#818c81;line-height:1.6}
+.strawberry-practices__chevron{color:#879d86;font-size:24px;line-height:1;font-weight:300}
+.strawberry-practices__detail{padding:0 28px 22px 0;max-width:660px;color:#738072;line-height:1.78;font-size:14px}
+.strawberry-practices__detail p{margin:0 0 17px}
+.strawberry-practices__detail strong{font-weight:500;color:#526a53}
+.strawberry-practices__detail h3{color:#5d725d;font-size:14px;font-weight:500;margin:17px 0 8px}
+.strawberry-practices__detail ol{margin:8px 0 19px;padding-left:22px}
+.strawberry-practices__detail li{padding:3px 0}
+.strawberry-practices__detail .strawberry-practices__safety{color:#a57f74}
+.strawberry-practices__detail .strawberry-practices__status-label{color:#788776;margin:19px 0 9px;font-size:13px}
+.strawberry-practices__status{display:flex;flex-wrap:wrap;gap:9px}
+.strawberry-practices__status button{background:#f6f8f5;border:0;border-radius:999px;padding:10px 15px;min-height:39px;color:#748775;font-size:13px!important}
+.strawberry-practices__status button.is-selected{background:#e5ebe3;color:#4f6e52}
+.strawberry-practices__status button:hover:not(:disabled){background:#ecf1ea}
+.strawberry-practices__status button:disabled{opacity:.5;cursor:wait}
+.strawberry-practices__feedback{color:#718c71;font-size:12px}
+.strawberry-practices__empty{color:#879287;font-size:14px;line-height:1.7;padding:18px 0}
+.strawberry-practices__link{border:0;background:none;color:#668367;padding:0;font-size:13px!important}
+.strawberry-practices__disclaimer{max-width:690px;font-size:12px;line-height:1.7;color:#9ca79c}
+.strawberry-practices__emergency{background:#fff2ed;border-left:4px solid #b94e43;padding:20px;max-width:690px;margin-bottom:32px;color:#7b332d}
+.strawberry-practices__emergency p{line-height:1.6;font-size:14px}
+.strawberry-practices__emergency a{display:inline-flex;min-height:44px;background:#a83d32;color:#fff;padding:10px 18px;border-radius:10px}
+@media(max-width:640px){
+.strawberry-practices__main{padding-top:38px}
+.strawberry-practices__item-button{padding:17px 0}
+.strawberry-practices__detail{padding-right:0}
+}

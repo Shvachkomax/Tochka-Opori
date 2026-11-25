@@ -1,0 +1,42 @@
+/* Screen 08: restrained chronological history in the common Support typography. */
+.strawberry-history__brand{border:0;padding:0;background:transparent;text-align:left}
+.strawberry-history__main{padding-top:clamp(46px,7vh,88px);padding-bottom:72px}
+.strawberry-history__back{display:block;border:0;background:none;color:#899787;font-size:13px!important;padding:0;margin:0 0 31px}
+.strawberry-history__eyebrow{color:#94a091;font-size:10px;letter-spacing:.17em;margin:0 0 22px}
+.strawberry-history h1{max-width:740px}
+.strawberry-history__lead{max-width:665px;margin-bottom:35px}
+.strawberry-history__preview{font-size:12px;color:#9aa69c;margin:0 0 32px}
+.strawberry-history__section{max-width:710px;margin:0 0 44px}
+.strawberry-history__section-heading{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.strawberry-history__section-heading h2{font:normal clamp(21px,2vw,25px)/1.3 Georgia,"Times New Roman",serif;color:#596959;margin:0 0 13px}
+.strawberry-history__section-heading span{font-size:12px;color:#a4ada2}
+.strawberry-history__filters{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0 31px}
+.strawberry-history__filters button{border:0;border-radius:999px;background:transparent;padding:8px 15px;color:#879387;font-size:13px!important}
+.strawberry-history__filters button:hover{background:#f4f6f2}
+.strawberry-history__filters .is-active{background:#edf1ec;color:#5c765f}
+.strawberry-history__items{list-style:none;margin:0;padding:0}
+.strawberry-history__item{margin:0 0 40px}
+.strawberry-history__item-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.strawberry-history__item-info{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.strawberry-history__date{font-size:13px;color:#8e9b8f}
+.strawberry-history__kind{font-size:12px;color:#779077}
+.strawberry-history__kind--followup{color:#a38a86}
+.strawberry-history__number{color:#b1b9ae;font-size:12px}
+.strawberry-history__summary{font:normal clamp(18px,1.7vw,22px)/1.55 Georgia,"Times New Roman",serif;color:#4f5f51;margin:13px 0}
+.strawberry-history__actions{display:flex;flex-wrap:wrap;gap:12px 24px}
+.strawberry-history__actions button{border:0;background:none;padding:7px 0;color:#687d69;font-size:13px!important}
+.strawberry-history__actions button:hover{color:#405c44}
+.strawberry-history__actions button:disabled{opacity:.5;cursor:not-allowed}
+.strawberry-history__demo-detail{font-size:13px;line-height:1.75;color:#8b968a;background:rgba(247,249,246,.8);padding:12px 15px;margin:12px 0 0;border-radius:12px}
+.strawberry-history__notice{font-size:12px;color:#788d7a}
+.strawberry-history__empty{font-size:14px;color:#909d90;line-height:1.7}
+.strawberry-history__footnote{max-width:700px;font-size:12px;color:#98a49a;line-height:1.8}
+.strawberry-history__emergency{max-width:700px;padding:18px 21px;border-left:4px solid #af5147;background:#fff3ed;margin:0 0 35px;color:#80352d}
+.strawberry-history__emergency p{font-size:14px;line-height:1.6}
+.strawberry-history__emergency a{display:inline-flex;padding:10px 15px;min-height:44px;border-radius:8px;background:#aa4338;color:white}
+@media(max-width:640px){
+.strawberry-history__main{padding-top:39px}
+.strawberry-history__item{margin-bottom:34px}
+.strawberry-history__actions{gap:5px 18px}
+.strawberry-history__summary{font-size:19px}
+}

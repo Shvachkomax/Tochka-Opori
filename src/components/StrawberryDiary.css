@@ -1,0 +1,52 @@
+/* Экран 06: «созревание» — только очень тихие ягодные тона в динамике. */
+.strawberry-diary__brand{border:0;background:transparent;padding:0;text-align:left}
+.strawberry-diary__main{padding-top:clamp(46px,7vh,88px);padding-bottom:74px}
+.strawberry-diary__back{border:0;background:none;padding:0;margin:0 0 31px;color:#8e998b;font-size:13px;line-height:1.4;cursor:pointer}
+.strawberry-diary__back:hover{color:#546f54}
+.strawberry-diary__eyebrow{font-size:10px;letter-spacing:.17em;color:#92a08e;margin:0 0 22px}
+.strawberry-diary h1{max-width:710px}
+.strawberry-diary__lead{max-width:610px;margin:0 0 37px}
+.strawberry-diary__preview{color:#94a197;font-size:12px;margin:0 0 28px}
+.strawberry-diary__form{width:min(100%,690px)}
+.strawberry-diary__field{margin:0 0 35px}
+.strawberry-diary__field h2,.strawberry-diary__history h2{font:normal clamp(20px,1.8vw,25px)/1.4 Georgia,"Times New Roman",serif;color:#536553;margin:0 0 7px}
+.strawberry-diary__field p,.strawberry-diary__history p{color:#818d7f;font-size:14px;line-height:1.75;margin:0 0 16px}
+.strawberry-diary__scale{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:6px;max-width:595px}
+.strawberry-diary__mark{min-width:0;min-height:43px;border:0;background:rgba(247,249,246,.88);color:#788778;border-radius:11px;font:500 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;cursor:pointer;transition:background-color .16s}
+.strawberry-diary__mark:hover{background:#eef2ec}
+.strawberry-diary__mark--selected{background:#e1e9df;color:#4f7151;box-shadow:inset 0 0 0 1px #b7c9b4}
+.strawberry-diary__mark--anxiety{background:#f2e7e5;color:#946966;box-shadow:inset 0 0 0 1px #ddc5c1}
+.strawberry-diary__mark:disabled{opacity:.65;cursor:wait}
+.strawberry-diary__ends{display:flex;justify-content:space-between;gap:10px;max-width:595px;margin-top:9px;color:#a0aaa0;font-size:11px}
+.strawberry-diary__field--note label{display:block;font:normal clamp(20px,1.8vw,25px)/1.4 Georgia,"Times New Roman",serif;color:#536553;margin:0 0 7px}
+.strawberry-diary__field textarea{width:100%;min-height:118px;background:rgba(250,250,248,.79);border:1px solid rgba(115,135,113,.1);border-radius:17px;padding:16px 19px;color:#495549;resize:vertical;outline:0;font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+.strawberry-diary__field textarea:focus{background:#fff;border-color:#bbcbb9}
+.strawberry-diary__field textarea::placeholder{color:#aab3a8}
+.strawberry-diary__save{display:flex;align-items:center;flex-wrap:wrap;gap:12px 23px;margin-top:16px}
+.strawberry-diary__save span{color:#a0aba0;font-size:12px}
+.strawberry-diary__save button:disabled{opacity:.55;cursor:wait}
+.strawberry-diary__feedback{font-size:13px;color:#69836b;line-height:1.5}
+.strawberry-diary__history{width:min(100%,765px);margin-top:80px}
+.strawberry-diary__history h2{margin-bottom:8px}
+.strawberry-diary__charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;max-width:765px;margin-top:28px}
+.strawberry-diary__chart-title{font-size:13px;color:#748571;margin-bottom:8px}
+.strawberry-diary__chart svg{width:100%;height:auto;max-height:120px}
+.strawberry-diary__chart-caption{font-size:11px;color:#a3ada1}
+.strawberry-diary__details{margin-top:26px}
+.strawberry-diary__details-toggle{background:none;border:0;color:#647c64;padding:7px 0;font-size:13px!important;cursor:pointer}
+.strawberry-diary__details-toggle span{margin-left:7px}
+.strawberry-diary__details ul{list-style:none;padding:0;margin:15px 0;max-width:630px}
+.strawberry-diary__details li{display:flex;gap:20px;flex-wrap:wrap;padding:9px 0;font-size:12px;color:#7b877a}
+.strawberry-diary__details time{min-width:96px}
+.strawberry-diary__emergency{max-width:650px;border-left:4px solid #b85548;background:#fff2ee;padding:20px;margin:0 0 25px;color:#84392e}
+.strawberry-diary__emergency p{font-size:14px;line-height:1.6}
+.strawberry-diary__emergency a{display:inline-flex;background:#ae4438;color:#fff;padding:10px 16px;border-radius:8px;min-height:44px}
+@media(max-width:680px){
+.strawberry-diary__main{padding-top:37px}
+.strawberry-diary__scale{gap:3px}
+.strawberry-diary__mark{min-height:37px;border-radius:8px;font-size:11px}
+.strawberry-diary__ends{font-size:10px}
+.strawberry-diary__charts{grid-template-columns:1fr;max-width:385px}
+.strawberry-diary__history{margin-top:58px}
+}
+@media(prefers-reduced-motion:reduce){.strawberry-diary__mark{transition:none}}
