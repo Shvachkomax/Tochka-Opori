@@ -1,4 +1,10 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": {
+      "codex/sec-003-legacy-bypass": false
+    }
+  },
   "rewrites": [
     {
       "source": "/((?!api/.*|audio/.*|support-practices/.*).*)",
