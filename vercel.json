@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "codex/sec-003-a3a5-integration": false
+    }
+  },
   "rewrites": [
     {
       "source": "/((?!api/.*|audio/.*|support-practices/.*).*)",
