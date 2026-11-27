@@ -23,6 +23,10 @@ import { normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.j
 import { buildSpecialistRequestContext } from "../lib/specialist/request-context.js";
 import { canViewExpandedPatientData } from "../lib/specialist/access-policy.js";
 import {
+  resolveClinicalPatientOwner,
+  resolvePatientRelationshipIdentity,
+} from "../lib/specialist/patient-owner.js";
+import {
   SAFE_MEDICATION_PERMISSION_KEYS,
   getMedicationOrderForOwner,
   listMedicationOrdersForOwner,
@@ -307,16 +311,13 @@ async function resolveSupportMedicationClient({ expert, memberships, clientRef, 
   if (!canViewExpandedPatientData(resolved)) {
     return { ok: false, status: 403, error: "Уровень доступа не разрешает просмотр подробных данных пациента." };
   }
-  if (!resolved.publicCode) return { ok: false, status: 403, error: "Владелец клиента не определён." };
-
-  const { data: session, error } = await getSupabase()
-    .from("sessions")
-    .select("anonymous_owner_id")
-    .eq("public_code", resolved.publicCode)
-    .eq("module", "support")
-    .maybeSingle();
-  if (error || !session?.anonymous_owner_id) return { ok: false, status: 404, error: "Пациент не найден." };
-  return { ...resolved, ownerType: "anonymous_case", ownerId: session.anonymous_owner_id };
+  const owner = await resolveClinicalPatientOwner({
+    resolved,
+    module: "support",
+    supabase: getSupabase(),
+    pilotId: getPilotId(),
+  });
+  return owner.ok ? { ...resolved, ...owner } : owner;
 }
 
 async function getVerifiedMedicationAuthorizationId({ expertId, organizationId }) {
@@ -454,17 +455,19 @@ async function handleListPatientReportedMedicationOrders(req, res) {
     module,
   });
   if (!resolved.ok) return res.status(resolved.status || 403).json({ ok: false, error: resolved.error });
-
-  let ownerId = resolved.ownerId;
-  let ownerType = resolved.ownerType;
-  const sourceModule = module === "body" ? "health" : "support";
-  if (module === "support") {
-    const { data: session, error } = await getSupabase().from("sessions")
-      .select("anonymous_owner_id").eq("public_code", resolved.publicCode).eq("module", "support").maybeSingle();
-    if (error || !session?.anonymous_owner_id) return res.status(404).json({ ok: false, error: "Пациент не найден." });
-    ownerId = session.anonymous_owner_id;
-    ownerType = "anonymous_case";
+  if (!canViewExpandedPatientData(resolved)) {
+    return res.status(403).json({ ok: false, error: "Уровень доступа не разрешает просмотр подробных данных пациента." });
   }
+  const owner = await resolveClinicalPatientOwner({
+    resolved,
+    module,
+    supabase: getSupabase(),
+    pilotId: getPilotId(),
+  });
+  if (!owner.ok) return res.status(owner.status || 403).json({ ok: false, error: owner.error });
+
+  const { ownerId, ownerType } = owner;
+  const sourceModule = module === "body" ? "health" : "support";
   if (!ownerId || ownerType !== (module === "body" ? "anonymous_profile" : "anonymous_case")) {
     return res.status(403).json({ ok: false, error: "Доступ к данным пациента запрещён." });
   }
@@ -486,7 +489,6 @@ async function handleListPatientReportedMedicationOrders(req, res) {
     .eq("owner_type", ownerType).eq("owner_id", ownerId).gte("scheduled_date", since)
     .order("scheduled_date", { ascending: false }).limit(200);
   if (intakeError) return medicationErrorResponse(res, intakeError, "Не удалось загрузить отметки приёма.");
-  const owner = { ownerType, ownerId, sourceModule };
   return res.status(200).json({
     ok: true,
     orders: ownedOrders.map((order) => ({
@@ -979,11 +981,18 @@ async function handleRevokePatientLink(req, res) {
 
 // ── CLIENT REF RESOLUTION ─────────────────────────────────
 
-async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRef, organizationId, module }) {
-  const supabase = getSupabase();
+export async function resolveAuthorizedSpecialistClient(
+  { expert, memberships, clientRef, organizationId, module },
+  dependencies = {},
+) {
+  if (typeof clientRef !== "string" || !/^(assignment|access):[a-f0-9-]{36}$/i.test(clientRef)) {
+    return { ok: false, error: "Некорректный client_ref", status: 400 };
+  }
+  const supabase = (dependencies.getSupabase || getSupabase)();
   let publicCode = null;
   let ownerType = null;
   let ownerId = null;
+  let identitySource = null;
   let relationship = null;
   let accessRole = null;
 
@@ -1014,18 +1023,9 @@ async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRe
     if (assignment.primary_expert_id !== expert.id) {
       return { ok: false, error: "Доступ запрещён", status: 403 };
     }
-    // Body module requires anonymous_profile owner
-    if (module === "body") {
-      if (assignment.owner_type !== "anonymous_profile" || !assignment.owner_id) {
-        return { ok: false, error: "Некорректный владелец", status: 403 };
-      }
-      ownerType = assignment.owner_type;
-      ownerId = assignment.owner_id;
-    } else {
-      publicCode = assignment.public_code;
-      ownerType = assignment.owner_type || "anonymous_case";
-      ownerId = assignment.owner_id;
-    }
+    const identity = resolvePatientRelationshipIdentity(assignment, module);
+    if (!identity.ok) return identity;
+    ({ publicCode, ownerType, ownerId, identitySource } = identity);
     relationship = "primary";
     accessRole = "owner";
   } else if (clientRef.startsWith("access:")) {
@@ -1054,25 +1054,16 @@ async function resolveAuthorizedSpecialistClient({ expert, memberships, clientRe
     if (accessRow.expert_id !== expert.id) {
       return { ok: false, error: "Доступ запрещён", status: 403 };
     }
-    // Body module requires anonymous_profile owner
-    if (module === "body") {
-      if (accessRow.owner_type !== "anonymous_profile" || !accessRow.owner_id) {
-        return { ok: false, error: "Некорректный владелец", status: 403 };
-      }
-      ownerType = accessRow.owner_type;
-      ownerId = accessRow.owner_id;
-    } else {
-      publicCode = accessRow.public_code;
-      ownerType = accessRow.owner_type || "anonymous_case";
-      ownerId = accessRow.owner_id;
-    }
+    const identity = resolvePatientRelationshipIdentity(accessRow, module);
+    if (!identity.ok) return identity;
+    ({ publicCode, ownerType, ownerId, identitySource } = identity);
     relationship = "shared";
     accessRole = accessRow.access_role;
   } else {
     return { ok: false, error: "Некорректный client_ref", status: 400 };
   }
 
-  return { ok: true, publicCode, ownerType, ownerId, relationship, accessRole };
+  return { ok: true, publicCode, ownerType, ownerId, identitySource, relationship, accessRole };
 }
 
 
@@ -1112,19 +1103,14 @@ async function handleGetClinicalTimeline(req, res) {
   if (resolved.relationship !== "primary") {
     return res.status(403).json({ ok: false, error: "Просмотр прошлой клинической истории требует отдельного разрешения пациента" });
   }
-  let ownerType = resolved.ownerType;
-  let ownerId = resolved.ownerId;
-  if (module === "support") {
-    if (!resolved.publicCode) return res.status(403).json({ ok: false, error: "Пациент не определён" });
-    const { data, error } = await getSupabase().from("sessions")
-      .select("anonymous_owner_id").eq("public_code", resolved.publicCode)
-      .eq("module", "support").limit(1).maybeSingle();
-    if (error || !data?.anonymous_owner_id) {
-      return res.status(404).json({ ok: false, error: "История пациента недоступна" });
-    }
-    ownerType = "anonymous_case";
-    ownerId = data.anonymous_owner_id;
-  }
+  const owner = await resolveClinicalPatientOwner({
+    resolved,
+    module,
+    supabase: getSupabase(),
+    pilotId: getPilotId(),
+  });
+  if (!owner.ok) return res.status(owner.status || 403).json({ ok: false, error: owner.error });
+  const { ownerType, ownerId } = owner;
   try {
     const timeline = await loadLongitudinalFromSources({
       supabase: getSupabase(), module, ownerType, ownerId, organizationId,
@@ -1185,17 +1171,25 @@ async function handleGetClientOverview(req, res) {
   }
   if (denyExpandedPatientData(res, resolved)) return;
 
-  const { publicCode, relationship, accessRole } = resolved;
+  const { relationship, accessRole } = resolved;
   const supabase = getSupabase();
+  const owner = await resolveClinicalPatientOwner({ resolved, module, supabase, pilotId: getPilotId() });
+  if (!owner.ok) return res.status(owner.status || 403).json({ ok: false, error: owner.error });
 
   // Resolve display name from assignment (no N+1 — single query)
   let display_name = "Клиент без имени";
-  const { data: assignmentLabel } = await supabase
+  let assignmentLabelQuery = supabase
     .from("patient_assignments")
     .select("patient_label")
-    .eq("public_code", publicCode)
     .eq("module", "support")
-    .eq("status", "active")
+    .eq("status", "active");
+  assignmentLabelQuery = resolved.identitySource === "canonical"
+    ? assignmentLabelQuery.eq("owner_type", owner.ownerType).eq("owner_id", owner.ownerId)
+    : assignmentLabelQuery.eq("public_code", resolved.publicCode);
+  assignmentLabelQuery = orgId === null
+    ? assignmentLabelQuery.is("organization_id", null)
+    : assignmentLabelQuery.eq("organization_id", orgId);
+  const { data: assignmentLabel } = await assignmentLabelQuery
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -1203,17 +1197,8 @@ async function handleGetClientOverview(req, res) {
     display_name = assignmentLabel.patient_label;
   }
 
-  // Find the anonymous_owner_id from the session with this public_code
-  const { data: ownerSession } = await supabase
-    .from("sessions")
-    .select("anonymous_owner_id")
-    .eq("public_code", publicCode)
-    .eq("module", "support")
-    .limit(1)
-    .maybeSingle();
-
   // Query ALL sessions for this owner (supports follow-up sessions with different public_codes)
-  const ownerId = ownerSession?.anonymous_owner_id;
+  const ownerId = owner.ownerId;
   const { data: sessions } = ownerId
     ? await supabase
         .from("sessions")
@@ -1298,22 +1283,10 @@ async function handleGetClientProfessionalAnalysis(req, res) {
   }
   if (denyExpandedPatientData(res, resolved)) return;
 
-  const { publicCode } = resolved;
   const supabase = getSupabase();
-
-  // Find owner from public_code
-  const { data: ownerSession } = await supabase
-    .from("sessions")
-    .select("anonymous_owner_id")
-    .eq("public_code", publicCode)
-    .eq("module", "support")
-    .limit(1)
-    .maybeSingle();
-
-  const ownerId = ownerSession?.anonymous_owner_id;
-  if (!ownerId) {
-    return res.status(200).json({ ok: true, latest_analysis: null, dynamics: { session_count: 0, points: [] }, voice_observations: [] });
-  }
+  const owner = await resolveClinicalPatientOwner({ resolved, module, supabase, pilotId: getPilotId() });
+  if (!owner.ok) return res.status(owner.status || 403).json({ ok: false, error: owner.error });
+  const ownerId = owner.ownerId;
 
   // Query sessions — professional fields only, voice observations via JSON path projection
   // Do NOT fetch full json_data; only extract the voiceObservations subtree.
@@ -2306,26 +2279,26 @@ export function validateSpecialistWorkspaceContext({ memberships, organizationId
 
 // Resolve every request through the current patient grant; pairing booking profiles
 // never grants access to another module's clinical history.
-async function authorizeMedicalRecord(req) {
-  const auth=await authorizeSpecialist(req);
+export async function authorizeMedicalRecord(req, dependencies = {}) {
+  const authorizeSpecialistDependency = dependencies.authorizeSpecialist || authorizeSpecialist;
+  const resolveClientDependency = dependencies.resolveAuthorizedSpecialistClient || resolveAuthorizedSpecialistClient;
+  const getSupabaseDependency = dependencies.getSupabase || getSupabase;
+  const getPilotIdDependency = dependencies.getPilotId || getPilotId;
+  const resolveOwnerDependency = dependencies.resolveClinicalPatientOwner || resolveClinicalPatientOwner;
+  const medicationAuthorizationDependency = dependencies.hasVerifiedMedicationAuthorization || hasVerifiedMedicationAuthorization;
+  const auth=await authorizeSpecialistDependency(req);
   if(auth.error)return {ok:false,status:auth.status||401,error:auth.error};
   const {client_ref:clientRef,module,organization_id:organizationId=null}=req.body||{};
   if(typeof clientRef!=="string"||!/^(assignment|access):[a-f0-9-]{36}$/i.test(clientRef)||!["support","body"].includes(module))return {ok:false,status:400,error:"Некорректная ссылка на пациента."};
   const context=validateSpecialistContext({memberships:auth.memberships,organizationId,module,allowedModules:auth.expert.allowed_modules});
   if(!context.ok)return {ok:false,error:context.error};
-  const resolved=await resolveAuthorizedSpecialistClient({expert:auth.expert,memberships:auth.memberships,clientRef,organizationId,module});
+  const resolved=await resolveClientDependency({expert:auth.expert,memberships:auth.memberships,clientRef,organizationId,module});
   if(!resolved.ok)return resolved;
   if(!canViewExpandedPatientData(resolved))return {ok:false,error:"Нет доступа к медицинской карте."};
-  let {ownerType,ownerId}=resolved;
-  if(module==="support"){
-    if(!resolved.publicCode)return {ok:false,error:"Пациент не определён."};
-    const {data,error}=await getSupabase().from("sessions").select("anonymous_owner_id,json_data")
-      .eq("public_code",resolved.publicCode).eq("module","support").maybeSingle();
-    if(error||!data?.anonymous_owner_id)return {ok:false,error:"Пациент не определён."};
-    if(getPilotId() && data.json_data?.pilot_id!==getPilotId())return {ok:false,error:"Нет доступа к пациенту."};
-    ownerType="anonymous_case";ownerId=data.anonymous_owner_id;
-  }
+  const owner=await resolveOwnerDependency({resolved,module,supabase:getSupabaseDependency(),pilotId:getPilotIdDependency()});
+  if(!owner.ok)return owner;
+  const {ownerType,ownerId}=owner;
   if(!ownerId||ownerType!==(module==="body"?"anonymous_profile":"anonymous_case"))return {ok:false,error:"Пациент не определён."};
   return {ok:true,expertId:auth.expert.id,expertName:auth.expert.name,ownerType,ownerId,module,organizationId,relationship:resolved.relationship,
-    canPrescribe:await hasVerifiedMedicationAuthorization({expertId:auth.expert.id,organizationId})};
+    canPrescribe:await medicationAuthorizationDependency({expertId:auth.expert.id,organizationId})};
 }
