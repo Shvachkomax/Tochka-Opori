@@ -96,7 +96,7 @@ function createDb(initial = {}) {
       .filter((row) => row.encounter_id === args.p_encounter_id)
       .sort((a, b) => b.version - a.version)[0];
     if ((previous?.version || 0) !== args.p_expected_version) {
-      return { data: null, error: { code: "40001" } };
+      return { data: null, error: { code: "PT409" } };
     }
     const row = {
       revision_id: ++revision,
