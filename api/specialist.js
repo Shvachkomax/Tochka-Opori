@@ -13,7 +13,11 @@ import { medicationRpcForClinicalArchive } from "../lib/clinical/medication-arch
 import { getPilotId, isAnMedSupportOnlyDeployment, rejectUnavailableModule } from "../lib/security/module-availability.js";
 import { handlePartnerProgram } from "../lib/partners/program-handler.js";
 import { loadSpecialistMemberships } from "../lib/specialist-memberships.js";
-import { handleMyPracticeWorkspace, isMyPracticeTestServerEnabled } from "../lib/my-practice/workspace-handler.js";
+import {
+  handleMyPracticeWorkspace,
+  isMyPracticeServerEnabled,
+  isMyPracticeTestServerEnabled,
+} from "../lib/my-practice/workspace-handler.js";
 import { buildSpecialistClientList } from "../lib/specialist-client-list.js";
 import { normalizeInvitationStatuses } from "../lib/session/cabinet-presenters.js";
 import { buildSpecialistRequestContext } from "../lib/specialist/request-context.js";
